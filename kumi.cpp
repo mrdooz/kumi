@@ -27,6 +27,8 @@ int main(int argc, char *argv[])
 	while (!GetAsyncKeyState(VK_ESCAPE)) {
 		Sleep(1000);
 	}
+
+
 	FILE_WATCHER.remove_watch(file_changed);
 	FILE_WATCHER.close();
 

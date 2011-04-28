@@ -52,7 +52,7 @@ struct WatcherThread {
 	static map<string, int> _deferred_file_events_ref_count;
 
 	typedef std::pair<FileWatcher::FileChanged, HANDLE /*event*/> DeferredRemove;
-	typedef std::tuple<FileWatcher *, string /*filename*/, FileWatcher::FileChanged> DeferredAdd;
+	typedef std::pair<string /*filename*/, FileWatcher::FileChanged> DeferredAdd;
 
 	static map<string, int> _watched_files;
 	static map<FileWatcher::FileChanged, vector<string> > _files_by_callback;
@@ -155,7 +155,6 @@ UINT WatcherThread::thread_proc(void *userdata)
 {
 	const DWORD cFileInactivity = 500;
 
-	FileWatcher *self = (FileWatcher *)userdata;
 	while (true) {
 		DWORD res = SleepEx(250, TRUE);
 		if (_terminating)
@@ -214,9 +213,8 @@ void WatcherThread::terminate_apc(ULONG_PTR data)
 void WatcherThread::add_watch_apc(ULONG_PTR data)
 {
 	scoped_ptr<DeferredAdd> cur((DeferredAdd *)data);
-	FileWatcher *self = std::get<0>(*cur);
-	const string &fullname = std::get<1>(*cur);
-	const FileWatcher::FileChanged &fn = std::get<2>(*cur);
+	const string &fullname = std::get<0>(*cur);
+	const FileWatcher::FileChanged &fn = std::get<1>(*cur);
 
 	_watched_files[fullname]++;
 	_files_by_callback[fn].push_back(fullname);
@@ -309,7 +307,7 @@ void FileWatcher::add_file_watch(const char *filename, const FileChanged &fn)
 	if (!lazy_create_worker_thread())
 		return;
 
-	QueueUserAPC(&WatcherThread::add_watch_apc, _thread, (ULONG_PTR)new WatcherThread::DeferredAdd(std::make_tuple(this, filename, fn)));
+	QueueUserAPC(&WatcherThread::add_watch_apc, _thread, (ULONG_PTR)new WatcherThread::DeferredAdd(std::make_pair(filename, fn)));
 }
 
 void FileWatcher::remove_watch(const FileChanged &fn)

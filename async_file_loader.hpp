@@ -9,12 +9,10 @@ public:
 
 	static AsyncFileLoader &instance();
 	bool load_file(const char *filename, const CbFileLoaded &cb);
+	void close();
 
 private:
 
-	static void CALLBACK load_file_apc(ULONG_PTR data);
-	static void CALLBACK terminate_apc(ULONG_PTR data);
-	static void CALLBACK on_completion(DWORD error_Code, DWORD bytes_transfered, OVERLAPPED *overlapped);
 
 	struct LoadData {
 		HANDLE h;
@@ -22,10 +20,8 @@ private:
 		OVERLAPPED overlapped;
 	};
 
-	static UINT __stdcall threadProc(void *userdata);
 	bool lazy_create_thread();
 
-	bool _terminating;
 	HANDLE _thread;
 	static AsyncFileLoader *_instance;
 };
