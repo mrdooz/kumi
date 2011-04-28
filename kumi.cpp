@@ -2,7 +2,7 @@
 #include "file_watcher.hpp"
 #include "resource_watcher.hpp"
 
-void file_changed(FileWatcher::FileEvent event, const char *old_name, const char *new_name)
+void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
 }
 

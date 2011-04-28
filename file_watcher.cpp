@@ -3,13 +3,32 @@
 
 #pragma comment(lib, "winmm.lib")
 
-#define ALIGNED_MALLOC(type) (type *)_aligned_malloc(sizeof(type), MEMORY_ALLOCATION_ALIGNMENT);
+struct DirWatch;
+
+struct DeferredFileEvent {
+	DeferredFileEvent(DirWatch *watch, FileEvent event, uint32_t time, const string &filename, const string &new_name = "") : watch(watch), event(event), time(time), filename(filename), new_name(new_name) {}
+	DirWatch *watch;
+	FileEvent event;
+	uint32_t time;
+	string filename;
+	string new_name;
+};
+
+struct DirWatch {
+	DirWatch(const string &path, HANDLE handle) : _path(path), _handle(handle) { ZeroMemory(&_overlapped, sizeof(_overlapped)); _overlapped.hEvent = this;}
+	void on_completion();
+	bool start_watch();
+	string _path;
+	HANDLE _handle;
+	uint8_t _buf[4096];
+	OVERLAPPED _overlapped;
+	typedef map<string, vector<FileWatcher::FileChanged> > FileWatches;
+	FileWatches _file_watches;
+};
+
 
 using std::pair;
 using boost::scoped_ptr;
-
-static FileWatcher *g_file_watcher = NULL;
-static CriticalSection g_file_watcher_cs;
 
 FileWatcher *FileWatcher::_instance = nullptr;
 
@@ -20,28 +39,48 @@ FileWatcher &FileWatcher::instance()
 	return *_instance;
 }
 
-bool FileWatcher::is_watching_file(const char *filename) const
+struct WatcherThread {
+
+	static UINT CALLBACK thread_proc(void *userdata);
+	static bool is_watching_file(const char *filename);
+
+	static void CALLBACK add_watch_apc(ULONG_PTR data);
+	static void CALLBACK remove_watch_apc(ULONG_PTR data);
+	static void CALLBACK terminate_apc(ULONG_PTR data);
+	static void CALLBACK on_completion(DWORD error_Code, DWORD bytes_transfered, OVERLAPPED *overlapped);
+
+	static map<string, int> _deferred_file_events_ref_count;
+
+	typedef std::pair<FileWatcher::FileChanged, HANDLE /*event*/> DeferredRemove;
+	typedef std::tuple<FileWatcher *, string /*filename*/, FileWatcher::FileChanged> DeferredAdd;
+
+	static map<string, int> _watched_files;
+	static map<FileWatcher::FileChanged, vector<string> > _files_by_callback;
+
+	typedef map<string, DirWatch *> DirWatches;
+	static DirWatches _dir_watches;
+
+	static deque<DeferredFileEvent> _events;
+
+	static bool _terminating;
+};
+
+map<string, int> WatcherThread::_deferred_file_events_ref_count;
+map<string, int> WatcherThread::_watched_files;
+map<FileWatcher::FileChanged, vector<string> > WatcherThread::_files_by_callback;
+WatcherThread::DirWatches WatcherThread::_dir_watches;
+deque<DeferredFileEvent> WatcherThread::_events;
+bool WatcherThread::_terminating = false;
+
+bool WatcherThread::is_watching_file(const char *filename)
 {
 	auto it = _watched_files.find(filename);
 	return it != _watched_files.end() && it->second > 0;
 }
 
-void FileWatcher::add_event(DirWatch *watch, FileEvent event, uint32_t time, const string &filename, const string &new_name)
-{
-	DeferredFileEvent *def = ALIGNED_MALLOC(DeferredFileEvent);
-	ZeroMemory(def, sizeof(DeferredFileEvent));
-	*def = DeferredFileEvent(watch, event, time, filename, new_name);
-	InterlockedPushEntrySList(g_file_watcher->_list_head, &def->entry);
-}
-
-void FileWatcher::DirWatch::on_completion()
+void DirWatch::on_completion()
 {
 	byte *base = _buf;
-	{
-		SCOPED_CS(g_file_watcher_cs);
-		if (!g_file_watcher)
-			return;
-	}
 
 	// to avoid multiple callbacks when doing operations that generate multiple file events (like
 	// copying large files), we ref count the file events
@@ -55,39 +94,39 @@ void FileWatcher::DirWatch::on_completion()
 			switch (info->Action) {
 			case FILE_ACTION_ADDED:
 				{
-					if (g_file_watcher->is_watching_file(fullname.c_str())) {
-						add_event(this, kFileEventCreate, now, filename);
-						_deferred_file_events_ref_count[filename]++;
+					if (WatcherThread::is_watching_file(fullname.c_str())) {
+						WatcherThread::_events.push_back(DeferredFileEvent(this, kFileEventCreate, now, filename));
+						WatcherThread::_deferred_file_events_ref_count[filename]++;
 					}
 				}
 				break;
 			case FILE_ACTION_MODIFIED:
 				{
-					if (g_file_watcher->is_watching_file(fullname.c_str())) {
-						add_event(this, kFileEventModify, now, filename);
-						_deferred_file_events_ref_count[filename]++;
+					if (WatcherThread::is_watching_file(fullname.c_str())) {
+						WatcherThread::_events.push_back(DeferredFileEvent(this, kFileEventModify, now, filename));
+						WatcherThread::_deferred_file_events_ref_count[filename]++;
 					}
 				}
 				break;
 			case FILE_ACTION_REMOVED:
 				{
-					if (g_file_watcher->is_watching_file(fullname.c_str())) {
-						add_event(this, kFileEventDelete, now, filename);
-						_deferred_file_events_ref_count[filename]++;
+					if (WatcherThread::is_watching_file(fullname.c_str())) {
+						WatcherThread::_events.push_back(DeferredFileEvent(this, kFileEventDelete, now, filename));
+						WatcherThread::_deferred_file_events_ref_count[filename]++;
 					}
 				}
 				break;
 			case FILE_ACTION_RENAMED_OLD_NAME:
 				{
-					if (g_file_watcher->is_watching_file(fullname.c_str())) {
+					if (WatcherThread::is_watching_file(fullname.c_str())) {
 						old_name = filename;
 					}
 				}
 				break;
 			case FILE_ACTION_RENAMED_NEW_NAME:
 				if (!old_name.empty()) {
-					add_event(this, kFileEventRename, now, old_name, filename);
-					_deferred_file_events_ref_count[old_name]++;
+					WatcherThread::_events.push_back(DeferredFileEvent(this, kFileEventRename, now, old_name, filename));
+					WatcherThread::_deferred_file_events_ref_count[old_name]++;
 					old_name.clear();
 				}
 				break;
@@ -100,62 +139,54 @@ void FileWatcher::DirWatch::on_completion()
 	}
 }
 
-bool FileWatcher::DirWatch::start_watch()
+bool DirWatch::start_watch()
 {
 	return !!ReadDirectoryChangesW(_handle, _buf, sizeof(_buf), FALSE, FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_FILE_NAME, 
-		NULL, &_overlapped, FileWatcher::on_completion);
+		NULL, &_overlapped, WatcherThread::on_completion);
 }
 
 FileWatcher::FileWatcher() 
 	: _thread(INVALID_HANDLE_VALUE) 
-	, _terminating(false)
 {
-	SCOPED_CS(g_file_watcher_cs);
-	g_file_watcher = this;
-
-	_list_head = ALIGNED_MALLOC(SLIST_HEADER);
-	InitializeSListHead(_list_head);
 }
 
-UINT FileWatcher::threadProc(void *userdata)
+
+UINT WatcherThread::thread_proc(void *userdata)
 {
 	const DWORD cFileInactivity = 500;
 
 	FileWatcher *self = (FileWatcher *)userdata;
 	while (true) {
 		DWORD res = SleepEx(250, TRUE);
-		if (self->_terminating)
+		if (_terminating)
 			break;
 
 		const DWORD now = timeGetTime();
 
 		// process any deferred file events
-		while (QueryDepthSList(self->_list_head)) {
-			SLIST_ENTRY *p = InterlockedPopEntrySList(self->_list_head);
-			DeferredFileEvent *cur = (DeferredFileEvent *)p;
+		while (!_events.empty()) {
+			const DeferredFileEvent &cur = _events.front();
 
-			if (now - cur->time < cFileInactivity) {
-				InterlockedPushEntrySList(self->_list_head, p);
+			if (now - cur.time < cFileInactivity) {
 				break;
 			}
 
-			DirWatch *watch = cur->watch;
-			if (--watch->_deferred_file_events_ref_count[cur->filename] == 0) {
-				auto it_file = watch->_file_watches.find(cur->filename);
+			DirWatch *watch = cur.watch;
+			if (--_deferred_file_events_ref_count[cur.filename] == 0) {
+				auto it_file = watch->_file_watches.find(cur.filename);
 				if (it_file != watch->_file_watches.end()) {
 					// invoke all the callbacks on the current file
 					for (auto it_callback = it_file->second.begin(); it_callback != it_file->second.end(); ++it_callback)
-						(*it_callback)(cur->event, cur->filename.c_str(), cur->new_name.c_str());
+						(*it_callback)(cur.event, cur.filename.c_str(), cur.new_name.c_str());
 				}
 			}
-
-			_aligned_free(p);
+			_events.pop_front();
 		}
 	}
 	return 0;
 }
 
-void FileWatcher::on_completion(DWORD error_code, DWORD bytes_transfered, OVERLAPPED *overlapped)
+void WatcherThread::on_completion(DWORD error_code, DWORD bytes_transfered, OVERLAPPED *overlapped)
 {
 	DirWatch *d = (DirWatch *)(overlapped->hEvent);
 	if (error_code == ERROR_OPERATION_ABORTED) {
@@ -170,30 +201,25 @@ void FileWatcher::on_completion(DWORD error_code, DWORD bytes_transfered, OVERLA
 	d->start_watch();
 }
 
-void FileWatcher::terminate_apc(ULONG_PTR data)
+void WatcherThread::terminate_apc(ULONG_PTR data)
 {
-	FileWatcher *self = (FileWatcher *)(data);
-	self->_terminating = true;
-	{
-		SCOPED_CS(g_file_watcher_cs);
-		g_file_watcher = NULL;
-	}
-	for (auto i = self->_dir_watches.begin(); i != self->_dir_watches.end(); ++i) {
+	_terminating = true;
+	for (auto i = _dir_watches.begin(); i != _dir_watches.end(); ++i) {
 		DirWatch *watch = i->second;
 		CancelIo(watch->_handle);
 	}
-	self->_dir_watches.clear();
+	_dir_watches.clear();
 }
 
-void FileWatcher::add_watch_apc(ULONG_PTR data)
+void WatcherThread::add_watch_apc(ULONG_PTR data)
 {
 	scoped_ptr<DeferredAdd> cur((DeferredAdd *)data);
 	FileWatcher *self = std::get<0>(*cur);
 	const string &fullname = std::get<1>(*cur);
-	const FileChanged &fn = std::get<2>(*cur);
+	const FileWatcher::FileChanged &fn = std::get<2>(*cur);
 
-	self->_watched_files[fullname]++;
-	self->_files_by_callback[fn].push_back(fullname);
+	_watched_files[fullname]++;
+	_files_by_callback[fn].push_back(fullname);
 
 	char drive[_MAX_DRIVE];
 	char dir[_MAX_DIR];
@@ -204,7 +230,7 @@ void FileWatcher::add_watch_apc(ULONG_PTR data)
 	string filename(string(fname) + ext);
 
 	// Check if we need to create a new watch
-	DirWatches &dir_watches = self->_dir_watches;
+	DirWatches &dir_watches = _dir_watches;
 	if (dir_watches.find(path) == dir_watches.end()) {
 
 		HANDLE h = CreateFile(
@@ -233,30 +259,31 @@ void FileWatcher::add_watch_apc(ULONG_PTR data)
 	dir_watches[path]->_file_watches[filename].push_back(fn);
 }
 
-void FileWatcher::remove_watch_apc(ULONG_PTR data)
+void WatcherThread::remove_watch_apc(ULONG_PTR data)
 {
 	scoped_ptr<DeferredRemove> p((DeferredRemove *)data);
-	FileWatcher *self = p->first;
-	FileChanged fn = p->second;
+	FileWatcher::FileChanged fn = p->first;
+	HANDLE event = p->second;
 
 	// dec the ref count on all the files watches by this callback
-	auto it = self->_files_by_callback.find(fn);
-	if (it != self->_files_by_callback.end()) {
+	auto it = _files_by_callback.find(fn);
+	if (it != _files_by_callback.end()) {
 		for (auto j = it->second.begin(); j != it->second.end(); ++j) {
-			auto tmp = self->_watched_files.find(*j);
+			auto tmp = _watched_files.find(*j);
 			if (--tmp->second == 0)
-				self->_watched_files.erase(tmp);
+				_watched_files.erase(tmp);
 		}
-		self->_files_by_callback.erase(it);
+		_files_by_callback.erase(it);
 	} else {
+		SetEvent(event);
 		return;
 	}
 
-	for (auto it_dir = self->_dir_watches.begin(); it_dir != self->_dir_watches.end(); ++it_dir) {
+	for (auto it_dir = _dir_watches.begin(); it_dir != _dir_watches.end(); ++it_dir) {
 		DirWatch *d = it_dir->second;
 		for (auto it_file = d->_file_watches.begin(); it_file != d->_file_watches.end(); ++it_file) {
 			for (auto it_callback = it_file->second.begin(); it_callback != it_file->second.end(); ) {
-				if (*it_callback == p->second) {
+				if (*it_callback == fn) {
 					it_callback = it_file->second.erase(it_callback);
 				} else {
 					++it_callback;
@@ -264,13 +291,14 @@ void FileWatcher::remove_watch_apc(ULONG_PTR data)
 			}
 		}
 	}
+	SetEvent(event);
 }
 
 bool FileWatcher::lazy_create_worker_thread()
 {
 	if (_thread != INVALID_HANDLE_VALUE)
 		return true;
-	_thread = (HANDLE)_beginthreadex(NULL, 0, &FileWatcher::threadProc, this, 0, NULL);
+	_thread = (HANDLE)_beginthreadex(NULL, 0, &WatcherThread::thread_proc, this, 0, NULL);
 	return _thread != INVALID_HANDLE_VALUE;
 }
 
@@ -281,7 +309,7 @@ void FileWatcher::add_file_watch(const char *filename, const FileChanged &fn)
 	if (!lazy_create_worker_thread())
 		return;
 
-	QueueUserAPC(&FileWatcher::add_watch_apc, _thread, (ULONG_PTR)new DeferredAdd(std::make_tuple(this, filename, fn)));
+	QueueUserAPC(&WatcherThread::add_watch_apc, _thread, (ULONG_PTR)new WatcherThread::DeferredAdd(std::make_tuple(this, filename, fn)));
 }
 
 void FileWatcher::remove_watch(const FileChanged &fn)
@@ -289,7 +317,9 @@ void FileWatcher::remove_watch(const FileChanged &fn)
 	if (_thread == INVALID_HANDLE_VALUE)
 		return;
 
-	QueueUserAPC(&FileWatcher::remove_watch_apc, _thread, (ULONG_PTR)new auto(std::make_pair(this, fn)));
+	HANDLE h = CreateEvent(NULL, FALSE, FALSE, NULL);
+	QueueUserAPC(&WatcherThread::remove_watch_apc, _thread, (ULONG_PTR)new WatcherThread::DeferredRemove(std::make_pair(fn, h)));
+	WaitForSingleObject(h, INFINITE);
 }
 
 void FileWatcher::close()
@@ -297,7 +327,7 @@ void FileWatcher::close()
 	if (_thread == INVALID_HANDLE_VALUE)
 		return;
 
-	QueueUserAPC(&FileWatcher::terminate_apc, _thread, (ULONG_PTR)this);
+	QueueUserAPC(&WatcherThread::terminate_apc, _thread, (ULONG_PTR)this);
 	WaitForSingleObject(_thread, INFINITE);
 	_thread = INVALID_HANDLE_VALUE;
 }
