@@ -17,11 +17,13 @@
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/variant/recursive_variant.hpp>
 #include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include <vector>
 #include <string>
 #include <map>
 #include <deque>
+#include <tuple>
 
 #include "fast_delegate.hpp"
 using namespace fastdelegate;

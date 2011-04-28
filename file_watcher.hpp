@@ -6,6 +6,7 @@ using std::string;
 using std::map;
 using std::vector;
 using std::deque;
+using std::tuple;
 
 
 class FileWatcher {
@@ -69,8 +70,9 @@ private:
 
 	map<string, int> _deferred_file_events_ref_count;
 
-	typedef deque< std::pair<string, FileChanged> > DeferredAdds;
-	DeferredAdds _deferred_adds;
+
+	typedef std::pair<FileWatcher *, FileChanged> DeferredRemove;
+	typedef std::tuple<FileWatcher *, string /*filename*/, FileChanged> DeferredAdd;
 	map<string, int> _watched_files;
 
 	map<FileChanged, vector<string> > _files_by_callback;

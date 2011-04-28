@@ -6,6 +6,7 @@
 #define ALIGNED_MALLOC(type) (type *)_aligned_malloc(sizeof(type), MEMORY_ALLOCATION_ALIGNMENT);
 
 using std::pair;
+using boost::scoped_ptr;
 
 static FileWatcher *g_file_watcher = NULL;
 static CriticalSection g_file_watcher_cs;
@@ -186,59 +187,70 @@ void FileWatcher::terminate_apc(ULONG_PTR data)
 
 void FileWatcher::add_watch_apc(ULONG_PTR data)
 {
-	FileWatcher *self = (FileWatcher *)(data);
-	SCOPED_CS(g_file_watcher_cs);
+	scoped_ptr<DeferredAdd> cur((DeferredAdd *)data);
+	FileWatcher *self = std::get<0>(*cur);
+	const string &fullname = std::get<1>(*cur);
+	const FileChanged &fn = std::get<2>(*cur);
 
-	// process the deferred add list
-	DeferredAdds &adds = self->_deferred_adds;
-	while (!adds.empty()) {
+	self->_watched_files[fullname]++;
+	self->_files_by_callback[fn].push_back(fullname);
 
-		pair<string, FileChanged> cur = adds.front();
-		adds.pop_front();
+	char drive[_MAX_DRIVE];
+	char dir[_MAX_DIR];
+	char fname[_MAX_FNAME];
+	char ext[_MAX_EXT];
+	_splitpath(fullname.c_str(), drive, dir, fname, ext);
+	string path(string(drive) + dir);
+	string filename(string(fname) + ext);
 
-		char drive[_MAX_DRIVE];
-		char dir[_MAX_DIR];
-		char fname[_MAX_FNAME];
-		char ext[_MAX_EXT];
-		_splitpath(cur.first.c_str(), drive, dir, fname, ext);
-		string path(string(drive) + dir);
-		string filename(string(fname) + ext);
+	// Check if we need to create a new watch
+	DirWatches &dir_watches = self->_dir_watches;
+	if (dir_watches.find(path) == dir_watches.end()) {
 
-		// Check if we need to create a new watch
-		DirWatches &dir_watches = self->_dir_watches;
-		if (dir_watches.find(path) == dir_watches.end()) {
+		HANDLE h = CreateFile(
+			path.c_str(),
+			FILE_LIST_DIRECTORY,
+			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+			NULL,
+			OPEN_EXISTING,
+			FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
+			NULL);
 
-			HANDLE h = CreateFile(
-				path.c_str(),
-				FILE_LIST_DIRECTORY,
-				FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-				NULL,
-				OPEN_EXISTING,
-				FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED,
-				NULL);
+		if (h == INVALID_HANDLE_VALUE)
+			return;
 
-			if (h == INVALID_HANDLE_VALUE)
-				return;
+		DirWatch *w = new DirWatch(path, h);
 
-			DirWatch *w = new DirWatch(path, h);
-
-			// add a new file watch
-			if (!w->start_watch()) {
-				delete w;
-				return;
-			}
-
-			dir_watches[path] = w;
+		// add a new file watch
+		if (!w->start_watch()) {
+			delete w;
+			return;
 		}
 
-		dir_watches[path]->_file_watches[filename].push_back(cur.second);
+		dir_watches[path] = w;
 	}
+
+	dir_watches[path]->_file_watches[filename].push_back(fn);
 }
 
 void FileWatcher::remove_watch_apc(ULONG_PTR data)
 {
-	pair<FileWatcher *, FileChanged > *p = (pair<FileWatcher *, FileChanged > *)data;
+	scoped_ptr<DeferredRemove> p((DeferredRemove *)data);
 	FileWatcher *self = p->first;
+	FileChanged fn = p->second;
+
+	// dec the ref count on all the files watches by this callback
+	auto it = self->_files_by_callback.find(fn);
+	if (it != self->_files_by_callback.end()) {
+		for (auto j = it->second.begin(); j != it->second.end(); ++j) {
+			auto tmp = self->_watched_files.find(*j);
+			if (--tmp->second == 0)
+				self->_watched_files.erase(tmp);
+		}
+		self->_files_by_callback.erase(it);
+	} else {
+		return;
+	}
 
 	for (auto it_dir = self->_dir_watches.begin(); it_dir != self->_dir_watches.end(); ++it_dir) {
 		DirWatch *d = it_dir->second;
@@ -252,8 +264,6 @@ void FileWatcher::remove_watch_apc(ULONG_PTR data)
 			}
 		}
 	}
-
-	delete p;
 }
 
 bool FileWatcher::lazy_create_worker_thread()
@@ -271,30 +281,15 @@ void FileWatcher::add_file_watch(const char *filename, const FileChanged &fn)
 	if (!lazy_create_worker_thread())
 		return;
 
-
-	SCOPED_CS(g_file_watcher_cs);
-	_deferred_adds.push_back(std::make_pair(filename, fn));
-	_watched_files[filename]++;
-	_files_by_callback[fn].push_back(filename);
-	QueueUserAPC(&FileWatcher::add_watch_apc, _thread, (ULONG_PTR)this);
+	QueueUserAPC(&FileWatcher::add_watch_apc, _thread, (ULONG_PTR)new DeferredAdd(std::make_tuple(this, filename, fn)));
 }
 
 void FileWatcher::remove_watch(const FileChanged &fn)
 {
-	SCOPED_CS(g_file_watcher_cs);
-
-	// dec the ref count on all the files watches by this callback
-	auto it = _files_by_callback.find(fn);
-	if (it == _files_by_callback.end())
+	if (_thread == INVALID_HANDLE_VALUE)
 		return;
 
-	for (auto j = it->second.begin(); j != it->second.end(); ++j)
-		_watched_files[*j]--;
-
-	auto p = new pair<FileWatcher *, FileChanged>;
-	p->first = this;
-	p->second = fn;
-	QueueUserAPC(&FileWatcher::remove_watch_apc, _thread, (ULONG_PTR)p);
+	QueueUserAPC(&FileWatcher::remove_watch_apc, _thread, (ULONG_PTR)new auto(std::make_pair(this, fn)));
 }
 
 void FileWatcher::close()
