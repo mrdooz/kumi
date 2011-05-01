@@ -1,15 +1,24 @@
 #include "stdafx.h"
 #include "file_watcher.hpp"
 #include "resource_watcher.hpp"
+#include "async_file_loader.hpp"
 
 void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
 }
 
+void file_loaded(const char *filename, const void *buf, size_t len)
+{
+	string str((const char *)buf, len);
+
+}
 
 int main(int argc, char *argv[])
 {
+
 	const char *filename = "c:\\temp\\state1.txt";
+	ASYNC_FILE_LOADER.load_file(filename, file_loaded);
+
 
 	HANDLE h = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	size_t size = GetFileSize(h, NULL);

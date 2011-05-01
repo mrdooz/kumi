@@ -1,24 +1,18 @@
 #pragma once
 
+typedef FastDelegate3<const char * /*filename*/, const void * /*buf*/, size_t /*len*/> CbFileLoaded;
+
 class AsyncFileLoader
 {
 public:
-	typedef FastDelegate3<const char * /*filename*/, const uint8_t * /*buf*/, size_t /*len*/> CbFileLoaded;
-
 	AsyncFileLoader();
 
 	static AsyncFileLoader &instance();
 	bool load_file(const char *filename, const CbFileLoaded &cb);
+	void remove_callback(const CbFileLoaded &cb);
 	void close();
 
 private:
-
-
-	struct LoadData {
-		HANDLE h;
-		CbFileLoaded cb;
-		OVERLAPPED overlapped;
-	};
 
 	bool lazy_create_thread();
 

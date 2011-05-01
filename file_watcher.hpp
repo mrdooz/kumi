@@ -1,14 +1,5 @@
 #pragma once
 
-#include "utils.hpp"
-
-using std::string;
-using std::map;
-using std::vector;
-using std::deque;
-using std::tuple;
-
-
 enum FileEvent {
 	kFileEventUnknown,
 	kFileEventCreate,
@@ -17,21 +8,19 @@ enum FileEvent {
 	kFileEventRename,
 };
 
+typedef FastDelegate3<FileEvent /*event*/, const char * /*old_name*/, const char * /*new_name*/> CbFileChanged;
+
 class FileWatcher {
 public:
-
-	typedef FastDelegate3<FileEvent /*event*/, const char * /*old_name*/, const char * /*new_name*/> FileChanged;
-
 	static FileWatcher &instance();
-	void add_file_watch(const char *filename, const FileChanged &fn);
-	void remove_watch(const FileChanged &fn);
+	void add_file_watch(const char *filename, const CbFileChanged &fn);
+	void remove_watch(const CbFileChanged &fn);
 	void close();
 private:
 	FileWatcher();
-	static FileWatcher *_instance;
-
 	bool lazy_create_worker_thread();
 
+	static FileWatcher *_instance;
 	HANDLE _thread;
 };
 
