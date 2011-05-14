@@ -6,6 +6,7 @@ using std::string;
 using std::tuple;
 using std::make_tuple;
 using std::get;
+using std::tie;
 using boost::scoped_ptr;
 
 struct LoadData {
@@ -14,13 +15,17 @@ struct LoadData {
 	OVERLAPPED overlapped;
 };
 
-typedef pair<string, CbFileLoaded> DeferredLoad;
 typedef tuple<OVERLAPPED, HANDLE, CbFileLoaded, void *, size_t, string> InProgressLoad;
+
+typedef tuple<string, CbFileLoaded> LoadFileData;
+typedef tuple<HANDLE, string> CancelLoadData;
+typedef tuple<HANDLE, CbFileLoaded> RemoveCallbackData;
 
 struct LoaderThread {
 
 	static void CALLBACK load_file_apc(ULONG_PTR data);
 	static void CALLBACK cancel_load_apc(ULONG_PTR data);
+	static void CALLBACK remove_callback_apc(ULONG_PTR data);
 	static void CALLBACK terminate_apc(ULONG_PTR data);
 	static void CALLBACK on_completion(DWORD error_code, DWORD bytes_transfered, OVERLAPPED *overlapped);
 
@@ -43,9 +48,9 @@ UINT LoaderThread::thread_proc(void *userdata)
 
 void LoaderThread::load_file_apc(ULONG_PTR data)
 {
-	scoped_ptr<DeferredLoad> load_data((DeferredLoad *)data);
-	const string &filename = load_data->first;
-	const CbFileLoaded &cb = load_data->second;
+	scoped_ptr<LoadFileData> load_data((LoadFileData *)data);
+	const string &filename = get<0>(*load_data);
+	const CbFileLoaded &cb = get<1>(*load_data);
 	HANDLE h = CreateFile(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (h == INVALID_HANDLE_VALUE)
 		return;
@@ -62,7 +67,18 @@ void LoaderThread::load_file_apc(ULONG_PTR data)
 
 void LoaderThread::cancel_load_apc(ULONG_PTR data)
 {
+	scoped_ptr<CancelLoadData> c((CancelLoadData *)data);
+/*
+	HANDLE h = get<0>(*c);
+	const string &filename = get<1>(*c);
+	
+	SetEvent(h);
+*/
+}
 
+void LoaderThread::remove_callback_apc(ULONG_PTR data)
+{
+	scoped_ptr<RemoveCallbackData> c((RemoveCallbackData *)data);
 }
 
 void LoaderThread::terminate_apc(ULONG_PTR data)
@@ -110,10 +126,15 @@ bool AsyncFileLoader::load_file(const char *filename, const CbFileLoaded &cb)
 	if (!lazy_create_thread())
 		return false;
 
-	return !!QueueUserAPC(&LoaderThread::load_file_apc, _thread, (ULONG_PTR)new DeferredLoad(filename, cb));
+	return !!QueueUserAPC(&LoaderThread::load_file_apc, _thread, (ULONG_PTR)new LoadFileData(filename, cb));
 }
 
-void AsyncFileLoader::remove_callback(const char *filename, const CbFileLoaded &cb)
+void AsyncFileLoader::remove_callback(const CbFileLoaded &cb)
+{
+
+}
+
+void AsyncFileLoader::cancel_load(const char *filename)
 {
 
 }

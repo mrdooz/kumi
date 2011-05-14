@@ -1,10 +1,12 @@
 #include "stdafx.h"
 #include "resource_watcher.hpp"
+#include "file_watcher.hpp"
 #include "utils.hpp"
 
 using std::vector;
 
 namespace {
+
 	struct RawSection {
 		RawSection(const string &name, const char *start, size_t len) : name(name), start(start), len(len) {}
 		string name;
@@ -72,14 +74,65 @@ namespace {
 	}
 }
 
-void extract_sections(const char *buf, size_t len, vector<Section> *sections)
+void extract_sections(const char *buf, size_t len, Sections *sections)
 {
 	vector<RawSection> raw_sections;
 	parse_sections(buf, len, &raw_sections);
 	for (size_t i = 0; i < raw_sections.size(); ++i) {
 		const RawSection &raw = raw_sections[i];
-		sections->push_back(Section(raw.name, string(raw.start, raw.len)));
-
+		sections->insert(make_pair(raw.name, Section(raw.name, string(raw.start, raw.len))));
 	}
 }
 
+ResourceWatcher *ResourceWatcher::_instance = nullptr;
+
+ResourceWatcher::ResourceWatcher()
+{
+}
+
+ResourceWatcher &ResourceWatcher::instance()
+{
+	if (!_instance)
+		_instance = new ResourceWatcher;
+	return *_instance;
+}
+
+void ResourceWatcher::file_changed(FileEvent event, const char *old_new, const char *new_name)
+{
+
+}
+
+bool ResourceWatcher::add_file_watch(const char *filename, bool initial_load, const FileChanged &fn)
+{
+	if (initial_load) {
+		void *buf;
+		size_t len;
+		if (load_file(filename, &buf, &len))
+			fn(filename, buf, len);
+	}
+
+	FILE_WATCHER.add_file_watch(filename, MakeDelegate(this, &ResourceWatcher::file_changed));
+
+	return true;
+}
+
+bool ResourceWatcher::add_section_watch(const char *filename, const char *section, bool initial_load, const SectionChanged &fn)
+{
+	// handle the initial load first to avoid race issues and other potential strangeness
+	if (initial_load) {
+		void *buf;
+		size_t len;
+		if (!load_file(filename, &buf, &len))
+			return false;
+
+		Sections sections;
+		extract_sections((const char *)buf, len, &sections);
+
+		// find the requested section
+		Sections::iterator it = sections.find(section);
+		if (it != sections.end())
+			fn(filename, section, it->second.data.c_str(), it->second.data.size());
+	}
+
+	return true;
+}

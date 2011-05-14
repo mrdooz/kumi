@@ -1,11 +1,16 @@
 #pragma once
 
 #include <windows.h>
-#include <d3d11.h>
+#include <atlbase.h>
 #include <process.h>
 
 #include <stdio.h>
 #include <tchar.h>
+#include <stdint.h>
+
+#include <direct.h>
+#include <io.h>
+#include <sys/stat.h>
 
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
@@ -25,5 +30,18 @@
 #include <deque>
 #include <tuple>
 
+#include <concurrent_queue.h>
+
+// these files don't change that much, so we can include them here
 #include "fast_delegate.hpp"
+#include "utils.hpp"
+#include "string_utils.hpp"
+#include "file_utils.hpp"
+#include "path_utils.hpp"
+#include "stb_truetype.h"
 using namespace fastdelegate;
+
+#include <d3d11.h>
+#include <DxErr.h>
+#include <xnamath.h>
+

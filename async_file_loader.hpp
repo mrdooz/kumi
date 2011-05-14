@@ -9,6 +9,7 @@ public:
 
 	static AsyncFileLoader &instance();
 	bool load_file(const char *filename, const CbFileLoaded &cb);
+	void cancel_load(const char *filename);
 	void remove_callback(const CbFileLoaded &cb);
 	void close();
 
