@@ -50,6 +50,14 @@ T either_or(const T &a, const T &b)
 	return a ? a : b;
 }
 
+template <class T>
+T exch_null(T &t)
+{
+	T tmp = t;
+	t = nullptr;
+	return tmp;
+}
+
 #define SAFE_RELEASE(x) if( (x) != 0 ) { (x)->Release(); (x) = 0; }
 #define SAFE_FREE(x) if( (x) != 0 ) { free((void*)(x)); (x) = 0; }
 #define SAFE_DELETE(x) if( (x) != 0 ) { delete (x); (x) = 0; }

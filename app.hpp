@@ -14,6 +14,7 @@ struct CTwBar;
 typedef struct CTwBar TwBar;
 class EffectBase;
 class FontWriter;
+class EffectWrapper;
 
 struct MouseInfo
 {
@@ -184,6 +185,7 @@ private:
   bool _draw_plane;
 	string _app_root;
 	DynamicVb<Pos2Tex> _font_vb;
+	EffectWrapper *_debug_fx;
 };
 
 #define APP App::instance()

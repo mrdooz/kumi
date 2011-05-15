@@ -42,6 +42,9 @@ HRESULT hr_meh()
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
+
+	XMMATRIX m = XMMatrixLookAtLH(XMLoadFloat3(&XMFLOAT3(0,0,0)), XMLoadFloat3(&XMFLOAT3(0,0,1)), XMLoadFloat3(&XMFLOAT3(0,1,0)));
+
 	if (!APP.init(instance))
 		return 1;
 

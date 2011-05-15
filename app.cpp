@@ -3,6 +3,7 @@
 #include "graphics.hpp"
 #include "logger.hpp"
 #include "resource_watcher.hpp"
+#include "effect_wrapper.hpp"
 
 /*
 #include "system.hpp"
@@ -47,12 +48,14 @@ App::App()
 	, _freefly(nullptr)
 	, _cur_camera(1)
 	, _draw_plane(false)
+	, _debug_fx(nullptr)
 {
 	find_app_root();
 }
 
 App::~App()
 {
+	delete exch_null(_debug_fx);
 }
 
 App& App::instance()
@@ -89,8 +92,17 @@ void App::debug_text(const char *fmt, ...)
 	
 }
 
+const char *debug_font = "effects/debug_font.fx";
+
 void App::resource_changed(const char *filename, const void *buf, size_t len)
 {
+	if (!strcmp(filename, debug_font)) {
+		EffectWrapper *tmp = new EffectWrapper;
+		if (tmp->load_shaders((const char *)buf, len, "vsMain", NULL, "psMain")) {
+			delete exch_null(_debug_fx);
+			_debug_fx = tmp;
+		}
+	}
 
 }
 
@@ -119,7 +131,7 @@ bool App::init(HINSTANCE hinstance)
 	GRAPHICS.context()->Unmap(texture.texture, 0);
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
-	RESOURCE_WATCHER.add_file_watch("effects/debug_font.fx", true, MakeDelegate(this, &App::resource_changed));
+	RESOURCE_WATCHER.add_file_watch(debug_font, true, MakeDelegate(this, &App::resource_changed));
 
 	debug_text("tjong");
 
