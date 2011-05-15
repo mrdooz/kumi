@@ -29,8 +29,15 @@
 #include <map>
 #include <deque>
 #include <tuple>
+#include <hash_map>
 
 #include <concurrent_queue.h>
+
+#include <d3d11.h>
+#include <D3D11Shader.h>
+#include <D3Dcompiler.h>
+#include <DxErr.h>
+#include <xnamath.h>
 
 // these files don't change that much, so we can include them here
 #include "fast_delegate.hpp"
@@ -38,10 +45,8 @@
 #include "string_utils.hpp"
 #include "file_utils.hpp"
 #include "path_utils.hpp"
+#include "dx_utils.hpp"
+#include "logger.hpp"
+
 #include "stb_truetype.h"
 using namespace fastdelegate;
-
-#include <d3d11.h>
-#include <DxErr.h>
-#include <xnamath.h>
-

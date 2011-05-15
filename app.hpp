@@ -142,6 +142,8 @@ private:
 
 	static void __stdcall tramp_menu(void *menu_item);
 
+	void resource_changed(const char *filename, const void *buf, size_t len);
+
 	void on_quit();
 	void toggle_debug();
 	void toggle_wireframe();

@@ -2,6 +2,8 @@
 #include "app.hpp"
 #include "graphics.hpp"
 #include "logger.hpp"
+#include "resource_watcher.hpp"
+
 /*
 #include "system.hpp"
 #include "test_effect.hpp"
@@ -87,6 +89,11 @@ void App::debug_text(const char *fmt, ...)
 	
 }
 
+void App::resource_changed(const char *filename, const void *buf, size_t len)
+{
+
+}
+
 bool App::init(HINSTANCE hinstance)
 {
 	_hinstance = hinstance;
@@ -111,6 +118,8 @@ bool App::init(HINSTANCE hinstance)
 	memcpy(resource.pData, font_buf, width * height);
 	GRAPHICS.context()->Unmap(texture.texture, 0);
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
+
+	RESOURCE_WATCHER.add_file_watch("effects/debug_font.fx", true, MakeDelegate(this, &App::resource_changed));
 
 	debug_text("tjong");
 

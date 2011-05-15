@@ -21,4 +21,3 @@ HRESULT create_dynamic_vertex_buffer(ID3D11Device *device, const uint32_t vertex
 {
 	return create_buffer_inner(device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, vertex_buffer);
 }
-
