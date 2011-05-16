@@ -20,17 +20,27 @@ void extract_sections(const char *buf, size_t len, Sections *sections);
 class ResourceWatcher
 {
 public:
-	typedef FastDelegate3<const char * /*filename*/, const void * /*buf*/, size_t /*len*/> FileChanged;
+	typedef FastDelegate4<void * /*token*/, const char * /*filename*/, const void * /*buf*/, size_t /*len*/> FileChanged;
 	typedef FastDelegate4<const char * /*filename*/, const char * /*section*/, const char * /*buf*/, size_t /*len*/> SectionChanged;
 
-	bool add_file_watch(const char *filename, bool initial_load, const FileChanged &fn);
+	bool add_file_watch(void *token, const char *filename, bool initial_load, const FileChanged &fn);
 	bool add_section_watch(const char *filename, const char *section, bool initial_load, const SectionChanged &fn);
+	void process_deferred();
 
 	static ResourceWatcher &instance();
 private:
-	void file_changed(FileEvent event, const char *old_new, const char *new_name);
+	void file_changed(void *token, FileEvent event, const char *old_new, const char *new_name);
 
-	concurrent_queue<string> _modified_files;
+	struct Context {
+		Context(void *token, const string &filename, const FileChanged &cb) : token(token), filename(filename), cb(cb) {}
+		void *token;
+		string filename;
+		FileChanged cb;
+	};
+
+	vector<Context *> _contexts;
+	typedef concurrent_queue<Context *> ModifiedFiles;
+	ModifiedFiles _modified_files;
 
 	ResourceWatcher();
 	static ResourceWatcher *_instance;

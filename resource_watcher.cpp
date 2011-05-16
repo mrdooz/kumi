@@ -97,21 +97,38 @@ ResourceWatcher &ResourceWatcher::instance()
 	return *_instance;
 }
 
-void ResourceWatcher::file_changed(FileEvent event, const char *old_new, const char *new_name)
+void ResourceWatcher::process_deferred()
 {
-
+	Context *ctx = NULL;
+	while (_modified_files.try_pop(ctx)) {
+		void *buf;
+		size_t len;
+		if (load_file(ctx->filename.c_str(), &buf, &len))
+			ctx->cb(ctx->token, ctx->filename.c_str(), buf, len);
+		SAFE_ADELETE(buf);
+	}
 }
 
-bool ResourceWatcher::add_file_watch(const char *filename, bool initial_load, const FileChanged &fn)
+void ResourceWatcher::file_changed(void *token, FileEvent event, const char *old_new, const char *new_name)
+{
+	Context *context = (Context *)token;
+	_modified_files.push(context);
+}
+
+bool ResourceWatcher::add_file_watch(void *token, const char *filename, bool initial_load, const FileChanged &fn)
 {
 	if (initial_load) {
 		void *buf;
 		size_t len;
 		if (load_file(filename, &buf, &len))
-			fn(filename, buf, len);
+			fn(token, filename, buf, len);
+		SAFE_ADELETE(buf);
 	}
 
-	FILE_WATCHER.add_file_watch(filename, MakeDelegate(this, &ResourceWatcher::file_changed));
+	Context *context = new Context(token, filename, fn);
+	_contexts.push_back(context);
+
+	FILE_WATCHER.add_file_watch(context, filename, MakeDelegate(this, &ResourceWatcher::file_changed));
 
 	return true;
 }

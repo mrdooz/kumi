@@ -10,12 +10,15 @@ using std::string;
 using std::map;
 using std::vector;
 using std::deque;
+using std::tuple;
+using std::make_tuple;
 using boost::scoped_ptr;
 
 struct DirWatch;
 
 struct DeferredFileEvent {
-	DeferredFileEvent(DirWatch *watch, FileEvent event, uint32_t time, const string &filename, const string &new_name = "") : watch(watch), event(event), time(time), filename(filename), new_name(new_name) {}
+	DeferredFileEvent(DirWatch *watch, FileEvent event, uint32_t time, const string &filename, const string &new_name = "") 
+		: watch(watch), event(event), time(time), filename(filename), new_name(new_name) {}
 	DirWatch *watch;
 	FileEvent event;
 	uint32_t time;
@@ -31,12 +34,12 @@ struct DirWatch {
 	HANDLE _handle;
 	uint8_t _buf[4096];
 	OVERLAPPED _overlapped;
-	typedef map<string, vector<CbFileChanged> > FileWatches;
+	typedef map<string, vector<pair<CbFileChanged, void *> > > FileWatches;
 	FileWatches _file_watches;
 };
 
 typedef pair<CbFileChanged, HANDLE /*event*/> DeferredRemove;
-typedef pair<string /*filename*/, CbFileChanged> DeferredAdd;
+typedef tuple<string /*filename*/, CbFileChanged, void * /*token*/> DeferredAdd;
 
 struct WatcherThread {
 
@@ -167,8 +170,11 @@ UINT WatcherThread::thread_proc(void *userdata)
 				auto it_file = watch->_file_watches.find(cur.filename);
 				if (it_file != watch->_file_watches.end()) {
 					// invoke all the callbacks on the current file
-					for (auto it_callback = it_file->second.begin(); it_callback != it_file->second.end(); ++it_callback)
-						(*it_callback)(cur.event, cur.filename.c_str(), cur.new_name.c_str());
+					for (auto it_callback = it_file->second.begin(); it_callback != it_file->second.end(); ++it_callback) {
+						CbFileChanged cb = it_callback->first;
+						void *token = it_callback->second;
+						cb(token, cur.event, cur.filename.c_str(), cur.new_name.c_str());
+					}
 				}
 			}
 			_events.pop_front();
@@ -207,6 +213,7 @@ void WatcherThread::add_watch_apc(ULONG_PTR data)
 	scoped_ptr<DeferredAdd> cur((DeferredAdd *)data);
 	const string &fullname = std::get<0>(*cur);
 	const CbFileChanged &fn = std::get<1>(*cur);
+	void *token = std::get<2>(*cur);
 
 	_watched_files[fullname]++;
 	_files_by_callback[fn].push_back(fullname);
@@ -246,7 +253,7 @@ void WatcherThread::add_watch_apc(ULONG_PTR data)
 		dir_watches[path] = w;
 	}
 
-	dir_watches[path]->_file_watches[filename].push_back(fn);
+	dir_watches[path]->_file_watches[filename].push_back(make_pair(fn, token));
 }
 
 void WatcherThread::remove_watch_apc(ULONG_PTR data)
@@ -273,7 +280,7 @@ void WatcherThread::remove_watch_apc(ULONG_PTR data)
 		DirWatch *d = it_dir->second;
 		for (auto it_file = d->_file_watches.begin(); it_file != d->_file_watches.end(); ++it_file) {
 			for (auto it_callback = it_file->second.begin(); it_callback != it_file->second.end(); ) {
-				if (*it_callback == fn) {
+				if (it_callback->first == fn) {
 					it_callback = it_file->second.erase(it_callback);
 				} else {
 					++it_callback;
@@ -304,12 +311,12 @@ bool FileWatcher::lazy_create_worker_thread()
 	return _thread != INVALID_HANDLE_VALUE;
 }
 
-void FileWatcher::add_file_watch(const char *filename, const CbFileChanged &fn)
+void FileWatcher::add_file_watch(void *token, const char *filename, const CbFileChanged &fn)
 {
 	if (!lazy_create_worker_thread())
 		return;
 
-	QueueUserAPC(&WatcherThread::add_watch_apc, _thread, (ULONG_PTR)new DeferredAdd(make_pair(filename, fn)));
+	QueueUserAPC(&WatcherThread::add_watch_apc, _thread, (ULONG_PTR)new DeferredAdd(make_tuple(filename, fn, token)));
 }
 
 void FileWatcher::remove_watch(const CbFileChanged &fn)

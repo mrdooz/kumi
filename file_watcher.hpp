@@ -8,12 +8,12 @@ enum FileEvent {
 	kFileEventRename,
 };
 
-typedef FastDelegate3<FileEvent /*event*/, const char * /*old_name*/, const char * /*new_name*/> CbFileChanged;
+typedef FastDelegate4<void * /*token*/, FileEvent /*event*/, const char * /*old_name*/, const char * /*new_name*/> CbFileChanged;
 
 class FileWatcher {
 public:
 	static FileWatcher &instance();
-	void add_file_watch(const char *filename, const CbFileChanged &fn);
+	void add_file_watch(void *token, const char *filename, const CbFileChanged &fn);
 	void remove_watch(const CbFileChanged &fn);
 	void close();
 private:

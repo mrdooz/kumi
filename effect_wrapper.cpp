@@ -17,8 +17,8 @@ bool EffectWrapper::load_shaders(const char *buf, int len, const char *vs, const
 {
 	return 
 		either_or(!vs, vs && load_inner(buf, len, vs, VertexShader)) && 
-		either_or(!gs, gs && load_inner(buf, len, vs, GeometryShader)) && 
-		either_or(!ps, ps && load_inner(buf, len, vs, PixelShader));
+		either_or(!gs, gs && load_inner(buf, len, gs, GeometryShader)) && 
+		either_or(!ps, ps && load_inner(buf, len, ps, PixelShader));
 }
 
 bool EffectWrapper::load_shaders(const char *filename, const char *vs, const char *gs, const char *ps)
@@ -51,6 +51,11 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 		vs = "vs_4_0_level_9_3";
 		ps = "ps_4_0_level_9_3";
 		gs = "gs_4_0_level_9_3";
+		break;
+	case D3D_FEATURE_LEVEL_11_0:
+		vs = "vs_5_0";
+		ps = "ps_5_0";
+		gs = "gs_5_0";
 		break;
 	default:
 		vs = "vs_4_0";

@@ -94,7 +94,7 @@ void App::debug_text(const char *fmt, ...)
 
 const char *debug_font = "effects/debug_font.fx";
 
-void App::resource_changed(const char *filename, const void *buf, size_t len)
+void App::resource_changed(void *token, const char *filename, const void *buf, size_t len)
 {
 	if (!strcmp(filename, debug_font)) {
 		EffectWrapper *tmp = new EffectWrapper;
@@ -131,7 +131,7 @@ bool App::init(HINSTANCE hinstance)
 	GRAPHICS.context()->Unmap(texture.texture, 0);
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
-	RESOURCE_WATCHER.add_file_watch(debug_font, true, MakeDelegate(this, &App::resource_changed));
+	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
 
 	debug_text("tjong");
 
@@ -319,6 +319,7 @@ void App::run()
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+			RESOURCE_WATCHER.process_deferred();
 			GRAPHICS.clear();
 			//System::instance().tick();
 			//graphics.clear();
