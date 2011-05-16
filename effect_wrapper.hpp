@@ -226,12 +226,9 @@ struct InputDesc
 		return *this;
 	}
 
-	bool create(CComPtr<ID3D11InputLayout>& layout, EffectWrapper *effect)
+	ID3D11InputLayout *create(EffectWrapper *effect)
 	{
-		auto p = effect->create_input_layout(_desc);
-		if (!p) return false;
-		layout.Attach(p);
-		return true;
+		return effect->create_input_layout(_desc);
 	}
 
 	vector<D3D11_INPUT_ELEMENT_DESC> _desc;

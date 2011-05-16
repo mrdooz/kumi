@@ -1,7 +1,7 @@
 #ifndef _DX_UTILS_HPP_
 #define _DX_UTILS_HPP_
 
-HRESULT create_dynamic_vertex_buffer(ID3D11Device *device, const uint32_t vertex_count, const uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
+HRESULT create_dynamic_vertex_buffer(ID3D11Device *device, uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 
 struct CD3D11_INPUT_ELEMENT_DESC : public D3D11_INPUT_ELEMENT_DESC
 {
@@ -19,5 +19,7 @@ struct CD3D11_INPUT_ELEMENT_DESC : public D3D11_INPUT_ELEMENT_DESC
 		InstanceDataStepRate = step_rate;
 	}
 };
+
+void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
 #endif

@@ -186,6 +186,8 @@ private:
 	string _app_root;
 	DynamicVb<Pos2Tex> _font_vb;
 	EffectWrapper *_debug_fx;
+	CComPtr<ID3D11InputLayout> _text_layout;
+	CComPtr<ID3D11RasterizerState> _rasterizer_state;
 };
 
 #define APP App::instance()

@@ -4,6 +4,7 @@
 #include "logger.hpp"
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
+#include "d3d_parser.hpp"
 
 /*
 #include "system.hpp"
@@ -93,6 +94,7 @@ void App::debug_text(const char *fmt, ...)
 }
 
 const char *debug_font = "effects/debug_font.fx";
+const char *debug_font_state = "effects/debug_font_states.txt";
 
 void App::resource_changed(void *token, const char *filename, const void *buf, size_t len)
 {
@@ -101,6 +103,17 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 		if (tmp->load_shaders((const char *)buf, len, "vsMain", NULL, "psMain")) {
 			delete exch_null(_debug_fx);
 			_debug_fx = tmp;
+			_text_layout.Attach(InputDesc(). 
+				add("POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0).
+				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8).
+				create(_debug_fx));
+		}
+	} else if (!strcmp(filename, debug_font_state)) {
+		D3D11_RASTERIZER_DESC desc;
+		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc)) {
+			ID3D11RasterizerState *state;
+			GRAPHICS.device()->CreateRasterizerState(&desc, &state);
+			_rasterizer_state.Attach(state);
 		}
 	}
 
@@ -132,6 +145,7 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
+	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &App::resource_changed));
 
 	debug_text("tjong");
 
@@ -378,6 +392,18 @@ void App::run()
 
 			Prof_Report *pob = Prof_create_report();
 */
+			debug_text("tjong");
+
+			ID3D11DeviceContext *context = GRAPHICS.context();
+			_debug_fx->set_shaders(context);
+
+			context->IASetInputLayout(_text_layout);
+			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			set_vb(context, _font_vb.get(), _font_vb.stride);
+			context->Draw(_font_vb.num_verts(), 0);
+			context->RSSetState(_rasterizer_state);
+
 			GRAPHICS.present();
 
 		}

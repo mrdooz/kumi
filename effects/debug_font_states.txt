@@ -1,0 +1,3 @@
+RasterizerDesc {
+	CullMode = CULL_FRONT;
+};

@@ -52,11 +52,6 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 		ps = "ps_4_0_level_9_3";
 		gs = "gs_4_0_level_9_3";
 		break;
-	case D3D_FEATURE_LEVEL_11_0:
-		vs = "vs_5_0";
-		ps = "ps_5_0";
-		gs = "gs_5_0";
-		break;
 	default:
 		vs = "vs_4_0";
 		ps = "ps_4_0";

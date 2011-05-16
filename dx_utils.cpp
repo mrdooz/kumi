@@ -12,12 +12,20 @@ namespace
 	}
 }
 
-HRESULT create_static_vertex_buffer(ID3D11Device* device, const uint32_t vertex_count, const uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
+HRESULT create_static_vertex_buffer(ID3D11Device* device, uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
 {
 	return create_buffer_inner(device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
 }
 
-HRESULT create_dynamic_vertex_buffer(ID3D11Device *device, const uint32_t vertex_count, const uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
+HRESULT create_dynamic_vertex_buffer(ID3D11Device *device, uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
 {
 	return create_buffer_inner(device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, vertex_buffer);
+}
+
+void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride)
+{
+	UINT ofs[] = { 0 };
+	ID3D11Buffer* bufs[] = { buf };
+	uint32_t strides[] = { stride };
+	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
