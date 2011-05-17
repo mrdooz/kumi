@@ -184,10 +184,11 @@ private:
   TwBar *_tweakbar;
   bool _draw_plane;
 	string _app_root;
-	DynamicVb<Pos2Tex> _font_vb;
+	DynamicVb<PosTex> _font_vb;
 	EffectWrapper *_debug_fx;
 	CComPtr<ID3D11InputLayout> _text_layout;
 	CComPtr<ID3D11RasterizerState> _rasterizer_state;
+	CComPtr<ID3D11DepthStencilState> _dss_state;
 };
 
 #define APP App::instance()

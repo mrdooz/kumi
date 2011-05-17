@@ -1,7 +1,5 @@
-// draws textures triangles in screen space
-
 void vsMain(
-	in float4 i_pos : POSITION, 
+	in float4 i_pos : SV_POSITION, 
 	in float2 i_tex : TEXCOORD,
 	out float4 o_pos : SV_POSITION, 
 	out float2 o_tex : TEXCOORD)

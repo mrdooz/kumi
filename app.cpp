@@ -74,18 +74,18 @@ void App::debug_text(const char *fmt, ...)
 	const char *str = "magnus mcagnus";
 	float x = 0;
 	float y = 100;
-	Pos2Tex *p = _font_vb.map();
-	Pos2Tex v0, v1, v2, v3;
+	PosTex *p = _font_vb.map();
+	PosTex v0, v1, v2, v3;
 	for (int i = 0, e = strlen(str); i < e; ++i) {
 		char ch = str[i];
 		stbtt_aligned_quad q;
 		stbtt_GetBakedQuad(chars, 512, 512, ch - 32, &x, &y, &q, 1);
 		// v0 v1
 		// v2 v3
-		v0.pos.x = q.x0; v0.pos.y = q.y0; v0.tex.x = q.s0; v0.tex.y = q.t0;
-		v1.pos.x = q.x1; v1.pos.y = q.y0; v1.tex.x = q.s1; v1.tex.y = q.t0;
-		v2.pos.x = q.x0; v2.pos.y = q.y1; v2.tex.x = q.s0; v2.tex.y = q.t1;
-		v3.pos.x = q.x1; v3.pos.y = q.y1; v3.tex.x = q.s1; v3.tex.y = q.t1;
+		v0.pos.x = q.x0; v0.pos.y = q.y0; v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
+		v1.pos.x = q.x1; v1.pos.y = q.y0; v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
+		v2.pos.x = q.x0; v2.pos.y = q.y1; v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
+		v3.pos.x = q.x1; v3.pos.y = q.y1; v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
 		*p++ = v0; *p++ = v1; *p++ = v2;
 		*p++ = v2; *p++ = v1; *p++ = v3;
 	}
@@ -104,16 +104,24 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 			delete exch_null(_debug_fx);
 			_debug_fx = tmp;
 			_text_layout.Attach(InputDesc(). 
-				add("POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0).
-				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8).
+				add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
+				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
 				create(_debug_fx));
 		}
 	} else if (!strcmp(filename, debug_font_state)) {
+/*
 		D3D11_RASTERIZER_DESC desc;
 		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc)) {
 			ID3D11RasterizerState *state;
 			GRAPHICS.device()->CreateRasterizerState(&desc, &state);
 			_rasterizer_state.Attach(state);
+		}
+*/
+		D3D11_DEPTH_STENCIL_DESC desc;
+		if (parse_depth_stencil_desc((const char *)buf, (const char *)buf + len, &desc)) {
+			ID3D11DepthStencilState *state;
+			GRAPHICS.device()->CreateDepthStencilState(&desc, &state);
+			_dss_state.Attach(state);
 		}
 	}
 
@@ -147,7 +155,7 @@ bool App::init(HINSTANCE hinstance)
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &App::resource_changed));
 
-	debug_text("tjong");
+	//debug_text("tjong");
 
 
 //	B_ERR_BOOL(GRAPHICS.
@@ -334,6 +342,7 @@ void App::run()
 			DispatchMessage(&msg);
 		} else {
 			RESOURCE_WATCHER.process_deferred();
+			GRAPHICS.set_clear_color(XMFLOAT4(0.3f, 0.3f, 0.3f, 1));
 			GRAPHICS.clear();
 			//System::instance().tick();
 			//graphics.clear();
@@ -392,17 +401,20 @@ void App::run()
 
 			Prof_Report *pob = Prof_create_report();
 */
-			debug_text("tjong");
 
 			ID3D11DeviceContext *context = GRAPHICS.context();
+			context->RSSetViewports(1, &GRAPHICS.viewport());
+
 			_debug_fx->set_shaders(context);
 
+			debug_text("tjong");
+			set_vb(context, _font_vb.get(), _font_vb.stride);
 			context->IASetInputLayout(_text_layout);
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			set_vb(context, _font_vb.get(), _font_vb.stride);
-			context->Draw(_font_vb.num_verts(), 0);
 			context->RSSetState(_rasterizer_state);
+			context->OMSetDepthStencilState(_dss_state, 0);
+			context->Draw(_font_vb.num_verts(), 0);
 
 			GRAPHICS.present();
 
