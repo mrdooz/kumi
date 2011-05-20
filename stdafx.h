@@ -48,5 +48,7 @@
 #include "dx_utils.hpp"
 #include "logger.hpp"
 
+#include "d3d_parser.hpp"
+
 #include "stb_truetype.h"
 using namespace fastdelegate;

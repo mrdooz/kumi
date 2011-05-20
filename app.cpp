@@ -4,7 +4,6 @@
 #include "logger.hpp"
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
-#include "d3d_parser.hpp"
 
 /*
 #include "system.hpp"
@@ -71,9 +70,30 @@ stbtt_bakedchar chars[96];
 
 void App::debug_text(const char *fmt, ...)
 {
+	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
+
+	PosTex *p = _font_vb.map();
+	float nw = -vp.Width / 2, pw = vp.Width / 2;
+	float nh = -vp.Height / 2, ph = vp.Height / 2;
+	PosTex v[] = {
+		PosTex(nw,ph,0,0,0),
+		PosTex(pw,ph,0,0,0),
+		PosTex(nw,nh,0,0,0),
+		PosTex(pw,nh,0,0,0),
+	};
+	*p++ = v[0];
+	*p++ = v[1];
+	*p++ = v[2];
+
+	*p++ = v[2];
+	*p++ = v[1];
+	*p++ = v[3];
+
+	const int num_verts = _font_vb.unmap(p);
+/*
 	const char *str = "magnus mcagnus";
-	float x = 0;
-	float y = 100;
+	float x = 200;
+	float y = 200;
 	PosTex *p = _font_vb.map();
 	PosTex v0, v1, v2, v3;
 	for (int i = 0, e = strlen(str); i < e; ++i) {
@@ -90,7 +110,7 @@ void App::debug_text(const char *fmt, ...)
 		*p++ = v2; *p++ = v1; *p++ = v3;
 	}
 	const int num_verts = _font_vb.unmap(p);
-	
+*/
 }
 
 const char *debug_font = "effects/debug_font.fx";
@@ -155,41 +175,6 @@ bool App::init(HINSTANCE hinstance)
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &App::resource_changed));
 
-	//debug_text("tjong");
-
-
-//	B_ERR_BOOL(GRAPHICS.
-	//Graphics& graphics = Graphics::instance();
-
-	//RETURN_ON_FAIL_BOOL_E(System::instance().init());
-/*
-	TwInit(TW_DIRECT3D11, graphics.device(), graphics.context());
-	TwWindowSize(_width, _height);
-	_tweakbar = TwNewBar("Shindig");
-	TwAddButton(_tweakbar, "quit", &App::tramp_menu, (void *)kMenuQuit, "label='quit'");
-	TwAddButton(_tweakbar, "debug", &App::tramp_menu, (void *)kMenuToggleDebug, "label='toggle debug'");
-	TwAddButton(_tweakbar, "wireframe", &App::tramp_menu, (void *)kMenuToggleWireframe, "label='toggle wireframe'");
-	TwAddSeparator(_tweakbar, NULL, NULL);
-
-
-	_debug_writer = new FontWriter();
-	RETURN_ON_FAIL_BOOL_E(_debug_writer->init(System::instance().convert_path("data/fonts/TCB_____.ttf", System::kDirRelative), 0, 0, _width, _height));
-	RETURN_ON_FAIL_BOOL_E(DebugMenu::instance().init());
-
-	RETURN_ON_FAIL_BOOL_E(IMGui::instance().init());
-	RETURN_ON_FAIL_BOOL_E(DebugRenderer::instance().init());
-	//RETURN_ON_FAIL_BOOL_E(Network::instance().init());
-
-	_test_effect = new TestEffect7();
-	_test_effect->init();
-
-	_trackball = new Trackball();
-	_freefly = new FreeFlyCamera();
-
-	init_menu();
-
-	Profiler::instance().print();
-*/
 	return true;
 }
 
@@ -206,30 +191,6 @@ void App::init_menu()
 
 bool App::close()
 {
-/*
-	TwRemoveAllVars(tweakbar());
-	TwDeleteAllBars();
-
-	TwTerminate();
-
-	if (_test_effect) {
-		_test_effect->close();
-		delete _test_effect;
-	}
-
-	RETURN_ON_FAIL_BOOL_E(Network::instance().close());
-	RETURN_ON_FAIL_BOOL_E(DebugRenderer::instance().close());
-	RETURN_ON_FAIL_BOOL_E(IMGui::instance().close());
-
-	RETURN_ON_FAIL_BOOL_E(DebugMenu::instance().close());
-
-	SAFE_DELETE(_debug_writer);
-	SAFE_DELETE(_trackball);
-	SAFE_DELETE(_freefly);
-
-	RETURN_ON_FAIL_BOOL_E(Graphics::instance().close());
-	RETURN_ON_FAIL_BOOL_E(System::instance().close());
-*/
 	B_ERR_BOOL(GRAPHICS.close());
 	delete this;
 	_instance = nullptr;
@@ -375,32 +336,7 @@ void App::run()
 
 				}
 			}
-/*
-			if (_draw_plane) {
-				D3DXPLANE plane;
-				D3DXPlaneFromPointNormal(&plane, &D3DXVECTOR3(0,0,0), &D3DXVECTOR3(0,1,0));
-				DebugRenderer::instance().draw_plane(camera(), plane);
-			}
 
-
-			graphics.tick();
-			_dbg_message_count = 0;
-			add_dbg_message(".fps: %.1f\n", graphics.fps());
-
-			int y_ofs = 100;
-
-			_debug_writer->render();
-			DebugMenu::instance().render();
-			DebugRenderer::instance().end_frame();
-			DebugRenderer::instance().render();
-			IMGui::instance().render();
-
-			TwDraw();
-
-			Prof_update(1);
-
-			Prof_Report *pob = Prof_create_report();
-*/
 
 			ID3D11DeviceContext *context = GRAPHICS.context();
 			context->RSSetViewports(1, &GRAPHICS.viewport());
@@ -412,8 +348,11 @@ void App::run()
 			context->IASetInputLayout(_text_layout);
 			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			context->RSSetState(_rasterizer_state);
-			context->OMSetDepthStencilState(_dss_state, 0);
+			float blend_factor[] = { 1, 1, 1, 1 };
+			context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
+			context->RSSetState(GRAPHICS.default_rasterizer_state());
+			context->OMSetDepthStencilState(_dss_state, 0xffffffff);
+
 			context->Draw(_font_vb.num_verts(), 0);
 
 			GRAPHICS.present();
