@@ -22,4 +22,8 @@ struct CD3D11_INPUT_ELEMENT_DESC : public D3D11_INPUT_ELEMENT_DESC
 
 void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
+// maps from screen space (0,0) top left, (width-1, height-1) bottom right
+// to clip space (-1,+1) top left, (+1, -1) bottom right
+void screen_to_clip(float x, float y, float w, float h, float *ox, float *oy);
+
 #endif

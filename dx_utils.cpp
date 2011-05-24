@@ -29,3 +29,9 @@ void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride)
 	uint32_t strides[] = { stride };
 	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
+
+void screen_to_clip(float x, float y, float w, float h, float *ox, float *oy)
+{
+	*ox = (x - w / 2) / (w / 2);
+	*oy = (h/2 - y) / (h/2);
+}

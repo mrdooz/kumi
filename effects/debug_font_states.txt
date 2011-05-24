@@ -1,3 +1,7 @@
-DepthStencilDesc {
-	DepthEnable = FALSE;
+RasterizerDesc mr_tjong = {
+	FillMode = FILL_SOLID;
+};
+
+RasterizerDesc mr_tjong2 = {
+	FillMode = FILL_WIREFRAME;
 };

@@ -13,6 +13,15 @@ using qi::uint_;
 using qi::float_;
 using phoenix::bind;
 using ascii::char_;
+using std::vector;
+
+static string from_vector(const vector<char>& v)
+{
+	string s;
+	s.resize(v.size());
+	std::copy(v.begin(), v.end(), s.begin());
+	return s;
+}
 
 // D3D symbol tables
 struct d3d11_bool_ : qi::symbols<char, BOOL> {
@@ -158,7 +167,7 @@ void set_rt_blend_desc(D3D11_BLEND_DESC *blend_desc, int i, const D3D11_RENDER_T
 
 	blend_desc->RenderTarget[i] = rt_blend_desc;
 }
-
+#if 0
 template <typename Iterator>
 struct blend_desc_parser_ : qi::grammar<Iterator, D3D11_BLEND_DESC(), ascii::space_type>
 {
@@ -229,7 +238,7 @@ struct depth_stencil_desc_parser_ : qi::grammar<Iterator, D3D11_DEPTH_STENCIL_DE
 	qi::rule<Iterator, D3D11_DEPTH_STENCILOP_DESC(), ascii::space_type> depth_stencil_op_desc;
 	qi::rule<Iterator, D3D11_DEPTH_STENCIL_DESC(), ascii::space_type> start;
 };
-
+#endif
 template <typename Iterator>
 struct rasterizer_desc_parser_ : qi::grammar<Iterator, D3D11_RASTERIZER_DESC(), ascii::space_type>
 {
@@ -237,7 +246,7 @@ struct rasterizer_desc_parser_ : qi::grammar<Iterator, D3D11_RASTERIZER_DESC(), 
 	{
 		start =
 			eps[qi::_val = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT())] >>
-			lit("RasterizerDesc") >> '{' >>
+			((lit("RasterizerDesc") >> -((+(qi::char_ - '='))[phoenix::ref(name) = qi::_1 ] >> '=') >> '{') || (lit("RasterizerDesc") >> '{'))  >>
 			*(
 			(lit("FillMode") >> '=' >> d3d11_fill_mode >> ';')               [bind(&D3D11_RASTERIZER_DESC::FillMode, _val) = qi::_1]
 		|| (lit("CullMode") >> '=' >> d3d11_cull_mode >> ';')              [bind(&D3D11_RASTERIZER_DESC::CullMode, _val) = qi::_1]
@@ -253,20 +262,98 @@ struct rasterizer_desc_parser_ : qi::grammar<Iterator, D3D11_RASTERIZER_DESC(), 
 			>> '}' >> ';'
 			;
 	}
+	vector<char> name;
 	qi::rule<Iterator, D3D11_RASTERIZER_DESC(), ascii::space_type> start;
 };
 
-bool parse_blend_desc(const char *start, const char *end, D3D11_BLEND_DESC *desc)
+const char *parse_blend_desc(const char *start, const char *end, D3D11_BLEND_DESC *desc, string *name)
 {
-	return phrase_parse(start, end, blend_desc_parser_<const char *>(), ascii::space, *desc);
+	return NULL;
+	//return phrase_parse(start, end, blend_desc_parser_<const char *>(), ascii::space, *desc);
 }
 
-bool parse_depth_stencil_desc(const char *start, const char *end, D3D11_DEPTH_STENCIL_DESC *desc)
+const char *parse_depth_stencil_desc(const char *start, const char *end, D3D11_DEPTH_STENCIL_DESC *desc, string *name)
 {
-	return phrase_parse(start, end, depth_stencil_desc_parser_<const char *>(), ascii::space, *desc);
+	return NULL;
+	//return phrase_parse(start, end, depth_stencil_desc_parser_<const char *>(), ascii::space, *desc);
 }
 
-bool parse_rasterizer_desc(const char *start, const char *end, D3D11_RASTERIZER_DESC *desc)
+const char *parse_rasterizer_desc(const char *start, const char *end, D3D11_RASTERIZER_DESC *desc, string *name)
 {
-	return phrase_parse(start, end, rasterizer_desc_parser_<const char *>(), ascii::space, *desc);
+	rasterizer_desc_parser_<const char *> p;
+	const bool res = phrase_parse(start, end, p, ascii::space, *desc);
+	if (name)
+		*name = from_vector(p.name);
+	return res ? start : NULL;
+}
+
+const char *parse_sampler_desc(const char *start, const char *end, D3D11_SAMPLER_DESC *desc, string *name)
+{
+	return NULL;
+}
+
+void parse_descs(const char *start, const char *end, 
+	map<string, D3D11_BLEND_DESC> *blend_descs, map<string, D3D11_DEPTH_STENCIL_DESC> *depth_descs, 
+	map<string, D3D11_RASTERIZER_DESC> *rasterizer_descs, map<string, D3D11_SAMPLER_DESC> *sampler_descs)
+{
+	const char *cur = start;
+	int i = 0;
+	int fail_count = 0;
+	string name;
+	D3D11_BLEND_DESC blend_desc;
+	D3D11_DEPTH_STENCIL_DESC dss_desc;
+	D3D11_RASTERIZER_DESC rasterizer_desc;
+	D3D11_SAMPLER_DESC sampler_desc;
+
+	while (cur != end && fail_count != 4) {
+		switch (i) {
+		case 0: 
+			if (const char *tmp = parse_blend_desc(cur, end, &blend_desc, &name)) {
+				cur = tmp;
+				if (blend_descs)
+					(*blend_descs)[name] = blend_desc;
+				fail_count = 0;
+			} else {
+				++i;
+				++fail_count;
+			}
+			break;
+
+		case 1:
+			if (const char *tmp = parse_depth_stencil_desc(cur, end, &dss_desc, &name)) {
+				cur = tmp;
+				if (depth_descs)
+					(*depth_descs)[name] = dss_desc;
+				fail_count = 0;
+			} else {
+				++i;
+				++fail_count;
+			}
+			break;
+
+		case 2: 
+			if (const char *tmp = parse_rasterizer_desc(cur, end, &rasterizer_desc, &name)) {
+				cur = tmp;
+				if (rasterizer_descs)
+					(*rasterizer_descs)[name] = rasterizer_desc;
+				fail_count = 0;
+			} else {
+				++i;
+				++fail_count;
+			}
+			break;
+
+		case 3: 
+			if (const char *tmp = parse_sampler_desc(cur, end, &sampler_desc, &name)) {
+				cur = tmp;
+				if (sampler_descs)
+					(*sampler_descs)[name] = sampler_desc;
+				fail_count = 0;
+			} else {
+				i = 0;
+				++fail_count;
+			}
+			break;
+		}
+	}
 }

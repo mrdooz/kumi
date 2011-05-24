@@ -4,6 +4,7 @@
 #include "logger.hpp"
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
+#include "d3d_parser.hpp"
 
 /*
 #include "system.hpp"
@@ -71,7 +72,7 @@ stbtt_bakedchar chars[96];
 void App::debug_text(const char *fmt, ...)
 {
 	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
-
+/*
 	PosTex *p = _font_vb.map();
 	float nw = -vp.Width / 2, pw = vp.Width / 2;
 	float nh = -vp.Height / 2, ph = vp.Height / 2;
@@ -88,9 +89,9 @@ void App::debug_text(const char *fmt, ...)
 	*p++ = v[2];
 	*p++ = v[1];
 	*p++ = v[3];
-
 	const int num_verts = _font_vb.unmap(p);
-/*
+*/
+
 	const char *str = "magnus mcagnus";
 	float x = 200;
 	float y = 200;
@@ -102,15 +103,15 @@ void App::debug_text(const char *fmt, ...)
 		stbtt_GetBakedQuad(chars, 512, 512, ch - 32, &x, &y, &q, 1);
 		// v0 v1
 		// v2 v3
-		v0.pos.x = q.x0; v0.pos.y = q.y0; v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
-		v1.pos.x = q.x1; v1.pos.y = q.y0; v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
-		v2.pos.x = q.x0; v2.pos.y = q.y1; v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
-		v3.pos.x = q.x1; v3.pos.y = q.y1; v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
+		screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
+		screen_to_clip(q.x1, q.y0, vp.Width, vp.Height, &v1.pos.x, &v1.pos.y); v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
+		screen_to_clip(q.x0, q.y1, vp.Width, vp.Height, &v2.pos.x, &v2.pos.y); v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
+		screen_to_clip(q.x1, q.y1, vp.Width, vp.Height, &v3.pos.x, &v3.pos.y); v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
 		*p++ = v0; *p++ = v1; *p++ = v2;
 		*p++ = v2; *p++ = v1; *p++ = v3;
 	}
 	const int num_verts = _font_vb.unmap(p);
-*/
+
 }
 
 const char *debug_font = "effects/debug_font.fx";
@@ -129,22 +130,27 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 				create(_debug_fx));
 		}
 	} else if (!strcmp(filename, debug_font_state)) {
-/*
+
+		map<string, D3D11_RASTERIZER_DESC> r;
+		parse_descs((const char *)buf, (const char *)buf + len, NULL, NULL, &r, NULL);
 		D3D11_RASTERIZER_DESC desc;
-		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc)) {
+		string name;
+		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc, &name)) {
 			ID3D11RasterizerState *state;
 			GRAPHICS.device()->CreateRasterizerState(&desc, &state);
 			_rasterizer_state.Attach(state);
 		}
-*/
+/*
 		D3D11_DEPTH_STENCIL_DESC desc;
 		if (parse_depth_stencil_desc((const char *)buf, (const char *)buf + len, &desc)) {
 			ID3D11DepthStencilState *state;
 			GRAPHICS.device()->CreateDepthStencilState(&desc, &state);
 			_dss_state.Attach(state);
 		}
+*/
 	}
 
+	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
 }
 
 bool App::init(HINSTANCE hinstance)
@@ -163,13 +169,12 @@ bool App::init(HINSTANCE hinstance)
 	const int width = 512;
 	const int height = res > 0 ? res : 512;
 
-	TextureData texture;
 	B_ERR_BOOL(GRAPHICS.create_texture(512, res, 
-		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8_UINT, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &texture));
+		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8_UINT, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
 	D3D11_MAPPED_SUBRESOURCE resource;
-	B_ERR_DX(GRAPHICS.context()->Map(texture.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
+	B_ERR_DX(GRAPHICS.context()->Map(_texture.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	memcpy(resource.pData, font_buf, width * height);
-	GRAPHICS.context()->Unmap(texture.texture, 0);
+	GRAPHICS.context()->Unmap(_texture.texture, 0);
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
@@ -340,6 +345,9 @@ void App::run()
 
 			ID3D11DeviceContext *context = GRAPHICS.context();
 			context->RSSetViewports(1, &GRAPHICS.viewport());
+
+			context->PSSetShaderResources(0, 1, &_texture.srv.p);
+			context->PSSetSamplers(0, 1, &_sampler_state.p);
 
 			_debug_fx->set_shaders(context);
 

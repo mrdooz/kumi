@@ -3,6 +3,7 @@
 
 #include "dynamic_vb.hpp"
 #include "vertex_types.hpp"
+#include "graphics.hpp"
 
 using std::string;
 
@@ -189,6 +190,8 @@ private:
 	CComPtr<ID3D11InputLayout> _text_layout;
 	CComPtr<ID3D11RasterizerState> _rasterizer_state;
 	CComPtr<ID3D11DepthStencilState> _dss_state;
+	CComPtr<ID3D11SamplerState> _sampler_state;
+	TextureData _texture;
 };
 
 #define APP App::instance()
