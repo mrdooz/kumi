@@ -72,25 +72,6 @@ stbtt_bakedchar chars[96];
 void App::debug_text(const char *fmt, ...)
 {
 	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
-/*
-	PosTex *p = _font_vb.map();
-	float nw = -vp.Width / 2, pw = vp.Width / 2;
-	float nh = -vp.Height / 2, ph = vp.Height / 2;
-	PosTex v[] = {
-		PosTex(nw,ph,0,0,0),
-		PosTex(pw,ph,0,0,0),
-		PosTex(nw,nh,0,0,0),
-		PosTex(pw,nh,0,0,0),
-	};
-	*p++ = v[0];
-	*p++ = v[1];
-	*p++ = v[2];
-
-	*p++ = v[2];
-	*p++ = v[1];
-	*p++ = v[3];
-	const int num_verts = _font_vb.unmap(p);
-*/
 
 	const char *str = "magnus mcagnus";
 	float x = 200;
@@ -132,7 +113,10 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 	} else if (!strcmp(filename, debug_font_state)) {
 
 		map<string, D3D11_RASTERIZER_DESC> r;
-		parse_descs((const char *)buf, (const char *)buf + len, NULL, NULL, &r, NULL);
+		map<string, D3D11_SAMPLER_DESC> s;
+		parse_descs((const char *)buf, (const char *)buf + len, NULL, NULL, &r, &s);
+		GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p);
+/*
 		D3D11_RASTERIZER_DESC desc;
 		string name;
 		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc, &name)) {
@@ -140,6 +124,7 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 			GRAPHICS.device()->CreateRasterizerState(&desc, &state);
 			_rasterizer_state.Attach(state);
 		}
+*/
 /*
 		D3D11_DEPTH_STENCIL_DESC desc;
 		if (parse_depth_stencil_desc((const char *)buf, (const char *)buf + len, &desc)) {
@@ -165,12 +150,13 @@ bool App::init(HINSTANCE hinstance)
 	void *font;
 	size_t len;
 	B_ERR_BOOL(load_file("data/arialbd.ttf", &font, &len));
-	int res = stbtt_BakeFontBitmap((const byte *)font, 0, 12, font_buf, 512, 512, 32, 96, chars);
+	int res = stbtt_BakeFontBitmap((const byte *)font, 0, 16, font_buf, 512, 512, 32, 96, chars);
 	const int width = 512;
 	const int height = res > 0 ? res : 512;
+	save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
 
 	B_ERR_BOOL(GRAPHICS.create_texture(512, res, 
-		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8_UINT, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
+		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8_UNORM, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
 	D3D11_MAPPED_SUBRESOURCE resource;
 	B_ERR_DX(GRAPHICS.context()->Map(_texture.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	memcpy(resource.pData, font_buf, width * height);
@@ -360,6 +346,7 @@ void App::run()
 			context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
 			context->RSSetState(GRAPHICS.default_rasterizer_state());
 			context->OMSetDepthStencilState(_dss_state, 0xffffffff);
+			context->PSSetSamplers(0, 1, &_sampler_state.p);
 
 			context->Draw(_font_vb.num_verts(), 0);
 

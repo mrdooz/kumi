@@ -13,6 +13,6 @@ void vsMain(
 
 float4 psMain(in float4 pos : SV_POSITION, in float2 tex : TEXCOORD) : SV_Target
 {
-	//return g_texture.Sample(g_sampler, tex);
-	return float4(1,1,1,1);
+	float f = g_texture.Sample(g_sampler, tex);
+	return float4(f,f,f,f);
 }

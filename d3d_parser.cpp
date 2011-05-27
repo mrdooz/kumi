@@ -23,6 +23,41 @@ static string from_vector(const vector<char>& v)
 	return s;
 }
 
+static void set_rt_defaults(D3D11_RENDER_TARGET_BLEND_DESC *desc)
+{
+	const D3D11_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
+	{
+		FALSE,
+		D3D11_BLEND_ONE, D3D11_BLEND_ZERO, D3D11_BLEND_OP_ADD,
+		D3D11_BLEND_ONE, D3D11_BLEND_ZERO, D3D11_BLEND_OP_ADD,
+		D3D11_COLOR_WRITE_ENABLE_ALL,
+	};
+	*desc = defaultRenderTargetBlendDesc;
+}
+
+static void set_depth_stencil_op_defaults(D3D11_DEPTH_STENCILOP_DESC *desc)
+{
+	const D3D11_DEPTH_STENCILOP_DESC defaultStencilOp =
+	{ D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_COMPARISON_ALWAYS };
+	*desc = defaultStencilOp;
+
+}
+
+static void set_rt_blend_desc(D3D11_BLEND_DESC *blend_desc, int i, const D3D11_RENDER_TARGET_BLEND_DESC &rt_blend_desc)
+{
+	if (i < 0 || i >= 8)
+		return;
+
+	blend_desc->RenderTarget[i] = rt_blend_desc;
+}
+
+static void set_border_color(D3D11_SAMPLER_DESC *sampler_desc, int idx, float value)
+{
+	if (idx < 0 || idx >= 4)
+		return;
+	sampler_desc->BorderColor[idx] = value;
+}
+
 // D3D symbol tables
 struct d3d11_bool_ : qi::symbols<char, BOOL> {
 	d3d11_bool_() {
@@ -108,7 +143,7 @@ struct d3d11_depth_write_mask_ : qi::symbols<char, D3D11_DEPTH_WRITE_MASK> {
 
 struct d3d11_comparison_func_ : qi::symbols<char, D3D11_COMPARISON_FUNC> {
 #define MK_TAG(x) ("COMPARISON_" #x, D3D11_COMPARISON_ ## x)
-	d3d11_comparison_func_ () {
+	d3d11_comparison_func_() {
 		add
 			MK_TAG(NEVER)
 			MK_TAG(LESS)
@@ -125,7 +160,7 @@ struct d3d11_comparison_func_ : qi::symbols<char, D3D11_COMPARISON_FUNC> {
 
 struct d3d11_stencil_op_ : qi::symbols<char, D3D11_STENCIL_OP> {
 #define MK_TAG(x) ("STENCIL_OP_" #x, D3D11_STENCIL_OP_ ## x)
-	d3d11_stencil_op_ () {
+	d3d11_stencil_op_() {
 		add
 			MK_TAG(KEEP)
 			MK_TAG(ZERO)
@@ -140,34 +175,47 @@ struct d3d11_stencil_op_ : qi::symbols<char, D3D11_STENCIL_OP> {
 #undef MK_TAG
 } d3d11_stencil_op;
 
-void set_rt_defaults(D3D11_RENDER_TARGET_BLEND_DESC *desc)
-{
-	const D3D11_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc =
-	{
-		FALSE,
-		D3D11_BLEND_ONE, D3D11_BLEND_ZERO, D3D11_BLEND_OP_ADD,
-		D3D11_BLEND_ONE, D3D11_BLEND_ZERO, D3D11_BLEND_OP_ADD,
-		D3D11_COLOR_WRITE_ENABLE_ALL,
-	};
-	*desc = defaultRenderTargetBlendDesc;
-}
+struct d3d11_texture_address_mode_ : qi::symbols<char, D3D11_TEXTURE_ADDRESS_MODE> {
+#define MK_TAG(x) ("TEXTURE_ADDRESS_" #x, D3D11_TEXTURE_ADDRESS_ ## x)
+	d3d11_texture_address_mode_() {
+		add
+			MK_TAG(WRAP)
+			MK_TAG(MIRROR)
+			MK_TAG(CLAMP)
+			MK_TAG(BORDER)
+			MK_TAG(MIRROR_ONCE)
+			;
+	}
+#undef MK_TAG
+} d3d11_texture_address_mode;
 
-void set_depth_stencil_op_defaults(D3D11_DEPTH_STENCILOP_DESC *desc)
-{
-	const D3D11_DEPTH_STENCILOP_DESC defaultStencilOp =
-	{ D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_STENCIL_OP_KEEP, D3D11_COMPARISON_ALWAYS };
-	*desc = defaultStencilOp;
+struct d3d11_filter_ : qi::symbols<char, D3D11_FILTER> {
+#define MK_TAG(x) ("FILTER_" #x, D3D11_FILTER_ ## x)
+	d3d11_filter_() {
+		add
+			MK_TAG(MIN_MAG_MIP_POINT)
+			MK_TAG(MIN_MAG_POINT_MIP_LINEAR)
+			MK_TAG(MIN_POINT_MAG_LINEAR_MIP_POINT)
+			MK_TAG(MIN_POINT_MAG_MIP_LINEAR)
+			MK_TAG(MIN_LINEAR_MAG_MIP_POINT)
+			MK_TAG(MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+			MK_TAG(MIN_MAG_LINEAR_MIP_POINT)
+			MK_TAG(MIN_MAG_MIP_LINEAR)
+			MK_TAG(ANISOTROPIC)
+			MK_TAG(COMPARISON_MIN_MAG_MIP_POINT)
+			MK_TAG(COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
+			MK_TAG(COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
+			MK_TAG(COMPARISON_MIN_POINT_MAG_MIP_LINEAR)
+			MK_TAG(COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
+			MK_TAG(COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+			MK_TAG(COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
+			MK_TAG(COMPARISON_MIN_MAG_MIP_LINEAR)
+			MK_TAG(COMPARISON_ANISOTROPIC)
+			;
+	}
+#undef MK_TAG
+} d3d11_filter;
 
-}
-
-void set_rt_blend_desc(D3D11_BLEND_DESC *blend_desc, int i, const D3D11_RENDER_TARGET_BLEND_DESC &rt_blend_desc)
-{
-	if (i < 0 || i >= 8)
-		return;
-
-	blend_desc->RenderTarget[i] = rt_blend_desc;
-}
-#if 0
 template <typename Iterator>
 struct blend_desc_parser_ : qi::grammar<Iterator, D3D11_BLEND_DESC(), ascii::space_type>
 {
@@ -175,7 +223,7 @@ struct blend_desc_parser_ : qi::grammar<Iterator, D3D11_BLEND_DESC(), ascii::spa
 	{
 		start =
 			eps[qi::_val = CD3D11_BLEND_DESC(CD3D11_DEFAULT())] >> 
-			lit("BlendDesc") >> '{' >> 
+			((lit("BlendDesc") >> -((+(qi::char_ - '='))[phoenix::ref(name) = qi::_1 ] >> '=') >> '{') || (lit("BlendDesc") >> '{'))  >>
 			*(			
 			(lit("AlphaToCoverageEnable") >> '=' >> d3d11_bool >> ';')                 [bind(&D3D11_BLEND_DESC::AlphaToCoverageEnable, _val) = qi::_1]
 		|| (lit("IndependentBlendEnable") >> '=' >> d3d11_bool >> ';')               [bind(&D3D11_BLEND_DESC::IndependentBlendEnable, _val) = qi::_1]
@@ -199,6 +247,7 @@ struct blend_desc_parser_ : qi::grammar<Iterator, D3D11_BLEND_DESC(), ascii::spa
 			;
 	}
 
+	vector<char> name;
 	qi::rule<Iterator, D3D11_RENDER_TARGET_BLEND_DESC(), ascii::space_type> rt_blend_rule;
 	qi::rule<Iterator, D3D11_BLEND_DESC(), ascii::space_type> start;
 };
@@ -210,7 +259,7 @@ struct depth_stencil_desc_parser_ : qi::grammar<Iterator, D3D11_DEPTH_STENCIL_DE
 	{
 		start =
 			eps[qi::_val = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT())] >>
-			lit("DepthStencilDesc") >> '{' >>
+			((lit("DepthStencilDesc") >> -((+(qi::char_ - '='))[phoenix::ref(name) = qi::_1 ] >> '=') >> '{') || (lit("DepthStencilDesc") >> '{'))  >>
 			*(
 			(lit("DepthEnable") >> '=' >> d3d11_bool >> ';')                          [bind(&D3D11_DEPTH_STENCIL_DESC::DepthEnable, _val) = qi::_1]
 		|| (lit("DepthWriteMask") >> '=' >> d3d11_depth_write_mask >> ';')          [bind(&D3D11_DEPTH_STENCIL_DESC::DepthWriteMask, _val) = qi::_1]
@@ -233,12 +282,13 @@ struct depth_stencil_desc_parser_ : qi::grammar<Iterator, D3D11_DEPTH_STENCIL_DE
 		|| (lit("StencilFunc") >> '=' >> d3d11_comparison_func >> ';')    [bind(&D3D11_DEPTH_STENCILOP_DESC::StencilFunc, _val) = qi::_1]
 		)
 			;
-
 	}
+
+	vector<char> name;
 	qi::rule<Iterator, D3D11_DEPTH_STENCILOP_DESC(), ascii::space_type> depth_stencil_op_desc;
 	qi::rule<Iterator, D3D11_DEPTH_STENCIL_DESC(), ascii::space_type> start;
 };
-#endif
+
 template <typename Iterator>
 struct rasterizer_desc_parser_ : qi::grammar<Iterator, D3D11_RASTERIZER_DESC(), ascii::space_type>
 {
@@ -266,30 +316,61 @@ struct rasterizer_desc_parser_ : qi::grammar<Iterator, D3D11_RASTERIZER_DESC(), 
 	qi::rule<Iterator, D3D11_RASTERIZER_DESC(), ascii::space_type> start;
 };
 
+template <typename Iterator>
+struct sampler_desc_parser_ : qi::grammar<Iterator, D3D11_SAMPLER_DESC(), ascii::space_type>
+{
+	sampler_desc_parser_() : sampler_desc_parser_::base_type(start)
+	{
+		start =
+			eps[qi::_val = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT())] >>
+			((lit("SamplerDesc") >> -((+(qi::char_ - '='))[phoenix::ref(name) = qi::_1 ] >> '=') >> '{') || (lit("SamplerDesc") >> '{'))  >>
+			*(
+			(lit("Filter") >> '=' >> d3d11_filter >> ';')                    [bind(&D3D11_SAMPLER_DESC::Filter, _val) = qi::_1]
+		|| (lit("AddressU") >> '=' >> d3d11_texture_address_mode >> ';')   [bind(&D3D11_SAMPLER_DESC::AddressU, _val) = qi::_1]
+		|| (lit("AddressV") >> '=' >> d3d11_texture_address_mode >> ';')   [bind(&D3D11_SAMPLER_DESC::AddressV, _val) = qi::_1]
+		|| (lit("AddressW") >> '=' >> d3d11_texture_address_mode >> ';')   [bind(&D3D11_SAMPLER_DESC::AddressW, _val) = qi::_1]
+		|| (lit("MipLODBias") >> '=' >> float_ >> ';')                     [bind(&D3D11_SAMPLER_DESC::MipLODBias, _val) = qi::_1]
+		|| (lit("MaxAnisotropy") >> '=' >> uint_ >> ';')                   [bind(&D3D11_SAMPLER_DESC::MaxAnisotropy, _val) = qi::_1]
+		|| (lit("ComparisonFunc") >> '=' >> d3d11_comparison_func >> ';')  [bind(&D3D11_SAMPLER_DESC::ComparisonFunc, _val) = qi::_1]
+		|| ((lit("BorderColor") >> '[' >> int_ >> ']') >> '=' >> float_ >> ';')              [bind(&set_border_color, &qi::_val, qi::_1, qi::_2)]
+		|| (lit("MinLOD") >> '=' >> float_ >> ';')                     [bind(&D3D11_SAMPLER_DESC::MinLOD, _val) = qi::_1]
+		|| (lit("MaxLOD") >> '=' >> float_ >> ';')                     [bind(&D3D11_SAMPLER_DESC::MaxLOD, _val) = qi::_1]
+		)
+			>> '}' >> ';'
+			;
+	}
+	vector<char> name;
+	qi::rule<Iterator, D3D11_SAMPLER_DESC(), ascii::space_type> start;
+};
+
+template< class T, class U>
+const char *parser_runner(const char *start, const char *end, T *desc, U &parser, string *name)
+{
+	const bool res = phrase_parse(start, end, parser, ascii::space, *desc);
+	if (name)
+		*name = from_vector(parser.name);
+	return res ? start : NULL;
+
+}
+
 const char *parse_blend_desc(const char *start, const char *end, D3D11_BLEND_DESC *desc, string *name)
 {
-	return NULL;
-	//return phrase_parse(start, end, blend_desc_parser_<const char *>(), ascii::space, *desc);
+	return parser_runner(start, end, desc, blend_desc_parser_<const char *>(), name);
 }
 
 const char *parse_depth_stencil_desc(const char *start, const char *end, D3D11_DEPTH_STENCIL_DESC *desc, string *name)
 {
-	return NULL;
-	//return phrase_parse(start, end, depth_stencil_desc_parser_<const char *>(), ascii::space, *desc);
+	return parser_runner(start, end, desc, depth_stencil_desc_parser_<const char *>(), name);
 }
 
 const char *parse_rasterizer_desc(const char *start, const char *end, D3D11_RASTERIZER_DESC *desc, string *name)
 {
-	rasterizer_desc_parser_<const char *> p;
-	const bool res = phrase_parse(start, end, p, ascii::space, *desc);
-	if (name)
-		*name = from_vector(p.name);
-	return res ? start : NULL;
+	return parser_runner(start, end, desc, rasterizer_desc_parser_<const char *>(), name);
 }
 
 const char *parse_sampler_desc(const char *start, const char *end, D3D11_SAMPLER_DESC *desc, string *name)
 {
-	return NULL;
+	return parser_runner(start, end, desc, sampler_desc_parser_<const char *>(), name);
 }
 
 void parse_descs(const char *start, const char *end, 
@@ -305,54 +386,32 @@ void parse_descs(const char *start, const char *end,
 	D3D11_RASTERIZER_DESC rasterizer_desc;
 	D3D11_SAMPLER_DESC sampler_desc;
 
+#define TRY_PARSE(parser, desc, result, next) \
+	if (const char *tmp = parser(cur, end, &desc, &name)) { \
+	cur = tmp; \
+	if (result) (*result)[name] = desc; \
+	fail_count = 0; \
+	} else { \
+		i = next; \
+		++fail_count; \
+	}
+
 	while (cur != end && fail_count != 4) {
 		switch (i) {
 		case 0: 
-			if (const char *tmp = parse_blend_desc(cur, end, &blend_desc, &name)) {
-				cur = tmp;
-				if (blend_descs)
-					(*blend_descs)[name] = blend_desc;
-				fail_count = 0;
-			} else {
-				++i;
-				++fail_count;
-			}
+			TRY_PARSE(parse_blend_desc, blend_desc, blend_descs, 1);
 			break;
 
 		case 1:
-			if (const char *tmp = parse_depth_stencil_desc(cur, end, &dss_desc, &name)) {
-				cur = tmp;
-				if (depth_descs)
-					(*depth_descs)[name] = dss_desc;
-				fail_count = 0;
-			} else {
-				++i;
-				++fail_count;
-			}
+			TRY_PARSE(parse_depth_stencil_desc, dss_desc, depth_descs, 2);
 			break;
 
 		case 2: 
-			if (const char *tmp = parse_rasterizer_desc(cur, end, &rasterizer_desc, &name)) {
-				cur = tmp;
-				if (rasterizer_descs)
-					(*rasterizer_descs)[name] = rasterizer_desc;
-				fail_count = 0;
-			} else {
-				++i;
-				++fail_count;
-			}
+			TRY_PARSE(parse_rasterizer_desc, rasterizer_desc, rasterizer_descs, 3);
 			break;
 
 		case 3: 
-			if (const char *tmp = parse_sampler_desc(cur, end, &sampler_desc, &name)) {
-				cur = tmp;
-				if (sampler_descs)
-					(*sampler_descs)[name] = sampler_desc;
-				fail_count = 0;
-			} else {
-				i = 0;
-				++fail_count;
-			}
+			TRY_PARSE(parse_sampler_desc, sampler_desc, sampler_descs, 0);
 			break;
 		}
 	}
