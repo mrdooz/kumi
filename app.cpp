@@ -68,6 +68,7 @@ App& App::instance()
 
 byte font_buf[512*512];
 stbtt_bakedchar chars[96];
+int texture_height;
 
 void App::debug_text(const char *fmt, ...)
 {
@@ -81,7 +82,7 @@ void App::debug_text(const char *fmt, ...)
 	for (int i = 0, e = strlen(str); i < e; ++i) {
 		char ch = str[i];
 		stbtt_aligned_quad q;
-		stbtt_GetBakedQuad(chars, 512, 512, ch - 32, &x, &y, &q, 1);
+		stbtt_GetBakedQuad(chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
 		// v0 v1
 		// v2 v3
 		screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
@@ -150,13 +151,14 @@ bool App::init(HINSTANCE hinstance)
 	void *font;
 	size_t len;
 	B_ERR_BOOL(load_file("data/arialbd.ttf", &font, &len));
-	int res = stbtt_BakeFontBitmap((const byte *)font, 0, 16, font_buf, 512, 512, 32, 96, chars);
+	int res = stbtt_BakeFontBitmap((const byte *)font, 0, 50, font_buf, 512, 512, 32, 96, chars);
 	const int width = 512;
 	const int height = res > 0 ? res : 512;
-	save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
+	texture_height = height;
+	//save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
 
 	B_ERR_BOOL(GRAPHICS.create_texture(512, res, 
-		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8_UNORM, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
+		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_A8_UNORM, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
 	D3D11_MAPPED_SUBRESOURCE resource;
 	B_ERR_DX(GRAPHICS.context()->Map(_texture.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	memcpy(resource.pData, font_buf, width * height);
