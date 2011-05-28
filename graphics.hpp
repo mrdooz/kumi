@@ -48,6 +48,9 @@ public:
 	bool create_render_target(int width, int height, RenderTargetData *out);
 	bool create_texture(int width, int height, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
+	// Create a texture, and fill it with data
+	bool create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
+
   ID3D11RasterizerState *default_rasterizer_state() const { return _default_rasterizer_state; }
   ID3D11DepthStencilState *default_depth_stencil_state() const { return _default_depth_stencil_state; }
   uint32_t default_stencil_ref() const { return 0; }

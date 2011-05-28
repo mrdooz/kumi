@@ -72,6 +72,26 @@ bool Graphics::create_texture(int width, int height, const D3D11_TEXTURE2D_DESC 
 	return true;
 }
 
+bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out)
+{
+	if (!create_texture(width, height, CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
+		return false;
+
+	D3D11_MAPPED_SUBRESOURCE resource;
+	B_ERR_DX(_immediate_context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
+	uint8_t *src = (uint8_t *)data;
+	uint8_t *dst = (uint8_t *)resource.pData;
+	const int w = std::min<int>(width, data_width);
+	const int h = std::min<int>(height, data_height);
+	for (int i = 0; i < h; ++i) {
+		memcpy(dst, src, w);
+		src += data_pitch;
+		dst += resource.RowPitch;
+	}
+	_immediate_context->Unmap(out->texture, 0);
+	return true;
+}
+
 bool Graphics::create_back_buffers(int width, int height)
 {
   _width = width;

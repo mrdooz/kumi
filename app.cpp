@@ -139,6 +139,28 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
 }
 
+struct FontManager {
+	enum Style {
+		kNormal,
+		kBold,
+		kItalic
+	};
+
+	void add_font(const char *family, Style style, const char *filename);
+	void render(int x, int y, const char *str, ...);
+};
+
+void FontManager::add_font(const char *family, Style style, const char *filename)
+{
+
+}
+
+void FontManager::render(int x, int y, const char *str, ...)
+{
+	// valid properties are: { font-family: XXX }, { font-size: XX }, { font-style: [Normal|Italic] }, { font-width: [Bold|Italic] }
+
+}
+
 bool App::init(HINSTANCE hinstance)
 {
 	_hinstance = hinstance;
@@ -157,12 +179,7 @@ bool App::init(HINSTANCE hinstance)
 	texture_height = height;
 	//save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
 
-	B_ERR_BOOL(GRAPHICS.create_texture(512, res, 
-		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_A8_UNORM, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), &_texture));
-	D3D11_MAPPED_SUBRESOURCE resource;
-	B_ERR_DX(GRAPHICS.context()->Map(_texture.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
-	memcpy(resource.pData, font_buf, width * height);
-	GRAPHICS.context()->Unmap(_texture.texture, 0);
+	B_ERR_BOOL(GRAPHICS.create_texture(512, res, DXGI_FORMAT_A8_UNORM, font_buf, width, height, width, &_texture));
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
