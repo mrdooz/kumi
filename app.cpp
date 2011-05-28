@@ -115,8 +115,11 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 
 		map<string, D3D11_RASTERIZER_DESC> r;
 		map<string, D3D11_SAMPLER_DESC> s;
-		parse_descs((const char *)buf, (const char *)buf + len, NULL, NULL, &r, &s);
-		GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p);
+		map<string, D3D11_BLEND_DESC> b;
+		map<string, D3D11_DEPTH_STENCIL_DESC> d;
+		parse_descs((const char *)buf, (const char *)buf + len, &b, &d, &r, &s);
+		LOG_WRN_DX(GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p));
+		LOG_WRN_DX(GRAPHICS.device()->CreateBlendState(&b["bs"], &_blend_state.p));
 /*
 		D3D11_RASTERIZER_DESC desc;
 		string name;
@@ -289,6 +292,30 @@ void App::toggle_plane()
 	//_draw_plane = !_draw_plane;
 }
 
+void App::render_font()
+{
+	ID3D11DeviceContext *context = GRAPHICS.context();
+	context->RSSetViewports(1, &GRAPHICS.viewport());
+
+	context->PSSetShaderResources(0, 1, &_texture.srv.p);
+	context->PSSetSamplers(0, 1, &_sampler_state.p);
+
+	_debug_fx->set_shaders(context);
+
+	debug_text("tjong");
+	set_vb(context, _font_vb.get(), _font_vb.stride);
+	context->IASetInputLayout(_text_layout);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	float blend_factor[] = { 1, 1, 1, 1 };
+	context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
+	context->RSSetState(GRAPHICS.default_rasterizer_state());
+	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
+	context->PSSetSamplers(0, 1, &_sampler_state.p);
+	context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+	context->Draw(_font_vb.num_verts(), 0);
+}
 
 void App::run()
 {
@@ -347,27 +374,7 @@ void App::run()
 				}
 			}
 
-
-			ID3D11DeviceContext *context = GRAPHICS.context();
-			context->RSSetViewports(1, &GRAPHICS.viewport());
-
-			context->PSSetShaderResources(0, 1, &_texture.srv.p);
-			context->PSSetSamplers(0, 1, &_sampler_state.p);
-
-			_debug_fx->set_shaders(context);
-
-			debug_text("tjong");
-			set_vb(context, _font_vb.get(), _font_vb.stride);
-			context->IASetInputLayout(_text_layout);
-			context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			float blend_factor[] = { 1, 1, 1, 1 };
-			context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
-			context->RSSetState(GRAPHICS.default_rasterizer_state());
-			context->OMSetDepthStencilState(_dss_state, 0xffffffff);
-			context->PSSetSamplers(0, 1, &_sampler_state.p);
-
-			context->Draw(_font_vb.num_verts(), 0);
+			render_font();
 
 			GRAPHICS.present();
 

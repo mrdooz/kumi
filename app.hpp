@@ -155,6 +155,8 @@ private:
   void set_client_size();
 	void find_app_root();
 
+	void render_font();
+
 	LRESULT wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -191,6 +193,7 @@ private:
 	CComPtr<ID3D11RasterizerState> _rasterizer_state;
 	CComPtr<ID3D11DepthStencilState> _dss_state;
 	CComPtr<ID3D11SamplerState> _sampler_state;
+	CComPtr<ID3D11BlendState> _blend_state;
 	TextureData _texture;
 };
 
