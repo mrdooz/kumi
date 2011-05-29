@@ -73,16 +73,182 @@ int texture_height;
 #include "text_parser.hpp"
 void parse_text(const char *str, vector<Token> *out);
 
+struct TokenIterator {
+	typedef vector<Token> Tokens;
+	TokenIterator(const Tokens &tokens) : tokens(tokens), ofs(0) {}
+	const Token *next()
+	{
+		if (ofs >= tokens.size())
+			return NULL;
+		return &tokens[ofs++];
+	}
+
+	void rewind(int num)
+	{
+		ofs = max(0, ofs - num);
+	}
+
+	const vector<Token> &tokens;
+	size_t ofs;
+};
+
+struct FontManager {
+	enum Style {
+		kNormal,
+		kBold,
+		kItalic
+	};
+
+	void add_font(const char *family, Style style, const char *filename);
+	bool get_font(const char *family, int size, Style weight, Style style, stbtt_bakedchar **chars);
+	void render(int x, int y, const char *str, ...);
+
+	static FontManager &instance();
+	static FontManager *_instance;
+};
+
+FontManager *FontManager::_instance = NULL;
+
+FontManager &FontManager::instance()
+{
+	if (!_instance)
+		_instance = new FontManager;
+	return *_instance;
+}
+
+#define FONT_MANAGER FontManager::instance()
+
+void FontManager::add_font(const char *family, Style style, const char *filename)
+{
+
+}
+
+void FontManager::render(int x, int y, const char *str, ...)
+{
+	// valid properties are: [[ pos-x: XX | pos-y: XX | font-family: XXX | font-size: XX | font-style: [Normal|Italic] | font-weight: [Normal|Bold] ]]+
+
+}
+
+
 void App::debug_text(const char *fmt, ...)
 {
 	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
 
-	const char *str = "magnus mcagnus [[ font-width: 10 ]]";
-	vector<Token> pp;
-	parse_text(str, &pp);
+	const char *str = "[[ pos-x: 200 pos-y: 200 ]]magnus mcagnus[[ font-size: 10 ]]";
+	vector<Token> tokens;
+	parse_text(str, &tokens);
 
-	float x = 200;
-	float y = 200;
+	string font_family = "Arial";
+	FontManager::Style font_style = FontManager::kNormal;
+	FontManager::Style font_weight = FontManager::kNormal;
+	int font_size = 12;
+	bool new_font = false;
+
+	bool cmd_mode = false;
+	float x = 0, y = 0;
+	TokenIterator it(tokens);
+	const Token *token = NULL;
+	const Token *next;
+	bool parse_error = false;
+
+	PosTex *p = _font_vb.map();
+	PosTex v0, v1, v2, v3;
+
+	while (!parse_error && (token = it.next())) {
+
+		switch (token->type) {
+
+		case Token::kChar:
+			{
+				stbtt_bakedchar *chars;
+				if (FONT_MANAGER.get_font(&chars)) {
+					char ch = token->ch;
+					stbtt_aligned_quad q;
+					stbtt_GetBakedQuad(chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
+					// v0 v1
+					// v2 v3
+					screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
+					screen_to_clip(q.x1, q.y0, vp.Width, vp.Height, &v1.pos.x, &v1.pos.y); v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
+					screen_to_clip(q.x0, q.y1, vp.Width, vp.Height, &v2.pos.x, &v2.pos.y); v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
+					screen_to_clip(q.x1, q.y1, vp.Width, vp.Height, &v3.pos.x, &v3.pos.y); v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
+					*p++ = v0; *p++ = v1; *p++ = v2;
+					*p++ = v2; *p++ = v1; *p++ = v3;
+				}
+			}
+			break;
+
+		case Token::kCmdOpen:
+			if (cmd_mode) {
+				parse_error = true;
+				continue;
+			}
+			cmd_mode = true;
+			break;
+
+		case Token::kCmdClose:
+			cmd_mode = false;
+			break;
+#define CHECK_NEXT(type) if (!(next = it.next()) || next->type != type) { parse_error = true; continue; }
+
+		case Token::kPosX:
+			CHECK_NEXT(Token::kInt);
+			x = (float)next->num;
+			break;
+
+		case Token::kPosY:
+			CHECK_NEXT(Token::kInt);
+			y = (float)next->num;
+			break;
+
+		case Token::kFontSize:
+			CHECK_NEXT(Token::kInt);
+			if (next->num != font_size) {
+				font_size = next->num;
+				new_font = true;
+			}
+			break;
+
+		case Token::kFontStyle:
+			CHECK_NEXT(Token::kId);
+			if (!strcmp(token->id, "normal")) {
+				new_font |= font_style != FontManager::kNormal;
+				font_style = FontManager::kNormal;
+			} else if (!strcmp(token->id, "italic")) {
+				new_font |= font_style != FontManager::kItalic;
+				font_style = FontManager::kItalic;
+			} else {
+				parse_error = true;
+			}
+			break;
+
+		case Token::kFontWeight:
+			CHECK_NEXT(Token::kId);
+			if (!strcmp(token->id, "normal")) {
+				new_font |= font_weight != FontManager::kNormal;
+				font_style = FontManager::kNormal;
+			}
+			else if (!strcmp(token->id, "bold")) {
+				new_font |= font_weight != FontManager::kBold;
+				font_style = FontManager::kBold;
+			} else {
+				parse_error = true;
+			}
+			break;
+
+		case Token::kFontFamily:
+			CHECK_NEXT(Token::kId);
+			new_font |= !strcmp(font_family.c_str(), next->id);
+			font_family = next->id;
+			break;
+		default:
+			parse_error = true;
+		}
+	}
+
+	_font_vb.unmap(p);
+/*
+	//float x = 200;
+	//float y = 200;
 	PosTex *p = _font_vb.map();
 	PosTex v0, v1, v2, v3;
 	for (int i = 0, e = strlen(str); i < e; ++i) {
@@ -99,7 +265,7 @@ void App::debug_text(const char *fmt, ...)
 		*p++ = v2; *p++ = v1; *p++ = v3;
 	}
 	const int num_verts = _font_vb.unmap(p);
-
+*/
 }
 
 const char *debug_font = "effects/debug_font.fx";
@@ -146,28 +312,6 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 	}
 
 	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
-}
-
-struct FontManager {
-	enum Style {
-		kNormal,
-		kBold,
-		kItalic
-	};
-
-	void add_font(const char *family, Style style, const char *filename);
-	void render(int x, int y, const char *str, ...);
-};
-
-void FontManager::add_font(const char *family, Style style, const char *filename)
-{
-
-}
-
-void FontManager::render(int x, int y, const char *str, ...)
-{
-	// valid properties are: { font-family: XXX }, { font-size: XX }, { font-style: [Normal|Italic] }, { font-width: [Bold|Italic] }
-
 }
 
 bool App::init(HINSTANCE hinstance)
@@ -318,7 +462,7 @@ void App::render_font()
 	context->RSSetState(GRAPHICS.default_rasterizer_state());
 	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
 	context->PSSetSamplers(0, 1, &_sampler_state.p);
-	context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+	//context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
 	context->Draw(_font_vb.num_verts(), 0);
 }

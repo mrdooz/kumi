@@ -6,16 +6,19 @@ struct Token {
 		kChar,
 		kInt,
 		kId,
-		kStyleOpen,
-		kStyleClose,
+		kCmdOpen,
+		kCmdClose,
+		kPosX,
+		kPosY,
 		kFontFamily,
-		kFontWidth,
+		kFontWeight,
+		kFontSize,
 		kFontStyle
 	};
 
 	Token(Type cmd) : type(cmd) {}
 	Token(Type cmd, int value) : type(cmd), num(value) { }
-	Token(Type cmd, const char *id, int len) : type(cmd), id(strdup(id)) { }
+	Token(const char *str, size_t len) : type(kId), id(strdup(str)) { if (len < strlen(str)) id[len] = 0; }
 	Token(const Token &rhs) { assign(rhs); }
 	Token &operator=(const Token &rhs) { assign(rhs); return *this; }
 	~Token() { if (type == kId) { free(id); id= NULL; } }
