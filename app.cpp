@@ -70,11 +70,17 @@ byte font_buf[512*512];
 stbtt_bakedchar chars[96];
 int texture_height;
 
+#include "text_parser.hpp"
+void parse_text(const char *str, vector<Token> *out);
+
 void App::debug_text(const char *fmt, ...)
 {
 	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
 
-	const char *str = "magnus mcagnus";
+	const char *str = "magnus mcagnus [[ font-width: 10 ]]";
+	vector<Token> pp;
+	parse_text(str, &pp);
+
 	float x = 200;
 	float y = 200;
 	PosTex *p = _font_vb.map();

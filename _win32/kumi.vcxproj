@@ -92,6 +92,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\logger.cpp" />
+    <ClCompile Include="..\text_parser.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
     <ClCompile Include="..\resource_watcher.cpp" />
     <ClCompile Include="..\stdafx.cpp">
@@ -118,6 +119,7 @@
     <ClInclude Include="..\stb_truetype.h" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\string_utils.hpp" />
+    <ClInclude Include="..\text_parser.hpp" />
     <ClInclude Include="..\utils.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
