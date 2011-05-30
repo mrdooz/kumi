@@ -6,6 +6,8 @@
 #include "graphics.hpp"
 
 using std::string;
+using std::map;
+using std::vector;
 
 /*
 	repeat after me: directx is left-handed. z goes into the screen.
@@ -194,7 +196,14 @@ private:
 	CComPtr<ID3D11DepthStencilState> _dss_state;
 	CComPtr<ID3D11SamplerState> _sampler_state;
 	CComPtr<ID3D11BlendState> _blend_state;
-	TextureData _texture;
+	struct DrawCall {
+		DrawCall() {}
+		DrawCall(int ofs, int num) : ofs(ofs), num(num) {}
+		int ofs, num;
+	};
+	typedef map<ID3D11ShaderResourceView *, vector<DrawCall> > DrawCalls;
+	DrawCalls _draw_calls;
+	//TextureData _texture;
 };
 
 #define APP App::instance()

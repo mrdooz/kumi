@@ -5,6 +5,7 @@
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
 #include "d3d_parser.hpp"
+#include <boost/scoped_array.hpp>
 
 /*
 #include "system.hpp"
@@ -99,9 +100,25 @@ struct FontManager {
 		kItalic
 	};
 
-	void add_font(const char *family, Style style, const char *filename);
-	bool get_font(const char *family, int size, Style weight, Style style, stbtt_bakedchar **chars);
+	bool add_font(const char *family, int size, Style weight, Style style, const char *filename);
+	bool get_font(const string &family, int size, Style weight, Style style, stbtt_bakedchar **chars);
 	void render(int x, int y, const char *str, ...);
+
+	struct FontInstance {
+		FontInstance(const string &family, int size, Style weight, Style style) : family(family), size(size), weight(weight), style(style) {}
+		friend bool operator==(const FontInstance &a, const FontInstance &b)
+		{
+			return a.family == b.family && a.size == b.size && a.weight == b.weight && a.style == b.style;
+		}
+		string family;
+		int size;
+		Style weight;
+		Style style;
+		stbtt_bakedchar chars[96];
+		TextureData texture;
+	};
+
+	vector<FontInstance *> _fonts;
 
 	static FontManager &instance();
 	static FontManager *_instance;
@@ -118,9 +135,33 @@ FontManager &FontManager::instance()
 
 #define FONT_MANAGER FontManager::instance()
 
-void FontManager::add_font(const char *family, Style style, const char *filename)
+bool FontManager::get_font(const string &family, int size, Style weight, Style style, stbtt_bakedchar **chars)
 {
+	FontInstance t(family, size, weight, style);
+	for (size_t i = 0; i < _fonts.size(); ++i) {
+		if (*_fonts[i] == t) {
+			*chars = _fonts[i]->chars;
+			return true;
+		}
+	}
+	return false;
+}
 
+bool FontManager::add_font(const char *family, int size, Style weight, Style style, const char *filename)
+{
+	void *font;
+	size_t len;
+	B_ERR_BOOL(load_file(filename, &font, &len));
+	const int num_chars = 96;
+	const int w = num_chars / 2 * (3 * size / 2);
+	const int h = 3 * size / 2;
+	boost::scoped_array<uint8_t> font_buf(new uint8_t[w*h]);
+	FontInstance *fi = new FontInstance(family, size, weight, style);
+	int res = stbtt_BakeFontBitmap((const byte *)font, 0, (float)size, font_buf.get(), w, h, 32, num_chars, fi->chars);
+	const int texture_height = res > 0 ? res : 512;
+
+	B_ERR_BOOL(GRAPHICS.create_texture(w, res, DXGI_FORMAT_A8_UNORM, font_buf.get(), w, texture_height, w, &fi->texture));
+	return true;
 }
 
 void FontManager::render(int x, int y, const char *str, ...)
@@ -142,6 +183,10 @@ void App::debug_text(const char *fmt, ...)
 	FontManager::Style font_style = FontManager::kNormal;
 	FontManager::Style font_weight = FontManager::kNormal;
 	int font_size = 12;
+	stbtt_bakedchar *baked_chars;
+	if (!FONT_MANAGER.get_font(font_family, font_size, font_weight, font_style, &baked_chars))
+		return;
+
 	bool new_font = false;
 
 	bool cmd_mode = false;
@@ -152,6 +197,8 @@ void App::debug_text(const char *fmt, ...)
 	bool parse_error = false;
 
 	PosTex *p = _font_vb.map();
+	PosTex *prev = p;
+	PosTex *org = p;
 	PosTex v0, v1, v2, v3;
 
 	while (!parse_error && (token = it.next())) {
@@ -160,11 +207,15 @@ void App::debug_text(const char *fmt, ...)
 
 		case Token::kChar:
 			{
-				stbtt_bakedchar *chars;
-				if (FONT_MANAGER.get_font(&chars)) {
+				if (new_font) {
+					_draw_calls[NULL].push_back(NULL, DrawCall(p - org, p - prev));
+					prev = p;
+				}
+				if (!new_font || new_font && FONT_MANAGER.get_font(font_family, font_size, font_weight, font_style, &baked_chars)) {
+					new_font = false;
 					char ch = token->ch;
 					stbtt_aligned_quad q;
-					stbtt_GetBakedQuad(chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
+					stbtt_GetBakedQuad(baked_chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
 					// v0 v1
 					// v2 v3
 					screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
@@ -246,26 +297,6 @@ void App::debug_text(const char *fmt, ...)
 	}
 
 	_font_vb.unmap(p);
-/*
-	//float x = 200;
-	//float y = 200;
-	PosTex *p = _font_vb.map();
-	PosTex v0, v1, v2, v3;
-	for (int i = 0, e = strlen(str); i < e; ++i) {
-		char ch = str[i];
-		stbtt_aligned_quad q;
-		stbtt_GetBakedQuad(chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
-		// v0 v1
-		// v2 v3
-		screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
-		screen_to_clip(q.x1, q.y0, vp.Width, vp.Height, &v1.pos.x, &v1.pos.y); v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
-		screen_to_clip(q.x0, q.y1, vp.Width, vp.Height, &v2.pos.x, &v2.pos.y); v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
-		screen_to_clip(q.x1, q.y1, vp.Width, vp.Height, &v3.pos.x, &v3.pos.y); v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
-		*p++ = v0; *p++ = v1; *p++ = v2;
-		*p++ = v2; *p++ = v1; *p++ = v3;
-	}
-	const int num_verts = _font_vb.unmap(p);
-*/
 }
 
 const char *debug_font = "effects/debug_font.fx";
@@ -292,23 +323,6 @@ void App::resource_changed(void *token, const char *filename, const void *buf, s
 		parse_descs((const char *)buf, (const char *)buf + len, &b, &d, &r, &s);
 		LOG_WRN_DX(GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p));
 		LOG_WRN_DX(GRAPHICS.device()->CreateBlendState(&b["bs"], &_blend_state.p));
-/*
-		D3D11_RASTERIZER_DESC desc;
-		string name;
-		if (parse_rasterizer_desc((const char *)buf, (const char *)buf + len, &desc, &name)) {
-			ID3D11RasterizerState *state;
-			GRAPHICS.device()->CreateRasterizerState(&desc, &state);
-			_rasterizer_state.Attach(state);
-		}
-*/
-/*
-		D3D11_DEPTH_STENCIL_DESC desc;
-		if (parse_depth_stencil_desc((const char *)buf, (const char *)buf + len, &desc)) {
-			ID3D11DepthStencilState *state;
-			GRAPHICS.device()->CreateDepthStencilState(&desc, &state);
-			_dss_state.Attach(state);
-		}
-*/
 	}
 
 	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
@@ -323,6 +337,8 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(create_window());
 	B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
 
+	FONT_MANAGER.add_font("Arial", 50, FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");
+/*
 	void *font;
 	size_t len;
 	B_ERR_BOOL(load_file("data/arialbd.ttf", &font, &len));
@@ -333,6 +349,7 @@ bool App::init(HINSTANCE hinstance)
 	//save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
 
 	B_ERR_BOOL(GRAPHICS.create_texture(512, res, DXGI_FORMAT_A8_UNORM, font_buf, width, height, width, &_texture));
+*/
 	B_ERR_BOOL(_font_vb.create(16 * 1024));
 
 	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
@@ -447,7 +464,7 @@ void App::render_font()
 	ID3D11DeviceContext *context = GRAPHICS.context();
 	context->RSSetViewports(1, &GRAPHICS.viewport());
 
-	context->PSSetShaderResources(0, 1, &_texture.srv.p);
+	//context->PSSetShaderResources(0, 1, &_texture.srv.p);
 	context->PSSetSamplers(0, 1, &_sampler_state.p);
 
 	_debug_fx->set_shaders(context);
@@ -463,8 +480,10 @@ void App::render_font()
 	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
 	context->PSSetSamplers(0, 1, &_sampler_state.p);
 	//context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-	context->Draw(_font_vb.num_verts(), 0);
+	//context->Draw(_font_vb.num_verts(), 0);
+	for (auto it = _draw_calls.begin(); it != _draw_calls.end(); ++it)
+		context->Draw(it->second.num, it->second.ofs);
+	_draw_calls.clear();
 }
 
 void App::run()
