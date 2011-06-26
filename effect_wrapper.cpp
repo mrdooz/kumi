@@ -16,9 +16,9 @@ EffectWrapper::~EffectWrapper()
 bool EffectWrapper::load_shaders(const char *buf, int len, const char *vs, const char *gs, const char *ps)
 {
 	return 
-		either_or(!vs, vs && load_inner(buf, len, vs, VertexShader)) && 
-		either_or(!gs, gs && load_inner(buf, len, gs, GeometryShader)) && 
-		either_or(!ps, ps && load_inner(buf, len, ps, PixelShader));
+		either_or(!vs, load_inner(buf, len, vs, VertexShader)) && 
+		either_or(!gs, load_inner(buf, len, gs, GeometryShader)) && 
+		either_or(!ps, load_inner(buf, len, ps, PixelShader));
 }
 
 bool EffectWrapper::load_shaders(const char *filename, const char *vs, const char *gs, const char *ps)

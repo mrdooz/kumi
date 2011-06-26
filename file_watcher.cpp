@@ -230,7 +230,7 @@ void WatcherThread::add_watch_apc(ULONG_PTR data)
 	DirWatches &dir_watches = _dir_watches;
 	if (dir_watches.find(path) == dir_watches.end()) {
 
-		HANDLE h = CreateFile(
+		HANDLE h = CreateFileA(
 			path.c_str(),
 			FILE_LIST_DIRECTORY,
 			FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,

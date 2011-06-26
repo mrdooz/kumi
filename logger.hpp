@@ -98,7 +98,7 @@ public:
 	LogMgr& print_file_and_line(const bool value);
   LogMgr& enable_output(OuputDevice output);
   LogMgr& disable_output(OuputDevice output);
-  LogMgr& open_output_file(const char* pFilename);
+  LogMgr& open_output_file(const TCHAR *filename);
   LogMgr& break_on_error(const bool setting);
 
   LogMgr& enable_severity(const OuputDevice output, const Severity severity);

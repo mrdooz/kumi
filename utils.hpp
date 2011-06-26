@@ -44,6 +44,15 @@ void map_delete(T& container)
 	container.clear();
 }
 
+template<class T>
+void container_delete(T& container)
+{
+	for (T::iterator it = container.begin(), e = container.end(); it != e; ++it) {
+		delete *it;
+	}
+	container.clear();
+}
+
 template <class T>
 T either_or(const T &a, const T &b)
 {

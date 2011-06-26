@@ -51,7 +51,7 @@ void LoaderThread::load_file_apc(ULONG_PTR data)
 	scoped_ptr<LoadFileData> load_data((LoadFileData *)data);
 	const string &filename = get<0>(*load_data);
 	const CbFileLoaded &cb = get<1>(*load_data);
-	HANDLE h = CreateFile(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+	HANDLE h = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 	if (h == INVALID_HANDLE_VALUE)
 		return;
 

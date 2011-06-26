@@ -43,3 +43,15 @@ string trim(const string &str)
 
 	return leading || trailing ? str.substr(leading, str.size() - (leading + trailing)) : str;
 }
+
+wstring ansi_to_unicode(const char *str)
+{
+	const int len = strlen(str);
+	TCHAR *buf = (TCHAR *)_alloca(len*2) + 1;
+
+	wstring res;
+	if (MultiByteToWideChar(CP_ACP, 0, str, -1, buf, len * 2 + 1))
+		res = wstring(buf);
+
+	return res;
+}

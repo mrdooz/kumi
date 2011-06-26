@@ -146,7 +146,7 @@ private:
 
 	static void __stdcall tramp_menu(void *menu_item);
 
-	void resource_changed(void *token, const char *filename, const void *buf, size_t len);
+	//void resource_changed(void *token, const char *filename, const void *buf, size_t len);
 
 	void on_quit();
 	void toggle_debug();
@@ -157,7 +157,6 @@ private:
   void set_client_size();
 	void find_app_root();
 
-	void render_font();
 
 	LRESULT wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
   static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -189,21 +188,7 @@ private:
   TwBar *_tweakbar;
   bool _draw_plane;
 	string _app_root;
-	DynamicVb<PosTex> _font_vb;
-	EffectWrapper *_debug_fx;
-	CComPtr<ID3D11InputLayout> _text_layout;
-	CComPtr<ID3D11RasterizerState> _rasterizer_state;
-	CComPtr<ID3D11DepthStencilState> _dss_state;
-	CComPtr<ID3D11SamplerState> _sampler_state;
-	CComPtr<ID3D11BlendState> _blend_state;
-	struct DrawCall {
-		DrawCall() {}
-		DrawCall(int ofs, int num) : ofs(ofs), num(num) {}
-		int ofs, num;
-	};
-	typedef map<ID3D11ShaderResourceView *, vector<DrawCall> > DrawCalls;
-	DrawCalls _draw_calls;
-	//TextureData _texture;
+	int _ref_count;
 };
 
 #define APP App::instance()

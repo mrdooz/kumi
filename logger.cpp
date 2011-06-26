@@ -85,7 +85,7 @@ void LogMgr::debug_output(const bool new_line, const bool one_shot, const char *
       char buf[MAX_PATH+1];
       buf[MAX_PATH] = 0;
       GetModuleFileNameA(NULL, buf, MAX_PATH);
-      open_output_file(Path::replace_extension(buf, "log").c_str());
+      open_output_file(ansi_to_unicode(Path::replace_extension(buf, "log").c_str()).c_str());
     }
   }
 
@@ -128,7 +128,7 @@ LogMgr& LogMgr::disable_output(OuputDevice output)
   return *this;
 }
 
-LogMgr& LogMgr::open_output_file(const char *filename) 
+LogMgr& LogMgr::open_output_file(const TCHAR *filename) 
 {
   // close open file
 	if (_file != INVALID_HANDLE_VALUE)

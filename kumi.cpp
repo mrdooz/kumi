@@ -6,6 +6,7 @@
 #include "logger.hpp"
 #include "app.hpp"
 
+
 void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
 }
@@ -42,6 +43,9 @@ HRESULT hr_meh()
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
+	CefSettings settings;
+	settings.multi_threaded_message_loop = false;
+	CefInitialize(settings);
 
 	XMMATRIX m = XMMatrixLookAtLH(XMLoadFloat3(&XMFLOAT3(0,0,0)), XMLoadFloat3(&XMFLOAT3(0,0,1)), XMLoadFloat3(&XMFLOAT3(0,1,0)));
 

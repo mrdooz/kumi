@@ -48,5 +48,7 @@
 #include "dx_utils.hpp"
 #include "logger.hpp"
 
+#include <cef.h>
+
 #include "stb_truetype.h"
 using namespace fastdelegate;

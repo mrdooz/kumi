@@ -35,6 +35,333 @@ App* App::_instance = nullptr;
 #define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
 #endif
 
+#pragma comment(lib, "libcef.lib")
+#pragma comment(lib, "libcef_dll_wrapper.lib")
+
+
+// ClientHandler implementation.
+class ClientHandler : public CefClient,
+	public CefLifeSpanHandler,
+	public CefLoadHandler,
+	public CefJSBindingHandler,
+	public CefRenderHandler
+	//public DownloadListener
+{
+public:
+	ClientHandler();
+	virtual ~ClientHandler();
+
+	// CefClient methods
+	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() OVERRIDE { return this; }
+	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() OVERRIDE { return this; }
+	virtual CefRefPtr<CefJSBindingHandler> GetJSBindingHandler() OVERRIDE { return this; }
+	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() OVERRIDE { return this; }
+
+	// CefLifeSpanHandler methods
+	virtual bool OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser,
+		const CefPopupFeatures& popupFeatures,
+		CefWindowInfo& windowInfo,
+		const CefString& url,
+		CefRefPtr<CefClient>& client,
+		CefBrowserSettings& settings) OVERRIDE;
+	virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) OVERRIDE;
+	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
+
+	// CefLoadHandler methods
+	virtual void OnLoadStart(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame) OVERRIDE;
+	virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		int httpStatusCode) OVERRIDE;
+	virtual bool OnLoadError(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		ErrorCode errorCode,
+		const CefString& failedUrl,
+		CefString& errorText) OVERRIDE;
+
+	// CefJSBindingHandler methods
+	virtual void OnJSBinding(CefRefPtr<CefBrowser> browser,
+		CefRefPtr<CefFrame> frame,
+		CefRefPtr<CefV8Value> object) OVERRIDE;
+
+	void SetMainHwnd(CefWindowHandle hwnd);
+	CefWindowHandle GetMainHwnd() { return m_MainHwnd; }
+	void SetEditHwnd(CefWindowHandle hwnd);
+	void SetButtonHwnds(CefWindowHandle backHwnd,
+		CefWindowHandle forwardHwnd,
+		CefWindowHandle reloadHwnd,
+		CefWindowHandle stopHwnd);
+
+	CefRefPtr<CefBrowser> GetBrowser() { return m_Browser; }
+	CefWindowHandle GetBrowserHwnd() { return m_BrowserHwnd; }
+
+	virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
+		static int hax = 0;
+		//save_bmp32(to_string("c:\\temp\\dump%.3d.bmp", hax++).c_str(), (uint8_t *)buffer, dirtyRect.width, dirtyRect.height);
+		//int a = 10;
+	}
+
+	virtual bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) { 
+		return false; 
+	}
+
+	virtual bool GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect) { 
+		return false; 
+	}
+
+	virtual bool GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY) { 
+		return false; 
+	}
+
+	std::string GetLogFile();
+
+	void SetLastDownloadFile(const std::string& fileName);
+	std::string GetLastDownloadFile();
+
+	// DOM visitors will be called after the associated path is loaded.
+	void AddDOMVisitor(const std::string& path, CefRefPtr<CefDOMVisitor> visitor);
+	CefRefPtr<CefDOMVisitor> GetDOMVisitor(const std::string& path);
+
+	// Send a notification to the application. Notifications should not block the
+	// caller.
+	enum NotificationType
+	{
+		NOTIFY_CONSOLE_MESSAGE,
+		NOTIFY_DOWNLOAD_COMPLETE,
+		NOTIFY_DOWNLOAD_ERROR,
+	};
+	void SendNotification(NotificationType type);
+
+protected:
+	void SetLoading(bool isLoading);
+	void SetNavState(bool canGoBack, bool canGoForward);
+
+	// The child browser window
+	CefRefPtr<CefBrowser> m_Browser;
+
+	// The main frame window handle
+	CefWindowHandle m_MainHwnd;
+
+	// The child browser window handle
+	CefWindowHandle m_BrowserHwnd;
+
+	// The edit window handle
+	CefWindowHandle m_EditHwnd;
+
+	// The button window handles
+	CefWindowHandle m_BackHwnd;
+	CefWindowHandle m_ForwardHwnd;
+	CefWindowHandle m_StopHwnd;
+	CefWindowHandle m_ReloadHwnd;
+
+	// Support for logging.
+	std::string m_LogFile;
+
+	// Support for downloading files.
+	std::string m_LastDownloadFile;
+
+	// Support for DOM visitors.
+	typedef std::map<std::string, CefRefPtr<CefDOMVisitor> > DOMVisitorMap;
+	DOMVisitorMap m_DOMVisitors;
+
+	// Include the default reference counting implementation.
+	IMPLEMENT_REFCOUNTING(ClientHandler);
+	// Include the default locking implementation.
+	IMPLEMENT_LOCKING(ClientHandler);
+};
+
+ClientHandler::ClientHandler()
+	: m_MainHwnd(NULL),
+	m_BrowserHwnd(NULL),
+	m_EditHwnd(NULL),
+	m_BackHwnd(NULL),
+	m_ForwardHwnd(NULL),
+	m_StopHwnd(NULL),
+	m_ReloadHwnd(NULL)
+{
+}
+
+ClientHandler::~ClientHandler()
+{
+}
+
+#define REQUIRE_UI_THREAD()
+
+void ClientHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser)
+{
+	REQUIRE_UI_THREAD();
+
+	AutoLock lock_scope(this);
+	if(!browser->IsPopup())
+	{
+		// We need to keep the main child window, but not popup windows
+		m_Browser = browser;
+		m_BrowserHwnd = browser->GetWindowHandle();
+		browser->SetSize(PET_VIEW, 1024, 768);
+	}
+}
+
+void ClientHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
+{
+	REQUIRE_UI_THREAD();
+
+	if(m_BrowserHwnd == browser->GetWindowHandle()) {
+		// Free the browser pointer so that the browser can be destroyed
+		m_Browser = NULL;
+	}
+}
+
+void ClientHandler::OnLoadStart(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame)
+{
+	REQUIRE_UI_THREAD();
+
+	if(!browser->IsPopup() && frame->IsMain()) {
+		// We've just started loading a page
+		SetLoading(true);
+	}
+}
+
+void ClientHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	int httpStatusCode)
+{
+	REQUIRE_UI_THREAD();
+
+	if(!browser->IsPopup() && frame->IsMain()) {
+		// We've just finished loading a page
+		SetLoading(false);
+
+		CefRefPtr<CefDOMVisitor> visitor = GetDOMVisitor(frame->GetURL());
+		if(visitor.get())
+			frame->VisitDOM(visitor);
+	}
+}
+
+bool ClientHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	ErrorCode errorCode,
+	const CefString& failedUrl,
+	CefString& errorText)
+{
+	REQUIRE_UI_THREAD();
+
+	if(errorCode == ERR_CACHE_MISS) {
+		// Usually caused by navigating to a page with POST data via back or
+		// forward buttons.
+		errorText = "<html><head><title>Expired Form Data</title></head>"
+			"<body><h1>Expired Form Data</h1>"
+			"<h2>Your form request has expired. "
+			"Click reload to re-submit the form data.</h2></body>"
+			"</html>";
+	} else {
+		// All other messages.
+		std::stringstream ss;
+		ss <<       "<html><head><title>Load Failed</title></head>"
+			"<body><h1>Load Failed</h1>"
+			"<h2>Load of URL " << std::string(failedUrl) <<
+			" failed with error code " << static_cast<int>(errorCode) <<
+			".</h2></body>"
+			"</html>";
+		errorText = ss.str();
+	}
+
+	return false;
+}
+
+void ClientHandler::OnJSBinding(CefRefPtr<CefBrowser> browser,
+	CefRefPtr<CefFrame> frame,
+	CefRefPtr<CefV8Value> object)
+{
+	REQUIRE_UI_THREAD();
+
+	// Add the V8 bindings.
+	//InitBindingTest(browser, frame, object);
+}
+
+void ClientHandler::SetMainHwnd(CefWindowHandle hwnd)
+{
+	AutoLock lock_scope(this);
+	m_MainHwnd = hwnd;
+}
+
+std::string ClientHandler::GetLogFile()
+{
+	AutoLock lock_scope(this);
+	return m_LogFile;
+}
+
+void ClientHandler::SetLastDownloadFile(const std::string& fileName)
+{
+	AutoLock lock_scope(this);
+	m_LastDownloadFile = fileName;
+}
+
+std::string ClientHandler::GetLastDownloadFile()
+{
+	AutoLock lock_scope(this);
+	return m_LastDownloadFile;
+}
+
+void ClientHandler::AddDOMVisitor(const std::string& path,
+	CefRefPtr<CefDOMVisitor> visitor)
+{
+	AutoLock lock_scope(this);
+	DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
+	if (it == m_DOMVisitors.end())
+		m_DOMVisitors.insert(std::make_pair(path, visitor));
+	else
+		it->second = visitor;
+}
+
+CefRefPtr<CefDOMVisitor> ClientHandler::GetDOMVisitor(const std::string& path)
+{
+	AutoLock lock_scope(this);
+	DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
+	if (it != m_DOMVisitors.end())
+		return it->second;
+	return NULL;
+}
+
+bool ClientHandler::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser,
+	const CefPopupFeatures& popupFeatures,
+	CefWindowInfo& windowInfo,
+	const CefString& url,
+	CefRefPtr<CefClient>& client,
+	CefBrowserSettings& settings)
+{
+	REQUIRE_UI_THREAD();
+
+#ifdef TEST_REDIRECT_POPUP_URLS
+	std::string urlStr = url;
+	if(urlStr.find("resources/inspector/devtools.html") == std::string::npos) {
+		// Show all popup windows excluding DevTools in the current window.
+		windowInfo.m_dwStyle &= ~WS_VISIBLE;
+		client = new ClientPopupHandler(m_Browser);
+	}
+#endif // TEST_REDIRECT_POPUP_URLS
+
+	return false;
+}
+
+
+void ClientHandler::SetLoading(bool isLoading)
+{
+	//ASSERT(m_EditHwnd != NULL && m_ReloadHwnd != NULL && m_StopHwnd != NULL);
+	EnableWindow(m_EditHwnd, TRUE);
+	EnableWindow(m_ReloadHwnd, !isLoading);
+	EnableWindow(m_StopHwnd, isLoading);
+}
+
+void ClientHandler::SetNavState(bool canGoBack, bool canGoForward)
+{
+	//ASSERT(m_BackHwnd != NULL && m_ForwardHwnd != NULL);
+	EnableWindow(m_BackHwnd, canGoBack);
+	EnableWindow(m_ForwardHwnd, canGoForward);
+}
+
+
+CefRefPtr<ClientHandler> g_handler;
 
 
 App::App()
@@ -50,14 +377,13 @@ App::App()
 	, _freefly(nullptr)
 	, _cur_camera(1)
 	, _draw_plane(false)
-	, _debug_fx(nullptr)
+	, _ref_count(1)
 {
 	find_app_root();
 }
 
 App::~App()
 {
-	delete exch_null(_debug_fx);
 }
 
 App& App::instance()
@@ -67,9 +393,9 @@ App& App::instance()
 	return *_instance;
 }
 
-byte font_buf[512*512];
-stbtt_bakedchar chars[96];
-int texture_height;
+//byte font_buf[512*512];
+//stbtt_bakedchar chars[96];
+//int texture_height;
 
 #include "text_parser.hpp"
 void parse_text(const char *str, vector<Token> *out);
@@ -93,38 +419,145 @@ struct TokenIterator {
 	size_t ofs;
 };
 
-struct FontManager {
+class FontManager {
+public:
 	enum Style {
 		kNormal,
 		kBold,
 		kItalic
 	};
 
-	bool add_font(const char *family, int size, Style weight, Style style, const char *filename);
-	bool get_font(const string &family, int size, Style weight, Style style, stbtt_bakedchar **chars);
-	void render(int x, int y, const char *str, ...);
+	static FontManager &instance();
 
+	bool init();
+	void close();
+
+	bool create_font_class(const char *family, Style weight, Style style, const char *filename);
+
+	bool create_font_class(const char *family, int size, Style weight, Style style, const char *filename);
+	void add_text(const char *fmt, ...);
+	void render();
+private:
+	FontManager();
+	~FontManager();
+
+	struct FontClass;
 	struct FontInstance {
-		FontInstance(const string &family, int size, Style weight, Style style) : family(family), size(size), weight(weight), style(style) {}
-		friend bool operator==(const FontInstance &a, const FontInstance &b)
-		{
-			return a.family == b.family && a.size == b.size && a.weight == b.weight && a.style == b.style;
-		}
-		string family;
+		FontInstance(const FontClass *fc, int size, int w, int h, const stbtt_bakedchar *baked, const TextureData &texture)
+			: font_class(fc), size(size), w(w), h(h), texture(texture) { memcpy(chars, baked, sizeof(chars)); }
+		const FontClass *font_class;
 		int size;
-		Style weight;
-		Style style;
+		int w, h;
 		stbtt_bakedchar chars[96];
 		TextureData texture;
 	};
 
-	vector<FontInstance *> _fonts;
+	struct FontClass {
+		FontClass(const string &family, Style weight, Style style) : family(family), weight(weight), style(style), buf(0), len(0) {}
+		FontClass(const string &filename, const string &family, Style weight, Style style, void *buf, size_t len) 
+			: filename(filename), family(family), weight(weight), style(style), buf(buf), len(len) {}
+		~FontClass() 
+		{
+			delete [] exch_null(buf);
+			container_delete(instances);
+		}
+		friend bool operator==(const FontClass &a, const FontClass &b)
+		{
+			return a.family == b.family && a.weight == b.weight && a.style == b.style;
+		}
+		string filename;
+		string family;
+		Style weight;
+		Style style;
+		void *buf;
+		size_t len;
+		vector<FontInstance *> instances;
+	};
 
-	static FontManager &instance();
+	bool create_font_instance(const FontClass *fc, int font_size, FontInstance **fi);
+
+	void resource_changed(void *token, const char *filename, const void *buf, size_t len);
+
+	bool find_font(const string &family, int size, Style weight, Style style, FontInstance **fi);
+
+	vector<PosTex> _vb_data;
+	DynamicVb<PosTex> _font_vb;
+	EffectWrapper *_debug_fx;
+	CComPtr<ID3D11InputLayout> _text_layout;
+	CComPtr<ID3D11RasterizerState> _rasterizer_state;
+	CComPtr<ID3D11DepthStencilState> _dss_state;
+	CComPtr<ID3D11SamplerState> _sampler_state;
+	CComPtr<ID3D11BlendState> _blend_state;
+	struct DrawCall {
+		DrawCall() {}
+		DrawCall(int ofs, int num) : ofs(ofs), num(num) {}
+		int ofs, num;
+	};
+	typedef map<ID3D11ShaderResourceView *, vector<DrawCall> > DrawCalls;
+	DrawCalls _draw_calls;
+
+	vector<FontClass *> _font_classes;
+
 	static FontManager *_instance;
 };
 
 FontManager *FontManager::_instance = NULL;
+
+FontManager::FontManager()
+	: _debug_fx(nullptr)
+{
+
+}
+
+FontManager::~FontManager()
+{
+	delete exch_null(_debug_fx);
+}
+
+const char *debug_font = "effects/debug_font.fx";
+const char *debug_font_state = "effects/debug_font_states.txt";
+
+bool FontManager::init()
+{
+	B_ERR_BOOL(_font_vb.create(16 * 1024));
+	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &FontManager::resource_changed));
+	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &FontManager::resource_changed));
+
+	return true;
+}
+
+void FontManager::close()
+{
+	delete exch_null(_instance);
+}
+
+
+void FontManager::resource_changed(void *token, const char *filename, const void *buf, size_t len)
+{
+	if (!strcmp(filename, debug_font)) {
+		EffectWrapper *tmp = new EffectWrapper;
+		if (tmp->load_shaders((const char *)buf, len, "vsMain", NULL, "psMain")) {
+			delete exch_null(_debug_fx);
+			_debug_fx = tmp;
+			_text_layout.Attach(InputDesc(). 
+				add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
+				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
+				create(_debug_fx));
+		}
+	} else if (!strcmp(filename, debug_font_state)) {
+
+		map<string, D3D11_RASTERIZER_DESC> r;
+		map<string, D3D11_SAMPLER_DESC> s;
+		map<string, D3D11_BLEND_DESC> b;
+		map<string, D3D11_DEPTH_STENCIL_DESC> d;
+		parse_descs((const char *)buf, (const char *)buf + len, &b, &d, &r, &s);
+		LOG_WRN_DX(GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p));
+		LOG_WRN_DX(GRAPHICS.device()->CreateBlendState(&b["bs"], &_blend_state.p));
+	}
+
+	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
+}
+
 
 FontManager &FontManager::instance()
 {
@@ -135,56 +568,23 @@ FontManager &FontManager::instance()
 
 #define FONT_MANAGER FontManager::instance()
 
-bool FontManager::get_font(const string &family, int size, Style weight, Style style, stbtt_bakedchar **chars)
-{
-	FontInstance t(family, size, weight, style);
-	for (size_t i = 0; i < _fonts.size(); ++i) {
-		if (*_fonts[i] == t) {
-			*chars = _fonts[i]->chars;
-			return true;
-		}
-	}
-	return false;
-}
-
-bool FontManager::add_font(const char *family, int size, Style weight, Style style, const char *filename)
-{
-	void *font;
-	size_t len;
-	B_ERR_BOOL(load_file(filename, &font, &len));
-	const int num_chars = 96;
-	const int w = num_chars / 2 * (3 * size / 2);
-	const int h = 3 * size / 2;
-	boost::scoped_array<uint8_t> font_buf(new uint8_t[w*h]);
-	FontInstance *fi = new FontInstance(family, size, weight, style);
-	int res = stbtt_BakeFontBitmap((const byte *)font, 0, (float)size, font_buf.get(), w, h, 32, num_chars, fi->chars);
-	const int texture_height = res > 0 ? res : 512;
-
-	B_ERR_BOOL(GRAPHICS.create_texture(w, res, DXGI_FORMAT_A8_UNORM, font_buf.get(), w, texture_height, w, &fi->texture));
-	return true;
-}
-
-void FontManager::render(int x, int y, const char *str, ...)
+void FontManager::add_text(const char *fmt, ...)
 {
 	// valid properties are: [[ pos-x: XX | pos-y: XX | font-family: XXX | font-size: XX | font-style: [Normal|Italic] | font-weight: [Normal|Bold] ]]+
-
-}
-
-
-void App::debug_text(const char *fmt, ...)
-{
 	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
 
-	const char *str = "[[ pos-x: 200 pos-y: 200 ]]magnus mcagnus[[ font-size: 10 ]]";
+	//const char *str = "[[pos-y: 200]]magnus mcagnus[[ font-size: 10 ]]lilla magne[[ font-size: 100 ]]stora magne!";
+	const char *str = "[[pos-y: 200]]magnus";
+	//const char *str = "[[pos-y: 20]]gx";
 	vector<Token> tokens;
 	parse_text(str, &tokens);
 
 	string font_family = "Arial";
 	FontManager::Style font_style = FontManager::kNormal;
 	FontManager::Style font_weight = FontManager::kNormal;
-	int font_size = 12;
-	stbtt_bakedchar *baked_chars;
-	if (!FONT_MANAGER.get_font(font_family, font_size, font_weight, font_style, &baked_chars))
+	int font_size = 50;
+	FontInstance *fi;
+	if (!find_font(font_family, font_size, font_weight, font_style, &fi))
 		return;
 
 	bool new_font = false;
@@ -196,10 +596,7 @@ void App::debug_text(const char *fmt, ...)
 	const Token *next;
 	bool parse_error = false;
 
-	PosTex *p = _font_vb.map();
-	PosTex *prev = p;
-	PosTex *org = p;
-	PosTex v0, v1, v2, v3;
+	int ofs = 0, num = 0;
 
 	while (!parse_error && (token = it.next())) {
 
@@ -208,22 +605,24 @@ void App::debug_text(const char *fmt, ...)
 		case Token::kChar:
 			{
 				if (new_font) {
-					_draw_calls[NULL].push_back(NULL, DrawCall(p - org, p - prev));
-					prev = p;
+					// Changing fonts, so save # primitives to draw with the old one
+					_draw_calls[fi->texture.srv].push_back(DrawCall(ofs, _vb_data.size() - ofs));
+					ofs = _vb_data.size();
 				}
-				if (!new_font || new_font && FONT_MANAGER.get_font(font_family, font_size, font_weight, font_style, &baked_chars)) {
+				if (!new_font || new_font && find_font(font_family, font_size, font_weight, font_style, &fi)) {
 					new_font = false;
 					char ch = token->ch;
 					stbtt_aligned_quad q;
-					stbtt_GetBakedQuad(baked_chars, 512, texture_height, ch - 32, &x, &y, &q, 1);
+					stbtt_GetBakedQuad(fi->chars, fi->w, fi->h, ch - 32, &x, &y, &q, 1);
 					// v0 v1
 					// v2 v3
+					PosTex v0, v1, v2, v3;
 					screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
 					screen_to_clip(q.x1, q.y0, vp.Width, vp.Height, &v1.pos.x, &v1.pos.y); v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
 					screen_to_clip(q.x0, q.y1, vp.Width, vp.Height, &v2.pos.x, &v2.pos.y); v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
 					screen_to_clip(q.x1, q.y1, vp.Width, vp.Height, &v3.pos.x, &v3.pos.y); v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
-					*p++ = v0; *p++ = v1; *p++ = v2;
-					*p++ = v2; *p++ = v1; *p++ = v3;
+					_vb_data.push_back(v0); _vb_data.push_back(v1); _vb_data.push_back(v2);
+					_vb_data.push_back(v2); _vb_data.push_back(v1); _vb_data.push_back(v3);
 				}
 			}
 			break;
@@ -296,37 +695,108 @@ void App::debug_text(const char *fmt, ...)
 		}
 	}
 
-	_font_vb.unmap(p);
+	if (ofs != _vb_data.size())
+		_draw_calls[fi->texture.srv].push_back(DrawCall(ofs, _vb_data.size() - ofs));
 }
 
-const char *debug_font = "effects/debug_font.fx";
-const char *debug_font_state = "effects/debug_font_states.txt";
-
-void App::resource_changed(void *token, const char *filename, const void *buf, size_t len)
+void FontManager::render()
 {
-	if (!strcmp(filename, debug_font)) {
-		EffectWrapper *tmp = new EffectWrapper;
-		if (tmp->load_shaders((const char *)buf, len, "vsMain", NULL, "psMain")) {
-			delete exch_null(_debug_fx);
-			_debug_fx = tmp;
-			_text_layout.Attach(InputDesc(). 
-				add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
-				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
-				create(_debug_fx));
+	if (_vb_data.empty())
+		return;
+
+	PosTex *p = _font_vb.map();
+	memcpy(p, &_vb_data[0], _vb_data.size() * sizeof(PosTex));
+	_vb_data.clear();
+	_font_vb.unmap(p);
+
+	ID3D11DeviceContext *context = GRAPHICS.context();
+	context->RSSetViewports(1, &GRAPHICS.viewport());
+
+	context->PSSetSamplers(0, 1, &_sampler_state.p);
+
+	_debug_fx->set_shaders(context);
+	set_vb(context, _font_vb.get(), _font_vb.stride);
+	context->IASetInputLayout(_text_layout);
+	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	float blend_factor[] = { 1, 1, 1, 1 };
+	context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
+	context->RSSetState(GRAPHICS.default_rasterizer_state());
+	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
+	context->PSSetSamplers(0, 1, &_sampler_state.p);
+	//context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+	//context->Draw(_font_vb.num_verts(), 0);
+	for (auto i = _draw_calls.begin(); i != _draw_calls.end(); ++i) {
+		ID3D11ShaderResourceView *srv = i->first;
+		context->PSSetShaderResources(0, 1, &srv);
+		for (auto j = i->second.begin(); j != i->second.end(); ++j) {
+			const DrawCall &cur = *j;
+			context->Draw(cur.num, cur.ofs);
 		}
-	} else if (!strcmp(filename, debug_font_state)) {
-
-		map<string, D3D11_RASTERIZER_DESC> r;
-		map<string, D3D11_SAMPLER_DESC> s;
-		map<string, D3D11_BLEND_DESC> b;
-		map<string, D3D11_DEPTH_STENCIL_DESC> d;
-		parse_descs((const char *)buf, (const char *)buf + len, &b, &d, &r, &s);
-		LOG_WRN_DX(GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p));
-		LOG_WRN_DX(GRAPHICS.device()->CreateBlendState(&b["bs"], &_blend_state.p));
 	}
-
-	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
+	_draw_calls.clear();
 }
+
+bool FontManager::find_font(const string &family, int size, Style weight, Style style, FontInstance **fi)
+{
+	// look for the FontClass
+	FontClass fc(family, weight, style);
+	for (size_t i = 0; i < _font_classes.size(); ++i) {
+		FontClass *cur = _font_classes[i];
+		if (fc == *cur) {
+			// look for instance
+			for (size_t j = 0; j < cur->instances.size(); ++j) {
+				if (cur->instances[j]->size == size) {
+					*fi = cur->instances[j];
+					return true;
+				}
+			}
+			// instance of the specified size wasn't found, so we create it
+			FontInstance *f;
+			if (!create_font_instance(cur, size, &f))
+				return false;
+			cur->instances.push_back(f);
+			*fi = f;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool FontManager::create_font_class(const char *family, Style weight, Style style, const char *filename)
+{
+	void *buf;
+	size_t len;
+	B_ERR_BOOL(load_file(filename, &buf, &len));
+	_font_classes.push_back(new FontClass(filename, family, weight, style, buf, len));
+	return true;
+}
+
+bool FontManager::create_font_instance(const FontClass *fc, int font_size, FontInstance **fi)
+{
+	const int num_chars = 96;
+	const int w = num_chars * font_size;
+	int mult = 1;
+	// expand the buffer until all the chars fit
+	while (true) {
+		int h = mult * font_size;
+		boost::scoped_array<uint8_t> font_buf(new uint8_t[w*h]);
+		stbtt_bakedchar chars[96];
+		int res = stbtt_BakeFontBitmap((const byte *)fc->buf, 0, (float)font_size, font_buf.get(), w, h, 32, num_chars, chars);
+		if (res < 0) {
+			mult++;
+		} else {
+			TextureData texture;
+			//static int hax = 0;
+			//save_bmp_mono(to_string("c:\\temp\\texture_%d.bmp", hax++).c_str(), font_buf.get(), w, res);
+			B_ERR_BOOL(GRAPHICS.create_texture(w, res, DXGI_FORMAT_A8_UNORM, font_buf.get(), w, res, w, &texture));
+			*fi = new FontInstance(fc, font_size, w, h, chars, texture);
+			return true;
+		}
+	}
+	return false;
+}
+
 
 bool App::init(HINSTANCE hinstance)
 {
@@ -334,26 +804,17 @@ bool App::init(HINSTANCE hinstance)
 	_width = GetSystemMetrics(SM_CXSCREEN) / 2;
 	_height = GetSystemMetrics(SM_CYSCREEN) / 2;
 	
+	CefSettings settings;
+	settings.multi_threaded_message_loop = false;
+
+	if (!CefInitialize(settings))
+		return false;
+
 	B_ERR_BOOL(create_window());
 	B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
 
-	FONT_MANAGER.add_font("Arial", 50, FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");
-/*
-	void *font;
-	size_t len;
-	B_ERR_BOOL(load_file("data/arialbd.ttf", &font, &len));
-	int res = stbtt_BakeFontBitmap((const byte *)font, 0, 50, font_buf, 512, 512, 32, 96, chars);
-	const int width = 512;
-	const int height = res > 0 ? res : 512;
-	texture_height = height;
-	//save_bmp_mono("c:\\temp\\tjoff.bmp", font_buf, width, height);
-
-	B_ERR_BOOL(GRAPHICS.create_texture(512, res, DXGI_FORMAT_A8_UNORM, font_buf, width, height, width, &_texture));
-*/
-	B_ERR_BOOL(_font_vb.create(16 * 1024));
-
-	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &App::resource_changed));
-	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &App::resource_changed));
+	FONT_MANAGER.init();
+	//FONT_MANAGER.create_font_class("Arial", FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");
 
 	return true;
 }
@@ -395,24 +856,24 @@ void App::set_client_size()
 
 bool App::create_window()
 {
-	const char* kClassName = "ShindigClass";
+	const TCHAR* kClassName = _T("KumiClass");
 
-	WNDCLASSEXA wcex;
+	WNDCLASSEX wcex;
 	ZeroMemory(&wcex, sizeof(wcex));
 
-	wcex.cbSize = sizeof(WNDCLASSEXA);
-	wcex.style          = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+	wcex.cbSize = sizeof(WNDCLASSEX);
+	wcex.style          = CS_HREDRAW | CS_VREDRAW;
 	wcex.lpfnWndProc    = tramp_wnd_proc;
 	wcex.hInstance      = _hinstance;
-	wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+	wcex.hbrBackground  = 0;
 	wcex.lpszClassName  = kClassName;
 
-	B_ERR_INT(RegisterClassExA(&wcex));
+	B_ERR_INT(RegisterClassEx(&wcex));
 
 	//const UINT window_style = WS_VISIBLE | WS_POPUP | WS_OVERLAPPEDWINDOW;
-	const UINT window_style = WS_VISIBLE | WS_POPUP;
+	const UINT window_style = WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS; //WS_VISIBLE | WS_POPUP;
 
-	_hwnd = CreateWindowA(kClassName, "kumi - magnus österlind - 2011", window_style,
+	_hwnd = CreateWindow(kClassName, _T("kumi - magnus österlind - 2011"), window_style,
 		CW_USEDEFAULT, CW_USEDEFAULT, _width, _height, NULL, NULL,
 		_hinstance, NULL);
 
@@ -459,33 +920,6 @@ void App::toggle_plane()
 	//_draw_plane = !_draw_plane;
 }
 
-void App::render_font()
-{
-	ID3D11DeviceContext *context = GRAPHICS.context();
-	context->RSSetViewports(1, &GRAPHICS.viewport());
-
-	//context->PSSetShaderResources(0, 1, &_texture.srv.p);
-	context->PSSetSamplers(0, 1, &_sampler_state.p);
-
-	_debug_fx->set_shaders(context);
-
-	debug_text("tjong");
-	set_vb(context, _font_vb.get(), _font_vb.stride);
-	context->IASetInputLayout(_text_layout);
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	float blend_factor[] = { 1, 1, 1, 1 };
-	context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
-	context->RSSetState(GRAPHICS.default_rasterizer_state());
-	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
-	context->PSSetSamplers(0, 1, &_sampler_state.p);
-	//context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-	//context->Draw(_font_vb.num_verts(), 0);
-	for (auto it = _draw_calls.begin(); it != _draw_calls.end(); ++it)
-		context->Draw(it->second.num, it->second.ofs);
-	_draw_calls.clear();
-}
-
 void App::run()
 {
 	//auto& graphics = Graphics::instance();
@@ -508,8 +942,12 @@ void App::run()
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+
+			CefDoMessageLoopWork();
+
 			RESOURCE_WATCHER.process_deferred();
-			GRAPHICS.set_clear_color(XMFLOAT4(0.3f, 0.3f, 0.3f, 1));
+			static int hax = 0;
+			GRAPHICS.set_clear_color(XMFLOAT4(0.5f + 0.5f * sin(hax++/1000.0f), 0.3f, 0.3f, 0));
 			GRAPHICS.clear();
 			//System::instance().tick();
 			//graphics.clear();
@@ -543,12 +981,46 @@ void App::run()
 				}
 			}
 
-			render_font();
-
+			FONT_MANAGER.add_text("tjong!");
+			FONT_MANAGER.render();
 			GRAPHICS.present();
-
 		}
 	}
+}
+
+void create_input_desc(const PosTex *verts, InputDesc *desc) {
+	desc->
+		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
+		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0);
+}
+
+template<typename T>
+bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
+{
+	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), vertex, vb));
+	create_input_desc(verts, desc);
+	/*
+	InputDesc desc;
+	_text_layout.Attach(InputDesc(). 
+		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
+		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
+		create(_debug_fx));
+*/
+	return true;
+}
+
+template<typename T>
+bool simple_load(const T *verts, int num_verts, const char *shader, const char *vs, const char *gs, const char *ps, const char *state, 
+	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect) {
+
+	if (!vb_from_data(verts, num_verts, vb, desc))
+		return false;
+
+	EffectWrapper *e = new EffectWrapper;
+	if (!e->load_shaders(shader, vs, gs, ps))
+		return false;
+
+	desc.create()
 
 }
 
@@ -562,15 +1034,63 @@ LRESULT App::tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 
 LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
 {
-	// See if the debug menu wants to handle the message first
-	//LRESULT res = DebugMenu::instance().wnd_proc(hWnd, message, wParam, lParam);
 
-	//UIState& ui_state = IMGui::instance().ui_state();
-
+	HDC hdc;
+	PAINTSTRUCT ps;
 	switch( message ) 
 	{
+/*
+	case WM_SETFOCUS:
+		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
+			// Pass focus to the browser window
+			PostMessage(g_handler->GetBrowserHwnd(), WM_SETFOCUS, wParam, NULL);
+		}
+		return 0;
+*/
 	case WM_SIZE:
 		GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
+		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
+			// Resize the browser window and address bar to match the new frame
+			// window size
+			RECT rect;
+			GetClientRect(hWnd, &rect);
+			HDWP hdwp = BeginDeferWindowPos(1);
+			hdwp = DeferWindowPos(hdwp, g_handler->GetBrowserHwnd(), 0, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
+			EndDeferWindowPos(hdwp);
+			g_handler->GetBrowser()->SetSize(PET_VIEW, rect.right - rect.left, rect.bottom - rect.top);
+		}
+		break;
+/*
+	case WM_ERASEBKGND:
+		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
+			// Dont erase the background if the browser window has been loaded
+			// (this avoids flashing)
+			return 0;
+		}
+		break;
+*/
+
+	case WM_PAINT:
+		hdc = BeginPaint(hWnd, &ps);
+		EndPaint(hWnd, &ps);
+		break;
+
+	case WM_CREATE:
+		{
+			g_handler = new ClientHandler();
+			g_handler->SetMainHwnd(hWnd);
+
+			CefWindowInfo info;
+			info.m_bIsTransparent = TRUE;
+			CefBrowserSettings settings;
+
+			RECT rect;
+			GetClientRect(hWnd, &rect);
+			info.SetAsOffScreen(hWnd);
+			info.SetIsTransparent(TRUE);
+			CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(g_handler), "file://C:/Users/dooz/Downloads/PlasterDemo/PlasterDemo/Assets/index.html", settings);
+			//g_handler->GetBrowser()->SetSize(PET_VIEW, 1024, 768);
+		}
 		break;
 
 	case WM_DESTROY:
