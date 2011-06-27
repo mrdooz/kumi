@@ -363,6 +363,67 @@ void ClientHandler::SetNavState(bool canGoBack, bool canGoForward)
 
 CefRefPtr<ClientHandler> g_handler;
 
+void create_input_desc(const PosTex *verts, InputDesc *desc) {
+	desc->
+		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
+		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0);
+}
+
+template<typename T>
+bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
+{
+	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), vertex, vb));
+	create_input_desc(verts, desc);
+	return true;
+}
+
+struct StateDesc {
+	StateDesc() : blend_desc(NULL), depth_stencil_desc(NULL), rasterizer_desc(NULL), sampler_desc(NULL) {}
+	D3D11_BLEND_DESC *blend_desc;
+	D3D11_DEPTH_STENCIL_DESC *depth_stencil_desc;
+	D3D11_RASTERIZER_DESC *rasterizer_desc;
+	D3D11_SAMPLER_DESC *sampler_desc;
+};
+
+template<typename T>
+bool simple_load(const T *verts, int num_verts, 
+	const char *shader, const char *vs, const char *gs, const char *ps, 
+	const char *state, const char *blend_desc, const char *depth_stencil_desc, const char *rasterizer_desc, const char *sampler_desc,
+	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect, StateDesc *state_desc) 
+{
+	InputDesc desc;
+	B_WRN_BOOL(vb_from_data(verts, num_verts, vb, &desc));
+
+	EffectWrapper *e = new EffectWrapper;
+	B_WRN_BOOL(e->load_shaders(shader, vs, gs, ps));
+
+	if (state && state_desc) {
+		void *buf = NULL;
+		size_t len = 0;
+		B_WRN_BOOL(load_file(state, &buf, &len));
+		map<string, D3D11_BLEND_DESC> blend_descs;
+		map<string, D3D11_DEPTH_STENCIL_DESC> depth_stencil_descs;
+		map<string, D3D11_RASTERIZER_DESC> rasterizer_descs;
+		map<string, D3D11_SAMPLER_DESC> sampler_descs;
+		parse_descs((const char *)buf, (const char *)buf + len, 
+			blend_desc ? &blend_descs : NULL,
+			depth_stencil_desc ? &depth_stencil_descs : NULL,
+			rasterizer_desc ? rasterizer_descs : NULL,
+			sampler_desc ? sampler_descs : NULL);
+
+#define TRY_GET(n) if (n) state_desc->n = n # s[n];
+		TRY_GET(blend_desc);
+		TRY_GET(depth_stencil_desc);
+		TRY_GET(rasterizer_desc);
+		TRY_GET(sampler_desc);
+#undef TRY_GET
+	}
+
+	*layout = desc.create(e);
+
+	return true;
+}
+
 
 App::App()
 	: _hinstance(NULL)
@@ -813,6 +874,23 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(create_window());
 	B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
 
+	PosTex verts[] = {
+		// 0 1
+		// 2 3
+		PosTex(0, 0, 0, 0, 0),
+		PosTex(1, 0, 0, 1, 0),
+		PosTex(0, 1, 0, 0, 1),
+		PosTex(1, 1, 0, 1, 1),
+	};
+
+	ID3D11Buffer *vb = NULL;
+	ID3D11InputLayout *layout = NULL;
+	EffectWrapper *effect = NULL;
+	StateDesc desc;
+	simple_load(verts, ELEMS_IN_ARRAY(verts), 
+		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
+		"effects/debug_font_states.txt", "", "", "mr_tjong", "debug_font", 
+
 	FONT_MANAGER.init();
 	//FONT_MANAGER.create_font_class("Arial", FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");
 
@@ -986,42 +1064,6 @@ void App::run()
 			GRAPHICS.present();
 		}
 	}
-}
-
-void create_input_desc(const PosTex *verts, InputDesc *desc) {
-	desc->
-		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
-		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0);
-}
-
-template<typename T>
-bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
-{
-	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), vertex, vb));
-	create_input_desc(verts, desc);
-	/*
-	InputDesc desc;
-	_text_layout.Attach(InputDesc(). 
-		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
-		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
-		create(_debug_fx));
-*/
-	return true;
-}
-
-template<typename T>
-bool simple_load(const T *verts, int num_verts, const char *shader, const char *vs, const char *gs, const char *ps, const char *state, 
-	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect) {
-
-	if (!vb_from_data(verts, num_verts, vb, desc))
-		return false;
-
-	EffectWrapper *e = new EffectWrapper;
-	if (!e->load_shaders(shader, vs, gs, ps))
-		return false;
-
-	desc.create()
-
 }
 
 LRESULT App::tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

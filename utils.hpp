@@ -71,3 +71,5 @@ T exch_null(T &t)
 #define SAFE_FREE(x) if( (x) != 0 ) { free((void*)(x)); (x) = 0; }
 #define SAFE_DELETE(x) if( (x) != 0 ) { delete (x); (x) = 0; }
 #define SAFE_ADELETE(x) if( (x) != 0 ) { delete [] (x); (x) = 0; }
+
+#define ELEMS_IN_ARRAY(x) sizeof(x) / sizeof((x)[0])
