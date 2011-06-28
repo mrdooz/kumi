@@ -5,26 +5,8 @@
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
 #include "d3d_parser.hpp"
-#include <boost/scoped_array.hpp>
-
-/*
-#include "system.hpp"
-#include "test_effect.hpp"
-#include "test_effect2.hpp"
-#include "test_effect3.hpp"
-#include "test_effect4.hpp"
-#include "test_effect5.hpp"
-#include "test_effect6.hpp"
-#include "test_effect7.hpp"
-#include "imgui.hpp"
-#include "font_writer.hpp"
-#include "debug_menu.hpp"
-#include "debug_renderer.hpp"
-#include <celsus/Profiler.hpp>
-#include "iprof/prof.h"
-#include "iprof/prof_internal.h"
-#include "network.hpp"
-*/
+#include "file_utils.hpp"
+#include "font_manager.hpp"
 
 App* App::_instance = nullptr;
 
@@ -363,7 +345,8 @@ void ClientHandler::SetNavState(bool canGoBack, bool canGoForward)
 
 CefRefPtr<ClientHandler> g_handler;
 
-void create_input_desc(const PosTex *verts, InputDesc *desc) {
+void create_input_desc(const PosTex *verts, InputDesc *desc) 
+{
 	desc->
 		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
 		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0);
@@ -372,24 +355,32 @@ void create_input_desc(const PosTex *verts, InputDesc *desc) {
 template<typename T>
 bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
 {
-	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), vertex, vb));
+	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), verts, vb));
 	create_input_desc(verts, desc);
 	return true;
 }
 
-struct StateDesc {
-	StateDesc() : blend_desc(NULL), depth_stencil_desc(NULL), rasterizer_desc(NULL), sampler_desc(NULL) {}
-	D3D11_BLEND_DESC *blend_desc;
-	D3D11_DEPTH_STENCIL_DESC *depth_stencil_desc;
-	D3D11_RASTERIZER_DESC *rasterizer_desc;
-	D3D11_SAMPLER_DESC *sampler_desc;
+struct RenderStates {
+	RenderStates() : blend_state(nullptr), depth_stencil_state(nullptr), rasterizer_state(nullptr), sampler_state(nullptr) {}
+
+	D3D11_BLEND_DESC blend_desc;
+	ID3D11BlendState *blend_state;
+	
+	D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
+	ID3D11DepthStencilState *depth_stencil_state;
+
+	D3D11_RASTERIZER_DESC rasterizer_desc;
+	ID3D11RasterizerState *rasterizer_state;
+
+	D3D11_SAMPLER_DESC sampler_desc;
+	ID3D11SamplerState *sampler_state;
 };
 
 template<typename T>
-bool simple_load(const T *verts, int num_verts, 
+bool simple_load(const T *verts, int num_verts,
 	const char *shader, const char *vs, const char *gs, const char *ps, 
 	const char *state, const char *blend_desc, const char *depth_stencil_desc, const char *rasterizer_desc, const char *sampler_desc,
-	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect, StateDesc *state_desc) 
+	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect, RenderStates *render_states) 
 {
 	InputDesc desc;
 	B_WRN_BOOL(vb_from_data(verts, num_verts, vb, &desc));
@@ -397,7 +388,7 @@ bool simple_load(const T *verts, int num_verts,
 	EffectWrapper *e = new EffectWrapper;
 	B_WRN_BOOL(e->load_shaders(shader, vs, gs, ps));
 
-	if (state && state_desc) {
+	if (state && render_states) {
 		void *buf = NULL;
 		size_t len = 0;
 		B_WRN_BOOL(load_file(state, &buf, &len));
@@ -408,16 +399,21 @@ bool simple_load(const T *verts, int num_verts,
 		parse_descs((const char *)buf, (const char *)buf + len, 
 			blend_desc ? &blend_descs : NULL,
 			depth_stencil_desc ? &depth_stencil_descs : NULL,
-			rasterizer_desc ? rasterizer_descs : NULL,
-			sampler_desc ? sampler_descs : NULL);
+			rasterizer_desc ? &rasterizer_descs : NULL,
+			sampler_desc ? &sampler_descs : NULL);
 
-#define TRY_GET(n) if (n) state_desc->n = n # s[n];
-		TRY_GET(blend_desc);
-		TRY_GET(depth_stencil_desc);
-		TRY_GET(rasterizer_desc);
-		TRY_GET(sampler_desc);
-#undef TRY_GET
+#define CREATE_STATE(n, fn) \
+	if (n ## _desc && n ## _descs.find(n ## _desc) != n ## _descs.end()) \
+			GRAPHICS.device()->fn(&render_states->n ## _desc, &render_states->n ## _state);
+
+		CREATE_STATE(blend, CreateBlendState);
+		CREATE_STATE(depth_stencil, CreateDepthStencilState);
+		CREATE_STATE(rasterizer, CreateRasterizerState);
+		CREATE_STATE(sampler, CreateSamplerState);
+
+#undef CREATE_STATE
 	}
+
 
 	*layout = desc.create(e);
 
@@ -458,407 +454,6 @@ App& App::instance()
 //stbtt_bakedchar chars[96];
 //int texture_height;
 
-#include "text_parser.hpp"
-void parse_text(const char *str, vector<Token> *out);
-
-struct TokenIterator {
-	typedef vector<Token> Tokens;
-	TokenIterator(const Tokens &tokens) : tokens(tokens), ofs(0) {}
-	const Token *next()
-	{
-		if (ofs >= tokens.size())
-			return NULL;
-		return &tokens[ofs++];
-	}
-
-	void rewind(int num)
-	{
-		ofs = max(0, ofs - num);
-	}
-
-	const vector<Token> &tokens;
-	size_t ofs;
-};
-
-class FontManager {
-public:
-	enum Style {
-		kNormal,
-		kBold,
-		kItalic
-	};
-
-	static FontManager &instance();
-
-	bool init();
-	void close();
-
-	bool create_font_class(const char *family, Style weight, Style style, const char *filename);
-
-	bool create_font_class(const char *family, int size, Style weight, Style style, const char *filename);
-	void add_text(const char *fmt, ...);
-	void render();
-private:
-	FontManager();
-	~FontManager();
-
-	struct FontClass;
-	struct FontInstance {
-		FontInstance(const FontClass *fc, int size, int w, int h, const stbtt_bakedchar *baked, const TextureData &texture)
-			: font_class(fc), size(size), w(w), h(h), texture(texture) { memcpy(chars, baked, sizeof(chars)); }
-		const FontClass *font_class;
-		int size;
-		int w, h;
-		stbtt_bakedchar chars[96];
-		TextureData texture;
-	};
-
-	struct FontClass {
-		FontClass(const string &family, Style weight, Style style) : family(family), weight(weight), style(style), buf(0), len(0) {}
-		FontClass(const string &filename, const string &family, Style weight, Style style, void *buf, size_t len) 
-			: filename(filename), family(family), weight(weight), style(style), buf(buf), len(len) {}
-		~FontClass() 
-		{
-			delete [] exch_null(buf);
-			container_delete(instances);
-		}
-		friend bool operator==(const FontClass &a, const FontClass &b)
-		{
-			return a.family == b.family && a.weight == b.weight && a.style == b.style;
-		}
-		string filename;
-		string family;
-		Style weight;
-		Style style;
-		void *buf;
-		size_t len;
-		vector<FontInstance *> instances;
-	};
-
-	bool create_font_instance(const FontClass *fc, int font_size, FontInstance **fi);
-
-	void resource_changed(void *token, const char *filename, const void *buf, size_t len);
-
-	bool find_font(const string &family, int size, Style weight, Style style, FontInstance **fi);
-
-	vector<PosTex> _vb_data;
-	DynamicVb<PosTex> _font_vb;
-	EffectWrapper *_debug_fx;
-	CComPtr<ID3D11InputLayout> _text_layout;
-	CComPtr<ID3D11RasterizerState> _rasterizer_state;
-	CComPtr<ID3D11DepthStencilState> _dss_state;
-	CComPtr<ID3D11SamplerState> _sampler_state;
-	CComPtr<ID3D11BlendState> _blend_state;
-	struct DrawCall {
-		DrawCall() {}
-		DrawCall(int ofs, int num) : ofs(ofs), num(num) {}
-		int ofs, num;
-	};
-	typedef map<ID3D11ShaderResourceView *, vector<DrawCall> > DrawCalls;
-	DrawCalls _draw_calls;
-
-	vector<FontClass *> _font_classes;
-
-	static FontManager *_instance;
-};
-
-FontManager *FontManager::_instance = NULL;
-
-FontManager::FontManager()
-	: _debug_fx(nullptr)
-{
-
-}
-
-FontManager::~FontManager()
-{
-	delete exch_null(_debug_fx);
-}
-
-const char *debug_font = "effects/debug_font.fx";
-const char *debug_font_state = "effects/debug_font_states.txt";
-
-bool FontManager::init()
-{
-	B_ERR_BOOL(_font_vb.create(16 * 1024));
-	RESOURCE_WATCHER.add_file_watch(NULL, debug_font, true, MakeDelegate(this, &FontManager::resource_changed));
-	RESOURCE_WATCHER.add_file_watch(NULL, debug_font_state, true, MakeDelegate(this, &FontManager::resource_changed));
-
-	return true;
-}
-
-void FontManager::close()
-{
-	delete exch_null(_instance);
-}
-
-
-void FontManager::resource_changed(void *token, const char *filename, const void *buf, size_t len)
-{
-	if (!strcmp(filename, debug_font)) {
-		EffectWrapper *tmp = new EffectWrapper;
-		if (tmp->load_shaders((const char *)buf, len, "vsMain", NULL, "psMain")) {
-			delete exch_null(_debug_fx);
-			_debug_fx = tmp;
-			_text_layout.Attach(InputDesc(). 
-				add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
-				add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0).
-				create(_debug_fx));
-		}
-	} else if (!strcmp(filename, debug_font_state)) {
-
-		map<string, D3D11_RASTERIZER_DESC> r;
-		map<string, D3D11_SAMPLER_DESC> s;
-		map<string, D3D11_BLEND_DESC> b;
-		map<string, D3D11_DEPTH_STENCIL_DESC> d;
-		parse_descs((const char *)buf, (const char *)buf + len, &b, &d, &r, &s);
-		LOG_WRN_DX(GRAPHICS.device()->CreateSamplerState(&s["debug_font"], &_sampler_state.p));
-		LOG_WRN_DX(GRAPHICS.device()->CreateBlendState(&b["bs"], &_blend_state.p));
-	}
-
-	GRAPHICS.device()->CreateSamplerState(&CD3D11_SAMPLER_DESC(CD3D11_DEFAULT()), &_sampler_state.p);
-}
-
-
-FontManager &FontManager::instance()
-{
-	if (!_instance)
-		_instance = new FontManager;
-	return *_instance;
-}
-
-#define FONT_MANAGER FontManager::instance()
-
-void FontManager::add_text(const char *fmt, ...)
-{
-	// valid properties are: [[ pos-x: XX | pos-y: XX | font-family: XXX | font-size: XX | font-style: [Normal|Italic] | font-weight: [Normal|Bold] ]]+
-	const D3D11_VIEWPORT &vp = GRAPHICS.viewport();
-
-	//const char *str = "[[pos-y: 200]]magnus mcagnus[[ font-size: 10 ]]lilla magne[[ font-size: 100 ]]stora magne!";
-	const char *str = "[[pos-y: 200]]magnus";
-	//const char *str = "[[pos-y: 20]]gx";
-	vector<Token> tokens;
-	parse_text(str, &tokens);
-
-	string font_family = "Arial";
-	FontManager::Style font_style = FontManager::kNormal;
-	FontManager::Style font_weight = FontManager::kNormal;
-	int font_size = 50;
-	FontInstance *fi;
-	if (!find_font(font_family, font_size, font_weight, font_style, &fi))
-		return;
-
-	bool new_font = false;
-
-	bool cmd_mode = false;
-	float x = 0, y = 0;
-	TokenIterator it(tokens);
-	const Token *token = NULL;
-	const Token *next;
-	bool parse_error = false;
-
-	int ofs = 0, num = 0;
-
-	while (!parse_error && (token = it.next())) {
-
-		switch (token->type) {
-
-		case Token::kChar:
-			{
-				if (new_font) {
-					// Changing fonts, so save # primitives to draw with the old one
-					_draw_calls[fi->texture.srv].push_back(DrawCall(ofs, _vb_data.size() - ofs));
-					ofs = _vb_data.size();
-				}
-				if (!new_font || new_font && find_font(font_family, font_size, font_weight, font_style, &fi)) {
-					new_font = false;
-					char ch = token->ch;
-					stbtt_aligned_quad q;
-					stbtt_GetBakedQuad(fi->chars, fi->w, fi->h, ch - 32, &x, &y, &q, 1);
-					// v0 v1
-					// v2 v3
-					PosTex v0, v1, v2, v3;
-					screen_to_clip(q.x0, q.y0, vp.Width, vp.Height, &v0.pos.x, &v0.pos.y); v0.pos.z = 0; v0.tex.x = q.s0; v0.tex.y = q.t0;
-					screen_to_clip(q.x1, q.y0, vp.Width, vp.Height, &v1.pos.x, &v1.pos.y); v1.pos.z = 0; v1.tex.x = q.s1; v1.tex.y = q.t0;
-					screen_to_clip(q.x0, q.y1, vp.Width, vp.Height, &v2.pos.x, &v2.pos.y); v2.pos.z = 0; v2.tex.x = q.s0; v2.tex.y = q.t1;
-					screen_to_clip(q.x1, q.y1, vp.Width, vp.Height, &v3.pos.x, &v3.pos.y); v3.pos.z = 0; v3.tex.x = q.s1; v3.tex.y = q.t1;
-					_vb_data.push_back(v0); _vb_data.push_back(v1); _vb_data.push_back(v2);
-					_vb_data.push_back(v2); _vb_data.push_back(v1); _vb_data.push_back(v3);
-				}
-			}
-			break;
-
-		case Token::kCmdOpen:
-			if (cmd_mode) {
-				parse_error = true;
-				continue;
-			}
-			cmd_mode = true;
-			break;
-
-		case Token::kCmdClose:
-			cmd_mode = false;
-			break;
-#define CHECK_NEXT(type) if (!(next = it.next()) || next->type != type) { parse_error = true; continue; }
-
-		case Token::kPosX:
-			CHECK_NEXT(Token::kInt);
-			x = (float)next->num;
-			break;
-
-		case Token::kPosY:
-			CHECK_NEXT(Token::kInt);
-			y = (float)next->num;
-			break;
-
-		case Token::kFontSize:
-			CHECK_NEXT(Token::kInt);
-			if (next->num != font_size) {
-				font_size = next->num;
-				new_font = true;
-			}
-			break;
-
-		case Token::kFontStyle:
-			CHECK_NEXT(Token::kId);
-			if (!strcmp(token->id, "normal")) {
-				new_font |= font_style != FontManager::kNormal;
-				font_style = FontManager::kNormal;
-			} else if (!strcmp(token->id, "italic")) {
-				new_font |= font_style != FontManager::kItalic;
-				font_style = FontManager::kItalic;
-			} else {
-				parse_error = true;
-			}
-			break;
-
-		case Token::kFontWeight:
-			CHECK_NEXT(Token::kId);
-			if (!strcmp(token->id, "normal")) {
-				new_font |= font_weight != FontManager::kNormal;
-				font_style = FontManager::kNormal;
-			}
-			else if (!strcmp(token->id, "bold")) {
-				new_font |= font_weight != FontManager::kBold;
-				font_style = FontManager::kBold;
-			} else {
-				parse_error = true;
-			}
-			break;
-
-		case Token::kFontFamily:
-			CHECK_NEXT(Token::kId);
-			new_font |= !strcmp(font_family.c_str(), next->id);
-			font_family = next->id;
-			break;
-		default:
-			parse_error = true;
-		}
-	}
-
-	if (ofs != _vb_data.size())
-		_draw_calls[fi->texture.srv].push_back(DrawCall(ofs, _vb_data.size() - ofs));
-}
-
-void FontManager::render()
-{
-	if (_vb_data.empty())
-		return;
-
-	PosTex *p = _font_vb.map();
-	memcpy(p, &_vb_data[0], _vb_data.size() * sizeof(PosTex));
-	_vb_data.clear();
-	_font_vb.unmap(p);
-
-	ID3D11DeviceContext *context = GRAPHICS.context();
-	context->RSSetViewports(1, &GRAPHICS.viewport());
-
-	context->PSSetSamplers(0, 1, &_sampler_state.p);
-
-	_debug_fx->set_shaders(context);
-	set_vb(context, _font_vb.get(), _font_vb.stride);
-	context->IASetInputLayout(_text_layout);
-	context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	float blend_factor[] = { 1, 1, 1, 1 };
-	context->OMSetBlendState(GRAPHICS.default_blend_state(), blend_factor, 0xffffffff);
-	context->RSSetState(GRAPHICS.default_rasterizer_state());
-	context->OMSetDepthStencilState(_dss_state, 0xffffffff);
-	context->PSSetSamplers(0, 1, &_sampler_state.p);
-	//context->OMSetBlendState(_blend_state, GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-	//context->Draw(_font_vb.num_verts(), 0);
-	for (auto i = _draw_calls.begin(); i != _draw_calls.end(); ++i) {
-		ID3D11ShaderResourceView *srv = i->first;
-		context->PSSetShaderResources(0, 1, &srv);
-		for (auto j = i->second.begin(); j != i->second.end(); ++j) {
-			const DrawCall &cur = *j;
-			context->Draw(cur.num, cur.ofs);
-		}
-	}
-	_draw_calls.clear();
-}
-
-bool FontManager::find_font(const string &family, int size, Style weight, Style style, FontInstance **fi)
-{
-	// look for the FontClass
-	FontClass fc(family, weight, style);
-	for (size_t i = 0; i < _font_classes.size(); ++i) {
-		FontClass *cur = _font_classes[i];
-		if (fc == *cur) {
-			// look for instance
-			for (size_t j = 0; j < cur->instances.size(); ++j) {
-				if (cur->instances[j]->size == size) {
-					*fi = cur->instances[j];
-					return true;
-				}
-			}
-			// instance of the specified size wasn't found, so we create it
-			FontInstance *f;
-			if (!create_font_instance(cur, size, &f))
-				return false;
-			cur->instances.push_back(f);
-			*fi = f;
-			return true;
-		}
-	}
-	return false;
-}
-
-bool FontManager::create_font_class(const char *family, Style weight, Style style, const char *filename)
-{
-	void *buf;
-	size_t len;
-	B_ERR_BOOL(load_file(filename, &buf, &len));
-	_font_classes.push_back(new FontClass(filename, family, weight, style, buf, len));
-	return true;
-}
-
-bool FontManager::create_font_instance(const FontClass *fc, int font_size, FontInstance **fi)
-{
-	const int num_chars = 96;
-	const int w = num_chars * font_size;
-	int mult = 1;
-	// expand the buffer until all the chars fit
-	while (true) {
-		int h = mult * font_size;
-		boost::scoped_array<uint8_t> font_buf(new uint8_t[w*h]);
-		stbtt_bakedchar chars[96];
-		int res = stbtt_BakeFontBitmap((const byte *)fc->buf, 0, (float)font_size, font_buf.get(), w, h, 32, num_chars, chars);
-		if (res < 0) {
-			mult++;
-		} else {
-			TextureData texture;
-			//static int hax = 0;
-			//save_bmp_mono(to_string("c:\\temp\\texture_%d.bmp", hax++).c_str(), font_buf.get(), w, res);
-			B_ERR_BOOL(GRAPHICS.create_texture(w, res, DXGI_FORMAT_A8_UNORM, font_buf.get(), w, res, w, &texture));
-			*fi = new FontInstance(fc, font_size, w, h, chars, texture);
-			return true;
-		}
-	}
-	return false;
-}
-
-
 bool App::init(HINSTANCE hinstance)
 {
 	_hinstance = hinstance;
@@ -874,22 +469,24 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(create_window());
 	B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
 
+	// 0 1
+	// 2 3
 	PosTex verts[] = {
-		// 0 1
-		// 2 3
 		PosTex(0, 0, 0, 0, 0),
 		PosTex(1, 0, 0, 1, 0),
 		PosTex(0, 1, 0, 0, 1),
 		PosTex(1, 1, 0, 1, 1),
 	};
+	make_quad_clip_space(&verts[0].pos.x, &verts[0].pos.y, sizeof(verts[0]), sizeof(verts[0]), 0, 0, 0.5f, 0.5f);
 
 	ID3D11Buffer *vb = NULL;
 	ID3D11InputLayout *layout = NULL;
 	EffectWrapper *effect = NULL;
-	StateDesc desc;
-	simple_load(verts, ELEMS_IN_ARRAY(verts), 
+	RenderStates desc;
+	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
 		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
 		"effects/debug_font_states.txt", "", "", "mr_tjong", "debug_font", 
+		&vb, &layout, &effect, &desc));
 
 	FONT_MANAGER.init();
 	//FONT_MANAGER.create_font_class("Arial", FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");

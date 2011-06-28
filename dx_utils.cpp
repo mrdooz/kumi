@@ -35,3 +35,20 @@ void screen_to_clip(float x, float y, float w, float h, float *ox, float *oy)
 	*ox = (x - w / 2) / (w / 2);
 	*oy = (h/2 - y) / (h/2);
 }
+
+void make_quad_clip_space(float *x, float *y, int stride_x, int stride_y, float center_x, float center_y, float width, float height)
+{
+	// 0 1
+	// 2 3
+	x[0*stride_x] = center_x - width;
+	y[0*stride_y] = center_y + height;
+
+	x[1*stride_x] = center_x + width;
+	y[1*stride_y] = center_y + height;
+
+	x[2*stride_x] = center_x - width;
+	y[2*stride_y] = center_y - height;
+
+	x[3*stride_x] = center_x + width;
+	y[3*stride_y] = center_y - height;
+}

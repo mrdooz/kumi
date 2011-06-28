@@ -2,6 +2,7 @@
 #include "logger.hpp"
 #include "utils.hpp"
 #include "path_utils.hpp"
+#include "string_utils.hpp"
 
 #pragma comment(lib, "dxerr.lib")
 

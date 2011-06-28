@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "file_watcher.hpp"
 #include "utils.hpp"
+#include "string_utils.hpp"
 
 #pragma comment(lib, "winmm.lib")
 

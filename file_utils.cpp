@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "file_utils.hpp"
+#include "utils.hpp"
 
 bool load_file(const char *filename, void **buf, size_t *size)
 {

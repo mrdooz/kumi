@@ -23,6 +23,7 @@
 #include <boost/variant/recursive_variant.hpp>
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/scoped_array.hpp>
 
 #include <vector>
 #include <string>
@@ -41,11 +42,6 @@
 
 // these files don't change that much, so we can include them here
 #include "fast_delegate.hpp"
-#include "utils.hpp"
-#include "string_utils.hpp"
-#include "file_utils.hpp"
-#include "path_utils.hpp"
-#include "dx_utils.hpp"
 #include "logger.hpp"
 
 #include <cef.h>

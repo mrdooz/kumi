@@ -2,6 +2,10 @@
 #include "resource_watcher.hpp"
 #include "file_watcher.hpp"
 #include "utils.hpp"
+#include "string_utils.hpp"
+#include "file_utils.hpp"
+#include "string_utils.hpp"
+#include "file_utils.hpp"
 
 using std::vector;
 

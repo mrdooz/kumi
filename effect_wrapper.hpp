@@ -1,6 +1,8 @@
 #ifndef _EFFECT_WRAPPER_HPP_
 #define _EFFECT_WRAPPER_HPP_
 
+#include "dx_utils.hpp"
+
 using std::string;
 using std::vector;
 using std::map;

@@ -53,11 +53,8 @@ void container_delete(T& container)
 	container.clear();
 }
 
-template <class T>
-T either_or(const T &a, const T &b)
-{
-	return a ? a : b;
-}
+// I'm not sure if this is crazy overkill or not.. I guess what I want is lazy evaluation of function arguments
+#define either_or(a, b) [&]() ->decltype((a)) { auto t = (a); return t ? t : (b); }()
 
 template <class T>
 T exch_null(T &t)
