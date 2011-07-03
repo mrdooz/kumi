@@ -25,6 +25,20 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/scoped_array.hpp>
 
+#include <boost/any.hpp>
+#include <boost/function_types/function_arity.hpp>
+#include <boost/function_types/parameter_types.hpp>
+#include <boost/function_types/result_type.hpp>
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/for_each.hpp>
+#include <boost/mpl/if.hpp> 
+#include <boost/mpl/int.hpp>
+#include <boost/mpl/size.hpp>
+#include <boost/mpl/transform.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/type_traits/is_void.hpp> 
+#include <boost/type_traits/remove_reference.hpp>
+
 #include <vector>
 #include <string>
 #include <map>

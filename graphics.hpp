@@ -3,7 +3,16 @@
 
 #include "utils.hpp"
 
+struct GraphicsObjectHandle;
+
 struct RenderTargetData {
+	void reset() {
+		texture = NULL;
+		depth_buffer = NULL;
+		rtv = NULL;
+		dsv = NULL;
+		srv = NULL;
+	}
 	D3D11_TEXTURE2D_DESC texture_desc;
 	D3D11_TEXTURE2D_DESC depth_buffer_desc;
 	D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
@@ -17,10 +26,24 @@ struct RenderTargetData {
 };
 
 struct TextureData {
+	void reset() {
+		texture.Release();
+		srv.Release();
+	}
 	D3D11_TEXTURE2D_DESC texture_desc;
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 	CComPtr<ID3D11Texture2D> texture;
 	CComPtr<ID3D11ShaderResourceView> srv;
+};
+
+class Graphics;
+
+class Context {
+	friend class Graphics;
+public:
+
+private:
+	CComPtr<ID3D11DeviceContext> _context;
 };
 
 class Graphics {
@@ -37,7 +60,7 @@ public:
 	void	resize(const int width, const int height);
 
 	ID3D11Device* device() { return _device; }
-  ID3D11DeviceContext* context() { return _immediate_context; }
+  ID3D11DeviceContext* context() { return _immediate_context._context; }
 
   const D3D11_VIEWPORT& viewport() const { return _viewport; }
 
@@ -46,7 +69,7 @@ public:
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
 	bool create_render_target(int width, int height, RenderTargetData *out);
-	bool create_texture(int width, int height, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
+	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
 	// Create a texture, and fill it with data
 	bool create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
@@ -61,6 +84,10 @@ public:
   float fps() const { return _fps; }
   int width() const { return _width; }
   int height() const { return _height; }
+
+	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
+	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(Graphics);
@@ -78,7 +105,6 @@ private:
   D3D_FEATURE_LEVEL _feature_level;
 	CComPtr<ID3D11Device> _device;
 	CComPtr<IDXGISwapChain> _swap_chain;
-	CComPtr<ID3D11DeviceContext> _immediate_context;
 	CComPtr<ID3D11RenderTargetView> _render_target_view;
 	CComPtr<ID3D11Texture2D> _depth_stencil;
 	CComPtr<ID3D11DepthStencilView> _depth_stencil_view;
@@ -101,6 +127,7 @@ private:
   DWORD _start_fps_time;
   int32_t _frame_count;
   float _fps;
+	Context _immediate_context;
 };
 
 #define GRAPHICS Graphics::instance()

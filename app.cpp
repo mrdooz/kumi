@@ -6,7 +6,7 @@
 #include "effect_wrapper.hpp"
 #include "d3d_parser.hpp"
 #include "file_utils.hpp"
-#include "font_manager.hpp"
+#include "string_utils.hpp"
 
 App* App::_instance = nullptr;
 
@@ -20,156 +20,64 @@ App* App::_instance = nullptr;
 #pragma comment(lib, "libcef.lib")
 #pragma comment(lib, "libcef_dll_wrapper.lib")
 
-
-// ClientHandler implementation.
-class ClientHandler : public CefClient,
-	public CefLifeSpanHandler,
-	public CefLoadHandler,
-	public CefJSBindingHandler,
-	public CefRenderHandler
-	//public DownloadListener
-{
-public:
-	ClientHandler();
-	virtual ~ClientHandler();
-
-	// CefClient methods
-	virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() OVERRIDE { return this; }
-	virtual CefRefPtr<CefLoadHandler> GetLoadHandler() OVERRIDE { return this; }
-	virtual CefRefPtr<CefJSBindingHandler> GetJSBindingHandler() OVERRIDE { return this; }
-	virtual CefRefPtr<CefRenderHandler> GetRenderHandler() OVERRIDE { return this; }
-
-	// CefLifeSpanHandler methods
-	virtual bool OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser,
-		const CefPopupFeatures& popupFeatures,
-		CefWindowInfo& windowInfo,
-		const CefString& url,
-		CefRefPtr<CefClient>& client,
-		CefBrowserSettings& settings) OVERRIDE;
-	virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) OVERRIDE;
-	virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
-
-	// CefLoadHandler methods
-	virtual void OnLoadStart(CefRefPtr<CefBrowser> browser,
-		CefRefPtr<CefFrame> frame) OVERRIDE;
-	virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser,
-		CefRefPtr<CefFrame> frame,
-		int httpStatusCode) OVERRIDE;
-	virtual bool OnLoadError(CefRefPtr<CefBrowser> browser,
-		CefRefPtr<CefFrame> frame,
-		ErrorCode errorCode,
-		const CefString& failedUrl,
-		CefString& errorText) OVERRIDE;
-
-	// CefJSBindingHandler methods
-	virtual void OnJSBinding(CefRefPtr<CefBrowser> browser,
-		CefRefPtr<CefFrame> frame,
-		CefRefPtr<CefV8Value> object) OVERRIDE;
-
-	void SetMainHwnd(CefWindowHandle hwnd);
-	CefWindowHandle GetMainHwnd() { return m_MainHwnd; }
-	void SetEditHwnd(CefWindowHandle hwnd);
-	void SetButtonHwnds(CefWindowHandle backHwnd,
-		CefWindowHandle forwardHwnd,
-		CefWindowHandle reloadHwnd,
-		CefWindowHandle stopHwnd);
-
-	CefRefPtr<CefBrowser> GetBrowser() { return m_Browser; }
-	CefWindowHandle GetBrowserHwnd() { return m_BrowserHwnd; }
-
-	virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
-		static int hax = 0;
-		//save_bmp32(to_string("c:\\temp\\dump%.3d.bmp", hax++).c_str(), (uint8_t *)buffer, dirtyRect.width, dirtyRect.height);
-		//int a = 10;
-	}
-
-	virtual bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect) { 
-		return false; 
-	}
-
-	virtual bool GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect) { 
-		return false; 
-	}
-
-	virtual bool GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY) { 
-		return false; 
-	}
-
-	std::string GetLogFile();
-
-	void SetLastDownloadFile(const std::string& fileName);
-	std::string GetLastDownloadFile();
-
-	// DOM visitors will be called after the associated path is loaded.
-	void AddDOMVisitor(const std::string& path, CefRefPtr<CefDOMVisitor> visitor);
-	CefRefPtr<CefDOMVisitor> GetDOMVisitor(const std::string& path);
-
-	// Send a notification to the application. Notifications should not block the
-	// caller.
-	enum NotificationType
-	{
-		NOTIFY_CONSOLE_MESSAGE,
-		NOTIFY_DOWNLOAD_COMPLETE,
-		NOTIFY_DOWNLOAD_ERROR,
-	};
-	void SendNotification(NotificationType type);
-
-protected:
-	void SetLoading(bool isLoading);
-	void SetNavState(bool canGoBack, bool canGoForward);
-
-	// The child browser window
-	CefRefPtr<CefBrowser> m_Browser;
-
-	// The main frame window handle
-	CefWindowHandle m_MainHwnd;
-
-	// The child browser window handle
-	CefWindowHandle m_BrowserHwnd;
-
-	// The edit window handle
-	CefWindowHandle m_EditHwnd;
-
-	// The button window handles
-	CefWindowHandle m_BackHwnd;
-	CefWindowHandle m_ForwardHwnd;
-	CefWindowHandle m_StopHwnd;
-	CefWindowHandle m_ReloadHwnd;
-
-	// Support for logging.
-	std::string m_LogFile;
-
-	// Support for downloading files.
-	std::string m_LastDownloadFile;
-
-	// Support for DOM visitors.
-	typedef std::map<std::string, CefRefPtr<CefDOMVisitor> > DOMVisitorMap;
-	DOMVisitorMap m_DOMVisitors;
-
-	// Include the default reference counting implementation.
-	IMPLEMENT_REFCOUNTING(ClientHandler);
-	// Include the default locking implementation.
-	IMPLEMENT_LOCKING(ClientHandler);
-};
-
-ClientHandler::ClientHandler()
-	: m_MainHwnd(NULL),
-	m_BrowserHwnd(NULL),
-	m_EditHwnd(NULL),
-	m_BackHwnd(NULL),
-	m_ForwardHwnd(NULL),
-	m_StopHwnd(NULL),
-	m_ReloadHwnd(NULL)
-{
-}
-
-ClientHandler::~ClientHandler()
-{
-}
-
 #define REQUIRE_UI_THREAD()
 
-void ClientHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser)
+void App::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
+	D3D11_MAPPED_SUBRESOURCE sub;
+	GRAPHICS.context()->Map(_cef_staging.texture, 0, D3D11_MAP_WRITE, 0, &sub);
+	uint8_t *dst = (uint8_t *)sub.pData + 4 * dirtyRect.x + dirtyRect.y * sub.RowPitch;
+	uint8_t *src = (uint8_t *)buffer + 4 * (dirtyRect.x + dirtyRect.y * _width);
+	const int src_pitch = _width * 4;
+	for (int i = 0; i < dirtyRect.height; ++i) {
+		memcpy(dst, src, src_pitch);
+		dst += sub.RowPitch;
+		src += src_pitch;
+	}
+	GRAPHICS.context()->Unmap(_cef_staging.texture, 0);
+
+	GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
+}
+
+void App::OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor)
+{
+	REQUIRE_UI_THREAD();
+
+	// Change the plugin window's cursor.
+	SetClassLong(_hwnd, GCL_HCURSOR, static_cast<LONG>(reinterpret_cast<LONG_PTR>(cursor)));
+	SetCursor(cursor);
+}
+
+bool App::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
+{
+	REQUIRE_UI_THREAD();
+
+	// The simulated screen and view rectangle are the same. This is necessary
+	// for popup menus to be located and sized inside the view.
+	rect.x = rect.y = 0;
+	rect.width = _width;
+	rect.height = _height;
+	return true;
+}
+
+bool App::GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
+{
+	return GetViewRect(browser, rect);
+}
+
+bool App::GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY)
+{
+	REQUIRE_UI_THREAD();
+
+	// Convert the point from view coordinates to actual screen coordinates.
+	POINT screen_pt = {viewX, viewY};
+	MapWindowPoints(_hwnd, HWND_DESKTOP, &screen_pt, 1);
+	screenX = screen_pt.x;
+	screenY = screen_pt.y;
+	return true;
+}
+
+
+void App::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 {
 	REQUIRE_UI_THREAD();
 
@@ -179,11 +87,11 @@ void ClientHandler::OnAfterCreated(CefRefPtr<CefBrowser> browser)
 		// We need to keep the main child window, but not popup windows
 		m_Browser = browser;
 		m_BrowserHwnd = browser->GetWindowHandle();
-		browser->SetSize(PET_VIEW, 1024, 768);
+		browser->SetSize(PET_VIEW, _width, _height);
 	}
 }
 
-void ClientHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
+void App::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 {
 	REQUIRE_UI_THREAD();
 
@@ -193,8 +101,7 @@ void ClientHandler::OnBeforeClose(CefRefPtr<CefBrowser> browser)
 	}
 }
 
-void ClientHandler::OnLoadStart(CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame)
+void App::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame)
 {
 	REQUIRE_UI_THREAD();
 
@@ -204,9 +111,7 @@ void ClientHandler::OnLoadStart(CefRefPtr<CefBrowser> browser,
 	}
 }
 
-void ClientHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	int httpStatusCode)
+void App::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode)
 {
 	REQUIRE_UI_THREAD();
 
@@ -220,11 +125,7 @@ void ClientHandler::OnLoadEnd(CefRefPtr<CefBrowser> browser,
 	}
 }
 
-bool ClientHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	ErrorCode errorCode,
-	const CefString& failedUrl,
-	CefString& errorText)
+bool App::OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, const CefString& failedUrl, CefString& errorText)
 {
 	REQUIRE_UI_THREAD();
 
@@ -251,42 +152,31 @@ bool ClientHandler::OnLoadError(CefRefPtr<CefBrowser> browser,
 	return false;
 }
 
-void ClientHandler::OnJSBinding(CefRefPtr<CefBrowser> browser,
-	CefRefPtr<CefFrame> frame,
-	CefRefPtr<CefV8Value> object)
-{
-	REQUIRE_UI_THREAD();
-
-	// Add the V8 bindings.
-	//InitBindingTest(browser, frame, object);
-}
-
-void ClientHandler::SetMainHwnd(CefWindowHandle hwnd)
+void App::SetMainHwnd(CefWindowHandle hwnd)
 {
 	AutoLock lock_scope(this);
 	m_MainHwnd = hwnd;
 }
 
-std::string ClientHandler::GetLogFile()
+std::string App::GetLogFile()
 {
 	AutoLock lock_scope(this);
 	return m_LogFile;
 }
 
-void ClientHandler::SetLastDownloadFile(const std::string& fileName)
+void App::SetLastDownloadFile(const std::string& fileName)
 {
 	AutoLock lock_scope(this);
 	m_LastDownloadFile = fileName;
 }
 
-std::string ClientHandler::GetLastDownloadFile()
+std::string App::GetLastDownloadFile()
 {
 	AutoLock lock_scope(this);
 	return m_LastDownloadFile;
 }
 
-void ClientHandler::AddDOMVisitor(const std::string& path,
-	CefRefPtr<CefDOMVisitor> visitor)
+void App::AddDOMVisitor(const std::string& path, CefRefPtr<CefDOMVisitor> visitor)
 {
 	AutoLock lock_scope(this);
 	DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
@@ -296,7 +186,7 @@ void ClientHandler::AddDOMVisitor(const std::string& path,
 		it->second = visitor;
 }
 
-CefRefPtr<CefDOMVisitor> ClientHandler::GetDOMVisitor(const std::string& path)
+CefRefPtr<CefDOMVisitor> App::GetDOMVisitor(const std::string& path)
 {
 	AutoLock lock_scope(this);
 	DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
@@ -305,12 +195,8 @@ CefRefPtr<CefDOMVisitor> ClientHandler::GetDOMVisitor(const std::string& path)
 	return NULL;
 }
 
-bool ClientHandler::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser,
-	const CefPopupFeatures& popupFeatures,
-	CefWindowInfo& windowInfo,
-	const CefString& url,
-	CefRefPtr<CefClient>& client,
-	CefBrowserSettings& settings)
+bool App::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatures& popupFeatures, CefWindowInfo& windowInfo, 
+	const CefString& url, CefRefPtr<CefClient>& client, CefBrowserSettings& settings)
 {
 	REQUIRE_UI_THREAD();
 
@@ -327,7 +213,7 @@ bool ClientHandler::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser,
 }
 
 
-void ClientHandler::SetLoading(bool isLoading)
+void App::SetLoading(bool isLoading)
 {
 	//ASSERT(m_EditHwnd != NULL && m_ReloadHwnd != NULL && m_StopHwnd != NULL);
 	EnableWindow(m_EditHwnd, TRUE);
@@ -335,15 +221,40 @@ void ClientHandler::SetLoading(bool isLoading)
 	EnableWindow(m_StopHwnd, isLoading);
 }
 
-void ClientHandler::SetNavState(bool canGoBack, bool canGoForward)
+void App::SetNavState(bool canGoBack, bool canGoForward)
 {
 	//ASSERT(m_BackHwnd != NULL && m_ForwardHwnd != NULL);
 	EnableWindow(m_BackHwnd, canGoBack);
 	EnableWindow(m_ForwardHwnd, canGoForward);
 }
 
+/*
+void App::OnJSBinding(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Value> object)
+{
+	REQUIRE_UI_THREAD();
 
-CefRefPtr<ClientHandler> g_handler;
+	// Create the new V8 object.
+	CefRefPtr<CefV8Value> testObjPtr = CefV8Value::CreateObject(NULL);
+
+	// Add the new V8 object to the global window object with the name
+	// "cef_test".
+	object->SetValue("cef_test", testObjPtr);
+
+	// Create an instance of ClientV8FunctionHandler as the V8 handler.
+	CefRefPtr<CefV8Handler> handlerPtr = new MyV8Handler();
+
+	// Add a new V8 function to the cef_test object with the name "Dump".
+	testObjPtr->SetValue("Dump", CefV8Value::CreateFunction("Dump", handlerPtr));
+	// Add a new V8 function to the cef_test object with the name "Call".
+	testObjPtr->SetValue("Call", CefV8Value::CreateFunction("Call", handlerPtr));
+
+
+	// Add the V8 bindings.
+	//InitBindingTest(browser, frame, object);
+}
+*/
+
+//CefRefPtr<ClientHandler> g_handler;
 
 void create_input_desc(const PosTex *verts, InputDesc *desc) 
 {
@@ -355,26 +266,11 @@ void create_input_desc(const PosTex *verts, InputDesc *desc)
 template<typename T>
 bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
 {
-	B_WRN_DX(create_static_vertex_buffer(GRAPHICS.device(), num_verts, sizeof(T), verts, vb));
+	B_WRN_DX(GRAPHICS.create_static_vertex_buffer(num_verts, sizeof(T), verts, vb));
 	create_input_desc(verts, desc);
 	return true;
 }
 
-struct RenderStates {
-	RenderStates() : blend_state(nullptr), depth_stencil_state(nullptr), rasterizer_state(nullptr), sampler_state(nullptr) {}
-
-	D3D11_BLEND_DESC blend_desc;
-	ID3D11BlendState *blend_state;
-	
-	D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
-	ID3D11DepthStencilState *depth_stencil_state;
-
-	D3D11_RASTERIZER_DESC rasterizer_desc;
-	ID3D11RasterizerState *rasterizer_state;
-
-	D3D11_SAMPLER_DESC sampler_desc;
-	ID3D11SamplerState *sampler_state;
-};
 
 template<typename T>
 bool simple_load(const T *verts, int num_verts,
@@ -385,8 +281,8 @@ bool simple_load(const T *verts, int num_verts,
 	InputDesc desc;
 	B_WRN_BOOL(vb_from_data(verts, num_verts, vb, &desc));
 
-	EffectWrapper *e = new EffectWrapper;
-	B_WRN_BOOL(e->load_shaders(shader, vs, gs, ps));
+	*effect = EffectWrapper::create_from_file(shader, vs, gs, ps);
+	B_WRN_BOOL(!!(*effect));
 
 	if (state && render_states) {
 		void *buf = NULL;
@@ -403,8 +299,10 @@ bool simple_load(const T *verts, int num_verts,
 			sampler_desc ? &sampler_descs : NULL);
 
 #define CREATE_STATE(n, fn) \
-	if (n ## _desc && n ## _descs.find(n ## _desc) != n ## _descs.end()) \
-			GRAPHICS.device()->fn(&render_states->n ## _desc, &render_states->n ## _state);
+	if (n ## _desc && n ## _descs.find(n ## _desc) != n ## _descs.end()) { \
+			render_states->n ## _desc = n ## _descs[n ## _desc];	\
+			GRAPHICS.device()->fn(&render_states->n ## _desc, &render_states->n ## _state); \
+	}
 
 		CREATE_STATE(blend, CreateBlendState);
 		CREATE_STATE(depth_stencil, CreateDepthStencilState);
@@ -414,8 +312,7 @@ bool simple_load(const T *verts, int num_verts,
 #undef CREATE_STATE
 	}
 
-
-	*layout = desc.create(e);
+	*layout = desc.create(*effect);
 
 	return true;
 }
@@ -435,6 +332,16 @@ App::App()
 	, _cur_camera(1)
 	, _draw_plane(false)
 	, _ref_count(1)
+	, _cef_vb(nullptr)
+	, _cef_layout(nullptr)
+	, _cef_effect(nullptr)
+	, m_MainHwnd(NULL),
+	m_BrowserHwnd(NULL),
+	m_EditHwnd(NULL),
+	m_BackHwnd(NULL),
+	m_ForwardHwnd(NULL),
+	m_StopHwnd(NULL),
+	m_ReloadHwnd(NULL)
 {
 	find_app_root();
 }
@@ -450,10 +357,6 @@ App& App::instance()
 	return *_instance;
 }
 
-//byte font_buf[512*512];
-//stbtt_bakedchar chars[96];
-//int texture_height;
-
 bool App::init(HINSTANCE hinstance)
 {
 	_hinstance = hinstance;
@@ -467,30 +370,24 @@ bool App::init(HINSTANCE hinstance)
 		return false;
 
 	B_ERR_BOOL(create_window());
-	B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
 
-	// 0 1
-	// 2 3
-	PosTex verts[] = {
-		PosTex(0, 0, 0, 0, 0),
-		PosTex(1, 0, 0, 1, 0),
-		PosTex(0, 1, 0, 0, 1),
-		PosTex(1, 1, 0, 1, 1),
-	};
-	make_quad_clip_space(&verts[0].pos.x, &verts[0].pos.y, sizeof(verts[0]), sizeof(verts[0]), 0, 0, 0.5f, 0.5f);
+	PosTex verts[6];
+	for (int i = 0; i < 6; ++i)
+		verts[i].pos.z = 0;
 
-	ID3D11Buffer *vb = NULL;
-	ID3D11InputLayout *layout = NULL;
-	EffectWrapper *effect = NULL;
-	RenderStates desc;
+	const int stride = sizeof(PosTex);
+	make_quad_clip_space_unindexed(&verts[0].pos.x, &verts[0].pos.y, &verts[0].tex.x, &verts[0].tex.y,
+		stride, stride, stride, stride, 0, 0, 1, 1);
+
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
 		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
-		"effects/debug_font_states.txt", "", "", "mr_tjong", "debug_font", 
-		&vb, &layout, &effect, &desc));
-
-	FONT_MANAGER.init();
-	//FONT_MANAGER.create_font_class("Arial", FontManager::kNormal, FontManager::kNormal, "data/arialbd.ttf");
-
+		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
+		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
+/*
+	GRAPHICS.create_texture(
+		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8G8B8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
+		&_cef_texture);
+*/
 	return true;
 }
 
@@ -597,8 +494,6 @@ void App::toggle_plane()
 
 void App::run()
 {
-	//auto& graphics = Graphics::instance();
-
 	MSG msg = {0};
 
 	float running_time = 0;
@@ -610,7 +505,6 @@ void App::run()
 	QueryPerformanceCounter(&cur);
 	float cur_time = (float)(cur.QuadPart / freq.QuadPart);
 	float accumulator = 0;
-
 
 	while (WM_QUIT != msg.message) {
 		if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) ) {
@@ -630,6 +524,23 @@ void App::run()
 			//IMGui::instance().init_frame();
 
 			//DebugRenderer::instance().start_frame();
+
+			{
+				GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
+				ID3D11DeviceContext *context = GRAPHICS.context();
+				context->PSSetSamplers(0, 1, &_cef_desc.sampler_state);
+				_cef_effect->set_shaders(context);
+				_cef_effect->set_resource("g_texture", _cef_texture.srv);
+				GRAPHICS.set_vb(context, _cef_vb, sizeof(PosTex));
+				context->IASetInputLayout(_cef_layout);
+				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+				float blend_factor[] = { 1, 1, 1, 1 };
+				context->OMSetBlendState(_cef_desc.blend_state, blend_factor, 0xffffffff);
+				context->RSSetState(_cef_desc.rasterizer_state);
+				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
+				context->Draw(6, 0);
+			}
 
 			if (_test_effect) {
 
@@ -656,8 +567,6 @@ void App::run()
 				}
 			}
 
-			FONT_MANAGER.add_text("tjong!");
-			FONT_MANAGER.render();
 			GRAPHICS.present();
 		}
 	}
@@ -671,53 +580,267 @@ LRESULT App::tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
 	return App::instance().wnd_proc(hWnd, message, wParam, lParam);
 }
 
+int funky(int a, float b, CefString c) {
+	return 42;
+}
+
+CefString monkey(CefString c) {
+	return CefString("apa");
+}
+
+namespace function_types = boost::function_types;
+namespace mpl = boost::mpl;
+
+typedef bool (CefV8Value::*CheckTypeFn)();
+typedef vector<CheckTypeFn> Validators;
+
+struct MakeValidatorList {
+	MakeValidatorList(Validators &v) : _validators(v) {}
+	Validators &_validators;
+
+	template<typename T> struct add_validator;
+	template<> struct add_validator<int> { void add(Validators &v) { v.push_back(&CefV8Value::IsInt); } };
+	template<> struct add_validator<bool> { void add(Validators &v) { v.push_back(&CefV8Value::IsBool); } };
+	template<> struct add_validator<float> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
+	template<> struct add_validator<double> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
+	template<> struct add_validator<string> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
+	template<> struct add_validator<CefString> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
+
+	template <typename T>
+	void operator()(T t) {
+		add_validator<T> v;
+		v.add(_validators);
+	}
+};
+
+// Transform that removes the references from types in the sequence
+struct remove_ref {
+	template <class T>
+	struct apply {
+		typedef typename boost::remove_reference<T>::type type;
+	};
+};
+
+struct MyV8Handler : public CefV8Handler {
+
+	struct Func {
+		Func(const string &cef_name, const string &native_name, const string &args) : _cef_name(cef_name), _native_name(native_name), _args(args) {}
+		virtual bool is_valid(const CefV8ValueList& arguments) = 0;
+		virtual CefRefPtr<CefV8Value> execute(const CefV8ValueList& arguments) = 0;
+		string _cef_name;
+		string _native_name;
+		string _args;
+		Validators _validators;
+	};
+
+	template<int T> struct Int2Type {}; 
+
+	template<class Fn>
+	struct FuncT : public Func {
+
+		// typedefs for the parameters and return type
+		typedef typename mpl::transform< function_types::parameter_types<Fn>, remove_ref>::type ParamTypes;
+		typedef typename function_types::result_type<Fn>::type ResultType;
+
+		FuncT(const string &cef_name, const string &native_name, const string &args, const Fn &fn) : Func(cef_name, native_name, args), _fn(fn) {}
+
+		virtual bool is_valid(const CefV8ValueList& arguments) {
+			if (arguments.size() != _validators.size())
+				return false;
+			// Apply the validator for each argument to check it's of the correct type
+			for (size_t i = 0; i < _validators.size(); ++i) {
+				if (!((arguments[i].get())->*_validators[i])())
+					return false;
+			}
+			return true;
+		}
+
+		// unboxes a CefV8Value to a native type
+		template<typename T> struct unbox_value;
+		template<> struct unbox_value<bool> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator bool() { return _v.GetBoolValue(); } };
+		template<> struct unbox_value<int> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator int() { return _v.GetIntValue(); } };
+		template<> struct unbox_value<float> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator float() { return (float)_v.GetDoubleValue(); } };
+		template<> struct unbox_value<double> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator double() { return _v.GetDoubleValue(); } };
+		template<> struct unbox_value<CefString> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator CefString() { return _v.GetStringValue(); } };
+
+		// box a native type in a CefV8Value
+		template<typename T> struct box_value;
+		template<> struct box_value<bool> { box_value(bool v) : _v(v) {} bool _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateBool(_v); } };
+		template<> struct box_value<int> { box_value(int v) : _v(v) {} int _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateInt(_v); } };
+		template<> struct box_value<float> { box_value(float v) : _v(v) {} float _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
+		template<> struct box_value<double> { box_value(double v) : _v(v) {} double _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
+		template<> struct box_value<CefString> { box_value(CefString v) : _v(v) {} CefString _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateString(_v); } };
+
+		// specialize the executors on the function arity
+		template<class Arity, class ParamTypes, class ResultType> struct exec;
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<0>, ParamTypes, ResultType> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				fn();
+				return CefV8Value::CreateNull();
+			}
+		};
+
+		// for each argument, get its type, and call the correct unbox_value-specialization to unbox the value
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<1>, ParamTypes, ResultType> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				return box_value<ResultType>(fn(
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get())));
+			}
+		};
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<2>, ParamTypes, ResultType> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				return box_value<ResultType>(fn(
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()), 
+					unbox_value<mpl::at<ParamTypes, mpl::int_<1> >::type>(*arguments[1].get())));
+			}
+		};
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<3>, ParamTypes, ResultType> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				return box_value<ResultType>(fn(
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()), 
+					unbox_value<mpl::at<ParamTypes, mpl::int_<1> >::type>(*arguments[1].get()), 
+					unbox_value<mpl::at<ParamTypes, mpl::int_<2> >::type>(*arguments[2].get())));
+			}
+		};
+
+		virtual CefRefPtr<CefV8Value> execute(const CefV8ValueList& arguments) {
+			typedef exec< Int2Type<function_types::function_arity<Fn>::value>, ParamTypes, ResultType> E;
+			E e;
+			return e(_fn, arguments);
+		}
+
+		Fn _fn;
+	};
+
+	virtual bool Execute(const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval, CefString& exception)
+	{
+		Funcs::iterator it = _funcs.find(name);
+		if (it == _funcs.end())
+			return false;
+
+		Func *func = it->second;
+		if (!func->is_valid(arguments))
+			return false;
+
+		retval = func->execute(arguments);
+
+		return true;
+	}
+
+	template<typename Arity> struct get_param_string;
+	template<> struct get_param_string<Int2Type<0>> { operator string() { return ""; } };
+	template<> struct get_param_string<Int2Type<1>> { operator string() { return "a"; } };
+	template<> struct get_param_string<Int2Type<2>> { operator string() { return "a,b"; } };
+	template<> struct get_param_string<Int2Type<3>> { operator string() { return "a,b,c"; } };
+
+	template <typename Fn> 
+	void AddFunction(const char *cef_name, const char *native_name, Fn fn) {
+		assert(_funcs.find(cef_name) == _funcs.end());
+		Func *f = new FuncT<Fn>(cef_name, native_name, get_param_string<Int2Type<function_types::function_arity<Fn>::value>>(), fn);
+		_funcs[cef_name] = f;
+
+		// create a validator for the function
+		mpl::for_each<mpl::transform< function_types::parameter_types<Fn>, remove_ref>::type>(MakeValidatorList(f->_validators));
+	}
+
+	void Register()
+	{
+		string code = "var cef;"
+			"if (!cef)\n"
+			"  cef = {};\n"
+			"if (!cef.test)\n"
+			"  cef.test = {};\n";
+
+		const char *fn_template = ""
+			"cef.test.%s = function(%s) {\n"
+			"  native function %s(%s);\n"
+			"  return %s(%s);\n"
+			"};\n";
+
+		// use the template to create the function bindings
+		for (auto it = _funcs.begin(); it != _funcs.end(); ++it) {
+			const Func *cur = it->second;
+			code += to_string(fn_template, 
+				cur->_cef_name.c_str(), cur->_args.c_str(), cur->_native_name.c_str(), cur->_args.c_str(), cur->_native_name.c_str(), cur->_args.c_str());
+		}
+
+		CefRegisterExtension("v8/test", code, this);
+	}
+
+	string _code;
+
+	typedef map<string, Func *> Funcs;
+	Funcs _funcs;
+
+	IMPLEMENT_REFCOUNTING(MyV8Handler);
+};
+
+void InitExtensionTest()
+{
+	MyV8Handler *vv = new MyV8Handler;
+	vv->AddFunction("funky", "funky", funky);
+	vv->AddFunction("funky2", "funky", funky);
+	vv->AddFunction("monkey", "monkey", monkey);
+	vv->Register();
+}
+
 LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
 {
+
+	//Validators vv;
+	//make_funky(funky, vv);
 
 	HDC hdc;
 	PAINTSTRUCT ps;
 	switch( message ) 
 	{
-/*
+
 	case WM_SETFOCUS:
-		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
-			// Pass focus to the browser window
-			PostMessage(g_handler->GetBrowserHwnd(), WM_SETFOCUS, wParam, NULL);
+	case WM_KILLFOCUS:
+		{
+			SetFocus(_hwnd);
+			if (GetBrowser())
+				GetBrowser()->SetFocus(message == WM_SETFOCUS);
 		}
 		return 0;
-*/
+
 	case WM_SIZE:
 		GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
-		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
-			// Resize the browser window and address bar to match the new frame
-			// window size
+		GRAPHICS.create_texture(
+			CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
+			&_cef_texture);
+
+		GRAPHICS.create_texture(
+			CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, 0, D3D11_USAGE_STAGING, D3D11_CPU_ACCESS_WRITE),
+			&_cef_staging);
+
+		if (GetBrowserHwnd()) {
 			RECT rect;
 			GetClientRect(hWnd, &rect);
 			HDWP hdwp = BeginDeferWindowPos(1);
-			hdwp = DeferWindowPos(hdwp, g_handler->GetBrowserHwnd(), 0, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
+			hdwp = DeferWindowPos(hdwp, GetBrowserHwnd(), 0, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, SWP_NOZORDER);
 			EndDeferWindowPos(hdwp);
-			g_handler->GetBrowser()->SetSize(PET_VIEW, rect.right - rect.left, rect.bottom - rect.top);
+			GetBrowser()->SetSize(PET_VIEW, rect.right - rect.left, rect.bottom - rect.top);
 		}
 		break;
-/*
+
 	case WM_ERASEBKGND:
-		if(g_handler.get() && g_handler->GetBrowserHwnd()) {
-			// Dont erase the background if the browser window has been loaded
-			// (this avoids flashing)
-			return 0;
-		}
-		break;
-*/
+		return 0;
 
 	case WM_PAINT:
 		hdc = BeginPaint(hWnd, &ps);
 		EndPaint(hWnd, &ps);
-		break;
+		return 0;
 
 	case WM_CREATE:
 		{
-			g_handler = new ClientHandler();
-			g_handler->SetMainHwnd(hWnd);
+			_hwnd = hWnd;
+			B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
+
+			SetMainHwnd(hWnd);
 
 			CefWindowInfo info;
 			info.m_bIsTransparent = TRUE;
@@ -727,8 +850,9 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 			GetClientRect(hWnd, &rect);
 			info.SetAsOffScreen(hWnd);
 			info.SetIsTransparent(TRUE);
-			CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(g_handler), "file://C:/Users/dooz/Downloads/PlasterDemo/PlasterDemo/Assets/index.html", settings);
-			//g_handler->GetBrowser()->SetSize(PET_VIEW, 1024, 768);
+			CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "file://C:/temp/tjong.html", settings);
+			InitExtensionTest();
+			//CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "http://www.google.com", settings);
 		}
 		break;
 
@@ -736,75 +860,40 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 		PostQuitMessage(0);
 		break;
 
-	case WM_LBUTTONDOWN:
-	case WM_MBUTTONDOWN:
-	case WM_RBUTTONDOWN:
-/*
-		ui_state.mouse_down = 1;
-		{
-			MouseInfo m(!!(wParam & MK_LBUTTON), !!(wParam & MK_MBUTTON), !!(wParam & MK_RBUTTON), LOWORD(lParam), HIWORD(lParam));
-			for (auto i = _mouse_down_callbacks.begin(), e = _mouse_down_callbacks.end(); i != e; ++i)
-				(*i)(m);
-		}
-*/
-		break;
-
 	case WM_LBUTTONUP:
 	case WM_MBUTTONUP:
 	case WM_RBUTTONUP:
-/*
-		ui_state.mouse_down = 0;
-		{
-			MouseInfo m(!!(wParam & MK_LBUTTON), !!(wParam & MK_MBUTTON), !!(wParam & MK_RBUTTON), LOWORD(lParam), HIWORD(lParam));
-			for (auto i = _mouse_up_callbacks.begin(), e = _mouse_up_callbacks.end(); i != e; ++i)
-				(*i)(m);
+		if (GetBrowser()) {
+			if (GetCapture() == hWnd)
+				ReleaseCapture();
+			cef_mouse_button_type_t btn = message == WM_LBUTTONUP ? MBT_LEFT : (message == WM_MBUTTONUP ? MBT_MIDDLE : MBT_RIGHT);
+			GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, true, 1);
 		}
-*/
+		break;
+
+	case WM_LBUTTONDOWN:
+	case WM_MBUTTONDOWN:
+	case WM_RBUTTONDOWN:
+		if (GetBrowser()) {
+			SetCapture(hWnd);
+			SetFocus(hWnd);
+			cef_mouse_button_type_t btn = message == WM_LBUTTONDOWN ? MBT_LEFT : (message == WM_MBUTTONDOWN ? MBT_MIDDLE : MBT_RIGHT);
+			GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, false, 1);
+		}
 		break;
 
 	case WM_MOUSEMOVE:
-/*
-		ui_state.mouse_x = GET_X_LPARAM(lParam);
-		ui_state.mouse_y = GET_Y_LPARAM(lParam);
-		{
-			// only call the callbacks if we've actually moved
-			static int last_wparam = 0;
-			static int last_lparam = 0;
-			if (last_lparam != lParam || last_wparam != wParam) {
-				int x = LOWORD(lParam);
-				int y = HIWORD(lParam);
-				MouseInfo m(!!(wParam & MK_LBUTTON), !!(wParam & MK_MBUTTON), !!(wParam & MK_RBUTTON), x, y, x - LOWORD(last_lparam), y - HIWORD(last_lparam), 0);
-				for (auto i = _mouse_move_callbacks.begin(), e = _mouse_move_callbacks.end(); i != e; ++i)
-					(*i)(m);
-				last_lparam = lParam;
-				last_wparam = wParam;
-			}
-		}
-*/
+		if (GetBrowser())
+			GetBrowser()->SendMouseMoveEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), false);
 		break;
 
 	case WM_MOUSEWHEEL:
-/*
-		{
-			MouseInfo m(!!(wParam & MK_LBUTTON), !!(wParam & MK_MBUTTON), !!(wParam & MK_RBUTTON), LOWORD(lParam), HIWORD(lParam), 0, 0, GET_WHEEL_DELTA_WPARAM(wParam));
-			for (auto i = _mouse_wheel_callbacks.begin(), e = _mouse_wheel_callbacks.end(); i != e; ++i)
-				(*i)(m);
-		}
-*/
 		break;
-
-	case WM_KEYDOWN:
 /*
-		{
-			KeyInfo k(wParam, lParam);
-			for (auto i = _keydown_callbacks.begin(), e = _keydown_callbacks.end(); i != e; ++i)
-				(*i)(k);
-		}
-*/
+	case WM_KEYDOWN:
 		break;
 
 	case WM_CHAR:
-		//ui_state.key_entered = wParam;
 		break;
 
 	case WM_KEYUP:
@@ -814,16 +903,34 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 			PostQuitMessage( 0 );
 			break;
 		default:
-/*
-			{
-				KeyInfo k(wParam, lParam);
-				for (auto i = _keyup_callbacks.begin(), e = _keyup_callbacks.end(); i != e; ++i)
-					(*i)(k);
-			}
-*/
 			break;
 		}
 		break;
+*/
+
+	case WM_KEYDOWN:
+	case WM_KEYUP:
+	case WM_SYSKEYDOWN:
+	case WM_SYSKEYUP:
+	case WM_CHAR:
+	case WM_SYSCHAR:
+	case WM_IME_CHAR:
+		if (GetBrowser()) {
+			const CefBrowser::KeyType type = 
+				(message == WM_KEYDOWN || message == WM_SYSKEYDOWN) ? KT_KEYDOWN :
+				(message == WM_KEYUP || message == WM_SYSKEYUP) ? KT_KEYUP :
+				KT_CHAR;
+
+			const bool sys_char = message == WM_SYSKEYDOWN || message == WM_SYSKEYUP || message == WM_SYSCHAR;
+			const bool ime_char = message == WM_IME_CHAR;
+
+			if (wParam == VK_F5)
+				GetBrowser()->Reload();
+			else
+				GetBrowser()->SendKeyEvent(type, wParam, lParam, sys_char, ime_char);
+		}
+		break;
+
 	}
 	return DefWindowProc( hWnd, message, wParam, lParam );
 }

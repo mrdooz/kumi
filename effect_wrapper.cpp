@@ -13,23 +13,36 @@ EffectWrapper::~EffectWrapper()
 {
 }
 
+EffectWrapper *EffectWrapper::create_from_buffer(const char *buf, int len, const char *vs, const char *gs, const char *ps) 
+{
+	EffectWrapper *e = new EffectWrapper;
+	if (!e->load_shaders(buf, len, vs, gs, ps))
+		delete exch_null(e);
+	return e;
+}
+
+EffectWrapper *EffectWrapper::create_from_file(const char *filename, const char *vs, const char *gs, const char *ps) 
+{
+	void *buf;
+	size_t len;
+	if (!load_file(filename, &buf, &len)) {
+		LOG_WARNING_LN("error loading file: %s", filename);
+		return NULL;
+	}
+
+	EffectWrapper *e = new EffectWrapper;
+	if (!e->load_shaders((const char *)buf, len, vs, gs, ps))
+		delete exch_null(e);
+	delete [] buf;
+	return e;
+}
+
 bool EffectWrapper::load_shaders(const char *buf, int len, const char *vs, const char *gs, const char *ps)
 {
 	return 
 		either_or(!vs, load_inner(buf, len, vs, VertexShader)) && 
 		either_or(!gs, load_inner(buf, len, gs, GeometryShader)) && 
 		either_or(!ps, load_inner(buf, len, ps, PixelShader));
-}
-
-bool EffectWrapper::load_shaders(const char *filename, const char *vs, const char *gs, const char *ps)
-{
-	void *buf;
-	size_t len;
-	if (!load_file(filename, &buf, &len)) {
-		LOG_WARNING_LN("error loading file: %s", filename);
-		return false;
-	}
-	return load_shaders((const char *)buf, len, vs, gs, ps);
 }
 
 bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point, ShaderType type)
@@ -40,7 +53,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 	// Must use ps_4_0_level_9_3 or ps_4_0_level_9_1
 	// Set shader version depending on feature level
 	const char *vs, *ps, *gs;
-	switch(Graphics::instance().feature_level()) {
+	switch (GRAPHICS.feature_level()) {
 	case D3D_FEATURE_LEVEL_9_1:
 		vs = "vs_4_0_level_9_1";
 		ps = "ps_4_0_level_9_1";
@@ -59,7 +72,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 		break;
 	}
 
-	ID3D11Device *device = Graphics::instance().device();
+	ID3D11Device *device = GRAPHICS.device();
 	switch (type)
 	{
 	case VertexShader:

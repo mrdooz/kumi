@@ -88,7 +88,6 @@
     <ClCompile Include="..\effect_wrapper.cpp" />
     <ClCompile Include="..\file_utils.cpp" />
     <ClCompile Include="..\file_watcher.cpp" />
-    <ClCompile Include="..\font_manager.cpp" />
     <ClCompile Include="..\graphics.cpp" />
     <ClCompile Include="..\kumi.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
@@ -116,7 +115,6 @@
     <ClInclude Include="..\effect_wrapper.hpp" />
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />
-    <ClInclude Include="..\font_manager.hpp" />
     <ClInclude Include="..\graphics.hpp" />
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\path_utils.hpp" />

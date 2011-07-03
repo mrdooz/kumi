@@ -9,3 +9,14 @@ RasterizerDesc mr_tjong2 = {
 	FillMode = FILL_WIREFRAME;
 };
 
+BlendDesc blend = {
+	RenderTarget[0] = {
+		BlendEnable = TRUE;
+		SrcBlend = BLEND_SRC_ALPHA;
+		DestBlend = BLEND_INV_SRC_ALPHA;
+		BlendOp = BLEND_OP_ADD;
+		SrcBlendAlpha = BLEND_ONE;
+		DestBlendAlpha = BLEND_ZERO;
+		BlendOpAlpha = BLEND_OP_ADD;
+	};
+};

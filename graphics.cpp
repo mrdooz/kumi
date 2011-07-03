@@ -8,6 +8,37 @@ using namespace std;
 #pragma comment(lib, "DXGUID.lib")
 #pragma comment(lib, "D3D11.lib")
 
+namespace
+{
+	HRESULT create_buffer_inner(ID3D11Device* device, const D3D11_BUFFER_DESC& desc, const void* data, ID3D11Buffer** buffer)
+	{
+		D3D11_SUBRESOURCE_DATA init_data;
+		ZeroMemory(&init_data, sizeof(init_data));
+		init_data.pSysMem = data;
+		return device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
+	}
+}
+
+struct GraphicsObjectHandle {
+	enum Type {
+		kVertexBuffer,
+		kIndexBuffer,
+		kConstantBuffer,
+		kTexture,
+		kShader,
+		kInputLayout,
+		kBlendState,
+		kRasterizerState,
+		kSamplerState,
+		kDepthStencilState,
+	};
+	uint32_t type : 8;
+	uint32_t generation : 8;
+	uint32_t id : 16;
+};
+
+static_assert(sizeof(GraphicsObjectHandle) == sizeof(uint32_t), "Invalid size for GraphicsObjectHandle");
+
 Graphics* Graphics::_instance = NULL;
 
 Graphics& Graphics::instance()
@@ -32,8 +63,28 @@ Graphics::~Graphics()
 {
 }
 
+HRESULT Graphics::create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
+{
+	return create_buffer_inner(_device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+}
+
+HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
+{
+	return create_buffer_inner(_device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, vertex_buffer);
+}
+
+void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride)
+{
+	UINT ofs[] = { 0 };
+	ID3D11Buffer* bufs[] = { buf };
+	uint32_t strides[] = { stride };
+	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
+}
+
 bool Graphics::create_render_target(int width, int height, RenderTargetData *out)
 {
+	out->reset();
+
 	// create the render target
 	ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
 	out->texture_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
@@ -58,27 +109,31 @@ bool Graphics::create_render_target(int width, int height, RenderTargetData *out
 	return true;
 }
 
-bool Graphics::create_texture(int width, int height, const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
+bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
 {
+	out->reset();
+
 	// create the texture
 	ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
 	out->texture_desc = desc;
 	B_WRN_DX(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
 
-	// create the shader resource view
-	out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
-	B_WRN_DX(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+	// create the shader resource view if the texture has a shader resource bind flag
+	if (desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) {
+		out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
+		B_WRN_DX(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+	}
 
 	return true;
 }
 
 bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out)
 {
-	if (!create_texture(width, height, CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
+	if (!create_texture(CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
 		return false;
 
 	D3D11_MAPPED_SUBRESOURCE resource;
-	B_ERR_DX(_immediate_context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
+	B_ERR_DX(_immediate_context._context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	uint8_t *src = (uint8_t *)data;
 	uint8_t *dst = (uint8_t *)resource.pData;
 	const int w = std::min<int>(width, data_width);
@@ -88,7 +143,7 @@ bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data
 		src += data_pitch;
 		dst += resource.RowPitch;
 	}
-	_immediate_context->Unmap(out->texture, 0);
+	_immediate_context._context->Unmap(out->texture, 0);
 	return true;
 }
 
@@ -174,7 +229,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 	// Create the DX11 device
 	B_ERR_DX(D3D11CreateDeviceAndSwapChain(
-		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context));
+		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context._context.p));
 
 	B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
@@ -193,8 +248,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 void Graphics::set_default_render_target()
 {
 	ID3D11RenderTargetView* render_targets[] = { _render_target_view };
-	_immediate_context->OMSetRenderTargets(1, render_targets, _depth_stencil_view);
-	_immediate_context->RSSetViewports(1, &_viewport);
+	_immediate_context._context->OMSetRenderTargets(1, render_targets, _depth_stencil_view);
+	_immediate_context._context->RSSetViewports(1, &_viewport);
 }
 
 bool Graphics::close()
@@ -211,8 +266,8 @@ void Graphics::clear()
 
 void Graphics::clear(const XMFLOAT4& c)
 {
-	_immediate_context->ClearRenderTargetView(_render_target_view, &c.x);
-	_immediate_context->ClearDepthStencilView(_depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+	_immediate_context._context->ClearRenderTargetView(_render_target_view, &c.x);
+	_immediate_context._context->ClearDepthStencilView(_depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0 );
 }
 
 void Graphics::present()

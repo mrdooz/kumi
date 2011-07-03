@@ -14,11 +14,7 @@ class EffectWrapper
 	struct BufferVariable;
 
 public:
-	EffectWrapper();
 	~EffectWrapper();
-
-	bool	load_shaders(const char *filename, const char *vs, const char *gs, const char *ps);
-	bool	load_shaders(const char *buf, int len, const char *vs, const char *gs, const char *ps);
 
 	void  set_shaders(ID3D11DeviceContext *context);
 
@@ -39,7 +35,13 @@ public:
 	ID3D11InputLayout*	create_input_layout(const vector<D3D11_INPUT_ELEMENT_DESC>& elems);
 	ID3D11InputLayout*	create_input_layout(const D3D11_INPUT_ELEMENT_DESC* elems, const int num_elems);
 
+	static EffectWrapper *create_from_buffer(const char *buf, int len, const char *vs, const char *gs, const char *ps);
+	static EffectWrapper *create_from_file(const char *filename, const char *vs, const char *gs, const char *ps);
+
 private:
+
+	EffectWrapper();
+	bool	load_shaders(const char *buf, int len, const char *vs, const char *gs, const char *ps);
 
 	ID3D11VertexShader* vertex_shader() { return _vs._shader; }
 	ID3D11PixelShader* pixel_shader() { return _ps._shader; }
