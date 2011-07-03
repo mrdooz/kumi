@@ -588,40 +588,44 @@ CefString monkey(CefString c) {
 	return CefString("apa");
 }
 
+void monkey2(int a) {
+
+}
+
 namespace function_types = boost::function_types;
 namespace mpl = boost::mpl;
 
-typedef bool (CefV8Value::*CheckTypeFn)();
-typedef vector<CheckTypeFn> Validators;
-
-struct MakeValidatorList {
-	MakeValidatorList(Validators &v) : _validators(v) {}
-	Validators &_validators;
-
-	template<typename T> struct add_validator;
-	template<> struct add_validator<int> { void add(Validators &v) { v.push_back(&CefV8Value::IsInt); } };
-	template<> struct add_validator<bool> { void add(Validators &v) { v.push_back(&CefV8Value::IsBool); } };
-	template<> struct add_validator<float> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
-	template<> struct add_validator<double> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
-	template<> struct add_validator<string> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
-	template<> struct add_validator<CefString> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
-
-	template <typename T>
-	void operator()(T t) {
-		add_validator<T> v;
-		v.add(_validators);
-	}
-};
-
-// Transform that removes the references from types in the sequence
-struct remove_ref {
-	template <class T>
-	struct apply {
-		typedef typename boost::remove_reference<T>::type type;
-	};
-};
-
 struct MyV8Handler : public CefV8Handler {
+
+	typedef bool (CefV8Value::*CheckTypeFn)();
+	typedef vector<CheckTypeFn> Validators;
+
+	struct MakeValidatorList {
+		MakeValidatorList(Validators &v) : _validators(v) {}
+		Validators &_validators;
+
+		template<typename T> struct add_validator;
+		template<> struct add_validator<int> { void add(Validators &v) { v.push_back(&CefV8Value::IsInt); } };
+		template<> struct add_validator<bool> { void add(Validators &v) { v.push_back(&CefV8Value::IsBool); } };
+		template<> struct add_validator<float> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
+		template<> struct add_validator<double> { void add(Validators &v) { v.push_back(&CefV8Value::IsDouble); } };
+		template<> struct add_validator<string> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
+		template<> struct add_validator<CefString> { void add(Validators &v) { v.push_back(&CefV8Value::IsString); } };
+
+		template <typename T>
+		void operator()(T t) {
+			add_validator<T> v;
+			v.add(_validators);
+		}
+	};
+
+	// Transform that removes the references from types in the sequence
+	struct remove_ref {
+		template <class T>
+		struct apply {
+			typedef typename boost::remove_reference<T>::type type;
+		};
+	};
 
 	struct Func {
 		Func(const string &cef_name, const string &native_name, const string &args) : _cef_name(cef_name), _native_name(native_name), _args(args) {}
@@ -641,6 +645,8 @@ struct MyV8Handler : public CefV8Handler {
 		// typedefs for the parameters and return type
 		typedef typename mpl::transform< function_types::parameter_types<Fn>, remove_ref>::type ParamTypes;
 		typedef typename function_types::result_type<Fn>::type ResultType;
+		enum { IsVoid = boost::is_void<ResultType>::value };
+		enum { Arity = function_types::function_arity<Fn>::value };
 
 		FuncT(const string &cef_name, const string &native_name, const string &args, const Fn &fn) : Func(cef_name, native_name, args), _fn(fn) {}
 
@@ -672,24 +678,23 @@ struct MyV8Handler : public CefV8Handler {
 		template<> struct box_value<CefString> { box_value(CefString v) : _v(v) {} CefString _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateString(_v); } };
 
 		// specialize the executors on the function arity
-		template<class Arity, class ParamTypes, class ResultType> struct exec;
+		template<class Arity, class ParamTypes, class ResultType, class IsVoid> struct exec;
 
-		template<class ParamTypes, class ResultType> struct exec< Int2Type<0>, ParamTypes, ResultType> {
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<0>, ParamTypes, ResultType, Int2Type<0> > {
 			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
-				fn();
-				return CefV8Value::CreateNull();
+				return box_value<ResultType>(fn());
 			}
 		};
 
-		// for each argument, get its type, and call the correct unbox_value-specialization to unbox the value
-		template<class ParamTypes, class ResultType> struct exec< Int2Type<1>, ParamTypes, ResultType> {
+		// unbox each parameter, call the function, and box the resulting value
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<1>, ParamTypes, ResultType, Int2Type<0> > {
 			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
 				return box_value<ResultType>(fn(
 					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get())));
 			}
 		};
 
-		template<class ParamTypes, class ResultType> struct exec< Int2Type<2>, ParamTypes, ResultType> {
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<2>, ParamTypes, ResultType, Int2Type<0>> {
 			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
 				return box_value<ResultType>(fn(
 					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()), 
@@ -697,7 +702,7 @@ struct MyV8Handler : public CefV8Handler {
 			}
 		};
 
-		template<class ParamTypes, class ResultType> struct exec< Int2Type<3>, ParamTypes, ResultType> {
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<3>, ParamTypes, ResultType, Int2Type<0>> {
 			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
 				return box_value<ResultType>(fn(
 					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()), 
@@ -706,8 +711,42 @@ struct MyV8Handler : public CefV8Handler {
 			}
 		};
 
+		// void return values
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<0>, ParamTypes, ResultType, Int2Type<1> > {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				fn();
+				return CefV8Value::CreateNull();
+			}
+		};
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<1>, ParamTypes, ResultType, Int2Type<1> > {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				fn(unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()));
+				return CefV8Value::CreateNull();
+			}
+		};
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<2>, ParamTypes, ResultType, Int2Type<1>> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				fn(
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()),
+					unbox_value<mpl::at<ParamTypes, mpl::int_<1> >::type>(*arguments[1].get()));
+				return CefV8Value::CreateNull();
+			}
+		};
+
+		template<class ParamTypes, class ResultType> struct exec< Int2Type<3>, ParamTypes, ResultType, Int2Type<1>> {
+			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+				fn(
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get()),
+					unbox_value<mpl::at<ParamTypes, mpl::int_<1> >::type>(*arguments[1].get()),
+					unbox_value<mpl::at<ParamTypes, mpl::int_<2> >::type>(*arguments[2].get()));
+				return CefV8Value::CreateNull();
+			}
+		};
+
 		virtual CefRefPtr<CefV8Value> execute(const CefV8ValueList& arguments) {
-			typedef exec< Int2Type<function_types::function_arity<Fn>::value>, ParamTypes, ResultType> E;
+			typedef exec<Int2Type<Arity>, ParamTypes, ResultType, Int2Type<IsVoid>> E;
 			E e;
 			return e(_fn, arguments);
 		}
@@ -739,11 +778,12 @@ struct MyV8Handler : public CefV8Handler {
 	template <typename Fn> 
 	void AddFunction(const char *cef_name, const char *native_name, Fn fn) {
 		assert(_funcs.find(cef_name) == _funcs.end());
-		Func *f = new FuncT<Fn>(cef_name, native_name, get_param_string<Int2Type<function_types::function_arity<Fn>::value>>(), fn);
+		typedef FuncT<Fn> F;
+		Func *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), fn);
 		_funcs[cef_name] = f;
 
 		// create a validator for the function
-		mpl::for_each<mpl::transform< function_types::parameter_types<Fn>, remove_ref>::type>(MakeValidatorList(f->_validators));
+		mpl::for_each<typename F::ParamTypes>(MakeValidatorList(f->_validators));
 	}
 
 	void Register()
@@ -784,6 +824,7 @@ void InitExtensionTest()
 	vv->AddFunction("funky", "funky", funky);
 	vv->AddFunction("funky2", "funky", funky);
 	vv->AddFunction("monkey", "monkey", monkey);
+	vv->AddFunction("monkey2", "monkey2", monkey2);
 	vv->Register();
 }
 
