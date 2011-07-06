@@ -55,3 +55,17 @@ wstring ansi_to_unicode(const char *str)
 
 	return res;
 }
+
+bool begins_with(const char *str, const char *sub_str) {
+	const size_t len_a = strlen(str);
+	const size_t len_b = strlen(sub_str);
+	if (len_a < len_b)
+		return false;
+
+	for (;*sub_str; ++str, ++sub_str) {
+		if (*sub_str != *str)
+			return false;
+	}
+
+	return true;
+}

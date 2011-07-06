@@ -7,6 +7,8 @@
 #include "d3d_parser.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
+#include <boost/type_traits/is_member_function_pointer.hpp>
+#include <boost/mpl/identity.hpp>
 
 App* App::_instance = nullptr;
 
@@ -595,13 +597,23 @@ void monkey2(int a) {
 namespace function_types = boost::function_types;
 namespace mpl = boost::mpl;
 
+// Transform that removes the references from types in the sequence
+struct remove_ref {
+	template <class T>
+	struct apply {
+		typedef typename boost::remove_reference<T>::type type;
+	};
+};
+
+template<int T> struct Int2Type {};
+
 struct MyV8Handler : public CefV8Handler {
 
 	typedef bool (CefV8Value::*CheckTypeFn)();
 	typedef vector<CheckTypeFn> Validators;
 
-	struct MakeValidatorList {
-		MakeValidatorList(Validators &v) : _validators(v) {}
+	struct AddValidatorFunctor {
+		AddValidatorFunctor(Validators &v) : _validators(v) {}
 		Validators &_validators;
 
 		template<typename T> struct add_validator;
@@ -619,36 +631,55 @@ struct MyV8Handler : public CefV8Handler {
 		}
 	};
 
-	// Transform that removes the references from types in the sequence
-	struct remove_ref {
-		template <class T>
-		struct apply {
-			typedef typename boost::remove_reference<T>::type type;
-		};
-	};
+	// unbox a CefV8Value to a native type
+	template<typename T> struct unbox_value;
+	template<> struct unbox_value<bool> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator bool() { return _v.GetBoolValue(); } };
+	template<> struct unbox_value<int> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator int() { return _v.GetIntValue(); } };
+	template<> struct unbox_value<float> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator float() { return (float)_v.GetDoubleValue(); } };
+	template<> struct unbox_value<double> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator double() { return _v.GetDoubleValue(); } };
+	template<> struct unbox_value<CefString> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator CefString() { return _v.GetStringValue(); } };
 
-	struct Func {
-		Func(const string &cef_name, const string &native_name, const string &args) : _cef_name(cef_name), _native_name(native_name), _args(args) {}
+	// box a native type in a CefV8Value
+	template<typename T> struct box_value;
+	template<> struct box_value<bool> { box_value(bool v) : _v(v) {} bool _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateBool(_v); } };
+	template<> struct box_value<int> { box_value(int v) : _v(v) {} int _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateInt(_v); } };
+	template<> struct box_value<float> { box_value(float v) : _v(v) {} float _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
+	template<> struct box_value<double> { box_value(double v) : _v(v) {} double _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
+	template<> struct box_value<CefString> { box_value(CefString v) : _v(v) {} CefString _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateString(_v); } };
+
+	struct Function {
+		Function(const string &cef_name, const string &native_name, const string &args) : _active(true), _cef_name(cef_name), _native_name(native_name), _args(args) {}
 		virtual bool is_valid(const CefV8ValueList& arguments) = 0;
 		virtual CefRefPtr<CefV8Value> execute(const CefV8ValueList& arguments) = 0;
+		bool _active;
 		string _cef_name;
 		string _native_name;
 		string _args;
 		Validators _validators;
 	};
 
-	template<int T> struct Int2Type {}; 
 
-	template<class Fn>
-	struct FuncT : public Func {
+	template<class Prototype, class Callable>
+	struct FunctionT : public Function {
 
-		// typedefs for the parameters and return type
-		typedef typename mpl::transform< function_types::parameter_types<Fn>, remove_ref>::type ParamTypes;
-		typedef typename function_types::result_type<Fn>::type ResultType;
+		enum { IsMemberFunction = boost::is_member_function_pointer<Prototype>::value };
+		typedef typename function_types::result_type<Prototype>::type ResultType;
 		enum { IsVoid = boost::is_void<ResultType>::value };
-		enum { Arity = function_types::function_arity<Fn>::value };
+		enum { Arity = function_types::function_arity<Prototype>::value - IsMemberFunction };
 
-		FuncT(const string &cef_name, const string &native_name, const string &args, const Fn &fn) : Func(cef_name, native_name, args), _fn(fn) {}
+		// Remove the references from the parameter types
+		typedef typename mpl::transform< function_types::parameter_types<Prototype>, remove_ref>::type ParamTypes1;
+
+		// Remove the class from the parameter types if this is a member function pointer
+		typedef typename mpl::if_<
+			typename mpl::bool_<IsMemberFunction>::type,
+			typename mpl::pop_front<ParamTypes1>::type,
+			ParamTypes1>::type ParamTypes;
+
+		FunctionT(const string &cef_name, const string &native_name, const string &args, const Callable &fn)
+			: Function(cef_name, native_name, args), _fn(fn)
+		{
+		}
 
 		virtual bool is_valid(const CefV8ValueList& arguments) {
 			if (arguments.size() != _validators.size())
@@ -661,22 +692,6 @@ struct MyV8Handler : public CefV8Handler {
 			return true;
 		}
 
-		// unboxes a CefV8Value to a native type
-		template<typename T> struct unbox_value;
-		template<> struct unbox_value<bool> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator bool() { return _v.GetBoolValue(); } };
-		template<> struct unbox_value<int> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator int() { return _v.GetIntValue(); } };
-		template<> struct unbox_value<float> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator float() { return (float)_v.GetDoubleValue(); } };
-		template<> struct unbox_value<double> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator double() { return _v.GetDoubleValue(); } };
-		template<> struct unbox_value<CefString> { unbox_value(CefV8Value& v) : _v(v) {} CefV8Value& _v; operator CefString() { return _v.GetStringValue(); } };
-
-		// box a native type in a CefV8Value
-		template<typename T> struct box_value;
-		template<> struct box_value<bool> { box_value(bool v) : _v(v) {} bool _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateBool(_v); } };
-		template<> struct box_value<int> { box_value(int v) : _v(v) {} int _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateInt(_v); } };
-		template<> struct box_value<float> { box_value(float v) : _v(v) {} float _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
-		template<> struct box_value<double> { box_value(double v) : _v(v) {} double _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateDouble(_v); } };
-		template<> struct box_value<CefString> { box_value(CefString v) : _v(v) {} CefString _v; operator CefRefPtr<CefV8Value>() { return CefV8Value::CreateString(_v); } };
-
 		// specialize the executors on the function arity
 		template<class Arity, class ParamTypes, class ResultType, class IsVoid> struct exec;
 
@@ -688,9 +703,9 @@ struct MyV8Handler : public CefV8Handler {
 
 		// unbox each parameter, call the function, and box the resulting value
 		template<class ParamTypes, class ResultType> struct exec< Int2Type<1>, ParamTypes, ResultType, Int2Type<0> > {
-			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
+			CefRefPtr<CefV8Value> operator()(Callable& fn, const CefV8ValueList& arguments) {
 				return box_value<ResultType>(fn(
-					unbox_value<mpl::at<ParamTypes, mpl::int_<0> >::type>(*arguments[0].get())));
+					unbox_value<mpl::at<ParamTypes, mpl::int_<0>>::type>(*arguments[0].get())));
 			}
 		};
 
@@ -711,7 +726,7 @@ struct MyV8Handler : public CefV8Handler {
 			}
 		};
 
-		// void return values
+		// void return value executors
 		template<class ParamTypes, class ResultType> struct exec< Int2Type<0>, ParamTypes, ResultType, Int2Type<1> > {
 			template<class Fn> CefRefPtr<CefV8Value> operator()(Fn& fn, const CefV8ValueList& arguments) {
 				fn();
@@ -751,20 +766,43 @@ struct MyV8Handler : public CefV8Handler {
 			return e(_fn, arguments);
 		}
 
-		Fn _fn;
+		Callable _fn;
 	};
 
 	virtual bool Execute(const CefString& name, CefRefPtr<CefV8Value> object, const CefV8ValueList& arguments, CefRefPtr<CefV8Value>& retval, CefString& exception)
 	{
-		Funcs::iterator it = _funcs.find(name);
-		if (it == _funcs.end())
+		Functions::iterator it_func = _functions.find(name);
+		if (it_func != _functions.end()) {
+			// got a function call
+			Function *func = it_func->second;
+			if (!func->_active || !func->is_valid(arguments))
+				return false;
+
+			retval = func->execute(arguments);
+			return true;
+		}
+
+		// check for variable access
+		const string str = name.ToString();
+		const bool getter = begins_with(str.c_str(), "get_");
+		const bool setter = begins_with(str.c_str(), "set_");
+
+		if (!(getter || setter))
 			return false;
 
-		Func *func = it->second;
-		if (!func->is_valid(arguments))
+		const string var_name(str.c_str() + 4, str.size() - 4);
+		Variables::iterator it_var = _variables.find(var_name);
+		if (it_var == _variables.end())
 			return false;
 
-		retval = func->execute(arguments);
+		Variable *var = it_var->second;
+		if (!var->_active)
+			return false;
+
+		if (getter)
+			retval = var->get();
+		else
+			var->set((arguments[0]));
 
 		return true;
 	}
@@ -777,13 +815,73 @@ struct MyV8Handler : public CefV8Handler {
 
 	template <typename Fn> 
 	void AddFunction(const char *cef_name, const char *native_name, Fn fn) {
-		assert(_funcs.find(cef_name) == _funcs.end());
-		typedef FuncT<Fn> F;
-		Func *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), fn);
-		_funcs[cef_name] = f;
+		assert(_functions.find(cef_name) == _functions.end());
+		typedef FunctionT<Fn, Fn> F;
+		Function *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), fn);
+		_functions[cef_name] = f;
 
 		// create a validator for the function
-		mpl::for_each<typename F::ParamTypes>(MakeValidatorList(f->_validators));
+		mpl::for_each<typename F::ParamTypes>(AddValidatorFunctor(f->_validators));
+	}
+
+	// add member function
+	template <class Obj, typename MemFn> 
+	void AddFunction(const char *cef_name, const char *native_name, Obj obj, MemFn fn) {
+		assert(_functions.find(cef_name) == _functions.end());
+		auto bb = MakeDelegate(obj, fn);
+		typedef FunctionT<MemFn, decltype(bb)> F;
+		Function *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), bb);
+		_functions[cef_name] = f;
+		// create a validator for the function
+		mpl::for_each<typename F::ParamTypes>(AddValidatorFunctor(f->_validators));
+	}
+
+	struct Variable {
+		Variable(const string &cef_name) : _active(true), _cef_name(cef_name) {}
+		virtual bool set_is_valid(const CefV8Value &value) = 0;
+		virtual CefRefPtr<CefV8Value> get() = 0;
+		virtual void set(const CefRefPtr<CefV8Value> &value) = 0;
+		bool _active;
+		string _cef_name;
+	};
+
+	template<class T>
+	struct VariableT : public Variable {
+		VariableT(const string &cef_name, T *ptr) : Variable(cef_name), _ptr(ptr) {}
+		virtual bool set_is_valid(const CefV8Value &value) {
+			return false;
+		}
+
+		virtual CefRefPtr<CefV8Value> get() {
+			return box_value<T>(*_ptr);
+		}
+
+		virtual void set(const CefRefPtr<CefV8Value> &value) {
+			*_ptr = unbox_value<T>(*(value.get()));
+		}
+
+		T *_ptr;
+	};
+
+	void RemoveFunction(const char *cef_name) {
+		Functions::iterator it = _functions.find(cef_name);
+		if (it == _functions.end())
+			return;
+		it->second->_active = false;
+	}
+
+	void RemoveVariable(const char *cef_name) {
+		Variables::iterator it = _variables.find(cef_name);
+		if (it == _variables.end())
+			return;
+		it->second->_active = false;
+	}
+
+	template <typename T>
+	void AddVariable(const char *cef_name, T* ptr) {
+		assert(_variables.find(cef_name) == _variables.end());
+		Variable *v = new VariableT<T>(cef_name, ptr);
+		_variables[cef_name] = v;
 	}
 
 	void Register()
@@ -794,6 +892,16 @@ struct MyV8Handler : public CefV8Handler {
 			"if (!cef.test)\n"
 			"  cef.test = {};\n";
 
+		const char *var_template = ""
+			"cef.test.__defineGetter__('%s', function() {\n"
+			"  native function get_%s();\n"
+			"  return get_%s();\n"
+			"});\n"
+			"cef.test.__defineSetter__('%s', function(b) {\n"
+			"  native function set_%s();\n"
+			"  if(b) set_%s(b);\n"
+			"});\n";
+
 		const char *fn_template = ""
 			"cef.test.%s = function(%s) {\n"
 			"  native function %s(%s);\n"
@@ -801,10 +909,17 @@ struct MyV8Handler : public CefV8Handler {
 			"};\n";
 
 		// use the template to create the function bindings
-		for (auto it = _funcs.begin(); it != _funcs.end(); ++it) {
-			const Func *cur = it->second;
-			code += to_string(fn_template, 
+		for (auto it = _functions.begin(); it != _functions.end(); ++it) {
+			const Function *cur = it->second;
+			code += to_string(fn_template,
 				cur->_cef_name.c_str(), cur->_args.c_str(), cur->_native_name.c_str(), cur->_args.c_str(), cur->_native_name.c_str(), cur->_args.c_str());
+		}
+
+		// create the variable bindings
+		for (auto it = _variables.begin(); it != _variables.end(); ++it) {
+			const Variable *cur = it->second;
+			code += to_string(var_template,
+				cur->_cef_name.c_str(), cur->_cef_name.c_str(), cur->_cef_name.c_str(), cur->_cef_name.c_str(), cur->_cef_name.c_str(), cur->_cef_name.c_str());
 		}
 
 		CefRegisterExtension("v8/test", code, this);
@@ -812,19 +927,46 @@ struct MyV8Handler : public CefV8Handler {
 
 	string _code;
 
-	typedef map<string, Func *> Funcs;
-	Funcs _funcs;
+	typedef map<string, Function *> Functions;
+	Functions _functions;
+
+	typedef map<string, Variable *> Variables;
+	Variables _variables;
 
 	IMPLEMENT_REFCOUNTING(MyV8Handler);
 };
 
+struct something {
+	something() : a(20) {}
+	int inner(bool) {
+		return 10;
+	}
+	int a;
+};
+
+#include <boost/bind.hpp>
+
+int apa = 10;
+
 void InitExtensionTest()
 {
+
+	//make_funky(&something::inner);
+
+	something *a = new something;
+	//auto x = boost::bind(&something::inner, a);
+	//make_funky(x);
+
 	MyV8Handler *vv = new MyV8Handler;
+
 	vv->AddFunction("funky", "funky", funky);
 	vv->AddFunction("funky2", "funky", funky);
 	vv->AddFunction("monkey", "monkey", monkey);
 	vv->AddFunction("monkey2", "monkey2", monkey2);
+
+	vv->AddFunction("xxx", "xxx", a, &something::inner);
+	vv->AddVariable("apa", &apa);
+	vv->AddVariable("apa2", &a->a);
 	vv->Register();
 }
 
