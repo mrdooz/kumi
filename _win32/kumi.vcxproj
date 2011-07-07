@@ -124,6 +124,7 @@
     <ClInclude Include="..\string_utils.hpp" />
     <ClInclude Include="..\text_parser.hpp" />
     <ClInclude Include="..\utils.hpp" />
+    <ClInclude Include="..\v8_handler.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

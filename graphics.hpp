@@ -3,8 +3,6 @@
 
 #include "utils.hpp"
 
-struct GraphicsObjectHandle;
-
 struct RenderTargetData {
 	void reset() {
 		texture = NULL;
@@ -36,7 +34,25 @@ struct TextureData {
 	CComPtr<ID3D11ShaderResourceView> srv;
 };
 
-class Graphics;
+class GraphicsObjectHandle {
+	friend class Graphics;
+private:
+	enum Type {
+		kVertexBuffer,
+		kIndexBuffer,
+		kConstantBuffer,
+		kTexture,
+		kShader,
+		kInputLayout,
+		kBlendState,
+		kRasterizerState,
+		kSamplerState,
+		kDepthStencilState,
+	};
+	uint32_t type : 8;
+	uint32_t generation : 8;
+	uint32_t id : 16;
+};
 
 class Context {
 	friend class Graphics;

@@ -38,6 +38,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/type_traits/is_void.hpp> 
 #include <boost/type_traits/remove_reference.hpp>
+#include <boost/type_traits/is_member_function_pointer.hpp>
 
 #include <vector>
 #include <string>

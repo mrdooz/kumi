@@ -19,23 +19,6 @@ namespace
 	}
 }
 
-struct GraphicsObjectHandle {
-	enum Type {
-		kVertexBuffer,
-		kIndexBuffer,
-		kConstantBuffer,
-		kTexture,
-		kShader,
-		kInputLayout,
-		kBlendState,
-		kRasterizerState,
-		kSamplerState,
-		kDepthStencilState,
-	};
-	uint32_t type : 8;
-	uint32_t generation : 8;
-	uint32_t id : 16;
-};
 
 static_assert(sizeof(GraphicsObjectHandle) == sizeof(uint32_t), "Invalid size for GraphicsObjectHandle");
 
