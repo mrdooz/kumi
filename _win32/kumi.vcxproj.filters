@@ -13,9 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="parsers">
-      <UniqueIdentifier>{9898e5e0-d471-4228-ad68-41bb6af05fbe}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\kumi.cpp">
@@ -62,9 +59,6 @@
     </ClCompile>
     <ClCompile Include="..\effect_wrapper.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\text_parser.cpp">
-      <Filter>parsers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -115,9 +109,6 @@
     </ClInclude>
     <ClInclude Include="..\effect_wrapper.hpp">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\text_parser.hpp">
-      <Filter>parsers</Filter>
     </ClInclude>
     <ClInclude Include="..\v8_handler.hpp">
       <Filter>Header Files</Filter>

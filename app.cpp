@@ -9,6 +9,8 @@
 #include "string_utils.hpp"
 #include "v8_handler.hpp"
 
+using std::swap;
+
 App* App::_instance = nullptr;
 
 #ifndef GET_X_LPARAM
@@ -22,6 +24,9 @@ App* App::_instance = nullptr;
 #pragma comment(lib, "libcef_dll_wrapper.lib")
 
 #define REQUIRE_UI_THREAD()
+
+int apa = 10;
+
 
 void App::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
 	D3D11_MAPPED_SUBRESOURCE sub;
@@ -423,6 +428,111 @@ bool App::create_window()
 	return true;
 }
 
+struct DemoEffect {
+	DemoEffect() : _start(0), _end(0) {}
+	virtual ~DemoEffect() {}
+	string _name;
+	int _start, _end;
+};
+
+template<class T, class Cmp = std::less<T> >
+class Heap {
+public:
+	Heap(int capacity)
+		: _data(new T[capacity])
+		, _capacity(capacity)
+		, _size(0)
+	{
+	}
+
+	~Heap() {
+		SAFE_DELETE(_data);
+	}
+
+	int left_child(int idx) { return idx*2+1; }
+	int right_child(int idx) { return idx*2+2; }
+	int parent(int idx) { return (idx-1) / 2; }
+
+	bool peek(T **out) {
+		if (empty())
+			return false;
+
+		*out = &_data[0];
+		return true;
+	}
+
+	bool pop(T *out) {
+		if (empty())
+			return false;
+
+		*out = _data[0];
+		if (--_size == 0)
+			return true;
+
+		// preserve the heap property by moving the bottom element to the
+		// front, and sifting it down
+		_data[0] = _data[_size];
+		int cur = 0;
+		while (true) {
+			const int l = left_child(cur);
+			const int r = right_child(cur);
+
+			int cand = -1;
+			// find the lesser of the two children
+			if (l <= _size && cmp(_data[l], _data[cur]))
+				cand = l;
+
+			if (r <= _size && cmp(_data[r], _data[cur]) && cmp(_data[r], _data[l]))
+				cand = r;
+
+			if (cand != -1) {
+				swap(_data[cur], _data[cand]);
+				cur = cand;
+			} else {
+				break;
+			}
+		}
+		return true;
+	}
+
+	bool push(const T &t) {
+		if (full())
+			return false;
+
+		// insert at the end, and sift up until the property holds
+		_data[_size] = t;
+		int cur = _size;
+		while (cur) {
+			const int p = parent(cur);
+			if (cmp(_data[cur], _data[p])) {
+				swap(_data[cur], _data[p]);
+				cur = p;
+			} else {
+				break;
+			}
+		}
+
+		_size++;
+		return true;
+	}
+
+	bool empty() const { return _size == 0; }
+	bool full() const { return _size == _capacity; }
+
+private:
+	Cmp cmp;
+	T *_data;
+	int _capacity;
+	int _size;
+};
+
+struct EffectManager {
+	~EffectManager() {
+
+	}
+	DemoEffect *_effects;
+};
+
 void App::run()
 {
 	MSG msg = {0};
@@ -472,6 +582,8 @@ void App::run()
 				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
 				context->Draw(6, 0);
 			}
+
+			apa++;
 
 			if (_test_effect) {
 
@@ -533,7 +645,6 @@ struct something {
 };
 
 
-int apa = 10;
 
 void InitExtensionTest()
 {
