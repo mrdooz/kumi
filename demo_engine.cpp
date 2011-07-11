@@ -9,7 +9,19 @@ DemoEngine& DemoEngine::instance() {
 	return *_instance;
 }
 
-DemoEngine::DemoEngine() {
+DemoEngine::DemoEngine() 
+	: _paused(true)
+{
+	QueryPerformanceFrequency(&_frequency);
+}
+
+bool DemoEngine::start() {
+	_paused = false;
+	return true;
+}
+
+void DemoEngine::pause(bool pause) {
+	_paused = pause;
 }
 
 bool DemoEngine::init() {
@@ -17,10 +29,18 @@ bool DemoEngine::init() {
 }
 
 bool DemoEngine::tick() {
+	if (_paused)
+		return true;
+
 	return true;
 }
 
 bool DemoEngine::close() {
 	return true;
 }
+
+void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
+	_effects.push(EffectInstance(effect, start_time, end_time));
+}
+
 
