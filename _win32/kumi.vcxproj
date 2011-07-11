@@ -84,6 +84,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
     <ClCompile Include="..\effect_wrapper.cpp" />
     <ClCompile Include="..\file_utils.cpp" />
@@ -109,12 +110,14 @@
     <ClInclude Include="..\app.hpp" />
     <ClInclude Include="..\async_file_loader.hpp" />
     <ClInclude Include="..\d3d_parser.hpp" />
+    <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />
     <ClInclude Include="..\dynamic_vb.hpp" />
     <ClInclude Include="..\effect_wrapper.hpp" />
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />
     <ClInclude Include="..\graphics.hpp" />
+    <ClInclude Include="..\heap.hpp" />
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
     <ClInclude Include="..\resource_watcher.hpp" />
