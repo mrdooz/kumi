@@ -38,6 +38,7 @@ class GraphicsObjectHandle {
 	friend class Graphics;
 private:
 	enum Type {
+		kContext,
 		kVertexBuffer,
 		kIndexBuffer,
 		kConstantBuffer,

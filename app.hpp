@@ -203,9 +203,6 @@ private:
 
 	virtual void OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor) OVERRIDE;
 
-	void SetMainHwnd(CefWindowHandle hwnd);
-	CefWindowHandle GetMainHwnd() { return m_MainHwnd; }
-
 	CefRefPtr<CefBrowser> GetBrowser() { return m_Browser; }
 	CefWindowHandle GetBrowserHwnd() { return m_BrowserHwnd; }
 

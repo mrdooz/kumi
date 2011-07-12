@@ -1,17 +1,19 @@
 #pragma once
 
 #include <queue>
+#include "graphics.hpp"
 
 class Effect {
 public:
-	Effect(const std::string &name) : _name(name) {}
+	Effect(GraphicsObjectHandle context, const std::string &name) : _context(context), _name(name) {}
 	virtual ~Effect() {}
-	virtual bool init() = 0;
-	virtual bool update(uint32 global_time, uint32 local_time, uint32 delta, uint32 ticks, uint32 ticks_fraction) = 0;
-	virtual bool render() = 0;
-	virtual bool close() = 0;
+	virtual bool init() { return true; }
+	virtual bool update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, float ticks_fraction) { return true; }
+	virtual bool render() { return true; }
+	virtual bool close() { return true; }
 protected:
 	std::string _name;
+	GraphicsObjectHandle _context;
 };
 
 class DemoEngine {
@@ -30,23 +32,26 @@ private:
 	struct EffectInstance {
 		struct compare {
 			bool operator()(const EffectInstance &a, const EffectInstance &b) {
-				return a.start_time < b.start_time;
+				return a._start_time < b._start_time;
 			}
 		};
-		EffectInstance(Effect *effect, uint32 start_time, uint32 end_time) : effect(effect), start_time(start_time), end_time(end_time) {}
-		Effect *effect;
-		uint32 start_time;
-		uint32 end_time;
+		EffectInstance(Effect *effect, uint32 start_time, uint32 end_time) : _effect(effect), _running(false), _start_time(start_time), _end_time(end_time) {}
+		Effect *_effect;
+		bool _running;
+		uint32 _start_time;
+		uint32 _end_time;
 	};
 
 	DemoEngine();
 	static DemoEngine *_instance;
 
-	std::priority_queue<EffectInstance, std::deque<EffectInstance>, EffectInstance::compare> _effects;
-	LARGE_INTEGER _frequency;
-	LARGE_INTEGER _start_time;
-	LARGE_INTEGER _last_time;
-	LARGE_INTEGER _elapsed_time;
+	std::deque<EffectInstance *> _active_effects;
+	std::deque<EffectInstance *> _inactive_effects;
+	std::vector<EffectInstance *> _effects;
+	int _cur_effect;
+	int64 _frequency;
+	int64 _last_time;
+	int64 _current_time_ms;
 	
 	bool _paused;
 };

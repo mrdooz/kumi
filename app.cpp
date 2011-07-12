@@ -8,6 +8,9 @@
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 #include "v8_handler.hpp"
+#include "demo_engine.hpp"
+
+#include "test/demo.hpp"
 
 using std::swap;
 
@@ -152,12 +155,6 @@ bool App::OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, 
 	}
 
 	return false;
-}
-
-void App::SetMainHwnd(CefWindowHandle hwnd)
-{
-	AutoLock lock_scope(this);
-	m_MainHwnd = hwnd;
 }
 
 std::string App::GetLogFile()
@@ -357,11 +354,11 @@ bool App::init(HINSTANCE hinstance)
 		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
 		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
 		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
-/*
-	GRAPHICS.create_texture(
-		CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R8G8B8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
-		&_cef_texture);
-*/
+
+	B_ERR_BOOL(DEMO_ENGINE.init());
+
+	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
+	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 	return true;
 }
 
@@ -438,6 +435,8 @@ void App::run()
 	float cur_time = (float)(cur.QuadPart / freq.QuadPart);
 	float accumulator = 0;
 
+	DEMO_ENGINE.start();
+
 	while (WM_QUIT != msg.message) {
 		if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) ) {
 			TranslateMessage(&msg);
@@ -445,6 +444,8 @@ void App::run()
 		} else {
 
 			CefDoMessageLoopWork();
+
+			DEMO_ENGINE.tick();
 
 			RESOURCE_WATCHER.process_deferred();
 			static int hax = 0;
@@ -609,8 +610,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 		{
 			_hwnd = hWnd;
 			B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
-
-			SetMainHwnd(hWnd);
 
 			CefWindowInfo info;
 			info.m_bIsTransparent = TRUE;
