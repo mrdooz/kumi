@@ -54,6 +54,7 @@ private:
 	int64 _current_time_ms;
 	
 	bool _paused;
+	bool _inited;
 };
 
 #define DEMO_ENGINE DemoEngine::instance()

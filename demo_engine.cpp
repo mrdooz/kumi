@@ -13,6 +13,7 @@ DemoEngine& DemoEngine::instance() {
 
 DemoEngine::DemoEngine() 
 	: _paused(true)
+	, _inited(false)
 	, _frequency(0)
 	, _last_time(0)
 	, _current_time_ms(0)
@@ -32,6 +33,15 @@ void DemoEngine::pause(bool pause) {
 
 bool DemoEngine::init() {
 	B_ERR_BOOL(!!QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency));
+
+	sort(_effects.begin(), _effects.end(), [](const EffectInstance *a, const EffectInstance *b){ return a->_start_time < b->_start_time; });
+
+	for (size_t i = 0; i < _effects.size(); ++i) {
+		LOG_WRN_BOOL(_effects[i]->_effect->init());
+		_inactive_effects.push_back(_effects[i]);
+	}
+
+	_inited = true;
 
 	return true;
 }
@@ -83,10 +93,6 @@ bool DemoEngine::close() {
 }
 
 void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
+	assert(!_inited);
 	_effects.push_back(new EffectInstance(effect, start_time, end_time));
-	sort(_effects.begin(), _effects.end(), [](const EffectInstance *a, const EffectInstance *b){ return a->_start_time < b->_start_time; });
-	_active_effects.clear();
-	_inactive_effects.clear();
-	for (size_t i = 0; i < _effects.size(); ++i)
-		_inactive_effects.push_back(_effects[i]);
 }

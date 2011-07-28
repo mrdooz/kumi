@@ -355,10 +355,11 @@ bool App::init(HINSTANCE hinstance)
 		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
 		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
 
-	B_ERR_BOOL(DEMO_ENGINE.init());
-
 	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
+
+	B_ERR_BOOL(DEMO_ENGINE.init());
+
 	return true;
 }
 
