@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <stdint.h>
+#include <assert.h>
 
 typedef int8_t int8;
 typedef uint8_t uint8;
@@ -48,6 +49,8 @@ typedef uint64_t uint64;
 #include <boost/type_traits/is_void.hpp> 
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/type_traits/is_member_function_pointer.hpp>
+
+#include <boost/assign/list_of.hpp>
 
 #include <vector>
 #include <string>

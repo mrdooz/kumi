@@ -69,6 +69,12 @@
     <ClCompile Include="..\test\demo.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\technique.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\technique_parser.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -130,6 +136,12 @@
     </ClInclude>
     <ClInclude Include="..\test\demo.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\technique.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\technique_parser.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

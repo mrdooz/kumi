@@ -104,6 +104,8 @@
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">-Zm200 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="..\string_utils.cpp" />
+    <ClCompile Include="..\technique.cpp" />
+    <ClCompile Include="..\technique_parser.cpp" />
     <ClCompile Include="..\test\demo.cpp" />
     <ClCompile Include="..\utils.cpp" />
   </ItemGroup>
@@ -125,6 +127,8 @@
     <ClInclude Include="..\stb_truetype.h" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\string_utils.hpp" />
+    <ClInclude Include="..\technique.hpp" />
+    <ClInclude Include="..\technique_parser.hpp" />
     <ClInclude Include="..\test\demo.hpp" />
     <ClInclude Include="..\utils.hpp" />
     <ClInclude Include="..\v8_handler.hpp" />
