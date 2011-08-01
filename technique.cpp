@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "technique.hpp"
 #include "technique_parser.hpp"
+#include "file_utils.hpp"
 
 Technique::Technique()
 	: _vertex_shader(nullptr)
@@ -23,5 +24,11 @@ Technique *Technique::create_from_file(const char *filename) {
 	if (!load_file(filename, &buf, &len))
 		return NULL;
 
+	TechniqueParser parser;
+	Technique *t = new Technique;
+	if (!parser.parse_main((const char *)buf, (const char *)buf + len, t)) {
+		SAFE_DELETE(t);
+	}
 
+	return t;
 }
