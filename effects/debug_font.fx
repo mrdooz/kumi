@@ -1,7 +1,7 @@
 Texture2D g_texture;
 extern sampler g_sampler;
 
-void vsMain(
+void vsMainX(
 	in float4 i_pos : SV_POSITION, 
 	in float2 i_tex : TEXCOORD,
 	out float4 o_pos : SV_POSITION, 

@@ -9,6 +9,8 @@
 #include "string_utils.hpp"
 #include "v8_handler.hpp"
 #include "demo_engine.hpp"
+#include "technique.hpp"
+#include "io.hpp"
 
 #include "test/demo.hpp"
 
@@ -349,6 +351,9 @@ bool App::init(HINSTANCE hinstance)
 	const int stride = sizeof(PosTex);
 	make_quad_clip_space_unindexed(&verts[0].pos.x, &verts[0].pos.y, &verts[0].tex.x, &verts[0].tex.y,
 		stride, stride, stride, stride, 0, 0, 1, 1);
+
+	DiskIo io;
+	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
 		"effects/debug_font.fx", "vsMain", NULL, "psMain", 

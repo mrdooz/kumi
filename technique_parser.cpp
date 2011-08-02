@@ -27,20 +27,15 @@ enum Symbol {
 	kSymId,
 	kSymVertexShader,
 	kSymPixelShader,
-	kSymFile,
-	kSymParams,
+		kSymFile,
+		kSymEntryPoint,
+		kSymParams,
 
-	kSymParamName,
-	kSymParamType,
-		kSymFloat,
-		kSymFloat2,
-		kSymFloat3,
-		kSymFloat4,
-		kSymInt,
-	kSymParamSource,
-		kSymSourceMaterial,
-		kSymSourceSystem,
-		kSymSourceUser,
+	kSymFloat,
+	kSymFloat2,
+	kSymFloat3,
+	kSymFloat4,
+	kSymInt,
 	kSymParamDefault,
 
 	kSymRasterizerDesc,
@@ -98,14 +93,14 @@ struct {
 	{ kSymEquals, "=" },
 
 	{ kSymTechnique, "technique" },
-	// shader related
+
 	{ kSymVertexShader, "vertex_shader" },
-	{ kSymFile, "file" },
-	{ kSymParams, "params" },
 	{ kSymPixelShader, "pixel_shader" },
+		{ kSymFile, "file" },
+		{ kSymEntryPoint, "entry_point" },
+		{ kSymParams, "params" },
 
 	// params
-	{ kSymParamName, "name" },
 	{ kSymFloat, "float" },
 	{ kSymFloat, "float1" },
 	{ kSymFloat2, "float2" },
@@ -408,10 +403,11 @@ const char *TechniqueParser::parse_shader(const char *start, const char *end, Sh
 		Symbol symbol;
 		start = next_symbol(start, block_end, &symbol);
 		if (symbol == kSymFile) {
-			string filename;
-			start = string_until(start, block_end, ';', &filename);
+			start = string_until(start, block_end, ';', &shader->filename);
 			CHOMP(kSymSemicolon, start, block_end);
-
+		} else if (symbol == kSymEntryPoint) {
+			start = string_until(start, block_end, ';', &shader->entry_point);
+			CHOMP(kSymSemicolon, start, block_end);
 		} else if (symbol == kSymParams) {
 			start = parse_params(start, block_end, &shader->params);
 		} else {

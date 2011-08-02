@@ -40,23 +40,36 @@ struct ShaderParam {
 
 struct Shader {
 	string filename;
+	string entry_point;
 	vector<ShaderParam> params;
 };
 
 struct VertexShader : public Shader{
+	VertexShader() {
+		entry_point = "vs_main";
+	}
 };
 
 struct PixelShader : public Shader {
+	PixelShader() {
+		entry_point = "ps_main";
+	}
 };
+
+struct Io;
 
 class Technique {
 	friend class TechniqueParser;
 public:
-	Technique();
+	Technique(Io *io);
 	~Technique();
 
-	static Technique *create_from_file(const char *filename);
+	static Technique *create_from_file(const char *filename, Io *io);
 private:
+	bool init();
+	bool init_shader(Shader *shader, const string &profile);
+
+	Io *_io;
 	string _name;
 	VertexShader *_vertex_shader;
 	PixelShader *_pixel_shader;
