@@ -11,6 +11,7 @@
 #include "demo_engine.hpp"
 #include "technique.hpp"
 #include "io.hpp"
+#include "kumi_loader.hpp"
 
 #include "test/demo.hpp"
 
@@ -353,6 +354,8 @@ bool App::init(HINSTANCE hinstance)
 		stride, stride, stride, stride, 0, 0, 1, 1);
 
 	DiskIo io;
+	KumiLoader loader;
+	loader.load("c:\\temp\\torus.kumi", &io);
 	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 

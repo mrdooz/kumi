@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "io.hpp"
 #include "file_utils.hpp"
+#include "utils.hpp"
 
 bool DiskIo::load_file(const char *filename, void **buf, size_t *len) {
 	return ::load_file(filename, buf, len);
@@ -14,4 +15,36 @@ __time64_t DiskIo::mdate(const char *filename) {
 	struct _stat s;
 	_stat(filename, &s);
 	return s.st_mtime;
+}
+
+bool DiskIo::load_partial(const char *filename, size_t ofs, size_t len, void **buf) {
+
+	ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+	if (h.handle() == INVALID_HANDLE_VALUE)
+		return false;
+
+	DWORD size = GetFileSize(h, NULL);
+	if (ofs + len > size)
+		return false;
+
+	// if no buffer is supplied, allocate a new one
+	const bool mem_supplied = *buf != NULL;
+	if (!mem_supplied)
+		*buf = new uint8_t[len];
+
+	DWORD res;
+	if (SetFilePointer(h, ofs, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
+		if (!mem_supplied)
+			delete [] exch_null(*buf);
+		return false;
+	}
+
+	if (!ReadFile(h, *buf, len, &res, NULL)) {
+		DWORD err = GetLastError();
+		if (!mem_supplied)
+			delete [] exch_null(*buf);
+		return false;
+	}
+
+	return true;
 }

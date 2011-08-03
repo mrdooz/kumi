@@ -89,8 +89,8 @@ private:
 	{
 		~Shader()
 		{
-			map_delete(_buffer_variables);
-			map_delete(_constant_buffers);
+			assoc_delete(&_buffer_variables);
+			assoc_delete(&_constant_buffers);
 		}
 
 		bool do_reflection()
