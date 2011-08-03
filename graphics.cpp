@@ -39,6 +39,9 @@ Graphics::Graphics()
   , _frame_count(0)
   , _fps(0)
 {
+	ZeroMemory(_vertex_buffers, sizeof(_vertex_buffers));
+	ZeroMemory(_index_buffers, sizeof(_index_buffers));
+
 	assert(!_instance);
 }
 
@@ -49,6 +52,10 @@ Graphics::~Graphics()
 HRESULT Graphics::create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
 {
 	return create_buffer_inner(_device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+}
+
+HRESULT Graphics::create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer) {
+	return create_buffer_inner(_device, CD3D11_BUFFER_DESC(index_count * elem_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
 }
 
 HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
@@ -273,3 +280,44 @@ void Graphics::resize(const int width, const int height)
     return;
   create_back_buffers(width, height);
 }
+
+GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
+	for (int i = 0; i < 1 << GraphicsObjectHandle::cIdBits; ++i) {
+		if (!_vertex_buffers[i]) {
+			if (FAILED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[i])))
+				return GraphicsObjectHandle();
+			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, i);
+		}
+	}
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
+	for (int i = 0; i < 1 << GraphicsObjectHandle::cIdBits; ++i) {
+		if (!_index_buffers[i]) {
+			if (FAILED(create_static_index_buffer(data_size, 1, data, &_index_buffers[i])))
+				return GraphicsObjectHandle();
+			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, i);
+		}
+	}
+	return GraphicsObjectHandle();
+}
+
+void Graphics::submit_command(RenderKey key, void *data) {
+	_render_commands.push_back(make_pair(key, data));
+}
+
+void Graphics::render() {
+	// aaah, lambdas, thank you!
+	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.key < b.first.key; });
+	for (size_t i = 0; i < _render_commands.size(); ++i) {
+		const RenderCmd &cmd = _render_commands[i];
+		switch (cmd.first.cmd) {
+		case RenderKey::kRenderMesh:
+			break;
+		}
+	}
+
+	_render_commands.clear();
+}
+

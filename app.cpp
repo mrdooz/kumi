@@ -12,6 +12,7 @@
 #include "technique.hpp"
 #include "io.hpp"
 #include "kumi_loader.hpp"
+#include "scene.hpp"
 
 #include "test/demo.hpp"
 
@@ -355,7 +356,8 @@ bool App::init(HINSTANCE hinstance)
 
 	DiskIo io;
 	KumiLoader loader;
-	loader.load("c:\\temp\\torus.kumi", &io);
+	Scene *scene = NULL;
+	loader.load("c:\\temp\\torus.kumi", &io, &scene);
 	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 

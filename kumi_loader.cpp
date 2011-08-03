@@ -2,6 +2,7 @@
 #include "kumi_loader.hpp"
 #include "io.hpp"
 #include "material_manager.hpp"
+#include "scene.hpp"
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -44,9 +45,30 @@ const T& step_read(const char **buf) {
 	return tmp;
 }
 
-bool KumiLoader::load_meshes(const char *buf) {
+bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 	BlockHeader *header = (BlockHeader *)buf;
 	buf += sizeof(BlockHeader);
+
+	const int mesh_count = step_read<int>(&buf);
+	for (int i = 0; i < mesh_count; ++i) {
+		Mesh *mesh = new Mesh(step_read<const char *>(&buf));
+		scene->meshes.push_back(mesh);
+		const int sub_meshes = step_read<int>(&buf);
+		for (int j = 0; j < sub_meshes; ++j) {
+			SubMesh *submesh = new SubMesh(step_read<const char *>(&buf));
+			mesh->submeshes.push_back(submesh);
+			const int vb_flags = step_read<int>(&buf);
+			const int vb_elem_size = step_read<int>(&buf);
+			const int ib_elem_size = step_read<int>(&buf);
+			const char *vb = step_read<const char*>(&buf);
+			const int vb_size = *(int*)vb;
+			submesh->data.vb = GRAPHICS.create_static_vertex_buffer(vb_size, (const void *)(vb + 4));
+			const char *ib = step_read<const char*>(&buf);
+			const int ib_size = *(int*)ib;
+			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 4));
+		}
+	}
+
 	return true;
 }
 
@@ -81,7 +103,7 @@ bool KumiLoader::load_materials(const char *buf) {
 	return true;
 }
 
-bool KumiLoader::load(const char *filename, Io *io) {
+bool KumiLoader::load(const char *filename, Io *io, Scene **scene) {
 
 	MainHeader header;
 	MainHeader *p = &header;
@@ -103,7 +125,8 @@ bool KumiLoader::load(const char *filename, Io *io) {
 
 	B_ERR_BOOL(load_materials(scene_data + header.material_ofs));
 
-	B_ERR_BOOL(load_meshes(scene_data + header.mesh_ofs));
+	Scene *s = *scene = new Scene;
+	B_ERR_BOOL(load_meshes(scene_data + header.mesh_ofs, s));
 
 	return true;
 }

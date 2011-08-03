@@ -3,6 +3,22 @@
 
 #include "utils.hpp"
 
+
+// from http://realtimecollisiondetection.net/blog/?p=86
+struct RenderKey {
+	enum Cmd {
+		kRenderMesh,
+	};
+	union {
+		struct {
+			uint64_t fullscreen_layer : 2;
+			uint64_t depth : 30;
+			uint64_t cmd : 32;
+		};
+		uint64_t key;
+	};
+};
+
 struct RenderTargetData {
 	void reset() {
 		texture = NULL;
@@ -36,8 +52,13 @@ struct TextureData {
 
 class GraphicsObjectHandle {
 	friend class Graphics;
-private:
+	enum { 
+		cTypeBits = 8,
+		cGenerationBits = 8,
+		cIdBits = 12 
+	};
 	enum Type {
+		kInvalid,
 		kContext,
 		kVertexBuffer,
 		kIndexBuffer,
@@ -49,10 +70,22 @@ private:
 		kRasterizerState,
 		kSamplerState,
 		kDepthStencilState,
-	};
+	};	
+	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : type(type), generation(generation), id(id) {}
 	uint32_t type : 8;
 	uint32_t generation : 8;
-	uint32_t id : 16;
+	uint32_t id : 12;
+public:
+	GraphicsObjectHandle() : type(kInvalid) {}
+	bool is_valid() const { return type != kInvalid; }
+};
+
+struct MeshRenderData {
+	GraphicsObjectHandle vb, ib;
+};
+
+enum RenderCommand {
+
 };
 
 class Context {
@@ -102,9 +135,16 @@ public:
   int width() const { return _width; }
   int height() const { return _height; }
 
+	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
+	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
+
 	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer);
 	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
+
+	void submit_command(RenderKey key, void *data);
+	void render();
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(Graphics);
@@ -145,6 +185,12 @@ private:
   int32_t _frame_count;
   float _fps;
 	Context _immediate_context;
+
+	ID3D11Buffer *_vertex_buffers[1 << GraphicsObjectHandle::cIdBits];
+	ID3D11Buffer *_index_buffers[1 << GraphicsObjectHandle::cIdBits];
+
+	typedef std::pair<RenderKey, void *> RenderCmd;
+	std::vector<RenderCmd > _render_commands;
 };
 
 #define GRAPHICS Graphics::instance()
