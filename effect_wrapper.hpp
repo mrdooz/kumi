@@ -96,7 +96,7 @@ private:
 		bool do_reflection()
 		{
 			ID3D11ShaderReflection* reflector = NULL; 
-			B_ERR_DX(D3DReflect(_blob->GetBufferPointer(), _blob->GetBufferSize(), IID_ID3D11ShaderReflection, (void**)&reflector));
+			B_ERR_HR(D3DReflect(_blob->GetBufferPointer(), _blob->GetBufferSize(), IID_ID3D11ShaderReflection, (void**)&reflector));
 			D3D11_SHADER_DESC shader_desc;
 			reflector->GetDesc(&shader_desc);
 
@@ -117,7 +117,7 @@ private:
 					cur_cb = it->second;
 				} else {
 					ID3D11Buffer *cb = NULL;
-					B_ERR_DX(Graphics::instance().device()->CreateBuffer(&bb, NULL, &cb));
+					B_ERR_HR(Graphics::instance().device()->CreateBuffer(&bb, NULL, &cb));
 					_constant_buffers.insert(make_pair(cur_cb->_name, new ConstantBuffer(d.Name, cb, bb)));
 				}
 

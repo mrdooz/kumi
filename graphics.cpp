@@ -76,23 +76,23 @@ bool Graphics::create_render_target(int width, int height, RenderTargetData *out
 	// create the render target
 	ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
 	out->texture_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
-	B_WRN_DX(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
+	B_WRN_HR(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
 
 	// create the render target view
 	out->rtv_desc = CD3D11_RENDER_TARGET_VIEW_DESC(D3D11_RTV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
-	B_WRN_DX(_device->CreateRenderTargetView(out->texture, &out->rtv_desc, &out->rtv.p));
+	B_WRN_HR(_device->CreateRenderTargetView(out->texture, &out->rtv_desc, &out->rtv.p));
 
 	// create the depth stencil texture
 	out->depth_buffer_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL);
-	B_WRN_DX(_device->CreateTexture2D(&out->depth_buffer_desc, NULL, &out->depth_buffer.p));
+	B_WRN_HR(_device->CreateTexture2D(&out->depth_buffer_desc, NULL, &out->depth_buffer.p));
 
 	// create depth stencil view
 	out->dsv_desc = CD3D11_DEPTH_STENCIL_VIEW_DESC(D3D11_DSV_DIMENSION_TEXTURE2D, DXGI_FORMAT_D24_UNORM_S8_UINT);
-	B_WRN_DX(_device->CreateDepthStencilView(out->depth_buffer, &out->dsv_desc, &out->dsv.p));
+	B_WRN_HR(_device->CreateDepthStencilView(out->depth_buffer, &out->dsv_desc, &out->dsv.p));
 
 	// create the shader resource view
 	out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
-	B_WRN_DX(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+	B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
 
 	return true;
 }
@@ -104,12 +104,12 @@ bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out
 	// create the texture
 	ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
 	out->texture_desc = desc;
-	B_WRN_DX(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
+	B_WRN_HR(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
 
 	// create the shader resource view if the texture has a shader resource bind flag
 	if (desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) {
 		out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
-		B_WRN_DX(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+		B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
 	}
 
 	return true;
@@ -121,7 +121,7 @@ bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data
 		return false;
 
 	D3D11_MAPPED_SUBRESOURCE resource;
-	B_ERR_DX(_immediate_context._context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
+	B_ERR_HR(_immediate_context._context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	uint8_t *src = (uint8_t *)data;
 	uint8_t *dst = (uint8_t *)resource.pData;
 	const int w = std::min<int>(width, data_width);
@@ -151,15 +151,15 @@ bool Graphics::create_back_buffers(int width, int height)
     _swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
 
   // Get the dx11 back buffer
-	B_ERR_DX(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_back_buffer)));
+	B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_back_buffer)));
   D3D11_TEXTURE2D_DESC back_buffer_desc;
   _back_buffer->GetDesc(&back_buffer_desc);
 
-  B_ERR_DX(_device->CreateRenderTargetView(_back_buffer, NULL, &_render_target_view));
+  B_ERR_HR(_device->CreateRenderTargetView(_back_buffer, NULL, &_render_target_view));
 
   // depth buffer
-  B_ERR_DX(_device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), NULL, &_depth_stencil));
-  B_ERR_DX(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view));
+  B_ERR_HR(_device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), NULL, &_depth_stencil));
+  B_ERR_HR(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view));
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
 
@@ -190,7 +190,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 	// Create DXGI factory to enumerate adapters
 	CComPtr<IDXGIFactory1> dxgi_factory;
-	B_ERR_DX(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
+	B_ERR_HR(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
 
 	// Use the first adapter
 	vector<CComPtr<IDXGIAdapter1> > adapters;
@@ -216,18 +216,18 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 #endif
 
 	// Create the DX11 device
-	B_ERR_DX(D3D11CreateDeviceAndSwapChain(
+	B_ERR_HR(D3D11CreateDeviceAndSwapChain(
 		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context._context.p));
 
 	B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
-  B_ERR_DX(_device->QueryInterface(IID_ID3D11Debug, (void **)&_d3d_debug));
+  B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&_d3d_debug));
 
   B_ERR_BOOL(create_back_buffers(width, height));
 
-	B_ERR_DX(_device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()), &_default_depth_stencil_state.p));
-	B_ERR_DX(_device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()), &_default_rasterizer_state.p));
-	B_ERR_DX(_device->CreateBlendState(&CD3D11_BLEND_DESC(CD3D11_DEFAULT()), &_default_blend_state.p));
+	B_ERR_HR(_device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()), &_default_depth_stencil_state.p));
+	B_ERR_HR(_device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()), &_default_rasterizer_state.p));
+	B_ERR_HR(_device->CreateBlendState(&CD3D11_BLEND_DESC(CD3D11_DEFAULT()), &_default_blend_state.p));
   for (int i = 0; i < 4; ++i)
     _default_blend_factors[i] = 1.0f;
 	return true;

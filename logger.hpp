@@ -34,14 +34,12 @@ using std::string;
 
 bool check_bool(bool value, const char *exp, string *out);
 bool check_hr(HRESULT hr, const char *exp, string *out);
-bool check_dx(HRESULT hr, const char *exp, string *out);
 
 #define LOG_INNER(x, chk, sev, ok) decltype((x)) res__ = (x); string err; if (!(ok = chk(res__, #x, &err))) sev(err.c_str());
 #define LOG(x, chk, sev) { bool ok; LOG_INNER(x, chk, sev, ok) }
 #define RET(x, chk, sev) { bool ok; LOG_INNER(x, chk, sev, ok); if (!ok) return res; }
 
 #define CHK_HR(x, exp, res) check_hr(x, exp, res)
-#define CHK_DX(x, exp, res) check_dx(x, exp, res)
 #define CHK_BOOL(x, exp, res) check_bool(x, exp, res)
 #define CHK_INT(x, exp, res) check_bool(!!x, exp, res)
 
@@ -51,28 +49,22 @@ bool check_dx(HRESULT hr, const char *exp, string *out);
 #define RET_ERR_BOOL(x) RET(x, CHK_BOOL, LOG_ERROR_LN);
 
 #define B_ERR_HR(x) { bool ok; LOG_INNER(x, CHK_HR, LOG_ERROR_LN, ok); if (!ok) return ok; }
-#define B_ERR_DX(x) { bool ok; LOG_INNER(x, CHK_DX, LOG_ERROR_LN, ok); if (!ok) return ok; }
 #define B_ERR_BOOL(x) { bool ok; LOG_INNER(x, CHK_BOOL, LOG_ERROR_LN, ok); if (!ok) return ok; }
 #define B_ERR_INT(x) { bool ok; LOG_INNER(x, CHK_INT, LOG_ERROR_LN, ok); if (!ok) return ok; }
 
 #define B_WRN_HR(x) { bool ok; LOG_INNER(x, CHK_HR, LOG_WARNING_LN, ok); if (!ok) return ok; }
-#define B_WRN_DX(x) { bool ok; LOG_INNER(x, CHK_DX, LOG_WARNING_LN, ok); if (!ok) return ok; }
 #define B_WRN_BOOL(x) { bool ok; LOG_INNER(x, CHK_BOOL, LOG_WARNING_LN, ok); if (!ok) return ok; }
 
 #define H_ERR_HR(x) RET(x, CHK_HR, LOG_ERROR_LN);
-#define H_ERR_DX(x) RET(x, CHK_DX, LOG_ERROR_LN);
 #define H_ERR_BOOL(x) RET(x, CHK_BOOL, LOG_ERROR_LN);
 
 #define LOG_ERR_HR(x) LOG(x, CHK_HR, LOG_ERROR_LN);
-#define LOG_ERR_DX(x) LOG(x, CHK_DX, LOG_ERROR_LN);
 #define LOG_ERR_BOOL(x) LOG(x, CHK_BOOL, LOG_ERROR_LN);
 
 #define LOG_WRN_HR(x) LOG(x, CHK_HR, LOG_WARNING_LN);
-#define LOG_WRN_DX(x) LOG(x, CHK_DX, LOG_WARNING_LN);
 #define LOG_WRN_BOOL(x) LOG(x, CHK_BOOL, LOG_WARNING_LN);
 
 #define LOG_INF_HR(x) LOG(x, CHK_HR, LOG_INFO_LN);
-#define LOG_INF_DX(x) LOG(x, CHK_DX, LOG_INFO_LN);
 #define LOG_INF_BOOL(x) LOG(x, CHK_BOOL, LOG_INFO_LN);
 
 class LogMgr 
@@ -106,6 +98,8 @@ public:
 
   static LogMgr& instance();
   static void close();
+
+	HANDLE handle() const { return _file; }
 
 private:
   LogMgr();

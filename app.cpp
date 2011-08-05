@@ -241,7 +241,7 @@ void create_input_desc(const PosTex *verts, InputDesc *desc)
 template<typename T>
 bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
 {
-	B_WRN_DX(GRAPHICS.create_static_vertex_buffer(num_verts, sizeof(T), verts, vb));
+	B_WRN_HR(GRAPHICS.create_static_vertex_buffer(num_verts, sizeof(T), verts, vb));
 	create_input_desc(verts, desc);
 	return true;
 }
@@ -334,6 +334,8 @@ App& App::instance()
 
 bool App::init(HINSTANCE hinstance)
 {
+	LOG_MGR.open_output_file(_T("kumi.log"));
+
 	_hinstance = hinstance;
 	_width = GetSystemMetrics(SM_CXSCREEN) / 2;
 	_height = GetSystemMetrics(SM_CYSCREEN) / 2;
@@ -363,8 +365,9 @@ bool App::init(HINSTANCE hinstance)
 	string filename;
 	if (io.find_first("effects/*.tec", &filename, &token)) {
 		do {
-			Technique *t = Technique::create_from_file(filename.c_str(), &io);
-			int a = 10;
+			if (!GRAPHICS.load_technique(filename.c_str(), &io).is_valid()) {
+				// log error
+			}
 		} while (io.find_next(token, &filename));
 		io.find_close(token);
 	}

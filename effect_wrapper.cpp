@@ -80,7 +80,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;
 		}
-		B_ERR_DX(device->CreateVertexShader(_vs._blob->GetBufferPointer(), _vs._blob->GetBufferSize(), NULL, &_vs._shader));
+		B_ERR_HR(device->CreateVertexShader(_vs._blob->GetBufferPointer(), _vs._blob->GetBufferSize(), NULL, &_vs._shader));
 		B_ERR_BOOL(_vs.do_reflection());
 		break;
 
@@ -89,7 +89,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;
 		}
-		B_ERR_DX(device->CreateGeometryShader(_gs._blob->GetBufferPointer(), _gs._blob->GetBufferSize(), NULL, &_gs._shader));
+		B_ERR_HR(device->CreateGeometryShader(_gs._blob->GetBufferPointer(), _gs._blob->GetBufferSize(), NULL, &_gs._shader));
 		B_ERR_BOOL(_gs.do_reflection());
 		break;
 
@@ -98,7 +98,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;
 		}
-		B_ERR_DX(device->CreatePixelShader(_ps._blob->GetBufferPointer(), _ps._blob->GetBufferSize(), NULL, &_ps._shader));
+		B_ERR_HR(device->CreatePixelShader(_ps._blob->GetBufferPointer(), _ps._blob->GetBufferSize(), NULL, &_ps._shader));
 		B_ERR_BOOL(_ps.do_reflection());
 		break;
 	}

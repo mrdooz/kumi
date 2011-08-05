@@ -25,16 +25,6 @@ bool check_hr(HRESULT hr, const char *exp, string *out)
 	return false;
 }
 
-bool check_dx(HRESULT hr, const char *exp, string *out)
-{
-	if (SUCCEEDED(hr))
-		return true;
-
-	*out = to_string("[%s] : %s", exp, DXGetErrorString(hr));
-	return false;
-}
-
-
 LogMgr* LogMgr::_instance = NULL;
 
 LogMgr::LogMgr() 
@@ -135,7 +125,12 @@ LogMgr& LogMgr::open_output_file(const TCHAR *filename)
 	if (_file != INVALID_HANDLE_VALUE)
 		CloseHandle(_file);
 
-	if (INVALID_HANDLE_VALUE == (_file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)))
+	SECURITY_ATTRIBUTES attr;
+	ZeroMemory(&attr, sizeof(attr));
+	attr.nLength = sizeof(attr);
+	attr.bInheritHandle = TRUE;
+
+	if (INVALID_HANDLE_VALUE == (_file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, &attr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)))
 		return *this;
 
   // write header

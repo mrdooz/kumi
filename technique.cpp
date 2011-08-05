@@ -40,7 +40,7 @@ Technique *Technique::create_from_file(const char *filename, Io *io) {
 bool do_reflection(void *buf, size_t len)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
-	B_ERR_DX(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
+	B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
 	D3D11_SHADER_DESC shader_desc;
 	reflector->GetDesc(&shader_desc);
 
@@ -100,49 +100,59 @@ bool do_reflection(void *buf, size_t len)
 }
 
 
-bool Technique::init_shader(Shader *shader, const string &profile) {
+bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_shader) {
 
 	const string source = replace_extension(shader->filename.c_str(), "fx");
 
 	// compile the shader if the source is newer, or the object file doesn't exist
 
 	bool force = true;
-	if (force ||
-		_io->file_exists(source.c_str()) && 
-		(!_io->file_exists(shader->filename.c_str()) || _io->mdate(source.c_str()) > _io->mdate(shader->filename.c_str()))) {
+	if (force || _io->file_exists(source.c_str()) && (!_io->file_exists(shader->filename.c_str()) || _io->mdate(source.c_str()) > _io->mdate(shader->filename.c_str()))) {
 
-			STARTUPINFOA startup_info;
-			ZeroMemory(&startup_info, sizeof(startup_info));
-			startup_info.cb = sizeof(STARTUPINFO);
-			PROCESS_INFORMATION process_info;
-			ZeroMemory(&process_info, sizeof(process_info));
+		STARTUPINFOA startup_info;
+		ZeroMemory(&startup_info, sizeof(startup_info));
+		startup_info.cb = sizeof(STARTUPINFO);
+		startup_info.dwFlags = STARTF_USESTDHANDLES;
+		startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
+		PROCESS_INFORMATION process_info;
+		ZeroMemory(&process_info, sizeof(process_info));
 
-			string fname;
-			split_path(shader->filename.c_str(), NULL, NULL, &fname, NULL);
+		string fname;
+		split_path(shader->filename.c_str(), NULL, NULL, &fname, NULL);
 
-			//fxc -Tvs_4_0 -EvsMain -Vi -O3 -Fo debug_font.vso debug_font.fx
+		//fxc -Tvs_4_0 -EvsMain -Vi -O3 -Fo debug_font.vso debug_font.fx
 
-			char cmd_line[MAX_PATH];
-			sprintf(cmd_line, "fxc.exe -T%s -E%s -Vi -Fo %s %s", 
-				profile.c_str(),
-				shader->entry_point.c_str(),
-				shader->filename.c_str(), source.c_str());
+		char cmd_line[MAX_PATH];
+		sprintf(cmd_line, "fxc.exe -T%s -E%s -Vi -Fo %s %s", 
+			profile.c_str(),
+			shader->entry_point.c_str(),
+			shader->filename.c_str(), source.c_str());
 
-			if (CreateProcessA(NULL, cmd_line, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS | CREATE_NEW_CONSOLE, NULL, NULL, &startup_info, &process_info)) {
-				WaitForSingleObject(process_info.hProcess, INFINITE);
+		if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS, NULL, NULL, &startup_info, &process_info)) {
+			WaitForSingleObject(process_info.hProcess, INFINITE);
+			DWORD exit_code;
+			GetExitCodeProcess(process_info.hProcess, &exit_code);
+			FlushFileBuffers(LOG_MGR.handle());
 
+			if (exit_code == 0) {
 				void *buf;
 				size_t len;
 				_io->load_file(shader->filename.c_str(), &buf, &len);
 
-				ID3D11VertexShader *shader;
-				GRAPHICS.device()->CreateVertexShader(buf, len, NULL, &shader);
+				if (vertex_shader) {
+					ID3D11VertexShader *shader;
+					GRAPHICS.device()->CreateVertexShader(buf, len, NULL, &shader);
+				} else {
+					ID3D11PixelShader *shader;
+					GRAPHICS.device()->CreatePixelShader(buf, len, NULL, &shader);
+				}
 				do_reflection(buf, len);
-
-			} else {
-
 			}
 
+		} else {
+			LOG_ERROR("Unable to launch fxc.exe");
+			return false;
+		}
 	}
 
 	return true;
@@ -151,11 +161,11 @@ bool Technique::init_shader(Shader *shader, const string &profile) {
 bool Technique::init() {
 
 	if (_vertex_shader) {
-		init_shader(_vertex_shader, "vs_4_0");
+		B_ERR_BOOL(init_shader(_vertex_shader, "vs_4_0", true));
 	}
 
 	if (_pixel_shader) {
-		init_shader(_pixel_shader, "ps_4_0");
+		B_ERR_BOOL(init_shader(_pixel_shader, "ps_4_0", false));
 	}
 
 	return true;

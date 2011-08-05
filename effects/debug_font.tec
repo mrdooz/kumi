@@ -1,7 +1,7 @@
 technique diffuse {
 	
 	vertex_shader {
-		file effects/debug_font2.vso;	// comment, wot!
+		file effects/debug_font.vso;	// comment, wot!
 		entry_point vs_main;
 		/* bla bla bla */
 		params [

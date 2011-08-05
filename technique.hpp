@@ -68,7 +68,7 @@ public:
 	const string &name() const { return _name; }
 private:
 	bool init();
-	bool init_shader(Shader *shader, const string &profile);
+	bool init_shader(Shader *shader, const string &profile, bool vertex_shader);
 
 	Io *_io;
 	string _name;
