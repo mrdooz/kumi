@@ -3,6 +3,8 @@
 #include "file_utils.hpp"
 #include "utils.hpp"
 
+using std::pair;
+
 bool DiskIo::load_file(const char *filename, void **buf, size_t *len) {
 	return ::load_file(filename, buf, len);
 }
@@ -47,4 +49,39 @@ bool DiskIo::load_partial(const char *filename, size_t ofs, size_t len, void **b
 	}
 
 	return true;
+}
+
+
+struct FindFileData {
+	HANDLE handle;
+	WIN32_FIND_DATAA data;
+	string path;
+};
+
+bool DiskIo::find_first(const char *filemask, string *filename, void **token) {
+	FindFileData *data = new FindFileData;
+	split_path(filemask, NULL, &data->path, NULL, NULL);
+
+	data->handle = FindFirstFileA(filemask, &data->data);
+	if (data->handle == INVALID_HANDLE_VALUE) {
+		delete data;
+		return false;
+	}
+	*filename = data->path + data->data.cFileName;
+	*token = (void *)data;
+	return true;
+}
+
+bool DiskIo::find_next(void *token, string *filename) {
+	FindFileData *data = (FindFileData *)token;
+	if (!FindNextFileA(data->handle, &data->data))
+		return false;
+	*filename = data->path + data->data.cFileName;
+	return true;
+}
+
+void DiskIo::find_close(void *token) {
+	FindFileData *data = (FindFileData *)token;
+	FindClose(data->handle);
+	delete data;
 }

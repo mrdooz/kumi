@@ -14,6 +14,8 @@ MaterialManager::MaterialManager() {
 
 }
 
-void MaterialManager::add_material(const Material &material) {
-	_materials.insert(make_pair(material.name, material));
+uint16 MaterialManager::add_material(const Material &material) {
+	uint16 key = _materials.size();
+	_materials.push_back(material);
+	return key;
 }

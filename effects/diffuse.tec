@@ -1,0 +1,18 @@
+technique diffuse {
+	
+	vertex_shader {
+		file effects/diffuse.vso;
+		params [
+			{ matrix4x4 view system; },
+			{ matrix4x4 proj system; },
+			{ matrix4x4 world mesh; }
+		];
+	};
+	
+	pixel_shader {
+		file effects/diffuse.pso;
+		params [
+			{ float4 diffuse_color material; }
+		];
+	};
+};

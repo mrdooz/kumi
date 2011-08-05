@@ -29,14 +29,10 @@ Technique *Technique::create_from_file(const char *filename, Io *io) {
 
 	TechniqueParser parser;
 	Technique *t = new Technique(io);
-	if (parser.parse_main((const char *)buf, (const char *)buf + len, t)) {
-		if (!t->init()) {
-			SAFE_DELETE(t);
-		}
-	} else {
+	bool ok = parser.parse_main((const char *)buf, (const char *)buf + len, t);
+	ok &= t->init();
+	if (!ok)
 		SAFE_DELETE(t);
-
-	}
 
 	return t;
 }
@@ -110,7 +106,9 @@ bool Technique::init_shader(Shader *shader, const string &profile) {
 
 	// compile the shader if the source is newer, or the object file doesn't exist
 
-	if (_io->file_exists(source.c_str()) && 
+	bool force = true;
+	if (force ||
+		_io->file_exists(source.c_str()) && 
 		(!_io->file_exists(shader->filename.c_str()) || _io->mdate(source.c_str()) > _io->mdate(shader->filename.c_str()))) {
 
 			STARTUPINFOA startup_info;

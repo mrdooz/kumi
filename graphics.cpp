@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "graphics.hpp"
 #include "logger.hpp"
+#include "technique.hpp"
 
 using namespace std;
 
@@ -39,9 +40,6 @@ Graphics::Graphics()
   , _frame_count(0)
   , _fps(0)
 {
-	ZeroMemory(_vertex_buffers, sizeof(_vertex_buffers));
-	ZeroMemory(_index_buffers, sizeof(_index_buffers));
-
 	assert(!_instance);
 }
 
@@ -282,38 +280,72 @@ void Graphics::resize(const int width, const int height)
 }
 
 GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
-	for (int i = 0; i < 1 << GraphicsObjectHandle::cIdBits; ++i) {
-		if (!_vertex_buffers[i]) {
-			if (FAILED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[i])))
-				return GraphicsObjectHandle();
-			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, i);
+	const int idx = _vertex_buffers.find_free_index();
+	if (idx != -1) {
+		if (SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx]))) {
+			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
 		}
 	}
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
-	for (int i = 0; i < 1 << GraphicsObjectHandle::cIdBits; ++i) {
-		if (!_index_buffers[i]) {
-			if (FAILED(create_static_index_buffer(data_size, 1, data, &_index_buffers[i])))
-				return GraphicsObjectHandle();
-			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, i);
+	const int idx = _index_buffers.find_free_index();
+	if (idx != -1) {
+		if (SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_vertex_buffers[idx]))) {
+			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
 		}
 	}
 	return GraphicsObjectHandle();
 }
+
+GraphicsObjectHandle Graphics::load_technique(const char *filename, Io *io) {
+	const int idx = _techniques.find_free_index();
+	if (idx != -1) {
+		if (Technique *technique = Technique::create_from_file(filename, io)) {
+			_techniques[idx] = technique;
+			return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
+		}
+	}
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::find_technique(const char *name) {
+	for (int i = 0; i < _techniques.Size; ++i) {
+		if (_techniques[i] && _techniques[i]->name() == name)
+			return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, i);
+	}
+	return GraphicsObjectHandle();
+}
+
 
 void Graphics::submit_command(RenderKey key, void *data) {
 	_render_commands.push_back(make_pair(key, data));
 }
 
 void Graphics::render() {
+
 	// aaah, lambdas, thank you!
 	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.key < b.first.key; });
+
+	// delete commands are sorted before render commands, so we can just save the
+	// deleted items when we find them
+	set<void *> deleted_items;
+
 	for (size_t i = 0; i < _render_commands.size(); ++i) {
 		const RenderCmd &cmd = _render_commands[i];
 		switch (cmd.first.cmd) {
+		case RenderKey::kDelete:
+				deleted_items.insert(cmd.second);
+				break;
 		case RenderKey::kRenderMesh:
+			{
+				if (deleted_items.find(cmd.second) != deleted_items.end())
+					break;
+				const MeshRenderData *data = (const MeshRenderData *)cmd.second;
+				int a = 10;
+
+			}
 			break;
 		}
 	}

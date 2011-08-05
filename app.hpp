@@ -117,6 +117,8 @@ struct RenderStates {
 	ID3D11SamplerState *sampler_state;
 };
 
+struct Scene;
+
 class App : public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler
 {
 public:
@@ -296,6 +298,7 @@ protected:
 	RenderStates _cef_desc;
 	TextureData _cef_texture;
 	TextureData _cef_staging;
+	Scene *_scene;
 };
 
 #define APP App::instance()

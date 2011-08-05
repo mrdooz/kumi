@@ -65,6 +65,7 @@ public:
 	~Technique();
 
 	static Technique *create_from_file(const char *filename, Io *io);
+	const string &name() const { return _name; }
 private:
 	bool init();
 	bool init_shader(Shader *shader, const string &profile);

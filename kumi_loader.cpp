@@ -55,7 +55,9 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 		scene->meshes.push_back(mesh);
 		const int sub_meshes = step_read<int>(&buf);
 		for (int j = 0; j < sub_meshes; ++j) {
-			SubMesh *submesh = new SubMesh(step_read<const char *>(&buf));
+			const char *material_name = step_read<const char *>(&buf);
+			SubMesh *submesh = new SubMesh;
+			submesh->data.material_id = _material_ids[material_name];
 			mesh->submeshes.push_back(submesh);
 			const int vb_flags = step_read<int>(&buf);
 			const int vb_elem_size = step_read<int>(&buf);
@@ -66,6 +68,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 			const char *ib = step_read<const char*>(&buf);
 			const int ib_size = *(int*)ib;
 			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 4));
+
 		}
 	}
 
@@ -97,7 +100,7 @@ bool KumiLoader::load_materials(const char *buf) {
 				break;
 			}
 		}
-		MATERIAL_MANAGER.add_material(material);
+		_material_ids[material.name] = MATERIAL_MANAGER.add_material(material);
 	}
 
 	return true;

@@ -356,8 +356,19 @@ bool App::init(HINSTANCE hinstance)
 
 	DiskIo io;
 	KumiLoader loader;
-	Scene *scene = NULL;
-	loader.load("c:\\temp\\torus.kumi", &io, &scene);
+	loader.load("c:\\temp\\torus.kumi", &io, &_scene);
+
+	// load all the techniques
+	void *token;
+	string filename;
+	if (io.find_first("effects/*.tec", &filename, &token)) {
+		do {
+			Technique *t = Technique::create_from_file(filename.c_str(), &io);
+			int a = 10;
+		} while (io.find_next(token, &filename));
+		io.find_close(token);
+	}
+
 	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
@@ -469,6 +480,9 @@ void App::run()
 
 			//DebugRenderer::instance().start_frame();
 
+			for (size_t i = 0; i < _scene->meshes.size(); ++i)
+				_scene->meshes[i]->submit();
+
 			{
 				GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
 				ID3D11DeviceContext *context = GRAPHICS.context();
@@ -511,6 +525,7 @@ void App::run()
 				}
 			}
 
+			GRAPHICS.render();
 			GRAPHICS.present();
 		}
 	}

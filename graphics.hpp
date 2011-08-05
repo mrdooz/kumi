@@ -2,22 +2,37 @@
 #define _GRAPHICS_HPP_
 
 #include "utils.hpp"
+#include <stack>
 
+struct Io;
+class Technique;
+
+using std::stack;
+using std::vector;
+using std::pair;
 
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
 	enum Cmd {
+		kDelete,	// submitted when the object is deleted to avoid using stale data
 		kRenderMesh,
 	};
 	union {
 		struct {
 			uint64_t fullscreen_layer : 2;
-			uint64_t depth : 30;
-			uint64_t cmd : 32;
+			uint64_t depth : 16;
+			uint64_t shader : 10;
+			uint64_t material : 16;
+			uint64_t cmd : 8;
+			uint64_t padding : 12;
 		};
 		uint64_t key;
 	};
 };
+
+extern RenderKey g_DeleteKey;
+
+static_assert(sizeof(RenderKey) == sizeof(uint64_t), "RenderKey too large");
 
 struct RenderTargetData {
 	void reset() {
@@ -58,7 +73,7 @@ class GraphicsObjectHandle {
 		cIdBits = 12 
 	};
 	enum Type {
-		kInvalid,
+		kInvalid = -1,
 		kContext,
 		kVertexBuffer,
 		kIndexBuffer,
@@ -70,18 +85,23 @@ class GraphicsObjectHandle {
 		kRasterizerState,
 		kSamplerState,
 		kDepthStencilState,
+		kTechnique,
 	};	
-	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : type(type), generation(generation), id(id) {}
-	uint32_t type : 8;
-	uint32_t generation : 8;
-	uint32_t id : 12;
+	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : _type(type), _generation(generation), _id(id) {}
+	uint32_t _type : 8;
+	uint32_t _generation : 8;
+	uint32_t _id : 12;
 public:
-	GraphicsObjectHandle() : type(kInvalid) {}
-	bool is_valid() const { return type != kInvalid; }
+	GraphicsObjectHandle() : _type(kInvalid) {}
+	bool is_valid() const { return _type != kInvalid; }
+	uint32_t id() const { return _id; }
 };
 
 struct MeshRenderData {
 	GraphicsObjectHandle vb, ib;
+	GraphicsObjectHandle shader;
+	GraphicsObjectHandle layout;
+	uint16 material_id;
 };
 
 enum RenderCommand {
@@ -138,11 +158,16 @@ public:
 	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
 	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
 
+	GraphicsObjectHandle load_technique(const char *filename, Io *io);
+	GraphicsObjectHandle find_technique(const char *name);
+
+
 	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer);
 	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
+	// TODO: this should be on the context
 	void submit_command(RenderKey key, void *data);
 	void render();
 
@@ -186,11 +211,46 @@ private:
   float _fps;
 	Context _immediate_context;
 
-	ID3D11Buffer *_vertex_buffers[1 << GraphicsObjectHandle::cIdBits];
-	ID3D11Buffer *_index_buffers[1 << GraphicsObjectHandle::cIdBits];
+	template<typename T, int N>
+	struct IdBuffer {
 
-	typedef std::pair<RenderKey, void *> RenderCmd;
-	std::vector<RenderCmd > _render_commands;
+		enum { Size = N };
+		IdBuffer() {
+			ZeroMemory(&_buffer, sizeof(_buffer));
+		}
+
+		int find_free_index() {
+			if (!reclaimed_indices.empty()) {
+				int tmp = reclaimed_indices.top();
+				reclaimed_indices.pop();
+				return tmp;
+			}
+			for (int i = 0; i < N; ++i) {
+				if (!_buffer[i])
+					return i;
+			}
+			return -1;
+		}
+
+		T &operator[](int idx) {
+			return _buffer[idx];
+		}
+
+		void reclaim_index(int idx) {
+			_reclaimed_indices.push(idx);
+
+		}
+
+		T _buffer[N];
+		stack<int> reclaimed_indices;
+	};
+
+	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _vertex_buffers;
+	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _index_buffers;
+	IdBuffer<Technique *, 1 << GraphicsObjectHandle::cIdBits> _techniques;
+
+	typedef pair<RenderKey, void *> RenderCmd;
+	vector<RenderCmd > _render_commands;
 };
 
 #define GRAPHICS Graphics::instance()

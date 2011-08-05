@@ -32,10 +32,10 @@ class MaterialManager {
 public:
 	static MaterialManager &instance();
 
-	void add_material(const Material &material);
+	uint16 add_material(const Material &material);
 private:
 	MaterialManager();
-	std::hash_map<string, Material > _materials;
+	std::vector<Material> _materials;
 
 	static MaterialManager *_instance;
 };

@@ -9,4 +9,5 @@ public:
 private:
 	bool load_meshes(const char *buf, Scene *scene);
 	bool load_materials(const char *buf);
+	std::hash_map<string, uint16> _material_ids;
 };
