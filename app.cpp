@@ -13,6 +13,7 @@
 #include "io.hpp"
 #include "kumi_loader.hpp"
 #include "scene.hpp"
+#include "property_manager.hpp"
 
 #include "test/demo.hpp"
 
@@ -334,7 +335,9 @@ App& App::instance()
 
 bool App::init(HINSTANCE hinstance)
 {
-	LOG_MGR.open_output_file(_T("kumi.log"));
+	LOG_MGR.
+		open_output_file(_T("kumi.log")).
+		break_on_error(true);
 
 	_hinstance = hinstance;
 	_width = GetSystemMetrics(SM_CXSCREEN) / 2;
@@ -371,14 +374,14 @@ bool App::init(HINSTANCE hinstance)
 		} while (io.find_next(token, &filename));
 		io.find_close(token);
 	}
-
+/*
 	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
 		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
 		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
 		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
-
+*/
 	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
@@ -485,7 +488,7 @@ void App::run()
 
 			for (size_t i = 0; i < _scene->meshes.size(); ++i)
 				_scene->meshes[i]->submit();
-
+/*
 			{
 				GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
 				ID3D11DeviceContext *context = GRAPHICS.context();
@@ -502,7 +505,7 @@ void App::run()
 				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
 				context->Draw(6, 0);
 			}
-
+*/
 			if (_test_effect) {
 
 				QueryPerformanceCounter(&cur);

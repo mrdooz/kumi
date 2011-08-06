@@ -1,6 +1,6 @@
-matrix proj, view, world;
+float4x4 proj, view, world;
 
-void vsMain(
+void vs_main(
 	in float3 i_pos : POSITION, 
 	in float3 i_normal : NORMAL,
 	in float2 i_tex : TEXCOORD,
@@ -12,7 +12,7 @@ void vsMain(
 	o_tex = i_tex;
 }
 
-float4 psMain(in float4 pos : POSITION, in float3 normal, in float2 tex : TEXCOORD) : SV_Target
+float4 vs_main(in float4 pos : POSITION, in float3 normal, in float2 tex : TEXCOORD) : SV_Target
 {
 	return float4(normal, 1);
 }

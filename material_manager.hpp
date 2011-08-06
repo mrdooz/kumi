@@ -1,20 +1,14 @@
 #pragma once
+#include "property_manager.hpp"
 
 struct MaterialProperty {
-	enum Type {
-		kInt = 1,
-		kFloat,
-		kFloat2,
-		kFloat3,
-		kFloat4
-	};
 
-	MaterialProperty(const string &name, int value) : name(name), type(kInt), _int(value) {}
-	MaterialProperty(const string &name, float value) : name(name), type(kFloat) { _float[0] = value; }
-	MaterialProperty(const string &name, const XMFLOAT4 &value) : name(name), type(kFloat4) { _float[0] = value.x; _float[1] = value.z; _float[2] = value.y; _float[3] = value.w; }
+	MaterialProperty(const string &name, int value) : name(name), type(Property::kInt), _int(value) {}
+	MaterialProperty(const string &name, float value) : name(name), type(Property::kFloat) { _float[0] = value; }
+	MaterialProperty(const string &name, const XMFLOAT4 &value) : name(name), type(Property::kFloat4) { _float[0] = value.x; _float[1] = value.z; _float[2] = value.y; _float[3] = value.w; }
 
 	string name;
-	Type type;
+	Property::Enum type;
 	union {
 		int _int;
 		float _float[4];
@@ -23,6 +17,7 @@ struct MaterialProperty {
 
 struct Material {
 	Material(const string &name) : name(name) {}
+	string technique;
 	string name;
 	std::vector<MaterialProperty> properties;
 };
@@ -33,6 +28,7 @@ public:
 	static MaterialManager &instance();
 
 	uint16 add_material(const Material &material);
+	const Material &get_material(uint16 id);
 private:
 	MaterialManager();
 	std::vector<Material> _materials;

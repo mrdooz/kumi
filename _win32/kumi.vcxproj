@@ -99,6 +99,7 @@
     <ClCompile Include="..\logger.cpp" />
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
+    <ClCompile Include="..\property_manager.cpp" />
     <ClCompile Include="..\resource_watcher.cpp" />
     <ClCompile Include="..\scene.cpp" />
     <ClCompile Include="..\stdafx.cpp">
@@ -129,6 +130,7 @@
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
+    <ClInclude Include="..\property_manager.hpp" />
     <ClInclude Include="..\resource_watcher.hpp" />
     <ClInclude Include="..\scene.hpp" />
     <ClInclude Include="..\stb_truetype.h" />

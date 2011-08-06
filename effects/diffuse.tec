@@ -3,9 +3,9 @@ technique diffuse {
 	vertex_shader {
 		file effects/diffuse.vso;
 		params [
-			{ matrix4x4 view system; },
-			{ matrix4x4 proj system; },
-			{ matrix4x4 world mesh; }
+			{ float4x4 view system; },
+			{ float4x4 proj system; },
+			{ float4x4 world mesh; }
 		];
 	};
 	

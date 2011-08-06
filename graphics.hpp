@@ -99,8 +99,7 @@ public:
 
 struct MeshRenderData {
 	GraphicsObjectHandle vb, ib;
-	GraphicsObjectHandle shader;
-	GraphicsObjectHandle layout;
+	GraphicsObjectHandle technique;
 	uint16 material_id;
 };
 
@@ -155,12 +154,13 @@ public:
   int width() const { return _width; }
   int height() const { return _height; }
 
+	GraphicsObjectHandle create_dynamic_constant_buffer(int size);
+	GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
 	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
 	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
 
 	GraphicsObjectHandle load_technique(const char *filename, Io *io);
 	GraphicsObjectHandle find_technique(const char *name);
-
 
 	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
@@ -233,6 +233,7 @@ private:
 		}
 
 		T &operator[](int idx) {
+			assert(idx >= 0 && idx < N);
 			return _buffer[idx];
 		}
 
@@ -247,7 +248,9 @@ private:
 
 	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _vertex_buffers;
 	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _index_buffers;
+	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _constant_buffers;
 	IdBuffer<Technique *, 1 << GraphicsObjectHandle::cIdBits> _techniques;
+	IdBuffer<ID3D11InputLayout *, 1 << GraphicsObjectHandle::cIdBits> _input_layouts;
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;

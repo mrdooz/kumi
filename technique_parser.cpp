@@ -1,9 +1,7 @@
-// material_parser.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h"
 #include "technique.hpp"
 #include "technique_parser.hpp"
+#include "property_manager.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -35,6 +33,7 @@ enum Symbol {
 	kSymFloat2,
 	kSymFloat3,
 	kSymFloat4,
+	kSymFloat4x4,
 	kSymInt,
 	kSymParamDefault,
 
@@ -106,6 +105,7 @@ struct {
 	{ kSymFloat2, "float2" },
 	{ kSymFloat3, "float3" },
 	{ kSymFloat4, "float4" },
+	{ kSymFloat4x4, "float4x4" },
 	{ kSymInt, "int" },
 	{ kSymParamDefault, "default" },
 
@@ -210,19 +210,6 @@ private:
 
 using namespace technique_parser_details;
 
-template<typename Key, typename Value>
-void match(Key str, const hash_map<Key, Value> &candidates, Value *res) {
-	auto it = candidates.find(str);
-	if (it != candidates.end())
-		*res = it->second;
-}
-
-template<typename Key, typename Value>
-Value match_default(Key str, const hash_map<Key, Value> &candidates, Value default_value) {
-	auto it = candidates.find(str);
-	return it != candidates.end() ? it->second : default_value;
-}
-
 TechniqueParser::TechniqueParser() : _symbol_trie(new Trie()) {
 	for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i)
 		_symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
@@ -302,6 +289,12 @@ bool TechniqueParser::expect(Symbol symbol, const char **start, const char *end)
 	return tmp == symbol;
 }
 
+Symbol TechniqueParser::peek(const char *start, const char *end) {
+	Symbol tmp;
+	next_symbol(start, end, &tmp);
+	return tmp;
+}
+
 #define CHOMP(x, s, e) if (!expect((x), &(s), (e))) return e;
 
 const char *TechniqueParser::string_until(const char *start, const char *end, char delim, string *res) {
@@ -320,16 +313,16 @@ const char *TechniqueParser::string_until(const char *start, const char *end, ch
 
 void TechniqueParser::parse_value(const string &value, ShaderParam *param) {
 	switch (param->type) {
-	case ShaderParam::Type::kFloat:
+	case Property::kFloat:
 		sscanf(value.c_str(), "%f", &param->default_value._float[0]);
 		break;
-	case ShaderParam::Type::kFloat2:
+	case Property::kFloat2:
 		sscanf(value.c_str(), "%f %f", &param->default_value._float[0], &param->default_value._float[1]);
 		break;
-	case ShaderParam::Type::kFloat3:
+	case Property::kFloat3:
 		sscanf(value.c_str(), "%f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2]);
 		break;
-	case ShaderParam::Type::kFloat4:
+	case Property::kFloat4:
 		sscanf(value.c_str(), "%f %f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2], &param->default_value._float[3]);
 		break;
 	}
@@ -339,27 +332,29 @@ const char *TechniqueParser::parse_param(const char *start, const char *end, Sha
 	const char *block_end = scope_extents(start, end, '{', '}');
 	CHOMP(kSymBlockOpen, start, end);
 
-	// type, name and source after required
+	// type, name and source are required. the default value is optional
 	Symbol type;
 	start = next_symbol(start, block_end, &type);
-	param->type = match_default<Symbol, ShaderParam::Type::Enum>(type, map_list_of
-		(kSymFloat, ShaderParam::Type::kFloat)
-		(kSymFloat2, ShaderParam::Type::kFloat2)
-		(kSymFloat3, ShaderParam::Type::kFloat3)
-		(kSymFloat4, ShaderParam::Type::kFloat4),
-		ShaderParam::Type::kUnknown);
+	param->type = lookup_default<Symbol, Property::Enum>(type, map_list_of
+		(kSymFloat, Property::kFloat)
+		(kSymFloat2, Property::kFloat2)
+		(kSymFloat3, Property::kFloat3)
+		(kSymFloat4, Property::kFloat4)
+		(kSymFloat4x4, Property::kFloat4x4),
+		Property::kUnknown);
 
-	if (param->type == ShaderParam::Type::kUnknown)
+	if (param->type == Property::kUnknown)
 		return end;
 
 	start = next_identifier(start, end, &param->name);
 
 	string source;
 	start = next_identifier(start, end, &source);
-	param->source = match_default<string, ShaderParam::Source::Enum>(source, map_list_of
+	param->source = lookup_default<string, ShaderParam::Source::Enum>(source, map_list_of
 		("material", ShaderParam::Source::kMaterial)
 		("system", ShaderParam::Source::kSystem)
-		("user", ShaderParam::Source::kUnknown),
+		("user", ShaderParam::Source::kUser)
+		("mesh", ShaderParam::Source::kMesh),
 		ShaderParam::Source::kUnknown);
 	if (param->source == ShaderParam::Source::kUnknown)
 		return end;
@@ -367,15 +362,12 @@ const char *TechniqueParser::parse_param(const char *start, const char *end, Sha
 	CHOMP(kSymSemicolon, start, end);
 
 	// check for default value
-	if (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, block_end, &symbol);
-		if (symbol == kSymParamDefault) {
-			string value;
-			start = string_until(start, end, ';', &value);
-			CHOMP(kSymSemicolon, start, end);
-			parse_value(value, param);
-		}
+	if (kSymParamDefault == peek(start, block_end)) {
+		CHOMP(kSymParamDefault, start, end);
+		string value;
+		start = string_until(start, end, ';', &value);
+		CHOMP(kSymSemicolon, start, end);
+		parse_value(value, param);
 	}
 
 	CHOMP(kSymBlockClose, block_end, end);
@@ -388,7 +380,11 @@ const char *TechniqueParser::parse_params(const char *start, const char *end, ve
 	while (start != block_end) {
 		params->push_back(ShaderParam());
 		start = parse_param(start, block_end, &params->back());
-		CHOMP(kSymComma, start, block_end);
+		if (kSymComma == peek(start, block_end)) {
+			CHOMP(kSymComma, start, block_end);
+		} else {
+			break;
+		}
 	}
 	CHOMP(kSymListClose, start, end);
 	return expect(kSymSemicolon, &start, end) ? start: end;
@@ -433,13 +429,13 @@ const char *TechniqueParser::parse_rasterizer_desc(const char *start, const char
 
 		switch (symbol) {
 		case kSymFillMode:
-			match<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
+			lookup<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
 			break;
 		case kSymCullMode:
-			match<string, D3D11_CULL_MODE>(value, map_list_of("wireframe", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
+			lookup<string, D3D11_CULL_MODE>(value, map_list_of("wireframe", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
 			break;
 		case kSymFrontCounterClockwise:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
 			break;
 		case kSymDepthBias:
 			sscanf(value.c_str(), "%d", &desc->DepthBias);
@@ -451,16 +447,16 @@ const char *TechniqueParser::parse_rasterizer_desc(const char *start, const char
 			sscanf(value.c_str(), "%f", &desc->SlopeScaledDepthBias);
 			break;
 		case kSymDepthClipEnable:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthClipEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthClipEnable);
 			break;
 		case kSymScissorEnable:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->ScissorEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->ScissorEnable);
 			break;
 		case kSymMultisampleEnable:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->MultisampleEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->MultisampleEnable);
 			break;
 		case kSymAntialiasedLineEnable:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AntialiasedLineEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AntialiasedLineEnable);
 			break;
 		}
 	}
@@ -481,7 +477,7 @@ const char *TechniqueParser::parse_sampler_desc(const char *start, const char *e
 
 		switch (symbol) {
 		case kSymFilter:
-			match<string, D3D11_FILTER>(value, map_list_of
+			lookup<string, D3D11_FILTER>(value, map_list_of
 				("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
 				("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
 				("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
@@ -503,7 +499,7 @@ const char *TechniqueParser::parse_sampler_desc(const char *start, const char *e
 		case kSymAddressU:
 		case kSymAddressV:
 		case kSymAddressW:
-			match<string, D3D11_TEXTURE_ADDRESS_MODE>(value, map_list_of
+			lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, map_list_of
 				("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
 				("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
 				("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
@@ -518,7 +514,7 @@ const char *TechniqueParser::parse_sampler_desc(const char *start, const char *e
 			sscanf(value.c_str(), "%ud", &desc->MaxAnisotropy);
 			break;
 		case kSymComparisonFunc:
-			match<string, D3D11_COMPARISON_FUNC>(value, map_list_of
+			lookup<string, D3D11_COMPARISON_FUNC>(value, map_list_of
 				("never", D3D11_COMPARISON_NEVER)
 				("less", D3D11_COMPARISON_LESS)
 				("equal", D3D11_COMPARISON_EQUAL)
@@ -558,13 +554,13 @@ const char *TechniqueParser::parse_render_target(const char *start, const char *
 
 		switch (symbol) {
 		case kSymBlendEnable:
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->BlendEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->BlendEnable);
 			break;
 		case kSymSrcBlend:
 		case kSymDestBlend:
 		case kSymSrcBlendAlpha:
 		case kSymDestBlendAlpha:
-			match<string, D3D11_BLEND>(value, map_list_of
+			lookup<string, D3D11_BLEND>(value, map_list_of
 				("zero", D3D11_BLEND_ZERO)
 				("one", D3D11_BLEND_ONE)
 				("src_color", D3D11_BLEND_SRC_COLOR)
@@ -589,7 +585,7 @@ const char *TechniqueParser::parse_render_target(const char *start, const char *
 			break;
 		case kSymBlendOp:
 		case kSymBlendOpAlpha:
-			match<string, D3D11_BLEND_OP>(value, map_list_of
+			lookup<string, D3D11_BLEND_OP>(value, map_list_of
 				("add", D3D11_BLEND_OP_ADD)
 				("subtract", D3D11_BLEND_OP_SUBTRACT)
 				("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
@@ -619,13 +615,13 @@ const char *TechniqueParser::parse_blend_desc(const char *start, const char *end
 			CHOMP(kSymEquals, start, end);
 			start = string_until(start, end, ';', &value);
 			CHOMP(kSymSemicolon, start, end);
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AlphaToCoverageEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AlphaToCoverageEnable);
 			break;
 		case kSymIndependentBlendEnable:
 			CHOMP(kSymEquals, start, end);
 			start = string_until(start, end, ';', &value);
 			CHOMP(kSymSemicolon, start, end);
-			match<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->IndependentBlendEnable);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->IndependentBlendEnable);
 			break;
 		case kSymRenderTarget:
 			{
@@ -653,8 +649,7 @@ const char *TechniqueParser::parse_depth_stencil_desc(const char *start, const c
 
 
 const char *TechniqueParser::parse_technique(const char *start, const char *end, Technique *technique) {
-	string name;
-	start = next_identifier(start, end, &name);
+	start = next_identifier(start, end, &technique->_name);
 	const char *block_end = scope_extents(start, end, '{', '}');
 	CHOMP(kSymBlockOpen, start, end);
 

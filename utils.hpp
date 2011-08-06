@@ -1,5 +1,7 @@
 #pragma once
 
+using std::hash_map;
+
 class CriticalSection {
 public:
 	CriticalSection();
@@ -106,3 +108,19 @@ T max4(const T &a, const T &b, const T &c, const T &d) {
 #define SAFE_ADELETE(x) if( (x) != 0 ) { delete [] (x); (x) = 0; }
 
 #define ELEMS_IN_ARRAY(x) sizeof(x) / sizeof((x)[0])
+
+template<typename Key, typename Value>
+bool lookup(Key str, const hash_map<Key, Value> &candidates, Value *res) {
+	auto it = candidates.find(str);
+	if (it != candidates.end()) {
+		*res = it->second;
+		return true;
+	}
+	return false;
+}
+
+template<typename Key, typename Value>
+Value lookup_default(Key str, const hash_map<Key, Value> &candidates, Value default_value) {
+	auto it = candidates.find(str);
+	return it != candidates.end() ? it->second : default_value;
+}

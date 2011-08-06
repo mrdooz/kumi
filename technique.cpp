@@ -4,6 +4,50 @@
 #include "io.hpp"
 #include "file_utils.hpp"
 #include "graphics.hpp"
+#include "dx_utils.hpp"
+
+using std::make_pair;
+using namespace boost::assign;
+/*
+struct ShaderInput {
+	ShaderInput(const string &name, int index, int slot) : name(name), index(index), slot(slot) {}
+	string name;
+	int index;
+	int slot;
+};
+
+typedef vector<ShaderInput> ShaderInputs;
+
+bool create_layout(void *buf, int len, const ShaderInputs &inputs) {
+
+	auto mapping = map_list_of
+		("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+		("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+		("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
+		("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
+
+	// the format is determined from the semantic name
+	vector<D3D11_INPUT_ELEMENT_DESC> input_desc;
+	for (size_t i = 0; i < inputs.size(); ++i) {
+		const ShaderInput &cur = inputs[i];
+
+		DXGI_FORMAT fmt;
+		if (!lookup<string, DXGI_FORMAT>(cur.name, mapping, &fmt))
+				return false;
+
+		input_desc.push_back(CD3D11_INPUT_ELEMENT_DESC(cur.name.c_str(), cur.index, fmt, cur.slot));
+
+		ID3D11InputLayout* layout = NULL;
+		if (FAILED(GRAPHICS.device()->CreateInputLayout(elems, num_elems, _vs._blob->GetBufferPointer(), _vs._blob->GetBufferSize(), &layout)))
+			return nullptr;
+		return layout;
+
+
+	}
+
+	return true;
+}
+*/
 
 Technique::Technique(Io *io)
 	: _io(io)
@@ -37,47 +81,67 @@ Technique *Technique::create_from_file(const char *filename, Io *io) {
 	return t;
 }
 
-bool do_reflection(void *buf, size_t len)
+struct CBuffer {
+	string name;
+	int size;
+};
+
+bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
 	B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
 	D3D11_SHADER_DESC shader_desc;
 	reflector->GetDesc(&shader_desc);
 
-	D3D11_SHADER_BUFFER_DESC d;
-	D3D11_SHADER_VARIABLE_DESC vd;
-	D3D11_SHADER_TYPE_DESC td;
+	// input mappings are only relevant for vertex shaders
+	if (vertex_shader) {
+		auto mapping = map_list_of
+			("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+			("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+			("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
+			("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
-	// global constant buffer is called "$Globals"
-	for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
-		ID3D11ShaderReflectionConstantBuffer* rcb = reflector->GetConstantBufferByIndex(i);
-		rcb->GetDesc(&d);
-		CD3D11_BUFFER_DESC bb(d.Size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE);
+		//ShaderInputs inputs;
+		vector<D3D11_INPUT_ELEMENT_DESC> inputs;
+		for (UINT i = 0; i < shader_desc.InputParameters; ++i) {
+			D3D11_SIGNATURE_PARAMETER_DESC input;
+			reflector->GetInputParameterDesc(i, &input);
 
-		// check if the constant buffer has already been created
-/*
-		ConstantBuffer* cur_cb = NULL;
-		auto it = _constant_buffers.find(d.Name);
-		if (it != _constant_buffers.end()) {
-			cur_cb = it->second;
-		} else {
-			ID3D11Buffer *cb = NULL;
-			B_ERR_DX(Graphics::instance().device()->CreateBuffer(&bb, NULL, &cb));
-			_constant_buffers.insert(make_pair(cur_cb->_name, new ConstantBuffer(d.Name, cb, bb)));
-		}
-*/
-		for (UINT j = 0; j < d.Variables; ++j) {
-			ID3D11ShaderReflectionVariable* v = rcb->GetVariableByIndex(j);
-			v->GetDesc(&vd);
-
-			ID3D11ShaderReflectionType* t = v->GetType();
-			t->GetDesc(&td);
-/*
-			if (_buffer_variables.find(vd.Name) == _buffer_variables.end()) {
-				ID3D11ShaderReflectionType* t = v->GetType();
-				t->GetDesc(&td);
-				_buffer_variables.insert(make_pair(vd.Name, new BufferVariable(vd.Name, cur_cb, vd, td)));
+			DXGI_FORMAT fmt;
+			if (!lookup<string, DXGI_FORMAT>(input.SemanticName, mapping, &fmt)) {
+				LOG_ERROR("Invalid input semantic found: %s", input.SemanticName);
+				return false;
 			}
+
+			inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
+		}
+
+		_input_layout = GRAPHICS.create_input_layout(&inputs[0], inputs.size(), buf, len);
+		if (!_input_layout.is_valid())
+			return false;
+	}
+
+	for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
+		ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
+		D3D11_SHADER_BUFFER_DESC cb_desc;
+		cb->GetDesc(&cb_desc);
+		shader->constant_buffers.push_back(GRAPHICS.create_dynamic_constant_buffer(cb_desc.Size));
+
+		for (UINT j = 0; j < cb_desc.Variables; ++j) {
+			ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
+			D3D11_SHADER_VARIABLE_DESC var_desc;
+			v->GetDesc(&var_desc);
+			ShaderParam *param = shader->find_by_name(var_desc.Name);
+			if (!param) {
+				LOG_ERROR("Shader parameter %s not found", var_desc.Name);
+				return false;
+			}
+			param->cbuffer = i;
+			param->start_offset = var_desc.StartOffset;
+/*
+			ID3D11ShaderReflectionType* t = v->GetType();
+			D3D11_SHADER_TYPE_DESC type_desc;
+			t->GetDesc(&type_desc);
 */
 		}
 	}
@@ -123,12 +187,12 @@ bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_s
 		//fxc -Tvs_4_0 -EvsMain -Vi -O3 -Fo debug_font.vso debug_font.fx
 
 		char cmd_line[MAX_PATH];
-		sprintf(cmd_line, "fxc.exe -T%s -E%s -Vi -Fo %s %s", 
+		sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Fo %s %s", 
 			profile.c_str(),
 			shader->entry_point.c_str(),
 			shader->filename.c_str(), source.c_str());
 
-		if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS, NULL, NULL, &startup_info, &process_info)) {
+		if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &startup_info, &process_info)) {
 			WaitForSingleObject(process_info.hProcess, INFINITE);
 			DWORD exit_code;
 			GetExitCodeProcess(process_info.hProcess, &exit_code);
@@ -140,13 +204,13 @@ bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_s
 				_io->load_file(shader->filename.c_str(), &buf, &len);
 
 				if (vertex_shader) {
-					ID3D11VertexShader *shader;
-					GRAPHICS.device()->CreateVertexShader(buf, len, NULL, &shader);
+					ID3D11VertexShader *vs;
+					GRAPHICS.device()->CreateVertexShader(buf, len, NULL, &vs);
 				} else {
-					ID3D11PixelShader *shader;
-					GRAPHICS.device()->CreatePixelShader(buf, len, NULL, &shader);
+					ID3D11PixelShader *ps;
+					GRAPHICS.device()->CreatePixelShader(buf, len, NULL, &ps);
 				}
-				do_reflection(buf, len);
+				do_reflection(shader, vertex_shader, buf, len);
 			}
 
 		} else {
@@ -170,3 +234,4 @@ bool Technique::init() {
 
 	return true;
 }
+

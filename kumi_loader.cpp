@@ -83,19 +83,20 @@ bool KumiLoader::load_materials(const char *buf) {
 	int count = step_read<int>(&buf);
 	for (int i = 0; i < count; ++i) {
 		Material material(step_read<const char *>(&buf));
+		material.technique = step_read<const char *>(&buf);
 		int props = step_read<int>(&buf);
 		for (int j = 0; j < props; ++j) {
 			const char *name = step_read<const char *>(&buf);
-			MaterialProperty::Type type = step_read<MaterialProperty::Type>(&buf);
+			Property::Enum type = step_read<Property::Enum>(&buf);
 			switch (type) {
-			case MaterialProperty::kInt:
+			case Property::kInt:
 				material.properties.push_back(MaterialProperty(name, step_read<int>(&buf)));
 				break;
-			case MaterialProperty::kFloat:
+			case Property::kFloat:
 				material.properties.push_back(MaterialProperty(name, step_read<float>(&buf)));
 				break;
 
-			case MaterialProperty::kFloat4:
+			case Property::kFloat4:
 				material.properties.push_back(MaterialProperty(name, step_read<XMFLOAT4>(&buf)));
 				break;
 			}

@@ -2,6 +2,7 @@
 #include "graphics.hpp"
 #include "logger.hpp"
 #include "technique.hpp"
+#include "material_manager.hpp"
 
 using namespace std;
 
@@ -279,12 +280,20 @@ void Graphics::resize(const int width, const int height)
   create_back_buffers(width, height);
 }
 
+GraphicsObjectHandle Graphics::create_dynamic_constant_buffer(int size) {
+	const int idx = _constant_buffers.find_free_index();
+	if (idx != -1) {
+		if (SUCCEEDED(create_buffer_inner(_device, CD3D11_BUFFER_DESC(size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, &_constant_buffers[idx])))
+			return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
+	}
+	return GraphicsObjectHandle();
+}
+
 GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
 	const int idx = _vertex_buffers.find_free_index();
 	if (idx != -1) {
-		if (SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx]))) {
+		if (SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-		}
 	}
 	return GraphicsObjectHandle();
 }
@@ -292,9 +301,17 @@ GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, c
 GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
 	const int idx = _index_buffers.find_free_index();
 	if (idx != -1) {
-		if (SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_vertex_buffers[idx]))) {
+		if (SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_vertex_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
-		}
+	}
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
+	const int idx = _vertex_buffers.find_free_index();
+	if (idx != -1) {
+		if (SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_input_layouts[idx])))
+			return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
 	}
 	return GraphicsObjectHandle();
 }
@@ -343,6 +360,8 @@ void Graphics::render() {
 				if (deleted_items.find(cmd.second) != deleted_items.end())
 					break;
 				const MeshRenderData *data = (const MeshRenderData *)cmd.second;
+				const Material &material = MATERIAL_MANAGER.get_material(data->material_id);
+				Technique *t = _techniques._buffer[find_technique(material.technique.c_str()).id()];
 				int a = 10;
 
 			}

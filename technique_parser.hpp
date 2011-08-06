@@ -17,6 +17,7 @@ private:
 	const char *next_int(const char *start, const char *end, int *out);
 	const char *next_identifier(const char *start, const char *end, string *id);
 	bool expect(technique_parser_details::Symbol symbol, const char **start, const char *end);
+	technique_parser_details::Symbol peek(const char *start, const char *end);
 	const char *string_until(const char *start, const char *end, char delim, string *res);
 	void parse_value(const string &value, ShaderParam *param);
 	const char *parse_param(const char *start, const char *end, ShaderParam *param);

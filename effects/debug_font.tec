@@ -1,4 +1,4 @@
-technique diffuse {
+technique debug_font {
 	
 	vertex_shader {
 		file effects/debug_font.vso;	// comment, wot!

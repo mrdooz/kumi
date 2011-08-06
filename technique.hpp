@@ -1,29 +1,20 @@
 #pragma once
 
+#include "utils.hpp"
+#include "property_manager.hpp"
+#include "graphics.hpp"
+
 using std::vector;
 using std::string;
 
-#include "utils.hpp"
-
 struct ShaderParam {
-	struct Type {
-		enum Enum {
-			kUnknown,
-			kFloat,
-			kFloat2,
-			kFloat3,
-			kFloat4,
-			kInt,
-			kMatrix,
-		};
-	};
-
 	struct Source {
 		enum Enum {
 			kUnknown,
 			kMaterial,
 			kSystem,
 			kUser,
+			kMesh,
 		};
 	};
 
@@ -33,28 +24,44 @@ struct ShaderParam {
 	};
 
 	string name;
-	Type::Enum type;
+	Property::Enum type;
 	Source::Enum source;
+	int cbuffer;
+	int start_offset;  // offset in cbuffer
 	DefaultValue default_value;
 };
 
 struct Shader {
+	Shader(const string &entry_point) : entry_point(entry_point) {}
+	ShaderParam *find_by_name(const char *name) {
+		for (size_t i = 0; i < params.size(); ++i) {
+			if (params[i].name == name)
+				return &params[i];
+		}
+		return NULL;
+	}
+
+	virtual void set_buffers() = 0;
+
 	string filename;
 	string entry_point;
 	vector<ShaderParam> params;
+	vector<GraphicsObjectHandle> constant_buffers;
+	// todo: sort params by cbuffers
 };
 
 struct VertexShader : public Shader{
-	VertexShader() {
-		entry_point = "vs_main";
+	VertexShader() : Shader("vs_main") {}
+	virtual void set_buffers() {
 	}
 };
 
 struct PixelShader : public Shader {
-	PixelShader() {
-		entry_point = "ps_main";
+	PixelShader() : Shader("ps_name") {}
+	virtual void set_buffers() {
 	}
 };
+
 
 struct Io;
 
@@ -69,11 +76,15 @@ public:
 private:
 	bool init();
 	bool init_shader(Shader *shader, const string &profile, bool vertex_shader);
+	bool do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len);
 
 	Io *_io;
 	string _name;
-	VertexShader *_vertex_shader;
-	PixelShader *_pixel_shader;
+	Shader *_vertex_shader;
+	Shader *_pixel_shader;
+
+	GraphicsObjectHandle _input_layout;
+
 	CD3D11_RASTERIZER_DESC _rasterizer_desc;
 	CD3D11_SAMPLER_DESC _sampler_desc;
 	CD3D11_BLEND_DESC _blend_desc;
