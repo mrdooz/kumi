@@ -5,6 +5,8 @@
 #include <stack>
 
 struct Io;
+struct Shader;
+struct Material;
 class Technique;
 
 using std::stack;
@@ -86,6 +88,8 @@ class GraphicsObjectHandle {
 		kSamplerState,
 		kDepthStencilState,
 		kTechnique,
+		kVertexShader,
+		kPixelShader,
 	};	
 	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : _type(type), _generation(generation), _id(id) {}
 	uint32_t _type : 8;
@@ -98,7 +102,13 @@ public:
 };
 
 struct MeshRenderData {
+	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
 	GraphicsObjectHandle vb, ib;
+	int index_size;
+	int index_count;
+	int vertex_size;
+	int vertex_count;
+	D3D_PRIMITIVE_TOPOLOGY topology;
 	GraphicsObjectHandle technique;
 	uint16 material_id;
 };
@@ -154,13 +164,21 @@ public:
   int width() const { return _width; }
   int height() const { return _height; }
 
-	GraphicsObjectHandle create_dynamic_constant_buffer(int size);
+	GraphicsObjectHandle create_constant_buffer(int size);
 	GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
 	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
 	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
 
+	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len);
+	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len);
+
 	GraphicsObjectHandle load_technique(const char *filename, Io *io);
 	GraphicsObjectHandle find_technique(const char *name);
+
+	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
+	GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
+	GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
+	GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
 	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
@@ -176,6 +194,8 @@ private:
 
 	Graphics();
 	~Graphics();
+
+	void set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id, bool vertex_shader);
 
   bool create_back_buffers(int width, int height);
 	static Graphics* _instance;
@@ -242,15 +262,27 @@ private:
 
 		}
 
+		T get(GraphicsObjectHandle handle) {
+			return _buffer[handle.id()];
+		}
+
 		T _buffer[N];
 		stack<int> reclaimed_indices;
 	};
 
-	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _vertex_buffers;
-	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _index_buffers;
-	IdBuffer<ID3D11Buffer *, 1 << GraphicsObjectHandle::cIdBits> _constant_buffers;
-	IdBuffer<Technique *, 1 << GraphicsObjectHandle::cIdBits> _techniques;
-	IdBuffer<ID3D11InputLayout *, 1 << GraphicsObjectHandle::cIdBits> _input_layouts;
+	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
+	IdBuffer<ID3D11VertexShader *, IdCount> _vertex_shaders;
+	IdBuffer<ID3D11PixelShader *, IdCount> _pixel_shaders;
+	IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
+	IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
+	IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
+	IdBuffer<Technique *, IdCount> _techniques;
+	IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
+
+	IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
+	IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
+	IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
+	IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;

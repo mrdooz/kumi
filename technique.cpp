@@ -6,8 +6,8 @@
 #include "graphics.hpp"
 #include "dx_utils.hpp"
 
-using std::make_pair;
 using namespace boost::assign;
+using namespace std;
 /*
 struct ShaderInput {
 	ShaderInput(const string &name, int index, int slot) : name(name), index(index), slot(slot) {}
@@ -50,8 +50,7 @@ bool create_layout(void *buf, int len, const ShaderInputs &inputs) {
 */
 
 Technique::Technique(Io *io)
-	: _io(io)
-	, _vertex_shader(nullptr)
+	: _vertex_shader(nullptr)
 	, _pixel_shader(nullptr)
 	, _rasterizer_desc(CD3D11_DEFAULT())
 	, _sampler_desc(CD3D11_DEFAULT())
@@ -74,19 +73,14 @@ Technique *Technique::create_from_file(const char *filename, Io *io) {
 	TechniqueParser parser;
 	Technique *t = new Technique(io);
 	bool ok = parser.parse_main((const char *)buf, (const char *)buf + len, t);
-	ok &= t->init();
+	ok &= t->init(io);
 	if (!ok)
 		SAFE_DELETE(t);
 
 	return t;
 }
 
-struct CBuffer {
-	string name;
-	int size;
-};
-
-bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len)
+bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len, set<string> *used_params)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
 	B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
@@ -125,19 +119,37 @@ bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, siz
 		ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
 		D3D11_SHADER_BUFFER_DESC cb_desc;
 		cb->GetDesc(&cb_desc);
-		shader->constant_buffers.push_back(GRAPHICS.create_dynamic_constant_buffer(cb_desc.Size));
+
+		// constant buffers are stored per technique as they are shared between the
+		// vertex and pixel shaders (at least the global cbuffer is)
+
+		int cb_idx = -1;
+		for (size_t j = 0; j < _constant_buffers.size(); ++j) {
+			if (_constant_buffers[j].name == cb_desc.Name) {
+				cb_idx = j;
+				goto cb_found;
+			}
+		}
+		cb_idx = _constant_buffers.size();
+		_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, GRAPHICS.create_constant_buffer(cb_desc.Size)));
+cb_found:
+
 
 		for (UINT j = 0; j < cb_desc.Variables; ++j) {
 			ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
 			D3D11_SHADER_VARIABLE_DESC var_desc;
 			v->GetDesc(&var_desc);
-			ShaderParam *param = shader->find_by_name(var_desc.Name);
-			if (!param) {
-				LOG_ERROR("Shader parameter %s not found", var_desc.Name);
-				return false;
+			if (var_desc.uFlags & D3D_SVF_USED) {
+				used_params->insert(var_desc.Name);
+				ShaderParam *param = shader->find_by_name(var_desc.Name);
+				if (!param) {
+					LOG_ERROR("Shader parameter %s not found", var_desc.Name);
+					return false;
+				}
+				param->cbuffer = cb_idx;
+				param->start_offset = var_desc.StartOffset;
+				param->size = var_desc.Size;
 			}
-			param->cbuffer = i;
-			param->start_offset = var_desc.StartOffset;
 /*
 			ID3D11ShaderReflectionType* t = v->GetType();
 			D3D11_SHADER_TYPE_DESC type_desc;
@@ -164,18 +176,19 @@ bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, siz
 }
 
 
-bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_shader) {
+bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_shader, Io *io) {
 
 	const string source = replace_extension(shader->filename.c_str(), "fx");
 
 	// compile the shader if the source is newer, or the object file doesn't exist
 
 	bool force = true;
-	if (force || _io->file_exists(source.c_str()) && (!_io->file_exists(shader->filename.c_str()) || _io->mdate(source.c_str()) > _io->mdate(shader->filename.c_str()))) {
+	if (force || io->file_exists(source.c_str()) && (!io->file_exists(shader->filename.c_str()) || io->mdate(source.c_str()) > io->mdate(shader->filename.c_str()))) {
 
 		STARTUPINFOA startup_info;
 		ZeroMemory(&startup_info, sizeof(startup_info));
 		startup_info.cb = sizeof(STARTUPINFO);
+		// redirect the child's output handles to the log manager's
 		startup_info.dwFlags = STARTF_USESTDHANDLES;
 		startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
 		PROCESS_INFORMATION process_info;
@@ -201,16 +214,19 @@ bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_s
 			if (exit_code == 0) {
 				void *buf;
 				size_t len;
-				_io->load_file(shader->filename.c_str(), &buf, &len);
+				io->load_file(shader->filename.c_str(), &buf, &len);
+				shader->shader = vertex_shader ? GRAPHICS.create_vertex_shader(buf, len) : GRAPHICS.create_pixel_shader(buf, len);
+				set<string> used_params;
+				do_reflection(shader, vertex_shader, buf, len, &used_params);
 
-				if (vertex_shader) {
-					ID3D11VertexShader *vs;
-					GRAPHICS.device()->CreateVertexShader(buf, len, NULL, &vs);
-				} else {
-					ID3D11PixelShader *ps;
-					GRAPHICS.device()->CreatePixelShader(buf, len, NULL, &ps);
-				}
-				do_reflection(shader, vertex_shader, buf, len);
+				// remove any unused parameters
+				vector<ShaderParam> &params = shader->params;
+				params.erase(
+					remove_if(params.begin(), params.end(), [&](const ShaderParam &p) { return used_params.find(p.name) == used_params.end(); }),
+					params.end());
+			} else {
+				int a = 10;
+				// error compiling shader..
 			}
 
 		} else {
@@ -222,16 +238,20 @@ bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_s
 	return true;
 }
 
-bool Technique::init() {
+bool Technique::init(Io *io) {
 
 	if (_vertex_shader) {
-		B_ERR_BOOL(init_shader(_vertex_shader, "vs_4_0", true));
+		B_ERR_BOOL(init_shader(_vertex_shader, "vs_4_0", true, io));
 	}
 
 	if (_pixel_shader) {
-		B_ERR_BOOL(init_shader(_pixel_shader, "ps_4_0", false));
+		B_ERR_BOOL(init_shader(_pixel_shader, "ps_4_0", false, io));
 	}
+
+	_rasterizer_state = GRAPHICS.create_rasterizer_state(_rasterizer_desc);
+	_sampler_state = GRAPHICS.create_sampler_state(_sampler_desc);
+	_blend_state = GRAPHICS.create_blend_state(_blend_desc);
+	_depth_stencil_state = GRAPHICS.create_depth_stencil_state(_depth_stencil_desc);
 
 	return true;
 }
-

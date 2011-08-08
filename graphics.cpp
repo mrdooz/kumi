@@ -59,7 +59,9 @@ HRESULT Graphics::create_static_index_buffer(uint32_t index_count, uint32_t elem
 
 HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
 {
-	return create_buffer_inner(_device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, vertex_buffer);
+	return create_buffer_inner(_device, 
+		CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
+		NULL, vertex_buffer);
 }
 
 void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride)
@@ -202,8 +204,9 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 		adapters.push_back(adapter);
 		DXGI_ADAPTER_DESC desc;
 		adapter->GetDesc(&desc);
-		if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0)
+		if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0) {
 			perfhud = i;
+		}
 	}
 
 	B_ERR_BOOL(!adapters.empty());
@@ -256,7 +259,7 @@ void Graphics::clear()
 void Graphics::clear(const XMFLOAT4& c)
 {
 	_immediate_context._context->ClearRenderTargetView(_render_target_view, &c.x);
-	_immediate_context._context->ClearDepthStencilView(_depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0 );
+	_immediate_context._context->ClearDepthStencilView(_depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 }
 
 void Graphics::present()
@@ -280,41 +283,78 @@ void Graphics::resize(const int width, const int height)
   create_back_buffers(width, height);
 }
 
-GraphicsObjectHandle Graphics::create_dynamic_constant_buffer(int size) {
+GraphicsObjectHandle Graphics::create_constant_buffer(int size) {
+	CD3D11_BUFFER_DESC desc(size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DEFAULT);
+
 	const int idx = _constant_buffers.find_free_index();
-	if (idx != -1) {
-		if (SUCCEEDED(create_buffer_inner(_device, CD3D11_BUFFER_DESC(size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), NULL, &_constant_buffers[idx])))
+	if (idx != -1 && SUCCEEDED(create_buffer_inner(_device, desc, NULL, &_constant_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
-	}
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
 	const int idx = _vertex_buffers.find_free_index();
-	if (idx != -1) {
-		if (SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx])))
+	if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-	}
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
 	const int idx = _index_buffers.find_free_index();
-	if (idx != -1) {
-		if (SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_vertex_buffers[idx])))
+	if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_index_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
-	}
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
-	const int idx = _vertex_buffers.find_free_index();
-	if (idx != -1) {
-		if (SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_input_layouts[idx])))
+	const int idx = _input_layouts.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_input_layouts[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
-	}
 	return GraphicsObjectHandle();
 }
+
+GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len) {
+	const int idx = _vertex_shaders.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &_vertex_shaders[idx])))
+			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len) {
+	const int idx = _pixel_shaders.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &_pixel_shaders[idx])))
+		return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc) {
+	const int idx = _rasterizer_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_rasterizer_states[idx])))
+		return GraphicsObjectHandle(GraphicsObjectHandle::kRasterizerState, 0, idx);
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_blend_state(const D3D11_BLEND_DESC &desc) {
+	const int idx = _blend_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_blend_states[idx])))
+		return GraphicsObjectHandle(GraphicsObjectHandle::kBlendState, 0, idx);
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc) {
+	const int idx = _depth_stencil_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_depth_stencil_states[idx])))
+		return GraphicsObjectHandle(GraphicsObjectHandle::kDepthStencilState, 0, idx);
+	return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &desc) {
+	const int idx = _sampler_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_sampler_states[idx])))
+		return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
+	return GraphicsObjectHandle();
+}
+
 
 GraphicsObjectHandle Graphics::load_technique(const char *filename, Io *io) {
 	const int idx = _techniques.find_free_index();
@@ -340,7 +380,53 @@ void Graphics::submit_command(RenderKey key, void *data) {
 	_render_commands.push_back(make_pair(key, data));
 }
 
+void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id, bool vertex_shader) {
+
+	ID3D11DeviceContext *ctx = _immediate_context._context;
+
+	vector<CBuffer> &cbuffers = technique->get_cbuffers();
+
+	for (size_t i = 0; i < shader->params.size(); ++i) {
+		const ShaderParam &p = shader->params[i];
+		const CBuffer &cb = cbuffers[p.cbuffer];
+		switch (p.source) {
+		case ShaderParam::Source::kMaterial:
+			memcpy((void *)&cb.staging[p.start_offset], &PROPERTY_MANAGER.get_material_property<XMFLOAT4>(material_id, p.name.c_str()), p.size);
+			break;
+		case ShaderParam::Source::kMesh:
+			{
+				XMFLOAT4X4 mtx;
+				XMStoreFloat4x4(&mtx, XMMatrixIdentity());
+				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
+			}
+			break;
+		case ShaderParam::Source::kSystem:
+			{
+				XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
+				//XMStoreFloat4x4(&mtx, XMMatrixIdentity());
+				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
+			}
+			break;
+		case ShaderParam::Source::kUser:
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < cbuffers.size(); ++i) {
+		const CBuffer &cb = cbuffers[i];
+		ID3D11Buffer *buffer = _constant_buffers.get(cb.handle);
+		ctx->UpdateSubresource(buffer, 0, NULL, &cb.staging[0], 0, 0);
+		if (vertex_shader)
+			ctx->VSSetConstantBuffers(0, 1, &buffer);
+		else
+			ctx->PSSetConstantBuffers(0, 1, &buffer);
+	}
+
+}
+
 void Graphics::render() {
+
+	_immediate_context._context->RSSetViewports(1, &_viewport);
 
 	// aaah, lambdas, thank you!
 	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.key < b.first.key; });
@@ -361,9 +447,34 @@ void Graphics::render() {
 					break;
 				const MeshRenderData *data = (const MeshRenderData *)cmd.second;
 				const Material &material = MATERIAL_MANAGER.get_material(data->material_id);
-				Technique *t = _techniques._buffer[find_technique(material.technique.c_str()).id()];
-				int a = 10;
+				Technique *technique = _techniques.get(find_technique(material.technique.c_str()));
+				ID3D11InputLayout *layout = _input_layouts.get(technique->input_layout());
+				Shader *vertex_shader = technique->vertex_shader();
+				Shader *pixel_shader = technique->pixel_shader();
+				ID3D11VertexShader *vs = _vertex_shaders.get(vertex_shader->shader);
+				ID3D11PixelShader *ps = _pixel_shaders.get(pixel_shader->shader);
+				ID3D11Buffer *vb = _vertex_buffers.get(data->vb);
+				ID3D11Buffer *ib = _index_buffers.get(data->ib);
 
+				ID3D11DeviceContext *ctx = _immediate_context._context;
+				ctx->VSSetShader(vs, NULL, 0);
+				ctx->GSSetShader(NULL, 0, 0);
+				ctx->PSSetShader(ps, NULL, 0);
+
+
+				set_vb(ctx, vb, data->vertex_size);
+				ctx->IASetIndexBuffer(ib, data->index_size == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
+				ctx->IASetInputLayout(layout);
+
+				ctx->IASetPrimitiveTopology(data->topology);
+
+				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
+				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
+
+				set_params(technique, vertex_shader, data->material_id, 0, true);
+				set_params(technique, pixel_shader, data->material_id, 0, false);
+
+				ctx->DrawIndexed(data->index_count, 0, 0);
 			}
 			break;
 		}

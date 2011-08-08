@@ -1,18 +1,31 @@
-float4x4 proj, view, world;
+matrix proj, view, world;
+float4 DiffuseColor;
 
-void vs_main(
-	in float3 i_pos : POSITION, 
-	in float3 i_normal : NORMAL,
-	in float2 i_tex : TEXCOORD,
-	out float4 o_pos : POSITION, 
-	out float3 o_normal : NORMAL,
-	out float2 o_tex : TEXCOORD)
+struct vs_input {
+	float4 pos : POSITION;
+	float3 normal : NORMAL;
+	float2 tex : TEXCOORD;
+};
+
+struct ps_input {
+	float4 pos : SV_POSITION;
+	float3 normal : NORMAL;
+	float2 tex : TEXCOORD;
+};
+
+ps_input vs_main(vs_input input)
 {
-	o_pos = mul(float4(i_pos, 1), world * view * proj);
-	o_tex = i_tex;
+	ps_input output = (ps_input)0;
+	output.pos = mul(input.pos, world);
+	output.pos = mul(output.pos, view);
+	output.pos = mul(output.pos, proj);
+	output.normal = input.normal;
+	output.tex = input.tex;
+	return output;
 }
 
-float4 vs_main(in float4 pos : POSITION, in float3 normal, in float2 tex : TEXCOORD) : SV_Target
+float4 ps_main(ps_input input) : SV_Target
 {
-	return float4(normal, 1);
+	//return float4(1,1,1,1);
+	return DiffuseColor;
 }

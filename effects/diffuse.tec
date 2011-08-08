@@ -12,7 +12,22 @@ technique diffuse {
 	pixel_shader {
 		file effects/diffuse.pso;
 		params [
-			{ float4 diffuse_color material; }
+			{ float4 DiffuseColor material; }
 		];
 	};
+	
+	rasterizer_desc {
+		cull_mode = none;
+	};
+/*	
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+*/	
 };

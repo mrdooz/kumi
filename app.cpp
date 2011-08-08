@@ -345,10 +345,10 @@ bool App::init(HINSTANCE hinstance)
 	
 	CefSettings settings;
 	settings.multi_threaded_message_loop = false;
-
+/*
 	if (!CefInitialize(settings))
 		return false;
-
+*/
 	B_ERR_BOOL(create_window());
 
 	PosTex verts[6];
@@ -374,14 +374,14 @@ bool App::init(HINSTANCE hinstance)
 		} while (io.find_next(token, &filename));
 		io.find_close(token);
 	}
-/*
-	Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
+
+	//Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
 
 	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
-		"effects/debug_font.fx", "vsMain", NULL, "psMain", 
+		"effects/debug_font.fx", "vs_main", NULL, "ps_main", 
 		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
 		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
-*/
+
 	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
@@ -473,12 +473,27 @@ void App::run()
 
 			CefDoMessageLoopWork();
 
-			DEMO_ENGINE.tick();
+			XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
+				XMVectorSet(0,0,-300,0),
+				XMVectorSet(0,0,0,0),
+				XMVectorSet(0,1,0,0)));
+
+			XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV4, 640/480.0f, 1, 1000));
+
+			XMFLOAT4X4 lookat_tmp, proj_tmp;
+			XMStoreFloat4x4(&lookat_tmp, lookat);
+			XMStoreFloat4x4(&proj_tmp, proj);
+
+			PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
+			PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
+
+			//DEMO_ENGINE.tick();
 
 			RESOURCE_WATCHER.process_deferred();
 			static int hax = 0;
 			GRAPHICS.set_clear_color(XMFLOAT4(0.5f + 0.5f * sin(hax++/1000.0f), 0.3f, 0.3f, 0));
 			GRAPHICS.clear();
+
 			//System::instance().tick();
 			//graphics.clear();
 			//_debug_writer->reset_frame();
@@ -488,6 +503,7 @@ void App::run()
 
 			for (size_t i = 0; i < _scene->meshes.size(); ++i)
 				_scene->meshes[i]->submit();
+
 /*
 			{
 				GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
@@ -506,6 +522,7 @@ void App::run()
 				context->Draw(6, 0);
 			}
 */
+/*
 			if (_test_effect) {
 
 				QueryPerformanceCounter(&cur);
@@ -531,6 +548,12 @@ void App::run()
 				}
 			}
 
+			float blend_factor[] = { 1, 1, 1, 1 };
+			ID3D11DeviceContext *context = GRAPHICS.context();
+			context->OMSetBlendState(_cef_desc.blend_state, blend_factor, 0xffffffff);
+			context->RSSetState(_cef_desc.rasterizer_state);
+			context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
+*/
 			GRAPHICS.render();
 			GRAPHICS.present();
 		}

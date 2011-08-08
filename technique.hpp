@@ -28,6 +28,7 @@ struct ShaderParam {
 	Source::Enum source;
 	int cbuffer;
 	int start_offset;  // offset in cbuffer
+	int size;
 	DefaultValue default_value;
 };
 
@@ -46,8 +47,7 @@ struct Shader {
 	string filename;
 	string entry_point;
 	vector<ShaderParam> params;
-	vector<GraphicsObjectHandle> constant_buffers;
-	// todo: sort params by cbuffers
+	GraphicsObjectHandle shader;
 };
 
 struct VertexShader : public Shader{
@@ -57,13 +57,24 @@ struct VertexShader : public Shader{
 };
 
 struct PixelShader : public Shader {
-	PixelShader() : Shader("ps_name") {}
+	PixelShader() : Shader("ps_main") {}
 	virtual void set_buffers() {
 	}
 };
 
 
 struct Io;
+
+struct CBuffer {
+	CBuffer(const string &name, int size, GraphicsObjectHandle handle) 
+		: name(name), handle(handle) 
+	{
+		staging.resize(size);
+	}
+	string name;
+	vector<uint8> staging;
+	GraphicsObjectHandle handle;
+};
 
 class Technique {
 	friend class TechniqueParser;
@@ -73,17 +84,35 @@ public:
 
 	static Technique *create_from_file(const char *filename, Io *io);
 	const string &name() const { return _name; }
-private:
-	bool init();
-	bool init_shader(Shader *shader, const string &profile, bool vertex_shader);
-	bool do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len);
 
-	Io *_io;
+	GraphicsObjectHandle input_layout() const { return _input_layout; }
+	Shader *vertex_shader() { return _vertex_shader; }
+	Shader *pixel_shader() { return _pixel_shader; }
+
+	vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
+
+	GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
+	GraphicsObjectHandle sampler_state() const { return _sampler_state; }
+	GraphicsObjectHandle blend_state() const { return _blend_state; }
+	GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
+private:
+
+	bool init(Io *io);
+	bool init_shader(Shader *shader, const string &profile, bool vertex_shader, Io *io);
+	bool do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len, set<string> *used_params);
+
 	string _name;
 	Shader *_vertex_shader;
 	Shader *_pixel_shader;
 
 	GraphicsObjectHandle _input_layout;
+
+	vector<CBuffer> _constant_buffers;
+
+	GraphicsObjectHandle _rasterizer_state;
+	GraphicsObjectHandle _sampler_state;  // todo: named samplers
+	GraphicsObjectHandle _blend_state;
+	GraphicsObjectHandle _depth_stencil_state;
 
 	CD3D11_RASTERIZER_DESC _rasterizer_desc;
 	CD3D11_SAMPLER_DESC _sampler_desc;

@@ -55,7 +55,7 @@ private:
 	struct PropertyBag {
 		hash_map<string, float> float_values;
 		hash_map<string, XMFLOAT4> float4_values;
-		hash_map<string, XMMATRIX> matrix_values;
+		hash_map<string, XMFLOAT4X4> matrix_values;
 	};
 
 	template<typename T>
@@ -73,9 +73,9 @@ private:
 		PropertyBag &bag;
 	};
 
-	template<> struct BagGetter<XMMATRIX> {
+	template<> struct BagGetter<XMFLOAT4X4> {
 		BagGetter(PropertyBag &bag) : bag(bag) {}
-		XMMATRIX &operator()(const char *name) { return bag.matrix_values[name]; }
+		XMFLOAT4X4 &operator()(const char *name) { return bag.matrix_values[name]; }
 		PropertyBag &bag;
 	};
 

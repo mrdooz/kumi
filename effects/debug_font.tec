@@ -3,12 +3,12 @@ technique debug_font {
 	vertex_shader {
 		file effects/debug_font.vso;	// comment, wot!
 		entry_point vs_main;
-		/* bla bla bla */
+		/* bla bla bla 
 		params [
 			{ float4 tjong material; default 1 0 0 1; },
 			{ float time system; default 10; },
 			{ float4 tjong2 user; default 1 2 3 4; },
-		];
+		]; */
 	};
 	
 	/*
@@ -17,10 +17,12 @@ technique debug_font {
 	*/
 	
 	pixel_shader {
-		file effects/debug_font2.pso;
+		file effects/debug_font.pso;
+/*		
 		params [
 			{ float4 tjong user; }
-		]
+		];
+*/		
 	};
 
 	rasterizer_desc {

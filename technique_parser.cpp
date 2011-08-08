@@ -62,6 +62,7 @@ enum Symbol {
 		kSymMaxLOD,
 
 	kSymDepthStencilDesc,
+		kSymDepthEnable,
 
 	kSymBlendDesc,
 		kSymAlphaToCoverageEnable,
@@ -133,6 +134,9 @@ struct {
 		{ kSymBorderColor, "border_color" },
 		{ kSymMinLOD, "min_lod" },
 		{ kSymMaxLOD, "max_lod" },
+
+	{ kSymDepthStencilDesc, "depth_stencil_desc" },
+		{ kSymDepthEnable, "depth_enable" },
 
 	{ kSymBlendDesc, "blend_desc" },
 		{ kSymAlphaToCoverageEnable, "alpha_to_coverage_enable" },
@@ -432,7 +436,7 @@ const char *TechniqueParser::parse_rasterizer_desc(const char *start, const char
 			lookup<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
 			break;
 		case kSymCullMode:
-			lookup<string, D3D11_CULL_MODE>(value, map_list_of("wireframe", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
+			lookup<string, D3D11_CULL_MODE>(value, map_list_of("none", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
 			break;
 		case kSymFrontCounterClockwise:
 			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
@@ -643,6 +647,30 @@ const char *TechniqueParser::parse_blend_desc(const char *start, const char *end
 
 const char *TechniqueParser::parse_depth_stencil_desc(const char *start, const char *end, D3D11_DEPTH_STENCIL_DESC *desc) {
 	const char *block_end = scope_extents(start, end, '{', '}');
+	CHOMP(kSymBlockOpen, start, end);
+	while (start < block_end) {
+		Symbol symbol;
+		start = next_symbol(start, end, &symbol);
+		string value;
+		switch (symbol) {
+		case kSymDepthEnable:
+			CHOMP(kSymEquals, start, end);
+			start = string_until(start, end, ';', &value);
+			CHOMP(kSymSemicolon, start, end);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthEnable);
+			break;
+		}
+	}
+
+	/*    BOOL DepthEnable;
+	D3D11_DEPTH_WRITE_MASK DepthWriteMask;
+	D3D11_COMPARISON_FUNC DepthFunc;
+	BOOL StencilEnable;
+	UINT8 StencilReadMask;
+	UINT8 StencilWriteMask;
+	D3D11_DEPTH_STENCILOP_DESC FrontFace;
+	D3D11_DEPTH_STENCILOP_DESC BackFace;
+*/
 	CHOMP(kSymBlockClose, block_end, end);
 	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
 }

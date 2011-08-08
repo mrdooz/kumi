@@ -60,14 +60,16 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 			submesh->data.material_id = _material_ids[material_name];
 			mesh->submeshes.push_back(submesh);
 			const int vb_flags = step_read<int>(&buf);
-			const int vb_elem_size = step_read<int>(&buf);
-			const int ib_elem_size = step_read<int>(&buf);
-			const char *vb = step_read<const char*>(&buf);
-			const int vb_size = *(int*)vb;
-			submesh->data.vb = GRAPHICS.create_static_vertex_buffer(vb_size, (const void *)(vb + 4));
-			const char *ib = step_read<const char*>(&buf);
-			const int ib_size = *(int*)ib;
-			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 4));
+			submesh->data.vertex_size = step_read<int>(&buf);
+			submesh->data.index_size = step_read<int>(&buf);
+			const int *vb = step_read<const int*>(&buf);
+			const int vb_size = *vb;
+			submesh->data.vertex_count = vb_size / submesh->data.vertex_size;
+			submesh->data.vb = GRAPHICS.create_static_vertex_buffer(vb_size, (const void *)(vb + 1));
+			const int *ib = step_read<const int*>(&buf);
+			const int ib_size = *ib;
+			submesh->data.index_count = ib_size / submesh->data.index_size;
+			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 1));
 
 		}
 	}
