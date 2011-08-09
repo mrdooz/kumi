@@ -2,6 +2,7 @@
 #include "technique.hpp"
 #include "technique_parser.hpp"
 #include "property_manager.hpp"
+#include "string_utils.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -9,6 +10,7 @@ using namespace boost::assign;
 namespace technique_parser_details {
 
 enum Symbol {
+	kSymInvalid = -1,
 	kSymUnknown,
 	kSymSingleLineComment,
 	kSymMultiLineCommentStart,
@@ -169,6 +171,7 @@ public:
 	}
 
 	Symbol find_symbol(const char *str, int max_len, int *match_length) {
+		// traverse the trie, and return the longest matching string
 		Node *cur = &root;
 		Node *last_match = NULL;
 		int last_len = 0;
@@ -212,110 +215,7 @@ private:
 
 }
 
-using namespace technique_parser_details;
-
-TechniqueParser::TechniqueParser() : _symbol_trie(new Trie()) {
-	for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i)
-		_symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
-}
-
-TechniqueParser::~TechniqueParser() {
-	SAFE_DELETE(_symbol_trie);
-}
-
-const char *TechniqueParser::next_symbol(const char *start, const char *end, Symbol *symbol) {
-	if (skip_whitespace(&start, end) == end)
-		return end;
-
-	int len = 0;
-	Symbol s = _symbol_trie->find_symbol(start, end - start, &len);
-	// skip comments
-	if (s == kSymSingleLineComment) {
-		// skip until CR-LF
-		start += len;
-		while (start < end && *start != '\r')
-			++start;
-		if (start < end && start[1] == '\n')
-			++start;
-		return next_symbol(start, end, symbol);
-
-	} else if (s == kSymMultiLineCommentStart) {
-		start += len;
-		while (start < end - 1 && start[0] != '*' && start[1] != '/')
-			++start;
-		if (start == end - 1)
-			return end;
-		return next_symbol(start+2, end, symbol);
-
-	} else {
-		*symbol = s;
-	}
-
-	return skip_whitespace(start + len, end);
-}
-
-const char *TechniqueParser::next_int(const char *start, const char *end, int *out) {
-	*out = 0;
-	start = skip_whitespace(&start, end);
-	if (start == end)
-		return end;
-	bool neg = false;
-	if (*start == '-') {
-		neg = true;
-		++start;
-	}
-
-	int res = 0;
-	while (start < end && isdigit((uint8_t)*start)) {
-		res = res * 10 + (*start - '0');
-		++start;
-	}
-	if (neg)
-		res = -res;
-	*out = res;
-	return skip_whitespace(start, end);
-}
-
-const char *TechniqueParser::next_identifier(const char *start, const char *end, string *id) {
-	const char *tmp = skip_whitespace(&start, end);
-	while (tmp < end && (isalnum((uint8_t)*tmp) || *tmp == '_'))
-		++tmp;
-
-	if (tmp == start)
-		return end;
-	*id = string(start, tmp - start);
-	return skip_whitespace(tmp, end);
-}
-
-bool TechniqueParser::expect(Symbol symbol, const char **start, const char *end) {
-	Symbol tmp;
-	*start = next_symbol(*start, end, &tmp);
-	return tmp == symbol;
-}
-
-Symbol TechniqueParser::peek(const char *start, const char *end) {
-	Symbol tmp;
-	next_symbol(start, end, &tmp);
-	return tmp;
-}
-
-#define CHOMP(x, s, e) if (!expect((x), &(s), (e))) return e;
-
-const char *TechniqueParser::string_until(const char *start, const char *end, char delim, string *res) {
-	start = skip_whitespace(start, end);
-	const char *tmp = start;
-	while (start < end && *start != delim)
-		++start;
-
-	if (start == end) {
-		return end;
-	}
-
-	*res = string(tmp, start - tmp);
-	return start;
-}
-
-void TechniqueParser::parse_value(const string &value, ShaderParam *param) {
+static void parse_value(const string &value, ShaderParam *param) {
 	switch (param->type) {
 	case Property::kFloat:
 		sscanf(value.c_str(), "%f", &param->default_value._float[0]);
@@ -332,431 +232,589 @@ void TechniqueParser::parse_value(const string &value, ShaderParam *param) {
 	}
 }
 
-const char *TechniqueParser::parse_param(const char *start, const char *end, ShaderParam *param) {
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
+using namespace technique_parser_details;
 
+TechniqueParser::TechniqueParser() : _symbol_trie(new Trie()) {
+	for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
+		_symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
+		_symbol_to_string[g_symbols[i].symbol] = g_symbols[i].str;
+	}
+}
+
+TechniqueParser::~TechniqueParser() {
+	SAFE_DELETE(_symbol_trie);
+}
+
+struct Scope {
+	// start and end point to the first and last character of the scope (inclusive)
+	Scope() : _symbol_trie(nullptr), _org_start(nullptr), _start(nullptr), _end(nullptr) {}
+	Scope(Trie *symbol_trie, const char *start, const char *end) : _symbol_trie(symbol_trie), _org_start(start), _start(start), _end(end) {}
+	bool is_valid() const { return _start != nullptr; }
+	bool end() const { return _start >= _end; }
+	bool advance(const Scope &inner) {
+		// advance the scope to point to the character after the inner scope
+		if (inner._start < _start || inner._end >= _end)
+			return false;
+		_start = inner._end + 1;
+		return true;
+	}
+
+	bool consume_if(Symbol symbol) {
+		if (peek() == symbol) {
+			next_symbol();
+			return true;
+		}
+		return false;
+	}
+
+	Symbol consume_in(const vector<Symbol> &symbols) {
+		Symbol tmp = peek();
+		for (size_t i = 0; i < symbols.size(); ++i) {
+			if (symbols[i] == tmp)
+				return next_symbol();
+		}
+		return kSymInvalid;
+	}
+
+	bool consume_in(const vector<Symbol> &symbols, Symbol *out) {
+		Symbol tmp = peek();
+		for (size_t i = 0; i < symbols.size(); ++i) {
+			if (symbols[i] == tmp) {
+				*out = next_symbol();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	Symbol next_symbol() {
+		skip_whitespace();
+
+		int len = 0;
+		Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
+
+		_start += len;
+		skip_whitespace();
+		return s;
+	}
+
+	void skip_whitespace() {
+		while (_start <= _end && isspace((uint8_t)*_start))
+			++_start;
+
+		if (_start == _end)
+			return;
+
+		int len = 0;
+		Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
+
+		// skip comments
+		if (s == kSymSingleLineComment) {
+			// skip until CR-LF
+			_start += len;
+			while (_start <= _end && *_start != '\r')
+				++_start;
+			if (_start < _end && _start[1] == '\n')
+				++_start;
+
+		} else if (s == kSymMultiLineCommentStart) {
+			_start += len;
+			while (_start < _end && _start[0] != '*' && _start[1] != '/')
+				++_start;
+			if (_start == _end)
+				return;
+			_start += 2;
+		}
+	}
+
+	int next_int() {
+		skip_whitespace();
+		bool neg = false;
+		if (*_start == '-') {
+			neg = true;
+			++_start;
+		}
+
+		int res = 0;
+		while (_start <= _end && isdigit((uint8_t)*_start)) {
+			res = res * 10 + (*_start - '0');
+			++_start;
+		}
+		if (neg)
+			res = -res;
+		skip_whitespace();
+		return res;
+	}
+
+	string next_identifier() {
+		const char *tmp = _start;
+		while (tmp <= _end && (isalnum((uint8_t)*tmp) || *tmp == '_'))
+			++tmp;
+
+		string res(_start, tmp - _start);
+		_start = tmp;
+		skip_whitespace();
+		return res;
+	}
+
+	bool expect(Symbol symbol) {
+		return next_symbol() == symbol;
+	}
+
+	Symbol peek() {
+		const char *tmp = _start;
+		Symbol sym = next_symbol();
+		_start = tmp;
+		return sym;
+	}
+
+	string string_until(char delim) {
+		skip_whitespace();
+		const char *tmp = _start;
+		while (_start <= _end && *_start != delim)
+			++_start;
+
+		return string(tmp, _start - tmp);
+	}
+
+	void log_error(const char *expected_symbol) {
+		// an error occured at the current position, so work backwards to figure out the line #
+		int line = 1;
+		const char *tmp = _start;
+		while (tmp >= _org_start) {
+			// CR-LF
+			if (*tmp == '\n' && tmp > _org_start && tmp[-1] == '\r')
+				++line;
+			--tmp;
+		}
+
+		LOG_ERROR(to_string("Error on line: %d. Looking for \"%s\", found \"%s\"", 
+			line, 
+			expected_symbol,
+			string(_start, min(_end - _start + 1, 20)).c_str()).c_str());
+	}
+
+	technique_parser_details::Trie *_symbol_trie;
+	const char *_org_start;
+	const char *_start;
+	const char *_end;
+};
+
+#define EXPECT(scope, symbol) do { if (scope->peek() != symbol) { scope->log_error(_symbol_to_string[symbol].c_str()); return false; } else { scope->next_symbol(); } } while(false)
+
+bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
 	// type, name and source are required. the default value is optional
-	Symbol type;
-	start = next_symbol(start, block_end, &type);
-	param->type = lookup_default<Symbol, Property::Enum>(type, map_list_of
+	param->type = lookup_default<Symbol, Property::Enum>(scope->next_symbol(), map_list_of
 		(kSymFloat, Property::kFloat)
 		(kSymFloat2, Property::kFloat2)
 		(kSymFloat3, Property::kFloat3)
 		(kSymFloat4, Property::kFloat4)
 		(kSymFloat4x4, Property::kFloat4x4),
 		Property::kUnknown);
-
 	if (param->type == Property::kUnknown)
-		return end;
+		return false;
 
-	start = next_identifier(start, end, &param->name);
-
-	string source;
-	start = next_identifier(start, end, &source);
-	param->source = lookup_default<string, ShaderParam::Source::Enum>(source, map_list_of
+	param->name = scope->next_identifier();
+	param->source = lookup_default<string, ShaderParam::Source::Enum>(scope->next_identifier(), map_list_of
 		("material", ShaderParam::Source::kMaterial)
 		("system", ShaderParam::Source::kSystem)
 		("user", ShaderParam::Source::kUser)
 		("mesh", ShaderParam::Source::kMesh),
 		ShaderParam::Source::kUnknown);
 	if (param->source == ShaderParam::Source::kUnknown)
-		return end;
+		return false;
 
-	CHOMP(kSymSemicolon, start, end);
+	EXPECT(scope, kSymSemicolon);
 
 	// check for default value
-	if (kSymParamDefault == peek(start, block_end)) {
-		CHOMP(kSymParamDefault, start, end);
-		string value;
-		start = string_until(start, end, ';', &value);
-		CHOMP(kSymSemicolon, start, end);
+	if (scope->consume_if(kSymParamDefault)) {
+		string value = scope->string_until(';');
+		EXPECT(scope, kSymSemicolon);
 		parse_value(value, param);
 	}
-
-	CHOMP(kSymBlockClose, block_end, end);
-	return block_end;
+	return true;
 }
 
-const char *TechniqueParser::parse_params(const char *start, const char *end, vector<ShaderParam> *params) {
-	const char *block_end = scope_extents(start, end, '[', ']');
-	CHOMP(kSymListOpen, start, block_end);
-	while (start != block_end) {
-		params->push_back(ShaderParam());
-		start = parse_param(start, block_end, &params->back());
-		if (kSymComma == peek(start, block_end)) {
-			CHOMP(kSymComma, start, block_end);
-		} else {
-			break;
-		}
+bool TechniqueParser::parse_params(Scope *scope, vector<ShaderParam> *params) {
+	while (true) {
+		EXPECT(scope, kSymBlockOpen);
+		ShaderParam param;
+		if (parse_param(scope, &param))
+			params->push_back(param);
+		else
+			return false;
+		EXPECT(scope, kSymBlockClose);
+		if (!scope->consume_if(kSymComma))
+			return true;
 	}
-	CHOMP(kSymListClose, start, end);
-	return expect(kSymSemicolon, &start, end) ? start: end;
+	return false;
 }
 
-const char *TechniqueParser::parse_shader(const char *start, const char *end, Shader *shader) {
-	const char *block_end = scope_extents(start, end, '{', '}');
+bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
-	CHOMP(kSymBlockOpen, start, block_end);
-
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, block_end, &symbol);
-		if (symbol == kSymFile) {
-			start = string_until(start, block_end, ';', &shader->filename);
-			CHOMP(kSymSemicolon, start, block_end);
-		} else if (symbol == kSymEntryPoint) {
-			start = string_until(start, block_end, ';', &shader->entry_point);
-			CHOMP(kSymSemicolon, start, block_end);
-		} else if (symbol == kSymParams) {
-			start = parse_params(start, block_end, &shader->params);
-		} else {
-			start = block_end;
-		}
-	}
-
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-const char *TechniqueParser::parse_rasterizer_desc(const char *start, const char *end, D3D11_RASTERIZER_DESC *desc) {
-
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, end, &symbol);
-		CHOMP(kSymEquals, start, end);
-		string value;
-		start = next_identifier(start, end, &value);
-		CHOMP(kSymSemicolon, start, end);
-
-		switch (symbol) {
-		case kSymFillMode:
-			lookup<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
+	while (true) {
+		switch (scope->consume_in(list_of(kSymFile)(kSymEntryPoint)(kSymParams))) {
+		case kSymFile:
+			shader->filename = scope->string_until(';');
+			EXPECT(scope, kSymSemicolon);
 			break;
-		case kSymCullMode:
-			lookup<string, D3D11_CULL_MODE>(value, map_list_of("none", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
+		case kSymEntryPoint:
+			shader->entry_point = scope->string_until(';');
+			EXPECT(scope, kSymSemicolon);
 			break;
-		case kSymFrontCounterClockwise:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
-			break;
-		case kSymDepthBias:
-			sscanf(value.c_str(), "%d", &desc->DepthBias);
-			break;
-		case kSymDepthBiasClamp:
-			sscanf(value.c_str(), "%f", &desc->DepthBiasClamp);
-			break;
-		case kSymSlopeScaledDepthBias:
-			sscanf(value.c_str(), "%f", &desc->SlopeScaledDepthBias);
-			break;
-		case kSymDepthClipEnable:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthClipEnable);
-			break;
-		case kSymScissorEnable:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->ScissorEnable);
-			break;
-		case kSymMultisampleEnable:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->MultisampleEnable);
-			break;
-		case kSymAntialiasedLineEnable:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AntialiasedLineEnable);
-			break;
-		}
-	}
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-const char *TechniqueParser::parse_sampler_desc(const char *start, const char *end, D3D11_SAMPLER_DESC *desc) {
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, end, &symbol);
-		CHOMP(kSymEquals, start, end);
-		string value;
-		start = string_until(start, end, ';', &value);
-		CHOMP(kSymSemicolon, start, end);
-
-		switch (symbol) {
-		case kSymFilter:
-			lookup<string, D3D11_FILTER>(value, map_list_of
-				("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
-				("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
-				("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
-				("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
-				("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-				("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
-				("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
-				("anisotropic", D3D11_FILTER_ANISOTROPIC)
-				("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
-				("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
-				("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
-				("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
-				("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-				("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
-				("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
-				("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC),
-				&desc->Filter);
-			break;
-		case kSymAddressU:
-		case kSymAddressV:
-		case kSymAddressW:
-			lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, map_list_of
-				("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
-				("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
-				("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
-				("border", D3D11_TEXTURE_ADDRESS_BORDER)
-				("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE), 
-				symbol == kSymAddressU ? &desc->AddressU : symbol == kSymAddressV ? &desc->AddressV : &desc->AddressW);
-			break;
-		case kSymMipLODBias:
-			sscanf(value.c_str(), "%f", &desc->MipLODBias);
-			break;
-		case kSymMaxAnisotropy:
-			sscanf(value.c_str(), "%ud", &desc->MaxAnisotropy);
-			break;
-		case kSymComparisonFunc:
-			lookup<string, D3D11_COMPARISON_FUNC>(value, map_list_of
-				("never", D3D11_COMPARISON_NEVER)
-				("less", D3D11_COMPARISON_LESS)
-				("equal", D3D11_COMPARISON_EQUAL)
-				("less_equal", D3D11_COMPARISON_LESS_EQUAL)
-				("greater", D3D11_COMPARISON_GREATER)
-				("not_equal", D3D11_COMPARISON_NOT_EQUAL)
-				("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
-				("always", D3D11_COMPARISON_ALWAYS), 
-				&desc->ComparisonFunc);
-			break;
-		case kSymBorderColor:
-			sscanf(value.c_str(), "%f %f %f %f", 
-				&desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
-			break;
-		case kSymMinLOD:
-			sscanf(value.c_str(), "%f", &desc->MinLOD);
-			break;
-		case kSymMaxLOD:
-			sscanf(value.c_str(), "%f", &desc->MaxLOD);
-			break;
-		}
-	}
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-const char *TechniqueParser::parse_render_target(const char *start, const char *end, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, end, &symbol);
-		CHOMP(kSymEquals, start, end);
-		string value;
-		start = string_until(start, end, ';', &value);
-		CHOMP(kSymSemicolon, start, end);
-
-		switch (symbol) {
-		case kSymBlendEnable:
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->BlendEnable);
-			break;
-		case kSymSrcBlend:
-		case kSymDestBlend:
-		case kSymSrcBlendAlpha:
-		case kSymDestBlendAlpha:
-			lookup<string, D3D11_BLEND>(value, map_list_of
-				("zero", D3D11_BLEND_ZERO)
-				("one", D3D11_BLEND_ONE)
-				("src_color", D3D11_BLEND_SRC_COLOR)
-				("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
-				("src_alpha", D3D11_BLEND_SRC_ALPHA)
-				("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
-				("dest_alpha", D3D11_BLEND_DEST_ALPHA)
-				("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
-				("dest_color", D3D11_BLEND_DEST_COLOR)
-				("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
-				("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
-				("blend_factor", D3D11_BLEND_BLEND_FACTOR)
-				("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
-				("src1_color", D3D11_BLEND_SRC1_COLOR)
-				("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
-				("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
-				("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA),
-				symbol == kSymSrcBlend ? &desc->SrcBlend : 
-				symbol == kSymDestBlend ? &desc->DestBlend :
-				symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
-				&desc->DestBlendAlpha);
-			break;
-		case kSymBlendOp:
-		case kSymBlendOpAlpha:
-			lookup<string, D3D11_BLEND_OP>(value, map_list_of
-				("add", D3D11_BLEND_OP_ADD)
-				("subtract", D3D11_BLEND_OP_SUBTRACT)
-				("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
-				("min", D3D11_BLEND_OP_MIN)
-				("max", D3D11_BLEND_OP_MAX),
-				symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
-			break;
-		case kSymRenderTargetWriteMask:
-			sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
-			break;
-		}
-	}
-
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-const char *TechniqueParser::parse_blend_desc(const char *start, const char *end, D3D11_BLEND_DESC *desc) {
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, end, &symbol);
-		string value;
-		switch (symbol) {
-		case kSymAlphaToCoverageEnable:
-			CHOMP(kSymEquals, start, end);
-			start = string_until(start, end, ';', &value);
-			CHOMP(kSymSemicolon, start, end);
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AlphaToCoverageEnable);
-			break;
-		case kSymIndependentBlendEnable:
-			CHOMP(kSymEquals, start, end);
-			start = string_until(start, end, ';', &value);
-			CHOMP(kSymSemicolon, start, end);
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->IndependentBlendEnable);
-			break;
-		case kSymRenderTarget:
-			{
-				CHOMP(kSymListOpen, start, end);
-				int target;
-				start = next_int(start, end, &target);
-				if (target >= 8)
-					return end;
-				CHOMP(kSymListClose, start, end);
-				CHOMP(kSymEquals, start, end);
-				start = parse_render_target(start, end, &desc->RenderTarget[target]);
-			}
-			break;
-		}
-	}
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-const char *TechniqueParser::parse_depth_stencil_desc(const char *start, const char *end, D3D11_DEPTH_STENCIL_DESC *desc) {
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-	while (start < block_end) {
-		Symbol symbol;
-		start = next_symbol(start, end, &symbol);
-		string value;
-		switch (symbol) {
-		case kSymDepthEnable:
-			CHOMP(kSymEquals, start, end);
-			start = string_until(start, end, ';', &value);
-			CHOMP(kSymSemicolon, start, end);
-			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthEnable);
-			break;
-		}
-	}
-
-	/*    BOOL DepthEnable;
-	D3D11_DEPTH_WRITE_MASK DepthWriteMask;
-	D3D11_COMPARISON_FUNC DepthFunc;
-	BOOL StencilEnable;
-	UINT8 StencilReadMask;
-	UINT8 StencilWriteMask;
-	D3D11_DEPTH_STENCILOP_DESC FrontFace;
-	D3D11_DEPTH_STENCILOP_DESC BackFace;
-*/
-	CHOMP(kSymBlockClose, block_end, end);
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
-}
-
-
-const char *TechniqueParser::parse_technique(const char *start, const char *end, Technique *technique) {
-	start = next_identifier(start, end, &technique->_name);
-	const char *block_end = scope_extents(start, end, '{', '}');
-	CHOMP(kSymBlockOpen, start, end);
-
-	Symbol symbol;
-	while (start < block_end) {
-		start = next_symbol(start, block_end, &symbol);
-		switch (symbol) {
-		case kSymBlockClose:
-			if (start == block_end)
-				break;
-			return end;
-			break;
-		case kSymVertexShader:
-			technique->_vertex_shader = new VertexShader;
-			start = parse_shader(start, block_end, technique->_vertex_shader);
-			break;
-		case kSymPixelShader:
-			technique->_pixel_shader = new PixelShader;
-			start = parse_shader(start, block_end, technique->_pixel_shader);
-			break;
-		case kSymRasterizerDesc:
-			start = parse_rasterizer_desc(start, block_end, &technique->_rasterizer_desc);
-			break;
-		case kSymSamplerDesc:
-			start = parse_sampler_desc(start, block_end, &technique->_sampler_desc);
-			break;
-		case kSymDepthStencilDesc:
-			start = parse_depth_stencil_desc(start, block_end, &technique->_depth_stencil_desc);
-			break;
-		case kSymBlendDesc:
-			start = parse_blend_desc(start, block_end, &technique->_blend_desc);
+		case kSymParams:
+			EXPECT(scope, kSymListOpen);
+			parse_params(scope, &shader->params);
+			EXPECT(scope, kSymListClose);
+			EXPECT(scope, kSymSemicolon);
 			break;
 		default:
-			return end;
-			break;
+			return true;
 		}
 	}
-
-	return expect(kSymSemicolon, &block_end, end) ? block_end : end;
 }
 
-const char *TechniqueParser::skip_whitespace(const char **start, const char *end) {
-	while (*start < end && isspace((uint8_t)**start))
-		(*start)++;
-	return *start;
-}
+bool TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc) {
 
-const char *TechniqueParser::skip_whitespace(const char *start, const char *end) {
-	return skip_whitespace(&start, end);
-}
+	while (!scope->end()) {
+		Symbol symbol;
+		if (scope->consume_in(list_of(kSymDepthEnable), &symbol)) {
 
-const char *TechniqueParser::scope_extents(const char *start, const char *end, char scope_open, char scope_close) {
-	// NOTE: scope_extents returns a pointer to the last character in the scope (the closing symbol)
-	// and not one past, like most other functions
-	if (skip_whitespace(&start, end) == end || *start != scope_open)
-		return NULL;
+			EXPECT(scope, kSymEquals);
+			string value = scope->next_identifier();
+			EXPECT(scope, kSymSemicolon);
 
-	int balance = 0;
-	while (start < end) {
-		char ch = *start;
-		if (ch == scope_open) {
-			++balance;
-		} else if (ch == scope_close) {
-			if (--balance == 0)
-				return start;
+			switch (symbol) {
+			case kSymDepthEnable:
+				lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthEnable);
+				break;
+			}
+		} else {
+			return true;
 		}
-		start++;
 	}
-	return end;
+	return false;
+}
+
+bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
+
+	static auto valid = list_of(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)(kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
+
+	while (!scope->end()) {
+		Symbol symbol;
+		if (scope->consume_in(valid, &symbol)) {
+			EXPECT(scope, kSymEquals);
+			string value = scope->next_identifier();
+			EXPECT(scope, kSymSemicolon);
+
+			switch (symbol) {
+				case kSymFilter:
+					lookup<string, D3D11_FILTER>(value, map_list_of
+						("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
+						("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
+						("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
+						("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
+						("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+						("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
+						("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
+						("anisotropic", D3D11_FILTER_ANISOTROPIC)
+						("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
+						("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
+						("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
+						("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
+						("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+						("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
+						("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
+						("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC),
+						&desc->Filter);
+					break;
+
+				case kSymAddressU:
+				case kSymAddressV:
+				case kSymAddressW:
+					lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, map_list_of
+						("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
+						("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
+						("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
+						("border", D3D11_TEXTURE_ADDRESS_BORDER)
+						("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE), 
+						symbol == kSymAddressU ? &desc->AddressU : symbol == kSymAddressV ? &desc->AddressV : &desc->AddressW);
+					break;
+
+				case kSymMipLODBias:
+					sscanf(value.c_str(), "%f", &desc->MipLODBias);
+					break;
+
+				case kSymMaxAnisotropy:
+					sscanf(value.c_str(), "%ud", &desc->MaxAnisotropy);
+					break;
+
+				case kSymComparisonFunc:
+					lookup<string, D3D11_COMPARISON_FUNC>(value, map_list_of
+						("never", D3D11_COMPARISON_NEVER)
+						("less", D3D11_COMPARISON_LESS)
+						("equal", D3D11_COMPARISON_EQUAL)
+						("less_equal", D3D11_COMPARISON_LESS_EQUAL)
+						("greater", D3D11_COMPARISON_GREATER)
+						("not_equal", D3D11_COMPARISON_NOT_EQUAL)
+						("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
+						("always", D3D11_COMPARISON_ALWAYS), 
+						&desc->ComparisonFunc);
+					break;
+
+				case kSymBorderColor:
+					sscanf(value.c_str(), "%f %f %f %f", 
+						&desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
+					break;
+
+				case kSymMinLOD:
+					sscanf(value.c_str(), "%f", &desc->MinLOD);
+					break;
+
+				case kSymMaxLOD:
+					sscanf(value.c_str(), "%f", &desc->MaxLOD);
+					break;
+			}
+		} else {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
+
+	static auto valid = list_of(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)(kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
+	while (!scope->end()) {
+		Symbol symbol;
+		if (scope->consume_in(valid, &symbol)) {
+			EXPECT(scope, kSymEquals);
+			string value = scope->next_identifier();
+			EXPECT(scope, kSymSemicolon);
+
+			switch (symbol) {
+				case kSymBlendEnable:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->BlendEnable);
+					break;
+				case kSymSrcBlend:
+				case kSymDestBlend:
+				case kSymSrcBlendAlpha:
+				case kSymDestBlendAlpha:
+					lookup<string, D3D11_BLEND>(value, map_list_of
+						("zero", D3D11_BLEND_ZERO)
+						("one", D3D11_BLEND_ONE)
+						("src_color", D3D11_BLEND_SRC_COLOR)
+						("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
+						("src_alpha", D3D11_BLEND_SRC_ALPHA)
+						("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
+						("dest_alpha", D3D11_BLEND_DEST_ALPHA)
+						("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
+						("dest_color", D3D11_BLEND_DEST_COLOR)
+						("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
+						("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
+						("blend_factor", D3D11_BLEND_BLEND_FACTOR)
+						("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
+						("src1_color", D3D11_BLEND_SRC1_COLOR)
+						("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
+						("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
+						("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA),
+						symbol == kSymSrcBlend ? &desc->SrcBlend : 
+						symbol == kSymDestBlend ? &desc->DestBlend :
+						symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
+						&desc->DestBlendAlpha);
+					break;
+				case kSymBlendOp:
+				case kSymBlendOpAlpha:
+					lookup<string, D3D11_BLEND_OP>(value, map_list_of
+						("add", D3D11_BLEND_OP_ADD)
+						("subtract", D3D11_BLEND_OP_SUBTRACT)
+						("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
+						("min", D3D11_BLEND_OP_MIN)
+						("max", D3D11_BLEND_OP_MAX),
+						symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
+					break;
+				case kSymRenderTargetWriteMask:
+					sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
+					break;
+			}
+		} else {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
+	while (!scope->end()) {
+
+		Symbol symbol = scope->consume_in(list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget));
+
+		if (symbol == kSymAlphaToCoverageEnable || symbol == kSymIndependentBlendEnable) {
+			EXPECT(scope, kSymEquals);
+			string value = scope->next_identifier();
+			EXPECT(scope, kSymSemicolon);
+			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), 
+				symbol == kSymAlphaToCoverageEnable ? &desc->AlphaToCoverageEnable : &desc->IndependentBlendEnable);
+
+		} else if (symbol == kSymRenderTarget) {
+			EXPECT(scope, kSymListOpen);
+			int target = scope->next_int();
+			if (target < 0 || target >= 8)
+				return false;
+			EXPECT(scope, kSymListClose);
+			EXPECT(scope, kSymEquals);
+			EXPECT(scope, kSymBlockOpen);
+			if (!parse_render_target(scope, &desc->RenderTarget[target]))
+				return false;
+			EXPECT(scope, kSymBlockClose);
+			EXPECT(scope, kSymSemicolon);
+
+		} else {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
+
+	static auto valid = list_of(kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)(kSymSlopeScaledDepthBias)(kSymDepthClipEnable)
+		(kSymScissorEnable)(kSymMultisampleEnable)(kSymAntialiasedLineEnable);
+
+	while (!scope->end()) {
+		Symbol symbol;
+		if (scope->consume_in(valid, &symbol)) {
+			EXPECT(scope, kSymEquals);
+			string value = scope->next_identifier();
+			EXPECT(scope, kSymSemicolon);
+
+			switch (symbol) {
+				case kSymFillMode:
+					lookup<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
+					break;
+				case kSymCullMode:
+					lookup<string, D3D11_CULL_MODE>(value, map_list_of("none", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
+					break;
+				case kSymFrontCounterClockwise:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
+					break;
+				case kSymDepthBias:
+					sscanf(value.c_str(), "%d", &desc->DepthBias);
+					break;
+				case kSymDepthBiasClamp:
+					sscanf(value.c_str(), "%f", &desc->DepthBiasClamp);
+					break;
+				case kSymSlopeScaledDepthBias:
+					sscanf(value.c_str(), "%f", &desc->SlopeScaledDepthBias);
+					break;
+				case kSymDepthClipEnable:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthClipEnable);
+					break;
+				case kSymScissorEnable:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->ScissorEnable);
+					break;
+				case kSymMultisampleEnable:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->MultisampleEnable);
+					break;
+				case kSymAntialiasedLineEnable:
+					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->AntialiasedLineEnable);
+					break;
+			}
+		} else {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
+
+	static auto valid = list_of(kSymVertexShader)(kSymPixelShader)(kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
+
+	while (!scope->end()) {
+		Symbol symbol;
+		if (scope->consume_in(valid, &symbol)) {
+			switch (symbol) {
+			case kSymVertexShader:
+			case kSymPixelShader:
+				{
+					Shader **shader;
+					if (symbol == kSymVertexShader) {
+						shader = &technique->_vertex_shader;
+						*shader = new VertexShader;
+					} else {
+						shader = &technique->_pixel_shader;
+						*shader = new PixelShader;
+					}
+					EXPECT(scope, kSymBlockOpen);
+					if (!parse_shader(scope, *shader)) {
+						SAFE_DELETE(*shader);
+						return false;
+					}
+					EXPECT(scope, kSymBlockClose);
+					EXPECT(scope, kSymSemicolon);
+				}
+				break;
+
+			case kSymRasterizerDesc:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_rasterizer_desc(scope, &technique->_rasterizer_desc))
+					return false;
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymSamplerDesc:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_sampler_desc(scope, &technique->_sampler_desc))
+					return false;
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymDepthStencilDesc:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_depth_stencil_desc(scope, &technique->_depth_stencil_desc))
+					return false;
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymBlendDesc:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_blend_desc(scope, &technique->_blend_desc))
+					return false;
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+			}
+		} else {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool TechniqueParser::parse_inner(Scope *scope, Technique *technique) {
+
+	switch (scope->next_symbol()) {
+	case kSymTechnique:
+		{
+			technique->_name = scope->next_identifier();
+			EXPECT(scope, kSymBlockOpen);
+			parse_technique(scope, technique);
+			EXPECT(scope, kSymBlockClose);
+			EXPECT(scope, kSymSemicolon);
+			return true;
+		}
+		break;
+	default:
+		return false;
+	}
 }
 
 bool TechniqueParser::parse_main(const char *start, const char *end, Technique *technique) {
-
-	Symbol symbol;
-	start = next_symbol(start, end, &symbol);
-	if (symbol == kSymTechnique) {
-		start = parse_technique(start, end, technique);
-		return true;
-	}
-
-	return false;
+	
+	Scope scope(_symbol_trie, start, end-1);
+	return parse_inner(&scope, technique);
 }
