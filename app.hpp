@@ -99,8 +99,6 @@ private:
     AppState<type> _state_ ## name; \
   public:\
 
-class Camera;
-
 struct RenderStates {
 	RenderStates() : blend_state(nullptr), depth_stencil_state(nullptr), rasterizer_state(nullptr), sampler_state(nullptr) {}
 
@@ -143,9 +141,6 @@ public:
 	void add_key_up(const fnKeyUp& fn, bool add);
 
   void add_update_callback(const fnUpdate& fn, bool add);
-
-  Camera *camera();
-	TwBar *tweakbar() { return _tweakbar; }
 
 	void debug_text(const char *fmt, ...);
 
@@ -285,9 +280,6 @@ protected:
 
 	FontWriter *_debug_writer;
   int _cur_camera;
-  Camera *_trackball;
-  Camera *_freefly;
-  TwBar *_tweakbar;
   bool _draw_plane;
 	string _app_root;
 	int _ref_count;

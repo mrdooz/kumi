@@ -7,7 +7,7 @@ technique debug_font {
 		params [
 			{ float4 tjong material; default 1 0 0 1; },
 			{ float time system; default 10; },
-			{ float4 tjong2 user; default 1 2 3 4; },
+			{ float4 tjong2 user; default 1 2 3 4; }
 		]; */
 	};
 	
@@ -24,7 +24,7 @@ technique debug_font {
 		];
 */		
 	};
-
+/*
 	rasterizer_desc {
 		fill_mode = fill_solid;
 	};
@@ -47,12 +47,5 @@ technique debug_font {
 	blend_state {
 	
 	};
+*/	
 };
-
-scene {
-	meshes {
-		box diffuse red;
-		torus specular blue;
-	}
-}
-

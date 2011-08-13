@@ -17,3 +17,8 @@ void Mesh::submit() {
 		GRAPHICS.submit_command(submeshes[i]->key, (void *)&submeshes[i]->data);
 	}
 }
+
+Scene::~Scene() {
+	seq_delete(&meshes);
+	seq_delete(&cameras);
+}

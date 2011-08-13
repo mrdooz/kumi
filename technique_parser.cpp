@@ -403,24 +403,26 @@ struct Scope {
 #define EXPECT(scope, symbol) do { if (scope->peek() != symbol) { scope->log_error(_symbol_to_string[symbol].c_str()); return false; } else { scope->next_symbol(); } } while(false)
 
 bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
-	// type, name and source are required. the default value is optional
-	param->type = lookup_default<Symbol, Property::Enum>(scope->next_symbol(), map_list_of
+	static auto valid_types = map_list_of
 		(kSymFloat, Property::kFloat)
 		(kSymFloat2, Property::kFloat2)
 		(kSymFloat3, Property::kFloat3)
 		(kSymFloat4, Property::kFloat4)
-		(kSymFloat4x4, Property::kFloat4x4),
-		Property::kUnknown);
+		(kSymFloat4x4, Property::kFloat4x4);
+
+	static auto valid_sources = map_list_of
+		("material", ShaderParam::Source::kMaterial)
+		("system", ShaderParam::Source::kSystem)
+		("user", ShaderParam::Source::kUser)
+		("mesh", ShaderParam::Source::kMesh);
+
+	// type, name and source are required. the default value is optional
+	param->type = lookup_default<Symbol, Property::Enum>(scope->next_symbol(), valid_types, Property::kUnknown);
 	if (param->type == Property::kUnknown)
 		return false;
 
 	param->name = scope->next_identifier();
-	param->source = lookup_default<string, ShaderParam::Source::Enum>(scope->next_identifier(), map_list_of
-		("material", ShaderParam::Source::kMaterial)
-		("system", ShaderParam::Source::kSystem)
-		("user", ShaderParam::Source::kUser)
-		("mesh", ShaderParam::Source::kMesh),
-		ShaderParam::Source::kUnknown);
+	param->source = lookup_default<string, ShaderParam::Source::Enum>(scope->next_identifier(), valid_sources, ShaderParam::Source::kUnknown);
 	if (param->source == ShaderParam::Source::kUnknown)
 		return false;
 
@@ -499,6 +501,40 @@ bool TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL
 bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
 
 	static auto valid = list_of(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)(kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
+	static auto valid_filters = map_list_of
+		("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
+		("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
+		("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
+		("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
+		("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+		("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
+		("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
+		("anisotropic", D3D11_FILTER_ANISOTROPIC)
+		("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
+		("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
+		("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
+		("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
+		("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+		("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
+		("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
+		("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC);
+
+	static auto valid_address = map_list_of
+		("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
+		("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
+		("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
+		("border", D3D11_TEXTURE_ADDRESS_BORDER)
+		("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE);
+
+	static auto valid_cmp_func = map_list_of
+		("never", D3D11_COMPARISON_NEVER)
+		("less", D3D11_COMPARISON_LESS)
+		("equal", D3D11_COMPARISON_EQUAL)
+		("less_equal", D3D11_COMPARISON_LESS_EQUAL)
+		("greater", D3D11_COMPARISON_GREATER)
+		("not_equal", D3D11_COMPARISON_NOT_EQUAL)
+		("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
+		("always", D3D11_COMPARISON_ALWAYS);
 
 	while (!scope->end()) {
 		Symbol symbol;
@@ -509,35 +545,13 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 
 			switch (symbol) {
 				case kSymFilter:
-					lookup<string, D3D11_FILTER>(value, map_list_of
-						("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
-						("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
-						("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
-						("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
-						("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-						("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
-						("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
-						("anisotropic", D3D11_FILTER_ANISOTROPIC)
-						("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
-						("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
-						("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
-						("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
-						("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-						("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
-						("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
-						("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC),
-						&desc->Filter);
+					lookup<string, D3D11_FILTER>(value, valid_filters, &desc->Filter);
 					break;
 
 				case kSymAddressU:
 				case kSymAddressV:
 				case kSymAddressW:
-					lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, map_list_of
-						("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
-						("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
-						("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
-						("border", D3D11_TEXTURE_ADDRESS_BORDER)
-						("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE), 
+					lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, valid_address, 
 						symbol == kSymAddressU ? &desc->AddressU : symbol == kSymAddressV ? &desc->AddressV : &desc->AddressW);
 					break;
 
@@ -550,16 +564,7 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 					break;
 
 				case kSymComparisonFunc:
-					lookup<string, D3D11_COMPARISON_FUNC>(value, map_list_of
-						("never", D3D11_COMPARISON_NEVER)
-						("less", D3D11_COMPARISON_LESS)
-						("equal", D3D11_COMPARISON_EQUAL)
-						("less_equal", D3D11_COMPARISON_LESS_EQUAL)
-						("greater", D3D11_COMPARISON_GREATER)
-						("not_equal", D3D11_COMPARISON_NOT_EQUAL)
-						("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
-						("always", D3D11_COMPARISON_ALWAYS), 
-						&desc->ComparisonFunc);
+					lookup<string, D3D11_COMPARISON_FUNC>(value, valid_cmp_func, &desc->ComparisonFunc);
 					break;
 
 				case kSymBorderColor:
@@ -585,6 +590,32 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
 
 	static auto valid = list_of(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)(kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
+	static auto valid_blend = map_list_of
+		("zero", D3D11_BLEND_ZERO)
+		("one", D3D11_BLEND_ONE)
+		("src_color", D3D11_BLEND_SRC_COLOR)
+		("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
+		("src_alpha", D3D11_BLEND_SRC_ALPHA)
+		("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
+		("dest_alpha", D3D11_BLEND_DEST_ALPHA)
+		("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
+		("dest_color", D3D11_BLEND_DEST_COLOR)
+		("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
+		("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
+		("blend_factor", D3D11_BLEND_BLEND_FACTOR)
+		("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
+		("src1_color", D3D11_BLEND_SRC1_COLOR)
+		("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
+		("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
+		("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA);
+
+	static auto valid_blend_op = map_list_of
+		("add", D3D11_BLEND_OP_ADD)
+		("subtract", D3D11_BLEND_OP_SUBTRACT)
+		("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
+		("min", D3D11_BLEND_OP_MIN)
+		("max", D3D11_BLEND_OP_MAX);
+
 	while (!scope->end()) {
 		Symbol symbol;
 		if (scope->consume_in(valid, &symbol)) {
@@ -600,24 +631,7 @@ bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 				case kSymDestBlend:
 				case kSymSrcBlendAlpha:
 				case kSymDestBlendAlpha:
-					lookup<string, D3D11_BLEND>(value, map_list_of
-						("zero", D3D11_BLEND_ZERO)
-						("one", D3D11_BLEND_ONE)
-						("src_color", D3D11_BLEND_SRC_COLOR)
-						("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
-						("src_alpha", D3D11_BLEND_SRC_ALPHA)
-						("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
-						("dest_alpha", D3D11_BLEND_DEST_ALPHA)
-						("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
-						("dest_color", D3D11_BLEND_DEST_COLOR)
-						("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
-						("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
-						("blend_factor", D3D11_BLEND_BLEND_FACTOR)
-						("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
-						("src1_color", D3D11_BLEND_SRC1_COLOR)
-						("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
-						("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
-						("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA),
+					lookup<string, D3D11_BLEND>(value, valid_blend,
 						symbol == kSymSrcBlend ? &desc->SrcBlend : 
 						symbol == kSymDestBlend ? &desc->DestBlend :
 						symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
@@ -625,12 +639,7 @@ bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 					break;
 				case kSymBlendOp:
 				case kSymBlendOpAlpha:
-					lookup<string, D3D11_BLEND_OP>(value, map_list_of
-						("add", D3D11_BLEND_OP_ADD)
-						("subtract", D3D11_BLEND_OP_SUBTRACT)
-						("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
-						("min", D3D11_BLEND_OP_MIN)
-						("max", D3D11_BLEND_OP_MAX),
+					lookup<string, D3D11_BLEND_OP>(value, valid_blend_op,
 						symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
 					break;
 				case kSymRenderTargetWriteMask:

@@ -8,6 +8,8 @@
 struct MainHeader {
 	int material_ofs;
 	int mesh_ofs;
+	int light_ofs;
+	int camera_ofs;
 	int string_ofs;
 	int binary_ofs;
 	int total_size;
@@ -16,7 +18,9 @@ struct MainHeader {
 namespace BlockId {
 	enum Enum {
 		kMaterials,
-		kMeshes
+		kMeshes,
+		kCameras,
+		kLights,
 	};
 }
 
@@ -77,6 +81,24 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 	return true;
 }
 
+bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
+	BlockHeader *header = (BlockHeader *)buf;
+	buf += sizeof(BlockHeader);
+
+	const int count = step_read<int>(&buf);
+	for (int i = 0; i < count; ++i) {
+		Camera *camera = new Camera(step_read<const char *>(&buf));
+		scene->cameras.push_back(camera);
+		camera->pos = step_read<XMFLOAT3>(&buf);
+		camera->target = step_read<XMFLOAT3>(&buf);
+		camera->up = step_read<XMFLOAT3>(&buf);
+		camera->roll = step_read<float>(&buf);
+	}
+
+	return true;
+}
+
+
 bool KumiLoader::load_materials(const char *buf) {
 
 	BlockHeader *header = (BlockHeader *)buf;
@@ -133,6 +155,7 @@ bool KumiLoader::load(const char *filename, Io *io, Scene **scene) {
 
 	Scene *s = *scene = new Scene;
 	B_ERR_BOOL(load_meshes(scene_data + header.mesh_ofs, s));
+	B_ERR_BOOL(load_cameras(scene_data + header.camera_ofs, s));
 
 	return true;
 }

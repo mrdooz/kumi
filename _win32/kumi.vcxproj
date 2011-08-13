@@ -112,6 +112,7 @@
     <ClCompile Include="..\technique.cpp" />
     <ClCompile Include="..\technique_parser.cpp" />
     <ClCompile Include="..\test\demo.cpp" />
+    <ClCompile Include="..\threading.cpp" />
     <ClCompile Include="..\utils.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -139,6 +140,7 @@
     <ClInclude Include="..\technique.hpp" />
     <ClInclude Include="..\technique_parser.hpp" />
     <ClInclude Include="..\test\demo.hpp" />
+    <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\utils.hpp" />
     <ClInclude Include="..\v8_handler.hpp" />
   </ItemGroup>

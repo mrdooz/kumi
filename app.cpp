@@ -303,8 +303,6 @@ App::App()
 	, _debug_writer(nullptr)
 	, _state_wireframe("wireframe", false)
 	, _dbg_message_count(0)
-	, _trackball(nullptr)
-	, _freefly(nullptr)
 	, _cur_camera(1)
 	, _draw_plane(false)
 	, _ref_count(1)
@@ -473,10 +471,11 @@ void App::run()
 
 			CefDoMessageLoopWork();
 
+			Camera *camera = _scene->cameras[0];
 			XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
-				XMVectorSet(0,0,-300,0),
-				XMVectorSet(0,0,0,0),
-				XMVectorSet(0,1,0,0)));
+				XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
+				XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
+				XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
 
 			XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV4, 640/480.0f, 1, 1000));
 
@@ -490,8 +489,8 @@ void App::run()
 			//DEMO_ENGINE.tick();
 
 			RESOURCE_WATCHER.process_deferred();
-			static int hax = 0;
-			GRAPHICS.set_clear_color(XMFLOAT4(0.5f + 0.5f * sin(hax++/1000.0f), 0.3f, 0.3f, 0));
+			//static int hax = 0;
+			//GRAPHICS.set_clear_color(XMFLOAT4(0.5f + 0.5f * sin(hax++/1000.0f), 0.3f, 0.3f, 0));
 			GRAPHICS.clear();
 
 			//System::instance().tick();
@@ -783,14 +782,3 @@ void App::find_app_root()
 	}
 	_app_root = starting_dir;
 }
-
-
-Camera *App::camera()
-{
-	switch (_cur_camera) {
-		case 0 : return _trackball;
-		case 1 : return _freefly;
-	}
-	return NULL;
-}
-
