@@ -3,6 +3,7 @@
 
 #include "utils.hpp"
 #include <stack>
+#include <type_traits>
 
 struct Io;
 struct Shader;
@@ -12,6 +13,10 @@ class Technique;
 using std::stack;
 using std::vector;
 using std::pair;
+
+enum FileEvent;
+
+namespace mpl = boost::mpl;
 
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
@@ -172,7 +177,7 @@ public:
 	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len);
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len);
 
-	GraphicsObjectHandle load_technique(const char *filename, Io *io);
+	GraphicsObjectHandle load_technique(const char *filename);
 	GraphicsObjectHandle find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
@@ -231,11 +236,13 @@ private:
   float _fps;
 	Context _immediate_context;
 
-	template<typename T, int N>
-	struct IdBuffer {
+	template<class Traits, int N>
+	struct IdBufferBase {
+
+		typedef typename Traits::Type T;
 
 		enum { Size = N };
-		IdBuffer() {
+		IdBufferBase() {
 			ZeroMemory(&_buffer, sizeof(_buffer));
 		}
 
@@ -246,13 +253,13 @@ private:
 				return tmp;
 			}
 			for (int i = 0; i < N; ++i) {
-				if (!_buffer[i])
+				if (!Traits::get(_buffer[i]))
 					return i;
 			}
 			return -1;
 		}
 
-		T &operator[](int idx) {
+		typename Traits::Type &operator[](int idx) {
 			assert(idx >= 0 && idx < N);
 			return _buffer[idx];
 		}
@@ -262,12 +269,60 @@ private:
 
 		}
 
-		T get(GraphicsObjectHandle handle) {
-			return _buffer[handle.id()];
+		typename Traits::Type get(GraphicsObjectHandle handle) {
+			return Traits::get(_buffer[handle.id()]);
 		}
 
-		T _buffer[N];
+		typename Traits::Elem _buffer[N];
 		stack<int> reclaimed_indices;
+	};
+
+	template<class Traits, int N>
+	struct SearchableIdBuffer : public IdBufferBase<Traits, N> {
+
+		typename Traits::Elem &operator[](int idx) {
+			assert(idx >= 0 && idx < N);
+			return _buffer[idx];
+		}
+
+		int find_by_token(const typename Traits::Token &t) {
+			for (int i = 0; i < Size; ++i) {
+				if (Traits::get_token(_buffer[i]) == t)
+					return i;
+			}
+			return -1;
+		}
+	};
+
+	template<class T, class U>
+	struct PairTraits {
+		typedef T Type;
+		typedef U Token;
+		typedef std::pair<T, U> Elem;
+		static T& get(Elem &t) {
+			return t.first;
+		}
+
+		static U get_token(const Elem &e) {
+			return e.second;
+		}
+	};
+
+	template<class T>
+	struct SingleTraits {
+		typedef T Type;
+		typedef T Elem;
+		static T& get(Elem& t) {
+			return t;
+		}
+	};
+
+	template<typename T, int N, typename SearchToken = void>
+	struct IdBuffer : public
+		mpl::if_<typename std::tr1::is_void<SearchToken>::type,
+		IdBufferBase<SingleTraits<T>, N>,
+		SearchableIdBuffer<PairTraits<T, SearchToken>, N> >::type
+	{
 	};
 
 	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
@@ -276,7 +331,7 @@ private:
 	IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
 	IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
 	IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
-	IdBuffer<Technique *, IdCount> _techniques;
+	IdBuffer<Technique *, IdCount, string> _techniques;
 	IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
 
 	IdBuffer<ID3D11BlendState *, IdCount> _blend_states;

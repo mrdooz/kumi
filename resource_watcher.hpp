@@ -29,7 +29,7 @@ public:
 
 	static ResourceWatcher &instance();
 private:
-	void file_changed(void *token, FileEvent event, const char *old_new, const char *new_name);
+	void file_changed(void *token, FileEvent event, const string &old_new, const string &new_name);
 
 	struct Context {
 		Context(void *token, const string &filename, const FileChanged &cb) : token(token), filename(filename), cb(cb) {}

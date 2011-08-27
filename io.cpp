@@ -85,3 +85,7 @@ void DiskIo::find_close(void *token) {
 	FindClose(data->handle);
 	delete data;
 }
+
+bool DiskIo::is_watchable() const {
+	return true;
+}

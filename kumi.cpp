@@ -47,12 +47,10 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
 	settings.multi_threaded_message_loop = false;
 	CefInitialize(settings);
 
-	XMMATRIX m = XMMatrixLookAtLH(XMLoadFloat3(&XMFLOAT3(0,0,0)), XMLoadFloat3(&XMFLOAT3(0,0,1)), XMLoadFloat3(&XMFLOAT3(0,1,0)));
-
 	if (!APP.init(instance))
 		return 1;
 
-	APP.run();
+	APP.run(NULL);
 
 	APP.close();
 

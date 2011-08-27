@@ -204,15 +204,6 @@ bool App::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatu
 {
 	REQUIRE_UI_THREAD();
 
-#ifdef TEST_REDIRECT_POPUP_URLS
-	std::string urlStr = url;
-	if(urlStr.find("resources/inspector/devtools.html") == std::string::npos) {
-		// Show all popup windows excluding DevTools in the current window.
-		windowInfo.m_dwStyle &= ~WS_VISIBLE;
-		client = new ClientPopupHandler(m_Browser);
-	}
-#endif // TEST_REDIRECT_POPUP_URLS
-
 	return false;
 }
 
@@ -300,8 +291,6 @@ App::App()
 	, _height(-1)
 	, _hwnd(NULL)
 	, _test_effect(NULL)
-	, _debug_writer(nullptr)
-	, _state_wireframe("wireframe", false)
 	, _dbg_message_count(0)
 	, _cur_camera(1)
 	, _draw_plane(false)
@@ -309,6 +298,7 @@ App::App()
 	, _cef_vb(nullptr)
 	, _cef_layout(nullptr)
 	, _cef_effect(nullptr)
+	, _io(nullptr)
 	, m_MainHwnd(NULL),
 	m_BrowserHwnd(NULL),
 	m_EditHwnd(NULL),
@@ -317,11 +307,14 @@ App::App()
 	m_StopHwnd(NULL),
 	m_ReloadHwnd(NULL)
 {
+	_io = new DiskIo;
 	find_app_root();
+	DISPATCHER.set_thread(threading::kMainThread, this);
 }
 
 App::~App()
 {
+	SAFE_DELETE(_io);
 }
 
 App& App::instance()
@@ -357,20 +350,19 @@ bool App::init(HINSTANCE hinstance)
 	make_quad_clip_space_unindexed(&verts[0].pos.x, &verts[0].pos.y, &verts[0].tex.x, &verts[0].tex.y,
 		stride, stride, stride, stride, 0, 0, 1, 1);
 
-	DiskIo io;
 	KumiLoader loader;
-	loader.load("c:\\temp\\torus.kumi", &io, &_scene);
+	loader.load("c:\\temp\\torus.kumi", _io, &_scene);
 
 	// load all the techniques
 	void *token;
 	string filename;
-	if (io.find_first("effects/*.tec", &filename, &token)) {
+	if (_io->find_first("effects/*.tec", &filename, &token)) {
 		do {
-			if (!GRAPHICS.load_technique(filename.c_str(), &io).is_valid()) {
+			if (!GRAPHICS.load_technique(filename.c_str()).is_valid()) {
 				// log error
 			}
-		} while (io.find_next(token, &filename));
-		io.find_close(token);
+		} while (_io->find_next(token, &filename));
+		_io->find_close(token);
 	}
 
 	//Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
@@ -386,11 +378,6 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(DEMO_ENGINE.init());
 
 	return true;
-}
-
-void App::on_quit()
-{
-	SendMessage(_hwnd, WM_DESTROY, 0, 0);
 }
 
 bool App::close()
@@ -447,8 +434,7 @@ bool App::create_window()
 	return true;
 }
 
-void App::run()
-{
+UINT App::run(void *userdata) {
 	MSG msg = {0};
 
 	float running_time = 0;
@@ -468,6 +454,7 @@ void App::run()
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		} else {
+			process_deferred();
 
 			CefDoMessageLoopWork();
 
@@ -557,6 +544,7 @@ void App::run()
 			GRAPHICS.present();
 		}
 	}
+	return 0;
 }
 
 LRESULT App::tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -781,4 +769,12 @@ void App::find_app_root()
 			break;
 	}
 	_app_root = starting_dir;
+}
+
+Io *App::io() {
+	return _io;
+}
+
+void App::set_io(Io *io) {
+	_io = io;
 }

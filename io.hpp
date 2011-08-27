@@ -8,6 +8,8 @@ struct Io {
 	virtual bool find_next(void *token, string *filename) = 0;
 	virtual void find_close(void *token) = 0;
 	virtual __time64_t mdate(const char *filename) = 0;
+
+	virtual bool is_watchable() const = 0;
 };
 
 class DiskIo : public Io {
@@ -19,5 +21,8 @@ public:
 	virtual bool find_next(void *token, string *filename);
 	virtual void find_close(void *token);
 	virtual __time64_t mdate(const char *filename);
+
+	virtual bool is_watchable() const;
+
 private:
 };

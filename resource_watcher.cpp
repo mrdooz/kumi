@@ -6,6 +6,7 @@
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 #include "file_utils.hpp"
+#include "threading.hpp"
 
 using std::vector;
 
@@ -113,7 +114,7 @@ void ResourceWatcher::process_deferred()
 	}
 }
 
-void ResourceWatcher::file_changed(void *token, FileEvent event, const char *old_new, const char *new_name)
+void ResourceWatcher::file_changed(void *token, FileEvent event, const string &old_new, const string &new_name)
 {
 	Context *context = (Context *)token;
 	_modified_files.push(context);
@@ -132,7 +133,7 @@ bool ResourceWatcher::add_file_watch(void *token, const char *filename, bool ini
 	Context *context = new Context(token, filename, fn);
 	_contexts.push_back(context);
 
-	FILE_WATCHER.add_file_watch(context, filename, MakeDelegate(this, &ResourceWatcher::file_changed));
+	FILE_WATCHER.add_file_watch(filename, context, false, threading::kMainThread, MakeDelegate(this, &ResourceWatcher::file_changed));
 
 	return true;
 }

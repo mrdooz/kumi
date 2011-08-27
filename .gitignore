@@ -23,3 +23,7 @@ ipch/
 *.log
 *.user
 *.swp
+*.vs
+*.vso
+*.ps
+*.pso

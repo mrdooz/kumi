@@ -3,6 +3,9 @@
 #include "logger.hpp"
 #include "technique.hpp"
 #include "material_manager.hpp"
+#include "file_watcher.hpp"
+#include "io.hpp"
+#include "app.hpp"
 
 using namespace std;
 
@@ -355,21 +358,49 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
 	return GraphicsObjectHandle();
 }
 
+GraphicsObjectHandle Graphics::load_technique(const char *filename) {
+	GraphicsObjectHandle ret;
+	if (!APP.io()->is_watchable()) {
+		// TODO: ...
 
-GraphicsObjectHandle Graphics::load_technique(const char *filename, Io *io) {
-	const int idx = _techniques.find_free_index();
-	if (idx != -1) {
-		if (Technique *technique = Technique::create_from_file(filename, io)) {
-			_techniques[idx] = technique;
-			return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
-		}
+	} else {
+		FILE_WATCHER.add_file_watch(filename, NULL, true, threading::kMainThread, 
+
+			[&](void *token, FileEvent event, const string &old_name, const string &new_name) {
+				int idx = _techniques.find_by_token(old_name);
+				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
+					if (Technique *technique = Technique::create_from_file(old_name.c_str(), APP.io())) {
+						SAFE_DELETE(_techniques[idx].first);
+						_techniques[idx] = make_pair(technique, filename);
+						ret = GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
+					}
+				}
+			}
+		);
 	}
-	return GraphicsObjectHandle();
+			//MakeDelegate(this, &Graphics::technique_changed));
+/*
+		const int idx = _techniques.find_free_index();
+		if (idx != -1) {
+			if (Technique *technique = Technique::create_from_file(filename, io)) {
+				if (io->is_watchable()) {
+					FILE_WATCHER.add_file_watch(NULL, filename, MakeDelegate(this, &Graphics::technique_changed));
+				}
+				_techniques[idx] = technique;
+				return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
+			}
+		}
+
+	
+	}
+*/
+	//return GraphicsObjectHandle();
+	return ret;
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
 	for (int i = 0; i < _techniques.Size; ++i) {
-		if (_techniques[i] && _techniques[i]->name() == name)
+		if (_techniques[i].first && _techniques[i].first->name() == name)
 			return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, i);
 	}
 	return GraphicsObjectHandle();

@@ -17,7 +17,7 @@ technique diffuse {
 	};
 	
 	rasterizer_desc {
-		cull_mode = none;
+		cull_mode = back;
 	};
 	
 	depth_stencil_desc {
@@ -30,3 +30,4 @@ technique diffuse {
 		};
 	};
 };
+
