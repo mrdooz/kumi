@@ -3,6 +3,7 @@
 #include "technique_parser.hpp"
 #include "property_manager.hpp"
 #include "string_utils.hpp"
+#include "file_utils.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -400,7 +401,15 @@ struct Scope {
 	const char *_end;
 };
 
-#define EXPECT(scope, symbol) do { if (scope->peek() != symbol) { scope->log_error(_symbol_to_string[symbol].c_str()); return false; } else { scope->next_symbol(); } } while(false)
+#define EXPECT(scope, symbol)                                         \
+	do {                                                                \
+		if (scope->peek() != symbol) {                                    \
+				scope->log_error(_symbol_to_string[symbol].c_str());          \
+				return false;                                                 \
+		} else {                                                          \
+			scope->next_symbol();                                           \
+		}                                                                 \
+	} while(false)
 
 bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
 	static auto valid_types = map_list_of
@@ -458,6 +467,7 @@ bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 		switch (scope->consume_in(list_of(kSymFile)(kSymEntryPoint)(kSymParams))) {
 		case kSymFile:
 			shader->filename = scope->string_until(';');
+			shader->source = replace_extension(shader->filename.c_str(), "fx");
 			EXPECT(scope, kSymSemicolon);
 			break;
 		case kSymEntryPoint:

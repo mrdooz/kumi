@@ -143,6 +143,9 @@ public:
 	void	present();
 	void	resize(const int width, const int height);
 
+	const char *vs_profile() const { return _vs_profile.c_str(); }
+	const char *ps_profile() const { return _ps_profile.c_str(); }
+
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context._context; }
 
@@ -174,8 +177,8 @@ public:
 	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
 	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
 
-	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len);
-	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len);
+	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
+	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
 	GraphicsObjectHandle load_technique(const char *filename);
 	GraphicsObjectHandle find_technique(const char *name);
@@ -326,8 +329,8 @@ private:
 	};
 
 	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
-	IdBuffer<ID3D11VertexShader *, IdCount> _vertex_shaders;
-	IdBuffer<ID3D11PixelShader *, IdCount> _pixel_shaders;
+	IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;
+	IdBuffer<ID3D11PixelShader *, IdCount, string> _pixel_shaders;
 	IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
 	IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
 	IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
@@ -341,6 +344,9 @@ private:
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;
+
+	string _vs_profile;
+	string _ps_profile;
 };
 
 #define GRAPHICS Graphics::instance()

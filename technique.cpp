@@ -5,51 +5,13 @@
 #include "file_utils.hpp"
 #include "graphics.hpp"
 #include "dx_utils.hpp"
+#include "app.hpp"
+#include "file_watcher.hpp"
 
 using namespace boost::assign;
 using namespace std;
-/*
-struct ShaderInput {
-	ShaderInput(const string &name, int index, int slot) : name(name), index(index), slot(slot) {}
-	string name;
-	int index;
-	int slot;
-};
 
-typedef vector<ShaderInput> ShaderInputs;
-
-bool create_layout(void *buf, int len, const ShaderInputs &inputs) {
-
-	auto mapping = map_list_of
-		("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
-		("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
-		("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
-		("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
-
-	// the format is determined from the semantic name
-	vector<D3D11_INPUT_ELEMENT_DESC> input_desc;
-	for (size_t i = 0; i < inputs.size(); ++i) {
-		const ShaderInput &cur = inputs[i];
-
-		DXGI_FORMAT fmt;
-		if (!lookup<string, DXGI_FORMAT>(cur.name, mapping, &fmt))
-				return false;
-
-		input_desc.push_back(CD3D11_INPUT_ELEMENT_DESC(cur.name.c_str(), cur.index, fmt, cur.slot));
-
-		ID3D11InputLayout* layout = NULL;
-		if (FAILED(GRAPHICS.device()->CreateInputLayout(elems, num_elems, _vs._blob->GetBufferPointer(), _vs._blob->GetBufferSize(), &layout)))
-			return nullptr;
-		return layout;
-
-
-	}
-
-	return true;
-}
-*/
-
-Technique::Technique(Io *io)
+Technique::Technique()
 	: _vertex_shader(nullptr)
 	, _pixel_shader(nullptr)
 	, _rasterizer_desc(CD3D11_DEFAULT())
@@ -64,23 +26,23 @@ Technique::~Technique() {
 	SAFE_DELETE(_pixel_shader);
 }
 
-Technique *Technique::create_from_file(const char *filename, Io *io) {
+Technique *Technique::create_from_file(const char *filename) {
 	void *buf;
 	size_t len;
-	if (!io->load_file(filename, &buf, &len))
+	if (!APP.io()->load_file(filename, &buf, &len))
 		return NULL;
 
 	TechniqueParser parser;
-	Technique *t = new Technique(io);
+	Technique *t = new Technique;
 	bool ok = parser.parse_main((const char *)buf, (const char *)buf + len, t);
-	ok &= t->init(io);
+	ok &= t->init();
 	if (!ok)
-		SAFE_DELETE(t);
+		delete exch_null(t);
 
 	return t;
 }
 
-bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len, set<string> *used_params)
+bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
 	B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
@@ -88,7 +50,7 @@ bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, siz
 	reflector->GetDesc(&shader_desc);
 
 	// input mappings are only relevant for vertex shaders
-	if (vertex_shader) {
+	if (shader->type() == Shader::kVertexShader) {
 		auto mapping = map_list_of
 			("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
 			("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
@@ -134,7 +96,6 @@ bool Technique::do_reflection(Shader *shader, bool vertex_shader, void *buf, siz
 		_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, GRAPHICS.create_constant_buffer(cb_desc.Size)));
 cb_found:
 
-
 		for (UINT j = 0; j < cb_desc.Variables; ++j) {
 			ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
 			D3D11_SHADER_VARIABLE_DESC var_desc;
@@ -176,77 +137,91 @@ cb_found:
 }
 
 
-bool Technique::init_shader(Shader *shader, const string &profile, bool vertex_shader, Io *io) {
+bool Technique::compile_shader(Shader *shader) {
 
-	const string source = replace_extension(shader->filename.c_str(), "fx");
+	STARTUPINFOA startup_info;
+	ZeroMemory(&startup_info, sizeof(startup_info));
+	startup_info.cb = sizeof(STARTUPINFO);
+	// redirect the child's output handles to the log manager's
+	startup_info.dwFlags = STARTF_USESTDHANDLES;
+	startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
+	PROCESS_INFORMATION process_info;
+	ZeroMemory(&process_info, sizeof(process_info));
 
-	// compile the shader if the source is newer, or the object file doesn't exist
+	const char *profile = shader->type() == Shader::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
 
-	bool force = true;
-	if (force || io->file_exists(source.c_str()) && (!io->file_exists(shader->filename.c_str()) || io->mdate(source.c_str()) > io->mdate(shader->filename.c_str()))) {
+	//fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
+	char cmd_line[MAX_PATH];
+	sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s", 
+		profile,
+		shader->entry_point.c_str(),
+		shader->filename.c_str(), shader->source.c_str());
 
-		STARTUPINFOA startup_info;
-		ZeroMemory(&startup_info, sizeof(startup_info));
-		startup_info.cb = sizeof(STARTUPINFO);
-		// redirect the child's output handles to the log manager's
-		startup_info.dwFlags = STARTF_USESTDHANDLES;
-		startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
-		PROCESS_INFORMATION process_info;
-		ZeroMemory(&process_info, sizeof(process_info));
+	DWORD exit_code = 1;
 
-		string fname;
-		split_path(shader->filename.c_str(), NULL, NULL, &fname, NULL);
-
-		//fxc -Tvs_4_0 -EvsMain -Vi -O3 -Fo debug_font.vso debug_font.fx
-
-		char cmd_line[MAX_PATH];
-		sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Fo %s %s", 
-			profile.c_str(),
-			shader->entry_point.c_str(),
-			shader->filename.c_str(), source.c_str());
-
-		if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &startup_info, &process_info)) {
-			WaitForSingleObject(process_info.hProcess, INFINITE);
-			DWORD exit_code;
-			GetExitCodeProcess(process_info.hProcess, &exit_code);
-			FlushFileBuffers(LOG_MGR.handle());
-
-			if (exit_code == 0) {
-				void *buf;
-				size_t len;
-				io->load_file(shader->filename.c_str(), &buf, &len);
-				shader->shader = vertex_shader ? GRAPHICS.create_vertex_shader(buf, len) : GRAPHICS.create_pixel_shader(buf, len);
-				set<string> used_params;
-				do_reflection(shader, vertex_shader, buf, len, &used_params);
-
-				// remove any unused parameters
-				vector<ShaderParam> &params = shader->params;
-				params.erase(
-					remove_if(params.begin(), params.end(), [&](const ShaderParam &p) { return used_params.find(p.name) == used_params.end(); }),
-					params.end());
-			} else {
-				int a = 10;
-				// error compiling shader..
-			}
-
-		} else {
-			LOG_ERROR("Unable to launch fxc.exe");
-			return false;
-		}
+	if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &startup_info, &process_info)) {
+		WaitForSingleObject(process_info.hProcess, INFINITE);
+		GetExitCodeProcess(process_info.hProcess, &exit_code);
+		FlushFileBuffers(LOG_MGR.handle());
+	} else {
+		LOG_ERROR("Unable to launch fxc.exe");
 	}
 
-	return true;
+	return exit_code == 0;
 }
 
-bool Technique::init(Io *io) {
+bool Technique::init_shader(Shader *shader) {
 
-	if (_vertex_shader) {
-		B_ERR_BOOL(init_shader(_vertex_shader, "vs_4_0", true, io));
-	}
+	Io *io = APP.io();
+	bool force = true;
 
-	if (_pixel_shader) {
-		B_ERR_BOOL(init_shader(_pixel_shader, "ps_4_0", false, io));
-	}
+	FILE_WATCHER.add_file_watch(shader->source.c_str(), NULL, true, threading::kMainThread, 
+
+		[=](void *token, FileEvent event, const string &old_name, const string &new_name) {
+
+			bool ok;
+			// compile the shader if the source is newer, or the object file doesn't exist
+			if (force || 
+				io->file_exists(shader->source.c_str()) && (!io->file_exists(shader->filename.c_str()) || io->mdate(shader->source.c_str()) > io->mdate(shader->filename.c_str()))) {
+					ok = compile_shader(shader);
+			} else {
+				ok = io->file_exists(shader->filename.c_str());
+			}
+
+			void *buf;
+			size_t len;
+			ok &= io->load_file(shader->filename.c_str(), &buf, &len);
+
+			set<string> used_params;
+			ok &= do_reflection(shader, buf, len, &used_params);
+
+			// remove any unused parameters
+			vector<ShaderParam> &params = shader->params;
+			params.erase(
+				remove_if(params.begin(), params.end(), [&](const ShaderParam &p) { return used_params.find(p.name) == used_params.end(); }),
+				params.end());
+
+			if (ok) {
+				switch (shader->type()) {
+				case Shader::kVertexShader: shader->shader = GRAPHICS.create_vertex_shader(buf, len, shader->filename); break;
+				case Shader::kPixelShader: shader->shader = GRAPHICS.create_pixel_shader(buf, len, shader->filename); break;
+				case Shader::kGeometryShader: break;
+				}
+			}
+			shader->valid = ok;
+		}
+	);
+
+	return shader->is_valid();
+}
+
+bool Technique::init() {
+
+	if (_vertex_shader)
+		B_ERR_BOOL(init_shader(_vertex_shader));
+
+	if (_pixel_shader)
+		B_ERR_BOOL(init_shader(_pixel_shader));
 
 	_rasterizer_state = GRAPHICS.create_rasterizer_state(_rasterizer_desc);
 	_sampler_state = GRAPHICS.create_sampler_state(_sampler_desc);

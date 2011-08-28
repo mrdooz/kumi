@@ -33,7 +33,13 @@ struct ShaderParam {
 };
 
 struct Shader {
-	Shader(const string &entry_point) : entry_point(entry_point) {}
+	enum Type {
+		kVertexShader,
+		kPixelShader,
+		kGeometryShader,
+	};
+
+	Shader(const string &entry_point) : entry_point(entry_point), valid(false) {}
 	ShaderParam *find_by_name(const char *name) {
 		for (size_t i = 0; i < params.size(); ++i) {
 			if (params[i].name == name)
@@ -43,8 +49,12 @@ struct Shader {
 	}
 
 	virtual void set_buffers() = 0;
+	virtual Type type() const = 0;
+	bool is_valid() const { return valid; }
 
+	bool valid;
 	string filename;
+	string source;
 	string entry_point;
 	vector<ShaderParam> params;
 	GraphicsObjectHandle shader;
@@ -54,12 +64,14 @@ struct VertexShader : public Shader{
 	VertexShader() : Shader("vs_main") {}
 	virtual void set_buffers() {
 	}
+	virtual Type type() const { return kVertexShader; }
 };
 
 struct PixelShader : public Shader {
 	PixelShader() : Shader("ps_main") {}
 	virtual void set_buffers() {
 	}
+	virtual Type type() const { return kPixelShader; }
 };
 
 
@@ -79,10 +91,10 @@ struct CBuffer {
 class Technique {
 	friend class TechniqueParser;
 public:
-	Technique(Io *io);
+	Technique();
 	~Technique();
 
-	static Technique *create_from_file(const char *filename, Io *io);
+	static Technique *create_from_file(const char *filename);
 	const string &name() const { return _name; }
 
 	GraphicsObjectHandle input_layout() const { return _input_layout; }
@@ -97,9 +109,10 @@ public:
 	GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
 private:
 
-	bool init(Io *io);
-	bool init_shader(Shader *shader, const string &profile, bool vertex_shader, Io *io);
-	bool do_reflection(Shader *shader, bool vertex_shader, void *buf, size_t len, set<string> *used_params);
+	bool init();
+	bool init_shader(Shader *shader);
+	bool compile_shader(Shader *shader);
+	bool do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params);
 
 	string _name;
 	Shader *_vertex_shader;

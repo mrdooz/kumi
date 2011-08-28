@@ -43,6 +43,8 @@ Graphics::Graphics()
   , _start_fps_time(0xffffffff)
   , _frame_count(0)
   , _fps(0)
+	, _vs_profile("vs_4_0")
+	, _ps_profile("ps_4_0")
 {
 	assert(!_instance);
 }
@@ -316,17 +318,31 @@ GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DES
 	return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len) {
-	const int idx = _vertex_shaders.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &_vertex_shaders[idx])))
+GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len, const string &id) {
+
+	int idx = _vertex_shaders.find_by_token(id);
+	if (idx != -1 || (idx = _vertex_shaders.find_free_index()) != -1) {
+		ID3D11VertexShader *vs = nullptr;
+		if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
+			SAFE_RELEASE(_vertex_shaders[idx].first);
+			_vertex_shaders[idx].first = vs;
 			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
+		}
+	}
 	return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len) {
-	const int idx = _pixel_shaders.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &_pixel_shaders[idx])))
-		return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
+GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len, const string &id) {
+
+	int idx = _pixel_shaders.find_by_token(id);
+	if (idx != -1 || (idx = _pixel_shaders.find_free_index()) != -1) {
+		ID3D11PixelShader *ps = nullptr;
+		if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
+			SAFE_RELEASE(_pixel_shaders[idx].first);
+			_pixel_shaders[idx].first = ps;
+			return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
+		}
+	}
 	return GraphicsObjectHandle();
 }
 
@@ -369,7 +385,7 @@ GraphicsObjectHandle Graphics::load_technique(const char *filename) {
 			[&](void *token, FileEvent event, const string &old_name, const string &new_name) {
 				int idx = _techniques.find_by_token(old_name);
 				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
-					if (Technique *technique = Technique::create_from_file(old_name.c_str(), APP.io())) {
+					if (Technique *technique = Technique::create_from_file(old_name.c_str())) {
 						SAFE_DELETE(_techniques[idx].first);
 						_techniques[idx] = make_pair(technique, filename);
 						ret = GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
@@ -378,23 +394,6 @@ GraphicsObjectHandle Graphics::load_technique(const char *filename) {
 			}
 		);
 	}
-			//MakeDelegate(this, &Graphics::technique_changed));
-/*
-		const int idx = _techniques.find_free_index();
-		if (idx != -1) {
-			if (Technique *technique = Technique::create_from_file(filename, io)) {
-				if (io->is_watchable()) {
-					FILE_WATCHER.add_file_watch(NULL, filename, MakeDelegate(this, &Graphics::technique_changed));
-				}
-				_techniques[idx] = technique;
-				return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
-			}
-		}
-
-	
-	}
-*/
-	//return GraphicsObjectHandle();
 	return ret;
 }
 
