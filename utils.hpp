@@ -119,6 +119,12 @@ bool lookup(Key str, const hash_map<Key, Value> &candidates, Value *res) {
 	return false;
 }
 
+template<typename Container, typename Key>
+bool contains(const Container &c, const Key key) {
+	Container::const_iterator it = c.find(key);
+	return it != c.end();
+}
+
 template<typename Key, typename Value>
 Value lookup_default(Key str, const hash_map<Key, Value> &candidates, Value default_value) {
 	auto it = candidates.find(str);

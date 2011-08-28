@@ -18,6 +18,8 @@ Technique::Technique()
 	, _sampler_desc(CD3D11_DEFAULT())
 	, _blend_desc(CD3D11_DEFAULT())
 	, _depth_stencil_desc(CD3D11_DEFAULT())
+	, _vert_size(-1)
+	, _index_size(-1)
 {
 }
 
@@ -175,25 +177,28 @@ bool Technique::init_shader(Shader *shader) {
 	Io *io = APP.io();
 	bool force = true;
 
+#define CHECKED_EXEC(x) if (ok) { bool res = (x); if (!res) LOG_ERROR(#x); }
+
 	FILE_WATCHER.add_file_watch(shader->source.c_str(), NULL, true, threading::kMainThread, 
 
 		[=](void *token, FileEvent event, const string &old_name, const string &new_name) {
 
-			bool ok;
+			bool ok = true;
 			// compile the shader if the source is newer, or the object file doesn't exist
 			if (force || 
 				io->file_exists(shader->source.c_str()) && (!io->file_exists(shader->filename.c_str()) || io->mdate(shader->source.c_str()) > io->mdate(shader->filename.c_str()))) {
-					ok = compile_shader(shader);
+					CHECKED_EXEC(compile_shader(shader));
 			} else {
 				ok = io->file_exists(shader->filename.c_str());
 			}
 
 			void *buf;
 			size_t len;
-			ok &= io->load_file(shader->filename.c_str(), &buf, &len);
+
 
 			set<string> used_params;
-			ok &= do_reflection(shader, buf, len, &used_params);
+			CHECKED_EXEC(io->load_file(shader->filename.c_str(), &buf, &len));
+			CHECKED_EXEC(do_reflection(shader, buf, len, &used_params));
 
 			// remove any unused parameters
 			vector<ShaderParam> &params = shader->params;

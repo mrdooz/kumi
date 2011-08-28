@@ -490,9 +490,8 @@ UINT App::run(void *userdata) {
 			for (size_t i = 0; i < _scene->meshes.size(); ++i)
 				_scene->meshes[i]->submit();
 
-/*
+
 			{
-				GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
 				ID3D11DeviceContext *context = GRAPHICS.context();
 				context->PSSetSamplers(0, 1, &_cef_desc.sampler_state);
 				_cef_effect->set_shaders(context);
@@ -507,7 +506,7 @@ UINT App::run(void *userdata) {
 				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
 				context->Draw(6, 0);
 			}
-*/
+
 /*
 			if (_test_effect) {
 

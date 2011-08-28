@@ -24,6 +24,8 @@ private:
 	bool parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc);
 	bool parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc);
 	bool parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc);
+	bool parse_vertices(Scope *scope, Technique *technique);
+	bool parse_indices(Scope *scope, Technique *technique);
 
 	technique_parser_details::Trie *_symbol_trie;
 	hash_map<technique_parser_details::Symbol, string > _symbol_to_string;

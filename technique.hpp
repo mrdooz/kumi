@@ -122,6 +122,13 @@ private:
 
 	vector<CBuffer> _constant_buffers;
 
+	int _vert_size;
+	vector<float> _vertices;
+	int _index_size;
+	vector<int> _indices;
+	GraphicsObjectHandle _vb;
+	GraphicsObjectHandle _ib;
+
 	GraphicsObjectHandle _rasterizer_state;
 	GraphicsObjectHandle _sampler_state;  // todo: named samplers
 	GraphicsObjectHandle _blend_state;

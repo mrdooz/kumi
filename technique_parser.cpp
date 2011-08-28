@@ -4,6 +4,7 @@
 #include "property_manager.hpp"
 #include "string_utils.hpp"
 #include "file_utils.hpp"
+#include <hash_set>
 
 using namespace std;
 using namespace boost::assign;
@@ -23,6 +24,8 @@ enum Symbol {
 	kSymSemicolon,
 	kSymComma,
 	kSymEquals,
+	kSymParenOpen,
+	kSymParenClose,
 
 	kSymTechnique,
 	kSymId,
@@ -31,6 +34,11 @@ enum Symbol {
 		kSymFile,
 		kSymEntryPoint,
 		kSymParams,
+
+	kSymVertices,
+		kSymFormat,
+		kSymData,
+	kSymIndices,
 
 	kSymFloat,
 	kSymFloat2,
@@ -94,6 +102,8 @@ struct {
 	{ kSymSemicolon, ";" },
 	{ kSymComma, "," },
 	{ kSymEquals, "=" },
+	{ kSymParenOpen, "(" },
+	{ kSymParenClose, ")" },
 
 	{ kSymTechnique, "technique" },
 
@@ -102,6 +112,11 @@ struct {
 		{ kSymFile, "file" },
 		{ kSymEntryPoint, "entry_point" },
 		{ kSymParams, "params" },
+
+	{ kSymVertices, "vertices" },
+	{ kSymFormat, "format" },
+	{ kSymData, "data" },
+	{ kSymIndices, "indices" },
 
 	// params
 	{ kSymFloat, "float" },
@@ -289,8 +304,6 @@ struct Scope {
 	}
 
 	Symbol next_symbol() {
-		skip_whitespace();
-
 		int len = 0;
 		Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
 
@@ -300,51 +313,64 @@ struct Scope {
 	}
 
 	void skip_whitespace() {
-		while (_start <= _end && isspace((uint8_t)*_start))
-			++_start;
-
-		if (_start == _end)
-			return;
-
-		int len = 0;
-		Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
-
-		// skip comments
-		if (s == kSymSingleLineComment) {
-			// skip until CR-LF
-			_start += len;
-			while (_start <= _end && *_start != '\r')
-				++_start;
-			if (_start < _end && _start[1] == '\n')
+		bool removed;
+		do {
+			removed = false;
+			while (_start <= _end && isspace((uint8_t)*_start))
 				++_start;
 
-		} else if (s == kSymMultiLineCommentStart) {
-			_start += len;
-			while (_start < _end && _start[0] != '*' && _start[1] != '/')
-				++_start;
 			if (_start == _end)
 				return;
-			_start += 2;
-		}
+
+			int len = 0;
+			Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
+
+			// skip comments
+			if (s == kSymSingleLineComment) {
+				removed = true;
+				// skip until CR-LF
+				_start += len;
+				while (_start <= _end && *_start != '\r')
+					++_start;
+				if (_start < _end && _start[1] == '\n')
+					++_start;
+
+
+			} else if (s == kSymMultiLineCommentStart) {
+				removed = true;
+				_start += len;
+				while (_start < _end && _start[0] != '*' && _start[1] != '/')
+					++_start;
+				if (_start == _end)
+					return;
+				_start += 2;
+			}
+
+		} while(removed);
 	}
 
 	int next_int() {
-		skip_whitespace();
-		bool neg = false;
-		if (*_start == '-') {
-			neg = true;
-			++_start;
-		}
-
-		int res = 0;
-		while (_start <= _end && isdigit((uint8_t)*_start)) {
-			res = res * 10 + (*_start - '0');
-			++_start;
-		}
-		if (neg)
-			res = -res;
+		bool sign = *_start == '-' || *_start == '+';
+		int res = atoi(_start);
+		_start += (res != 0 ? (int)log10(abs((double)res)) : 0) + 1 + (sign ? 1 : 0);
 		skip_whitespace();
 		return res;
+	}
+
+	float next_float() {
+		float r = (float)next_int();
+		float frac = 0;
+		if (*_start == '.') {
+			++_start;
+			float mul = 0.1f;
+			while (_start <= _end && isdigit((byte)*_start)) {
+				frac += *_start - '0' * mul;
+				mul /= 10;
+				_start++;
+			}
+		}
+		skip_whitespace();
+		return r + frac;
 	}
 
 	string next_identifier() {
@@ -510,7 +536,10 @@ bool TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL
 
 bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
 
-	static auto valid = list_of(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)(kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
+	static auto valid = list_of
+		(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)
+		(kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
+
 	static auto valid_filters = map_list_of
 		("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
 		("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
@@ -599,7 +628,10 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 
 bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
 
-	static auto valid = list_of(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)(kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
+	static auto valid = list_of
+		(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)
+		(kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
+
 	static auto valid_blend = map_list_of
 		("zero", D3D11_BLEND_ZERO)
 		("one", D3D11_BLEND_ONE)
@@ -664,10 +696,11 @@ bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 }
 
 bool TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
+
+	static auto valid = list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget);
+
 	while (!scope->end()) {
-
-		Symbol symbol = scope->consume_in(list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget));
-
+		Symbol symbol = scope->consume_in(valid);
 		if (symbol == kSymAlphaToCoverageEnable || symbol == kSymIndependentBlendEnable) {
 			EXPECT(scope, kSymEquals);
 			string value = scope->next_identifier();
@@ -697,7 +730,9 @@ bool TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
 
 bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
 
-	static auto valid = list_of(kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)(kSymSlopeScaledDepthBias)(kSymDepthClipEnable)
+	static auto valid = list_of
+		(kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)
+		(kSymSlopeScaledDepthBias)(kSymDepthClipEnable)
 		(kSymScissorEnable)(kSymMultisampleEnable)(kSymAntialiasedLineEnable);
 
 	while (!scope->end()) {
@@ -746,34 +781,137 @@ bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 	return false;
 }
 
+bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
+
+	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+
+	while (true) {
+		switch (scope->consume_in(valid_tags)) {
+
+		case kSymFormat: {
+			string format = scope->string_until(';');
+			if (format == "pos") {
+				technique->_vert_size = 3;
+			} else if (format == "pos_tex") {
+				technique->_vert_size = 5;
+			} else {
+				return false;
+			}
+			EXPECT(scope, kSymSemicolon);
+			break;
+		}
+
+		case kSymData:
+			EXPECT(scope, kSymListOpen);
+			while (scope->consume_if(kSymParenOpen)) {
+				for (int i = 0; i < technique->_vert_size; ++i) {
+					technique->_vertices.push_back(scope->next_float());
+					scope->consume_if(kSymComma);
+				}
+				EXPECT(scope, kSymParenClose);
+				scope->consume_if(kSymComma);
+			}
+			EXPECT(scope, kSymListClose);
+			EXPECT(scope, kSymSemicolon);
+			break;
+
+		default:
+			if (technique->_vert_size == -1)
+				return false;
+			technique->_vb = GRAPHICS.create_static_vertex_buffer(technique->_vert_size * sizeof(float), &technique->_vertices[0]);
+			return true;
+		}
+	}
+	return true;
+}
+
+bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
+
+	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+
+	technique->_index_size = -1;
+	while (true) {
+		switch (scope->consume_in(valid_tags)) {
+
+		case kSymFormat: {
+			string format = scope->string_until(';');
+			if (format == "index16") {
+				technique->_index_size = 2;
+			} else if (format == "index32") {
+				technique->_index_size = 4;
+			} else {
+				return false;
+			}
+			EXPECT(scope, kSymSemicolon);
+			break;
+		}
+
+		case kSymData: {
+			int max_value = INT_MIN;
+			EXPECT(scope, kSymListOpen);
+			do {
+				technique->_indices.push_back(scope->next_int());
+				max_value = max(max_value, technique->_indices.back());
+
+			} while (scope->consume_if(kSymComma));
+
+			if (technique->_index_size == -1)
+				technique->_index_size = max_value < (1 << 16) ? 2 : 4;
+
+			EXPECT(scope, kSymListClose);
+			EXPECT(scope, kSymSemicolon);
+			break;
+		}
+		default:
+			if (technique->_index_size == -1) {
+				return false;
+			} else if (technique->_index_size == 2) {
+				// create a local copy of the indices
+				vector<uint16> v;
+				v.reserve(technique->_indices.size());
+				for (size_t i = 0; i < technique->_indices.size(); ++i)
+					v.push_back((uint16)technique->_indices[i]);
+				technique->_ib = GRAPHICS.create_static_index_buffer(technique->_index_size * v.size(), &v[0]);
+			} else {
+				technique->_ib = GRAPHICS.create_static_index_buffer(technique->_index_size * technique->_indices.size(), &technique->_indices[0]);
+			}
+			return true;
+		}
+	}
+	return true;
+}
+
 bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
-	static auto valid = list_of(kSymVertexShader)(kSymPixelShader)(kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
+	static auto valid = list_of
+		(kSymVertexShader)(kSymPixelShader)
+		(kSymVertices)(kSymIndices)
+		(kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
 
 	while (!scope->end()) {
 		Symbol symbol;
 		if (scope->consume_in(valid, &symbol)) {
 			switch (symbol) {
+
 			case kSymVertexShader:
-			case kSymPixelShader:
-				{
-					Shader **shader;
-					if (symbol == kSymVertexShader) {
-						shader = &technique->_vertex_shader;
-						*shader = new VertexShader;
-					} else {
-						shader = &technique->_pixel_shader;
-						*shader = new PixelShader;
-					}
-					EXPECT(scope, kSymBlockOpen);
-					if (!parse_shader(scope, *shader)) {
-						SAFE_DELETE(*shader);
-						return false;
-					}
-					EXPECT(scope, kSymBlockClose);
-					EXPECT(scope, kSymSemicolon);
+			case kSymPixelShader: {
+				Shader **shader;
+				if (symbol == kSymVertexShader) {
+					shader = &technique->_vertex_shader;
+					*shader = new VertexShader;
+				} else {
+					shader = &technique->_pixel_shader;
+					*shader = new PixelShader;
 				}
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_shader(scope, *shader)) {
+					SAFE_DELETE(*shader);
+					return false;
+				}
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
 				break;
+			}
 
 			case kSymRasterizerDesc:
 				EXPECT(scope, kSymBlockOpen);
@@ -806,6 +944,26 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 				EXPECT(scope, kSymBlockClose);
 				EXPECT(scope, kSymSemicolon);
 				break;
+
+			case kSymVertices:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_vertices(scope, technique)) {
+					// TODO: delete buffer
+					return false;
+				}
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymIndices:
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_indices(scope, technique)) {
+					// TODO: delete buffer
+					return false;
+				}
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
 			}
 		} else {
 			return true;
@@ -817,16 +975,17 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 bool TechniqueParser::parse_inner(Scope *scope, Technique *technique) {
 
 	switch (scope->next_symbol()) {
-	case kSymTechnique:
-		{
-			technique->_name = scope->next_identifier();
-			EXPECT(scope, kSymBlockOpen);
-			parse_technique(scope, technique);
-			EXPECT(scope, kSymBlockClose);
-			EXPECT(scope, kSymSemicolon);
-			return true;
-		}
+
+	case kSymTechnique: {
+		technique->_name = scope->next_identifier();
+		EXPECT(scope, kSymBlockOpen);
+		parse_technique(scope, technique);
+		EXPECT(scope, kSymBlockClose);
+		EXPECT(scope, kSymSemicolon);
+		return true;
 		break;
+	}
+
 	default:
 		return false;
 	}
