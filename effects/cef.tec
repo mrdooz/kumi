@@ -4,6 +4,16 @@ technique cef {
 		file effects/cef.vso;
 		entry_point vs_main;
 	};
+	
+	pixel_shader {
+		params [
+			{ texture2d cef_rt system; },
+			{ sampler cef_sampler technique; }
+		];
+
+		file effects/cef.pso;
+		entry_point ps_main;
+	};
 
 	// 0,1
 	// 2,3
@@ -17,5 +27,17 @@ technique cef {
 	indices {
 		// format index32;
 		data [0, 1, 2, 2, 1, 3];
+	};
+	
+	sampler_desc {
+	};
+	
+	blend_desc {
+	};
+	
+	rasterizer_desc {
+	};
+	
+	depth_stencil_desc {
 	};
 };

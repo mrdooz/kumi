@@ -10,6 +10,8 @@ namespace Property {
 		kFloat3,
 		kFloat4,
 		kFloat4x4,
+		kTexture2d,
+		kSampler,
 		kInt,
 	};
 }

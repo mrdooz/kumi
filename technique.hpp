@@ -15,6 +15,7 @@ struct ShaderParam {
 			kSystem,
 			kUser,
 			kMesh,
+			kTechnique,
 		};
 	};
 
@@ -107,12 +108,17 @@ public:
 	GraphicsObjectHandle sampler_state() const { return _sampler_state; }
 	GraphicsObjectHandle blend_state() const { return _blend_state; }
 	GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
+
+	void submit();
 private:
 
 	bool init();
 	bool init_shader(Shader *shader);
 	bool compile_shader(Shader *shader);
 	bool do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params);
+
+	RenderKey _key;
+	MeshRenderData _render_data;
 
 	string _name;
 	Shader *_vertex_shader;

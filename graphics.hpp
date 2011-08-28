@@ -23,6 +23,7 @@ struct RenderKey {
 	enum Cmd {
 		kDelete,	// submitted when the object is deleted to avoid using stale data
 		kRenderMesh,
+		kRenderTechnique,
 	};
 	union {
 		struct {
@@ -182,6 +183,7 @@ public:
 
 	GraphicsObjectHandle load_technique(const char *filename);
 	GraphicsObjectHandle find_technique(const char *name);
+	Technique *find_technique2(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
 	GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
@@ -203,7 +205,7 @@ private:
 	Graphics();
 	~Graphics();
 
-	void set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id, bool vertex_shader);
+	void set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id);
 
   bool create_back_buffers(int width, int height);
 	static Graphics* _instance;

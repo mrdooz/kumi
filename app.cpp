@@ -299,6 +299,7 @@ App::App()
 	, _cef_layout(nullptr)
 	, _cef_effect(nullptr)
 	, _io(nullptr)
+	, _scene(nullptr)
 	, m_MainHwnd(NULL),
 	m_BrowserHwnd(NULL),
 	m_EditHwnd(NULL),
@@ -353,16 +354,11 @@ bool App::init(HINSTANCE hinstance)
 	KumiLoader loader;
 	loader.load("c:\\temp\\torus.kumi", _io, &_scene);
 
-	// load all the techniques
-	void *token;
-	string filename;
-	if (_io->find_first("effects/*.tec", &filename, &token)) {
-		do {
-			if (!GRAPHICS.load_technique(filename.c_str()).is_valid()) {
-				// log error
-			}
-		} while (_io->find_next(token, &filename));
-		_io->find_close(token);
+	if (!GRAPHICS.load_technique("effects/diffuse.tec").is_valid()) {
+		// log error
+	}
+	if (!GRAPHICS.load_technique("effects/cef.tec").is_valid()) {
+		// log error
 	}
 
 	//Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
@@ -458,20 +454,22 @@ UINT App::run(void *userdata) {
 
 			CefDoMessageLoopWork();
 
-			Camera *camera = _scene->cameras[0];
-			XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
-				XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
-				XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
-				XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
+			if (_scene && !_scene->cameras.empty()) {
+				Camera *camera = _scene->cameras[0];
+				XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
+					XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
+					XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
+					XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
 
-			XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV4, 640/480.0f, 1, 1000));
+				XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV4, 640/480.0f, 1, 1000));
 
-			XMFLOAT4X4 lookat_tmp, proj_tmp;
-			XMStoreFloat4x4(&lookat_tmp, lookat);
-			XMStoreFloat4x4(&proj_tmp, proj);
+				XMFLOAT4X4 lookat_tmp, proj_tmp;
+				XMStoreFloat4x4(&lookat_tmp, lookat);
+				XMStoreFloat4x4(&proj_tmp, proj);
 
-			PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
-			PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
+				PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
+				PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
+			}
 
 			//DEMO_ENGINE.tick();
 
@@ -487,11 +485,14 @@ UINT App::run(void *userdata) {
 
 			//DebugRenderer::instance().start_frame();
 
-			for (size_t i = 0; i < _scene->meshes.size(); ++i)
-				_scene->meshes[i]->submit();
-
+			if (_scene) {
+				for (size_t i = 0; i < _scene->meshes.size(); ++i)
+					_scene->meshes[i]->submit();
+			}
 
 			{
+				GRAPHICS.find_technique2("cef")->submit();
+/*
 				ID3D11DeviceContext *context = GRAPHICS.context();
 				context->PSSetSamplers(0, 1, &_cef_desc.sampler_state);
 				_cef_effect->set_shaders(context);
@@ -505,6 +506,7 @@ UINT App::run(void *userdata) {
 				context->RSSetState(_cef_desc.rasterizer_state);
 				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
 				context->Draw(6, 0);
+*/
 			}
 
 /*
@@ -660,7 +662,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 			GetClientRect(hWnd, &rect);
 			info.SetAsOffScreen(hWnd);
 			info.SetIsTransparent(TRUE);
-			CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "file://C:/temp/tjong.html", settings);
+			CefBrowser::CreateBrowser(info, CefRefPtr<CefClient>(this), "file://C:/temp/tjong.html", settings);
 			//InitExtensionTest();
 			//CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "http://www.google.com", settings);
 		}

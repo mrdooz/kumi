@@ -126,10 +126,14 @@ cb_found:
 		D3D11_SHADER_INPUT_BIND_DESC input_desc;
 		reflector->GetResourceBindingDesc(i, &input_desc);
 		switch (input_desc.Type) {
-		case D3D10_SIT_TEXTURE:
+		case D3D10_SIT_TEXTURE: {
+			int a = 10;
+														}
 			//_bound_textures.insert(make_pair(input_desc.Name, input_desc));
 			break;
-		case D3D10_SIT_SAMPLER:
+		case D3D10_SIT_SAMPLER: {
+			int a =10;
+														}
 			//_bound_samplers.insert(make_pair(input_desc.Name, input_desc));
 			break;
 
@@ -234,4 +238,9 @@ bool Technique::init() {
 	_depth_stencil_state = GRAPHICS.create_depth_stencil_state(_depth_stencil_desc);
 
 	return true;
+}
+
+void Technique::submit() {
+	_key.cmd = RenderKey::kRenderTechnique;
+	GRAPHICS.submit_command(_key, (void *)this);
 }

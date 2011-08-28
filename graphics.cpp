@@ -397,6 +397,14 @@ GraphicsObjectHandle Graphics::load_technique(const char *filename) {
 	return ret;
 }
 
+Technique *Graphics::find_technique2(const char *name) {
+	for (int i = 0; i < _techniques.Size; ++i) {
+		if (_techniques[i].first && _techniques[i].first->name() == name)
+			return _techniques[i].first;
+	}
+	return NULL;
+}
+
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
 	for (int i = 0; i < _techniques.Size; ++i) {
 		if (_techniques[i].first && _techniques[i].first->name() == name)
@@ -410,7 +418,7 @@ void Graphics::submit_command(RenderKey key, void *data) {
 	_render_commands.push_back(make_pair(key, data));
 }
 
-void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id, bool vertex_shader) {
+void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id) {
 
 	ID3D11DeviceContext *ctx = _immediate_context._context;
 
@@ -446,7 +454,7 @@ void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_
 		const CBuffer &cb = cbuffers[i];
 		ID3D11Buffer *buffer = _constant_buffers.get(cb.handle);
 		ctx->UpdateSubresource(buffer, 0, NULL, &cb.staging[0], 0, 0);
-		if (vertex_shader)
+		if (shader->type() == Shader::kVertexShader)
 			ctx->VSSetConstantBuffers(0, 1, &buffer);
 		else
 			ctx->PSSetConstantBuffers(0, 1, &buffer);
@@ -471,6 +479,16 @@ void Graphics::render() {
 		case RenderKey::kDelete:
 				deleted_items.insert(cmd.second);
 				break;
+
+		case RenderKey::kRenderTechnique: {
+			if (deleted_items.find(cmd.second) != deleted_items.end())
+				break;
+
+			Technique *technique = (Technique *)cmd.second;
+
+			break;
+			}
+
 		case RenderKey::kRenderMesh:
 			{
 				if (deleted_items.find(cmd.second) != deleted_items.end())
@@ -478,31 +496,25 @@ void Graphics::render() {
 				const MeshRenderData *data = (const MeshRenderData *)cmd.second;
 				const Material &material = MATERIAL_MANAGER.get_material(data->material_id);
 				Technique *technique = _techniques.get(find_technique(material.technique.c_str()));
-				ID3D11InputLayout *layout = _input_layouts.get(technique->input_layout());
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
-				ID3D11VertexShader *vs = _vertex_shaders.get(vertex_shader->shader);
-				ID3D11PixelShader *ps = _pixel_shaders.get(pixel_shader->shader);
-				ID3D11Buffer *vb = _vertex_buffers.get(data->vb);
-				ID3D11Buffer *ib = _index_buffers.get(data->ib);
 
 				ID3D11DeviceContext *ctx = _immediate_context._context;
-				ctx->VSSetShader(vs, NULL, 0);
+				ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
 				ctx->GSSetShader(NULL, 0, 0);
-				ctx->PSSetShader(ps, NULL, 0);
+				ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
 
-
-				set_vb(ctx, vb, data->vertex_size);
-				ctx->IASetIndexBuffer(ib, data->index_size == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
-				ctx->IASetInputLayout(layout);
+				set_vb(ctx, _vertex_buffers.get(data->vb), data->vertex_size);
+				ctx->IASetIndexBuffer(_index_buffers.get(data->ib), data->index_size == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
+				ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
 
 				ctx->IASetPrimitiveTopology(data->topology);
 
 				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
 				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
 
-				set_params(technique, vertex_shader, data->material_id, 0, true);
-				set_params(technique, pixel_shader, data->material_id, 0, false);
+				set_params(technique, vertex_shader, data->material_id, 0);
+				set_params(technique, pixel_shader, data->material_id, 0);
 
 				ctx->DrawIndexed(data->index_count, 0, 0);
 			}

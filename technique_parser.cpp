@@ -45,6 +45,8 @@ enum Symbol {
 	kSymFloat3,
 	kSymFloat4,
 	kSymFloat4x4,
+	kSymTexture2d,
+	kSymSampler,
 	kSymInt,
 	kSymParamDefault,
 
@@ -126,6 +128,8 @@ struct {
 	{ kSymFloat4, "float4" },
 	{ kSymFloat4x4, "float4x4" },
 	{ kSymInt, "int" },
+	{ kSymTexture2d, "texture2d" },
+	{ kSymSampler, "sampler" },
 	{ kSymParamDefault, "default" },
 
 	// descs
@@ -443,13 +447,16 @@ bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
 		(kSymFloat2, Property::kFloat2)
 		(kSymFloat3, Property::kFloat3)
 		(kSymFloat4, Property::kFloat4)
-		(kSymFloat4x4, Property::kFloat4x4);
+		(kSymFloat4x4, Property::kFloat4x4)
+		(kSymTexture2d, Property::kTexture2d)
+		(kSymSampler, Property::kSampler);
 
 	static auto valid_sources = map_list_of
 		("material", ShaderParam::Source::kMaterial)
 		("system", ShaderParam::Source::kSystem)
 		("user", ShaderParam::Source::kUser)
-		("mesh", ShaderParam::Source::kMesh);
+		("mesh", ShaderParam::Source::kMesh)
+		("technique", ShaderParam::Source::kTechnique);
 
 	// type, name and source are required. the default value is optional
 	param->type = lookup_default<Symbol, Property::Enum>(scope->next_symbol(), valid_types, Property::kUnknown);
