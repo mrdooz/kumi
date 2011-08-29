@@ -418,12 +418,22 @@ void Graphics::submit_command(RenderKey key, void *data) {
 	_render_commands.push_back(make_pair(key, data));
 }
 
-void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id) {
+void Graphics::set_samplers(Technique *technique, Shader *shader) {
+
+}
+
+void Graphics::set_resource_views(Technique *technique, Shader *shader) {
+
+}
+
+void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id) {
 
 	ID3D11DeviceContext *ctx = _immediate_context._context;
 
 	vector<CBuffer> &cbuffers = technique->get_cbuffers();
 
+	// copy the parameters into the technique's cbuffer staging area
+	// TODO: lots of hacks here..
 	for (size_t i = 0; i < shader->params.size(); ++i) {
 		const ShaderParam &p = shader->params[i];
 		const CBuffer &cb = cbuffers[p.cbuffer];
@@ -450,6 +460,7 @@ void Graphics::set_params(Technique *technique, Shader *shader, uint16 material_
 		}
 	}
 
+	// commit the staging area
 	for (size_t i = 0; i < cbuffers.size(); ++i) {
 		const CBuffer &cb = cbuffers[i];
 		ID3D11Buffer *buffer = _constant_buffers.get(cb.handle);
@@ -513,8 +524,8 @@ void Graphics::render() {
 				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
 				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
 
-				set_params(technique, vertex_shader, data->material_id, 0);
-				set_params(technique, pixel_shader, data->material_id, 0);
+				set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
+				set_cbuffer_params(technique, pixel_shader, data->material_id, 0);
 
 				ctx->DrawIndexed(data->index_count, 0, 0);
 			}

@@ -1,5 +1,5 @@
-Texture2D g_texture;
-extern sampler g_sampler;
+Texture2D cef_texture;
+sampler cef_sampler;
 
 void vs_main(
 	in float4 i_pos : SV_POSITION, 
@@ -13,5 +13,5 @@ void vs_main(
 
 float4 ps_main(in float4 pos : SV_POSITION, in float2 tex : TEXCOORD) : SV_Target
 {
-	return g_texture.Sample(g_sampler, tex);
+	return cef_texture.Sample(cef_sampler, tex);
 }

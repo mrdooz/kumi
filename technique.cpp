@@ -15,7 +15,6 @@ Technique::Technique()
 	: _vertex_shader(nullptr)
 	, _pixel_shader(nullptr)
 	, _rasterizer_desc(CD3D11_DEFAULT())
-	, _sampler_desc(CD3D11_DEFAULT())
 	, _blend_desc(CD3D11_DEFAULT())
 	, _depth_stencil_desc(CD3D11_DEFAULT())
 	, _vert_size(-1)
@@ -79,25 +78,30 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 			return false;
 	}
 
+	// constant buffers are stored per technique as they are shared between the
+	// vertex and pixel shaders (at least the global cbuffer is)
+
 	for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
 		ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
 		D3D11_SHADER_BUFFER_DESC cb_desc;
 		cb->GetDesc(&cb_desc);
 
-		// constant buffers are stored per technique as they are shared between the
-		// vertex and pixel shaders (at least the global cbuffer is)
-
+		// see if a cbuffer with the current name already exists..
 		int cb_idx = -1;
+		bool found = false;
 		for (size_t j = 0; j < _constant_buffers.size(); ++j) {
 			if (_constant_buffers[j].name == cb_desc.Name) {
 				cb_idx = j;
-				goto cb_found;
+				found = true;
+				break;
 			}
 		}
-		cb_idx = _constant_buffers.size();
-		_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, GRAPHICS.create_constant_buffer(cb_desc.Size)));
-cb_found:
+		if (!found) {
+			cb_idx = _constant_buffers.size();
+			_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, GRAPHICS.create_constant_buffer(cb_desc.Size)));
+		}
 
+		// extract all the used variable's cbuffer, starting offset and size
 		for (UINT j = 0; j < cb_desc.Variables; ++j) {
 			ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
 			D3D11_SHADER_VARIABLE_DESC var_desc;
@@ -113,11 +117,6 @@ cb_found:
 				param->start_offset = var_desc.StartOffset;
 				param->size = var_desc.Size;
 			}
-/*
-			ID3D11ShaderReflectionType* t = v->GetType();
-			D3D11_SHADER_TYPE_DESC type_desc;
-			t->GetDesc(&type_desc);
-*/
 		}
 	}
 
@@ -233,9 +232,10 @@ bool Technique::init() {
 		B_ERR_BOOL(init_shader(_pixel_shader));
 
 	_rasterizer_state = GRAPHICS.create_rasterizer_state(_rasterizer_desc);
-	_sampler_state = GRAPHICS.create_sampler_state(_sampler_desc);
 	_blend_state = GRAPHICS.create_blend_state(_blend_desc);
 	_depth_stencil_state = GRAPHICS.create_depth_stencil_state(_depth_stencil_desc);
+	for (size_t i = 0; i < _sampler_descs.size(); ++i)
+		_sampler_states.push_back(make_pair(_sampler_descs[i].first, GRAPHICS.create_sampler_state(_sampler_descs[i].second)));
 
 	return true;
 }

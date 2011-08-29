@@ -7,30 +7,42 @@
 using std::vector;
 using std::string;
 
-struct ShaderParam {
-	struct Source {
-		enum Enum {
-			kUnknown,
-			kMaterial,
-			kSystem,
-			kUser,
-			kMesh,
-			kTechnique,
-		};
+namespace PropertySource {
+	enum Enum {
+		kUnknown,
+		kMaterial,
+		kSystem,
+		kUser,
+		kMesh,
+		kTechnique,
 	};
+}
+
+struct ParamBase {
+	string name;
+	PropertyType::Enum type;
+	PropertySource::Enum source;
+};
+
+struct CBufferParam : public ParamBase {
 
 	union DefaultValue {
 		int _int;
 		float _float[16];
 	};
 
-	string name;
-	Property::Enum type;
-	Source::Enum source;
 	int cbuffer;
 	int start_offset;  // offset in cbuffer
 	int size;
 	DefaultValue default_value;
+};
+
+struct SamplerParam : public ParamBase {
+
+};
+
+struct ResourceViewParam : public ParamBase {
+
 };
 
 struct Shader {
@@ -41,10 +53,10 @@ struct Shader {
 	};
 
 	Shader(const string &entry_point) : entry_point(entry_point), valid(false) {}
-	ShaderParam *find_by_name(const char *name) {
-		for (size_t i = 0; i < params.size(); ++i) {
-			if (params[i].name == name)
-				return &params[i];
+	CBufferParam *find_cbuffer_param(const char *name) {
+		for (size_t i = 0; i < cbuffer_params.size(); ++i) {
+			if (cbuffer_params[i].name == name)
+				return &cbuffer_params[i];
 		}
 		return NULL;
 	}
@@ -57,7 +69,9 @@ struct Shader {
 	string filename;
 	string source;
 	string entry_point;
-	vector<ShaderParam> params;
+	vector<CBufferParam> cbuffer_params;
+	vector<SamplerParam> sampler_params;
+	vector<ResourceViewParam> resource_view_params;
 	GraphicsObjectHandle shader;
 };
 
@@ -105,7 +119,7 @@ public:
 	vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
 	GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
-	GraphicsObjectHandle sampler_state() const { return _sampler_state; }
+	//GraphicsObjectHandle sampler_state() const { return _sampler_state; }
 	GraphicsObjectHandle blend_state() const { return _blend_state; }
 	GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
 
@@ -136,12 +150,12 @@ private:
 	GraphicsObjectHandle _ib;
 
 	GraphicsObjectHandle _rasterizer_state;
-	GraphicsObjectHandle _sampler_state;  // todo: named samplers
+	vector<pair<string, GraphicsObjectHandle> > _sampler_states;
 	GraphicsObjectHandle _blend_state;
 	GraphicsObjectHandle _depth_stencil_state;
 
 	CD3D11_RASTERIZER_DESC _rasterizer_desc;
-	CD3D11_SAMPLER_DESC _sampler_desc;
+	vector<pair<string, CD3D11_SAMPLER_DESC>> _sampler_descs;
 	CD3D11_BLEND_DESC _blend_desc;
 	CD3D11_DEPTH_STENCIL_DESC _depth_stencil_desc;
 };

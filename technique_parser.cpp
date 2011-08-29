@@ -235,18 +235,18 @@ private:
 
 }
 
-static void parse_value(const string &value, ShaderParam *param) {
+static void parse_value(const string &value, CBufferParam *param) {
 	switch (param->type) {
-	case Property::kFloat:
+	case PropertyType::kFloat:
 		sscanf(value.c_str(), "%f", &param->default_value._float[0]);
 		break;
-	case Property::kFloat2:
+	case PropertyType::kFloat2:
 		sscanf(value.c_str(), "%f %f", &param->default_value._float[0], &param->default_value._float[1]);
 		break;
-	case Property::kFloat3:
+	case PropertyType::kFloat3:
 		sscanf(value.c_str(), "%f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2]);
 		break;
-	case Property::kFloat4:
+	case PropertyType::kFloat4:
 		sscanf(value.c_str(), "%f %f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2], &param->default_value._float[3]);
 		break;
 	}
@@ -441,31 +441,31 @@ struct Scope {
 		}                                                                 \
 	} while(false)
 
-bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
+bool TechniqueParser::parse_param(Scope *scope, CBufferParam *param) {
 	static auto valid_types = map_list_of
-		(kSymFloat, Property::kFloat)
-		(kSymFloat2, Property::kFloat2)
-		(kSymFloat3, Property::kFloat3)
-		(kSymFloat4, Property::kFloat4)
-		(kSymFloat4x4, Property::kFloat4x4)
-		(kSymTexture2d, Property::kTexture2d)
-		(kSymSampler, Property::kSampler);
+		(kSymFloat, PropertyType::kFloat)
+		(kSymFloat2, PropertyType::kFloat2)
+		(kSymFloat3, PropertyType::kFloat3)
+		(kSymFloat4, PropertyType::kFloat4)
+		(kSymFloat4x4, PropertyType::kFloat4x4)
+		(kSymTexture2d, PropertyType::kTexture2d)
+		(kSymSampler, PropertyType::kSampler);
 
 	static auto valid_sources = map_list_of
-		("material", ShaderParam::Source::kMaterial)
-		("system", ShaderParam::Source::kSystem)
-		("user", ShaderParam::Source::kUser)
-		("mesh", ShaderParam::Source::kMesh)
-		("technique", ShaderParam::Source::kTechnique);
+		("material", PropertySource::kMaterial)
+		("system", PropertySource::kSystem)
+		("user", PropertySource::kUser)
+		("mesh", PropertySource::kMesh)
+		("technique", PropertySource::kTechnique);
 
 	// type, name and source are required. the default value is optional
-	param->type = lookup_default<Symbol, Property::Enum>(scope->next_symbol(), valid_types, Property::kUnknown);
-	if (param->type == Property::kUnknown)
+	param->type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_types, PropertyType::kUnknown);
+	if (param->type == PropertyType::kUnknown)
 		return false;
 
 	param->name = scope->next_identifier();
-	param->source = lookup_default<string, ShaderParam::Source::Enum>(scope->next_identifier(), valid_sources, ShaderParam::Source::kUnknown);
-	if (param->source == ShaderParam::Source::kUnknown)
+	param->source = lookup_default<string, PropertySource::Enum>(scope->next_identifier(), valid_sources, PropertySource::kUnknown);
+	if (param->source == PropertySource::kUnknown)
 		return false;
 
 	EXPECT(scope, kSymSemicolon);
@@ -479,10 +479,10 @@ bool TechniqueParser::parse_param(Scope *scope, ShaderParam *param) {
 	return true;
 }
 
-bool TechniqueParser::parse_params(Scope *scope, vector<ShaderParam> *params) {
+bool TechniqueParser::parse_params(Scope *scope, vector<CBufferParam> *params) {
 	while (true) {
 		EXPECT(scope, kSymBlockOpen);
-		ShaderParam param;
+		CBufferParam param;
 		if (parse_param(scope, &param))
 			params->push_back(param);
 		else
@@ -509,7 +509,7 @@ bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 			break;
 		case kSymParams:
 			EXPECT(scope, kSymListOpen);
-			parse_params(scope, &shader->params);
+			parse_params(scope, &shader->cbuffer_params);
 			EXPECT(scope, kSymListClose);
 			EXPECT(scope, kSymSemicolon);
 			break;
@@ -928,13 +928,17 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 				EXPECT(scope, kSymSemicolon);
 				break;
 
-			case kSymSamplerDesc:
+			case kSymSamplerDesc: {
+				string name = scope->next_identifier();
 				EXPECT(scope, kSymBlockOpen);
-				if (!parse_sampler_desc(scope, &technique->_sampler_desc))
+				D3D11_SAMPLER_DESC desc;
+				if (!parse_sampler_desc(scope, &desc))
 					return false;
+				technique->_sampler_descs.push_back(make_pair(name, desc));
 				EXPECT(scope, kSymBlockClose);
 				EXPECT(scope, kSymSemicolon);
 				break;
+			}
 
 			case kSymDepthStencilDesc:
 				EXPECT(scope, kSymBlockOpen);

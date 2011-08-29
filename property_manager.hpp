@@ -2,7 +2,7 @@
 
 using std::hash_map;
 
-namespace Property {
+namespace PropertyType {
 	enum Enum {
 		kUnknown,
 		kFloat,

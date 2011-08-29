@@ -96,6 +96,7 @@ class GraphicsObjectHandle {
 		kTechnique,
 		kVertexShader,
 		kPixelShader,
+		kShaderResourceView,
 	};	
 	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : _type(type), _generation(generation), _id(id) {}
 	uint32_t _type : 8;
@@ -205,7 +206,9 @@ private:
 	Graphics();
 	~Graphics();
 
-	void set_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id);
+	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id);
+	void set_samplers(Technique *technique, Shader *shader);
+	void set_resource_views(Technique *technique, Shader *shader);
 
   bool create_back_buffers(int width, int height);
 	static Graphics* _instance;
@@ -343,6 +346,7 @@ private:
 	IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
 	IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
 	IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
+	IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;
