@@ -73,5 +73,4 @@ typedef uint64_t uint64;
 
 #include <cef.h>
 
-#include "stb_truetype.h"
 using namespace fastdelegate;

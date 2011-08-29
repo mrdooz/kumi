@@ -4,7 +4,6 @@
 #include "logger.hpp"
 #include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
-#include "d3d_parser.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 #include "v8_handler.hpp"
@@ -35,7 +34,7 @@ App* App::_instance = nullptr;
 
 void App::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
 	D3D11_MAPPED_SUBRESOURCE sub;
-	GRAPHICS.context()->Map(_cef_staging.texture, 0, D3D11_MAP_WRITE, 0, &sub);
+	GRAPHICS.map(_cef_staging, 0, D3D11_MAP_WRITE, 0, &sub);
 	uint8_t *dst = (uint8_t *)sub.pData + 4 * dirtyRect.x + dirtyRect.y * sub.RowPitch;
 	uint8_t *src = (uint8_t *)buffer + 4 * (dirtyRect.x + dirtyRect.y * _width);
 	const int src_pitch = _width * 4;
@@ -44,8 +43,8 @@ void App::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const Ce
 		dst += sub.RowPitch;
 		src += src_pitch;
 	}
-	GRAPHICS.context()->Unmap(_cef_staging.texture, 0);
-	GRAPHICS.context()->CopyResource(_cef_texture.texture, _cef_staging.texture);
+	GRAPHICS.unmap(_cef_staging, 0);
+	GRAPHICS.copy_resource(_cef_texture, _cef_staging);
 }
 
 void App::OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor)
@@ -223,68 +222,6 @@ void App::SetNavState(bool canGoBack, bool canGoForward)
 	EnableWindow(m_ForwardHwnd, canGoForward);
 }
 
-void create_input_desc(const PosTex *verts, InputDesc *desc) 
-{
-	desc->
-		add("SV_POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0).
-		add("TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0);
-}
-
-template<typename T>
-bool vb_from_data(const T *verts, int num_verts, ID3D11Buffer **vb, InputDesc *desc)
-{
-	B_WRN_HR(GRAPHICS.create_static_vertex_buffer(num_verts, sizeof(T), verts, vb));
-	create_input_desc(verts, desc);
-	return true;
-}
-
-
-template<typename T>
-bool simple_load(const T *verts, int num_verts,
-	const char *shader, const char *vs, const char *gs, const char *ps, 
-	const char *state, const char *blend_desc, const char *depth_stencil_desc, const char *rasterizer_desc, const char *sampler_desc,
-	ID3D11Buffer **vb, ID3D11InputLayout **layout, EffectWrapper **effect, RenderStates *render_states) 
-{
-	InputDesc desc;
-	B_WRN_BOOL(vb_from_data(verts, num_verts, vb, &desc));
-
-	*effect = EffectWrapper::create_from_file(shader, vs, gs, ps);
-	B_WRN_BOOL(!!(*effect));
-
-	if (state && render_states) {
-		void *buf = NULL;
-		size_t len = 0;
-		B_WRN_BOOL(load_file(state, &buf, &len));
-		map<string, D3D11_BLEND_DESC> blend_descs;
-		map<string, D3D11_DEPTH_STENCIL_DESC> depth_stencil_descs;
-		map<string, D3D11_RASTERIZER_DESC> rasterizer_descs;
-		map<string, D3D11_SAMPLER_DESC> sampler_descs;
-		parse_descs((const char *)buf, (const char *)buf + len, 
-			blend_desc ? &blend_descs : NULL,
-			depth_stencil_desc ? &depth_stencil_descs : NULL,
-			rasterizer_desc ? &rasterizer_descs : NULL,
-			sampler_desc ? &sampler_descs : NULL);
-
-#define CREATE_STATE(n, fn) \
-	if (n ## _desc && n ## _descs.find(n ## _desc) != n ## _descs.end()) { \
-			render_states->n ## _desc = n ## _descs[n ## _desc];	\
-			GRAPHICS.device()->fn(&render_states->n ## _desc, &render_states->n ## _state); \
-	}
-
-		CREATE_STATE(blend, CreateBlendState);
-		CREATE_STATE(depth_stencil, CreateDepthStencilState);
-		CREATE_STATE(rasterizer, CreateRasterizerState);
-		CREATE_STATE(sampler, CreateSamplerState);
-
-#undef CREATE_STATE
-	}
-
-	*layout = desc.create(*effect);
-
-	return true;
-}
-
-
 App::App()
 	: _hinstance(NULL)
 	, _width(-1)
@@ -295,9 +232,6 @@ App::App()
 	, _cur_camera(1)
 	, _draw_plane(false)
 	, _ref_count(1)
-	, _cef_vb(nullptr)
-	, _cef_layout(nullptr)
-	, _cef_effect(nullptr)
 	, _io(nullptr)
 	, _scene(nullptr)
 	, m_MainHwnd(NULL),
@@ -343,14 +277,6 @@ bool App::init(HINSTANCE hinstance)
 */
 	B_ERR_BOOL(create_window());
 
-	PosTex verts[6];
-	for (int i = 0; i < 6; ++i)
-		verts[i].pos.z = 0;
-
-	const int stride = sizeof(PosTex);
-	make_quad_clip_space_unindexed(&verts[0].pos.x, &verts[0].pos.y, &verts[0].tex.x, &verts[0].tex.y,
-		stride, stride, stride, stride, 0, 0, 1, 1);
-
 	KumiLoader loader;
 	loader.load("c:\\temp\\torus.kumi", _io, &_scene);
 
@@ -360,13 +286,6 @@ bool App::init(HINSTANCE hinstance)
 	if (!GRAPHICS.load_technique("effects/cef.tec").is_valid()) {
 		// log error
 	}
-
-	//Technique *t = Technique::create_from_file("effects/debug_font.tec", &io);
-
-	B_ERR_BOOL(simple_load(verts, ELEMS_IN_ARRAY(verts), 
-		"effects/debug_font.fx", "vs_main", NULL, "ps_main", 
-		"effects/debug_font_states.txt", "blend", "", "mr_tjong", "debug_font", 
-		&_cef_vb, &_cef_layout, &_cef_effect, &_cef_desc));
 
 	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
@@ -623,13 +542,13 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 
 	case WM_SIZE:
 		GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
-		GRAPHICS.create_texture(
+		_cef_texture = GRAPHICS.create_texture(
 			CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
-			&_cef_texture);
+			"cef_texture");
 
-		GRAPHICS.create_texture(
+		_cef_staging = GRAPHICS.create_texture(
 			CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, 0, D3D11_USAGE_STAGING, D3D11_CPU_ACCESS_WRITE),
-			&_cef_staging);
+			"cef_staging");
 
 		if (GetBrowserHwnd()) {
 			RECT rect;

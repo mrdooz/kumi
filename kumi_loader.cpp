@@ -3,6 +3,7 @@
 #include "io.hpp"
 #include "material_manager.hpp"
 #include "scene.hpp"
+#include "dx_utils.hpp"
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -65,14 +66,14 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 			mesh->submeshes.push_back(submesh);
 			const int vb_flags = step_read<int>(&buf);
 			submesh->data.vertex_size = step_read<int>(&buf);
-			submesh->data.index_size = step_read<int>(&buf);
+			submesh->data.index_format = index_size_to_format(step_read<int>(&buf));
 			const int *vb = step_read<const int*>(&buf);
 			const int vb_size = *vb;
 			submesh->data.vertex_count = vb_size / submesh->data.vertex_size;
 			submesh->data.vb = GRAPHICS.create_static_vertex_buffer(vb_size, (const void *)(vb + 1));
 			const int *ib = step_read<const int*>(&buf);
 			const int ib_size = *ib;
-			submesh->data.index_count = ib_size / submesh->data.index_size;
+			submesh->data.index_count = ib_size / index_format_to_size(submesh->data.index_format);
 			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 1));
 
 		}
@@ -111,16 +112,16 @@ bool KumiLoader::load_materials(const char *buf) {
 		int props = step_read<int>(&buf);
 		for (int j = 0; j < props; ++j) {
 			const char *name = step_read<const char *>(&buf);
-			Property::Enum type = step_read<Property::Enum>(&buf);
+			PropertyType::Enum type = step_read<PropertyType::Enum>(&buf);
 			switch (type) {
-			case Property::kInt:
+			case PropertyType::kInt:
 				material.properties.push_back(MaterialProperty(name, step_read<int>(&buf)));
 				break;
-			case Property::kFloat:
+			case PropertyType::kFloat:
 				material.properties.push_back(MaterialProperty(name, step_read<float>(&buf)));
 				break;
 
-			case Property::kFloat4:
+			case PropertyType::kFloat4:
 				material.properties.push_back(MaterialProperty(name, step_read<XMFLOAT4>(&buf)));
 				break;
 			}

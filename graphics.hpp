@@ -67,6 +67,7 @@ struct TextureData {
 		texture.Release();
 		srv.Release();
 	}
+	operator bool() { return texture || srv; }
 	D3D11_TEXTURE2D_DESC texture_desc;
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 	CComPtr<ID3D11Texture2D> texture;
@@ -111,7 +112,7 @@ public:
 struct MeshRenderData {
 	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
 	GraphicsObjectHandle vb, ib;
-	int index_size;
+	DXGI_FORMAT index_format;
 	int index_count;
 	int vertex_size;
 	int vertex_count;
@@ -159,6 +160,13 @@ public:
 
 	bool create_render_target(int width, int height, RenderTargetData *out);
 	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
+
+	GraphicsObjectHandle create_render_target(int width, int height);
+	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
+
+	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
+	void unmap(GraphicsObjectHandle h, UINT sub);
+	void copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src);
 
 	// Create a texture, and fill it with data
 	bool create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
@@ -347,6 +355,7 @@ private:
 	IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
 	IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 	IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
+	IdBuffer<TextureData, IdCount, string> _textures;
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;

@@ -27,10 +27,10 @@ uint16 MaterialManager::add_material(const Material &material) {
 	for (size_t i = 0; i < material.properties.size(); ++i) {
 		const MaterialProperty &p = material.properties[i];
 		switch (p.type) {
-		case Property::kFloat:
+		case PropertyType::kFloat:
 			PROPERTY_MANAGER.set_material_property(key, p.name.c_str(), p._float[0]);
 			break;
-		case Property::kFloat4:
+		case PropertyType::kFloat4:
 			PROPERTY_MANAGER.set_material_property(key, p.name.c_str(), XMFLOAT4(p._float[0], p._float[1], p._float[2], p._float[3]));
 			break;
 		}

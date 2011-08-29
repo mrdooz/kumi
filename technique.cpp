@@ -17,8 +17,8 @@ Technique::Technique()
 	, _rasterizer_desc(CD3D11_DEFAULT())
 	, _blend_desc(CD3D11_DEFAULT())
 	, _depth_stencil_desc(CD3D11_DEFAULT())
-	, _vert_size(-1)
-	, _index_size(-1)
+	, _vertex_size(-1)
+	, _index_format(DXGI_FORMAT_UNKNOWN)
 {
 }
 
@@ -108,7 +108,7 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 			v->GetDesc(&var_desc);
 			if (var_desc.uFlags & D3D_SVF_USED) {
 				used_params->insert(var_desc.Name);
-				ShaderParam *param = shader->find_by_name(var_desc.Name);
+				CBufferParam *param = shader->find_cbuffer_param(var_desc.Name);
 				if (!param) {
 					LOG_ERROR("Shader parameter %s not found", var_desc.Name);
 					return false;
@@ -124,18 +124,32 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 	for (UINT i = 0; i < shader_desc.BoundResources; ++i) {
 		D3D11_SHADER_INPUT_BIND_DESC input_desc;
 		reflector->GetResourceBindingDesc(i, &input_desc);
-		switch (input_desc.Type) {
-		case D3D10_SIT_TEXTURE: {
-			int a = 10;
-														}
-			//_bound_textures.insert(make_pair(input_desc.Name, input_desc));
-			break;
-		case D3D10_SIT_SAMPLER: {
-			int a =10;
-														}
-			//_bound_samplers.insert(make_pair(input_desc.Name, input_desc));
-			break;
+		if (input_desc.BindCount > 1) {
+			LOG_ERROR("Only bind counts of 1 are supported");
+			return false;
+		}
 
+		switch (input_desc.Type) {
+
+			case D3D10_SIT_TEXTURE: {
+				ResourceViewParam *param = shader->find_resource_view_param(input_desc.Name);
+				if (!param) {
+					LOG_ERROR("Resource view %s not found", input_desc.Name);
+					return false;
+				}
+				param->bind_point = input_desc.BindPoint;
+				break;
+			}
+
+			case D3D10_SIT_SAMPLER: {
+				SamplerParam *param = shader->find_sampler_param(input_desc.Name);
+				if (!param) {
+					LOG_ERROR("Sampler %s not found", input_desc.Name);
+					return false;
+				}
+				param->bind_point = input_desc.BindPoint;
+				break;
+			}
 		}
 	}
 	return true;
@@ -204,9 +218,9 @@ bool Technique::init_shader(Shader *shader) {
 			CHECKED_EXEC(do_reflection(shader, buf, len, &used_params));
 
 			// remove any unused parameters
-			vector<ShaderParam> &params = shader->params;
+			vector<CBufferParam> &params = shader->cbuffer_params;
 			params.erase(
-				remove_if(params.begin(), params.end(), [&](const ShaderParam &p) { return used_params.find(p.name) == used_params.end(); }),
+				remove_if(params.begin(), params.end(), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); }),
 				params.end());
 
 			if (ok) {
@@ -243,4 +257,9 @@ bool Technique::init() {
 void Technique::submit() {
 	_key.cmd = RenderKey::kRenderTechnique;
 	GRAPHICS.submit_command(_key, (void *)this);
+}
+
+GraphicsObjectHandle Technique::sampler_state(const char *name) const {
+	auto it = find_if(_sampler_states.begin(), _sampler_states.end(), [&](const pair<string, GraphicsObjectHandle> &p) { return p.first == name; });
+	return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
 }

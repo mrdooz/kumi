@@ -79,11 +79,6 @@
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
     </ClCompile>
     <ClCompile Include="..\async_file_loader.cpp" />
-    <ClCompile Include="..\d3d_parser.cpp">
-      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">/Zm250 %(AdditionalOptions)</AdditionalOptions>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
     <ClCompile Include="..\effect_wrapper.cpp" />
@@ -118,7 +113,6 @@
   <ItemGroup>
     <ClInclude Include="..\app.hpp" />
     <ClInclude Include="..\async_file_loader.hpp" />
-    <ClInclude Include="..\d3d_parser.hpp" />
     <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />
     <ClInclude Include="..\dynamic_vb.hpp" />
@@ -134,7 +128,6 @@
     <ClInclude Include="..\property_manager.hpp" />
     <ClInclude Include="..\resource_watcher.hpp" />
     <ClInclude Include="..\scene.hpp" />
-    <ClInclude Include="..\stb_truetype.h" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\string_utils.hpp" />
     <ClInclude Include="..\technique.hpp" />

@@ -4,6 +4,7 @@
 #include "property_manager.hpp"
 #include "string_utils.hpp"
 #include "file_utils.hpp"
+#include "dx_utils.hpp"
 #include <hash_set>
 
 using namespace std;
@@ -441,7 +442,7 @@ struct Scope {
 		}                                                                 \
 	} while(false)
 
-bool TechniqueParser::parse_param(Scope *scope, CBufferParam *param) {
+bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 	static auto valid_types = map_list_of
 		(kSymFloat, PropertyType::kFloat)
 		(kSymFloat2, PropertyType::kFloat2)
@@ -459,33 +460,41 @@ bool TechniqueParser::parse_param(Scope *scope, CBufferParam *param) {
 		("technique", PropertySource::kTechnique);
 
 	// type, name and source are required. the default value is optional
-	param->type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_types, PropertyType::kUnknown);
-	if (param->type == PropertyType::kUnknown)
+	PropertyType::Enum type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_types, PropertyType::kUnknown);
+	if (type == PropertyType::kUnknown)
 		return false;
 
-	param->name = scope->next_identifier();
-	param->source = lookup_default<string, PropertySource::Enum>(scope->next_identifier(), valid_sources, PropertySource::kUnknown);
-	if (param->source == PropertySource::kUnknown)
+	string name = scope->next_identifier();
+	PropertySource::Enum source = lookup_default<string, PropertySource::Enum>(scope->next_identifier(), valid_sources, PropertySource::kUnknown);
+	if (source == PropertySource::kUnknown)
 		return false;
+
+	bool cbuffer_param = false;
+	if (type == PropertyType::kSampler) {
+		shader->sampler_params.push_back(SamplerParam(name, type, source));
+	} else if (type == PropertyType::kTexture2d) {
+		shader->resource_view_params.push_back(ResourceViewParam(name, type, source));
+	} else {
+		shader->cbuffer_params.push_back(CBufferParam(name, type, source));
+		cbuffer_param = true;
+	}
 
 	EXPECT(scope, kSymSemicolon);
 
 	// check for default value
-	if (scope->consume_if(kSymParamDefault)) {
+	if (cbuffer_param && scope->consume_if(kSymParamDefault)) {
 		string value = scope->string_until(';');
 		EXPECT(scope, kSymSemicolon);
-		parse_value(value, param);
+		parse_value(value, &shader->cbuffer_params.back());
 	}
+
 	return true;
 }
 
-bool TechniqueParser::parse_params(Scope *scope, vector<CBufferParam> *params) {
+bool TechniqueParser::parse_params(Scope *scope, Shader *shader) {
 	while (true) {
 		EXPECT(scope, kSymBlockOpen);
-		CBufferParam param;
-		if (parse_param(scope, &param))
-			params->push_back(param);
-		else
+		if (!parse_param(scope, shader))
 			return false;
 		EXPECT(scope, kSymBlockClose);
 		if (!scope->consume_if(kSymComma))
@@ -498,23 +507,27 @@ bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
 	while (true) {
 		switch (scope->consume_in(list_of(kSymFile)(kSymEntryPoint)(kSymParams))) {
-		case kSymFile:
-			shader->filename = scope->string_until(';');
-			shader->source = replace_extension(shader->filename.c_str(), "fx");
-			EXPECT(scope, kSymSemicolon);
-			break;
-		case kSymEntryPoint:
-			shader->entry_point = scope->string_until(';');
-			EXPECT(scope, kSymSemicolon);
-			break;
-		case kSymParams:
-			EXPECT(scope, kSymListOpen);
-			parse_params(scope, &shader->cbuffer_params);
-			EXPECT(scope, kSymListClose);
-			EXPECT(scope, kSymSemicolon);
-			break;
-		default:
-			return true;
+
+			case kSymFile:
+				shader->filename = scope->string_until(';');
+				shader->source = replace_extension(shader->filename.c_str(), "fx");
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymEntryPoint:
+				shader->entry_point = scope->string_until(';');
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			case kSymParams:
+				EXPECT(scope, kSymListOpen);
+				parse_params(scope, shader);
+				EXPECT(scope, kSymListClose);
+				EXPECT(scope, kSymSemicolon);
+				break;
+
+			default:
+				return true;
 		}
 	}
 }
@@ -798,9 +811,9 @@ bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 		case kSymFormat: {
 			string format = scope->string_until(';');
 			if (format == "pos") {
-				technique->_vert_size = 3;
+				technique->_vertex_size = 3 * sizeof(float);
 			} else if (format == "pos_tex") {
-				technique->_vert_size = 5;
+				technique->_vertex_size = 5 * sizeof(float);
 			} else {
 				return false;
 			}
@@ -811,7 +824,8 @@ bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 		case kSymData:
 			EXPECT(scope, kSymListOpen);
 			while (scope->consume_if(kSymParenOpen)) {
-				for (int i = 0; i < technique->_vert_size; ++i) {
+				int num_verts = technique->_vertex_size / sizeof(float);
+				for (int i = 0; i < num_verts; ++i) {
 					technique->_vertices.push_back(scope->next_float());
 					scope->consume_if(kSymComma);
 				}
@@ -823,9 +837,9 @@ bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 			break;
 
 		default:
-			if (technique->_vert_size == -1)
+			if (technique->_vertex_size == -1)
 				return false;
-			technique->_vb = GRAPHICS.create_static_vertex_buffer(technique->_vert_size * sizeof(float), &technique->_vertices[0]);
+			technique->_vb = GRAPHICS.create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
 			return true;
 		}
 	}
@@ -836,16 +850,16 @@ bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 
 	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
 
-	technique->_index_size = -1;
+	technique->_index_format = DXGI_FORMAT_UNKNOWN;
 	while (true) {
 		switch (scope->consume_in(valid_tags)) {
 
 		case kSymFormat: {
 			string format = scope->string_until(';');
 			if (format == "index16") {
-				technique->_index_size = 2;
+				technique->_index_format = DXGI_FORMAT_R16_UINT;
 			} else if (format == "index32") {
-				technique->_index_size = 4;
+				technique->_index_format = DXGI_FORMAT_R32_UINT;
 			} else {
 				return false;
 			}
@@ -862,25 +876,25 @@ bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 
 			} while (scope->consume_if(kSymComma));
 
-			if (technique->_index_size == -1)
-				technique->_index_size = max_value < (1 << 16) ? 2 : 4;
+			if (technique->_index_format == DXGI_FORMAT_UNKNOWN)
+				technique->_index_format = max_value < (1 << 16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 
 			EXPECT(scope, kSymListClose);
 			EXPECT(scope, kSymSemicolon);
 			break;
 		}
 		default:
-			if (technique->_index_size == -1) {
+			if (technique->_index_format == DXGI_FORMAT_UNKNOWN) {
 				return false;
-			} else if (technique->_index_size == 2) {
+			} else if (technique->_index_format == DXGI_FORMAT_R16_UINT) {
 				// create a local copy of the indices
 				vector<uint16> v;
 				v.reserve(technique->_indices.size());
 				for (size_t i = 0; i < technique->_indices.size(); ++i)
 					v.push_back((uint16)technique->_indices[i]);
-				technique->_ib = GRAPHICS.create_static_index_buffer(technique->_index_size * v.size(), &v[0]);
+				technique->_ib = GRAPHICS.create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
 			} else {
-				technique->_ib = GRAPHICS.create_static_index_buffer(technique->_index_size * technique->_indices.size(), &technique->_indices[0]);
+				technique->_ib = GRAPHICS.create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
 			}
 			return true;
 		}
@@ -931,7 +945,8 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 			case kSymSamplerDesc: {
 				string name = scope->next_identifier();
 				EXPECT(scope, kSymBlockOpen);
-				D3D11_SAMPLER_DESC desc;
+
+				D3D11_SAMPLER_DESC desc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
 				if (!parse_sampler_desc(scope, &desc))
 					return false;
 				technique->_sampler_descs.push_back(make_pair(name, desc));

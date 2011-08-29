@@ -77,6 +77,10 @@ void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t 
 	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
+GraphicsObjectHandle Graphics::create_render_target(int width, int height) {
+	return GraphicsObjectHandle();
+}
+
 bool Graphics::create_render_target(int width, int height, RenderTargetData *out)
 {
 	out->reset();
@@ -103,6 +107,20 @@ bool Graphics::create_render_target(int width, int height, RenderTargetData *out
 	B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
 
 	return true;
+}
+
+GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name) {
+	TextureData data;
+	if (!create_texture(desc, &data))
+		return GraphicsObjectHandle();
+
+	int idx = name ? _textures.find_by_token(name) : -1;
+	if (idx != -1 || (idx = _textures.find_free_index()) != -1) {
+		_textures[idx].first.reset();
+		_textures[idx] = make_pair(data, name);
+		return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
+	}
+	return GraphicsObjectHandle();
 }
 
 bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
@@ -420,10 +438,36 @@ void Graphics::submit_command(RenderKey key, void *data) {
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
+	ID3D11DeviceContext *ctx = _immediate_context._context;
+
+	const int num_samplers = (int)shader->sampler_params.size();
+	if (!num_samplers)
+		return;
+
+	vector<ID3D11SamplerState *> samplers(num_samplers);
+	for (int i = 0; i < num_samplers; ++i) {
+		const SamplerParam &s = shader->sampler_params[i];
+		samplers[s.bind_point] = _sampler_states.get(technique->sampler_state(s.name.c_str()));
+	}
+
+	ctx->PSSetSamplers(0, num_samplers, &samplers[0]);
 }
 
 void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 
+	ID3D11DeviceContext *ctx = _immediate_context._context;
+
+	const int num_views = (int)shader->resource_view_params.size();
+	if (!num_views)
+		return;
+
+	vector<ID3D11ShaderResourceView *> views(num_views);
+	for (int i = 0; i < num_views; ++i) {
+		const ResourceViewParam &v = shader->resource_view_params[i];
+		views[v.bind_point] = _textures[_textures.find_by_token(v.name)].first.srv;
+	}
+
+	ctx->PSSetShaderResources(0, num_views, &views[0]);
 }
 
 void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id) {
@@ -434,28 +478,28 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 
 	// copy the parameters into the technique's cbuffer staging area
 	// TODO: lots of hacks here..
-	for (size_t i = 0; i < shader->params.size(); ++i) {
-		const ShaderParam &p = shader->params[i];
+	for (size_t i = 0; i < shader->cbuffer_params.size(); ++i) {
+		const CBufferParam &p = shader->cbuffer_params[i];
 		const CBuffer &cb = cbuffers[p.cbuffer];
 		switch (p.source) {
-		case ShaderParam::Source::kMaterial:
+		case PropertySource::kMaterial:
 			memcpy((void *)&cb.staging[p.start_offset], &PROPERTY_MANAGER.get_material_property<XMFLOAT4>(material_id, p.name.c_str()), p.size);
 			break;
-		case ShaderParam::Source::kMesh:
+		case PropertySource::kMesh:
 			{
 				XMFLOAT4X4 mtx;
 				XMStoreFloat4x4(&mtx, XMMatrixIdentity());
 				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
 			}
 			break;
-		case ShaderParam::Source::kSystem:
+		case PropertySource::kSystem:
 			{
 				XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
 				//XMStoreFloat4x4(&mtx, XMMatrixIdentity());
 				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
 			}
 			break;
-		case ShaderParam::Source::kUser:
+		case PropertySource::kUser:
 			break;
 		}
 	}
@@ -470,7 +514,18 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 		else
 			ctx->PSSetConstantBuffers(0, 1, &buffer);
 	}
+}
 
+bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
+	return SUCCEEDED(_immediate_context._context->Map(_textures.get(h).texture, sub, type, flags, res));
+}
+
+void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
+	_immediate_context._context->Unmap(_textures.get(h).texture, sub);
+}
+
+void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {
+	_immediate_context._context->CopyResource(_textures.get(dst).texture, _textures.get(src).texture);
 }
 
 void Graphics::render() {
@@ -497,6 +552,32 @@ void Graphics::render() {
 
 			Technique *technique = (Technique *)cmd.second;
 
+			if (deleted_items.find(cmd.second) != deleted_items.end())
+				break;
+			Shader *vertex_shader = technique->vertex_shader();
+			Shader *pixel_shader = technique->pixel_shader();
+
+			ID3D11DeviceContext *ctx = _immediate_context._context;
+			ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
+			ctx->GSSetShader(NULL, 0, 0);
+			ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
+
+			set_vb(ctx, _vertex_buffers.get(technique->vb()), technique->vertex_size());
+			ctx->IASetIndexBuffer(_index_buffers.get(technique->ib()), technique->index_format(), 0);
+			ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
+
+			ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
+			ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
+
+			//set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
+			//set_cbuffer_params(technique, pixel_shader, data->material_id, 0);
+			set_samplers(technique, pixel_shader);
+			set_resource_views(technique, pixel_shader);
+
+			ctx->DrawIndexed(technique->index_count(), 0, 0);
+
 			break;
 			}
 
@@ -516,7 +597,7 @@ void Graphics::render() {
 				ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
 
 				set_vb(ctx, _vertex_buffers.get(data->vb), data->vertex_size);
-				ctx->IASetIndexBuffer(_index_buffers.get(data->ib), data->index_size == 2 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT, 0);
+				ctx->IASetIndexBuffer(_index_buffers.get(data->ib), data->index_format, 0);
 				ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
 
 				ctx->IASetPrimitiveTopology(data->topology);
@@ -526,6 +607,8 @@ void Graphics::render() {
 
 				set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
 				set_cbuffer_params(technique, pixel_shader, data->material_id, 0);
+				set_samplers(technique, pixel_shader);
+				set_resource_views(technique, pixel_shader);
 
 				ctx->DrawIndexed(data->index_count, 0, 0);
 			}

@@ -21,7 +21,7 @@ technique cef {
 	// 2, 1, 3
 	vertices {
 		format pos_tex;
-		data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (-1, -1, 1, 1, 1)];
+		data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (1, -1, 1, 1, 1)];
 	};
 	
 	indices {
@@ -33,11 +33,21 @@ technique cef {
 	};
 	
 	blend_desc {
+		render_target[0] = {
+			blend_enable = true;
+			src_blend = blend_src_alpha;
+			dest_blend = blend_inv_src_alpha;
+			blend_op = blend_op_add;
+			src_blend_alpha = blend_one;
+			dest_blend_alpha = blend_zero;
+			blend_op_alpha = blend_op_add;
+		};
 	};
 	
 	rasterizer_desc {
 	};
 	
 	depth_stencil_desc {
+		depth_enable = false;
 	};
 };

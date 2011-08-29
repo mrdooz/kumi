@@ -1,8 +1,6 @@
 #ifndef _APP_HPP_
 #define _APP_HPP_
 
-#include "dynamic_vb.hpp"
-#include "vertex_types.hpp"
 #include "graphics.hpp"
 #include "threading.hpp"
 
@@ -163,12 +161,8 @@ protected:
 	string _app_root;
 	int _ref_count;
 
-	ID3D11Buffer *_cef_vb;
-	ID3D11InputLayout *_cef_layout;
-	EffectWrapper *_cef_effect;
-	RenderStates _cef_desc;
-	TextureData _cef_texture;
-	TextureData _cef_staging;
+	GraphicsObjectHandle _cef_texture;
+	GraphicsObjectHandle _cef_staging;
 	Scene *_scene;
 	Io *_io;
 };

@@ -19,12 +19,14 @@ namespace PropertySource {
 }
 
 struct ParamBase {
+	ParamBase(const string &name, PropertyType::Enum type, PropertySource::Enum source) : name(name), type(type), source(source) {}
 	string name;
 	PropertyType::Enum type;
 	PropertySource::Enum source;
 };
 
 struct CBufferParam : public ParamBase {
+	CBufferParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
 
 	union DefaultValue {
 		int _int;
@@ -38,11 +40,13 @@ struct CBufferParam : public ParamBase {
 };
 
 struct SamplerParam : public ParamBase {
-
+	SamplerParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
+	int bind_point;
 };
 
 struct ResourceViewParam : public ParamBase {
-
+	ResourceViewParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
+	int bind_point;
 };
 
 struct Shader {
@@ -53,10 +57,24 @@ struct Shader {
 	};
 
 	Shader(const string &entry_point) : entry_point(entry_point), valid(false) {}
+
 	CBufferParam *find_cbuffer_param(const char *name) {
-		for (size_t i = 0; i < cbuffer_params.size(); ++i) {
-			if (cbuffer_params[i].name == name)
-				return &cbuffer_params[i];
+		return find_by_name(name, cbuffer_params);
+	}
+
+	SamplerParam *find_sampler_param(const char *name) {
+		return find_by_name(name, sampler_params);
+	}
+
+	ResourceViewParam *find_resource_view_param(const char *name) {
+		return find_by_name(name, resource_view_params);
+	}
+
+	template<class T>
+	T* find_by_name(const char *name, vector<T> &v) {
+		for (size_t i = 0; i < v.size(); ++i) {
+			if (v[i].name == name)
+				return &v[i];
 		}
 		return NULL;
 	}
@@ -119,9 +137,15 @@ public:
 	vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
 	GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
-	//GraphicsObjectHandle sampler_state() const { return _sampler_state; }
 	GraphicsObjectHandle blend_state() const { return _blend_state; }
 	GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
+	GraphicsObjectHandle sampler_state(const char *name) const;
+
+	GraphicsObjectHandle vb() const { return _vb; }
+	GraphicsObjectHandle ib() const { return _ib; }
+	int vertex_size() const { return _vertex_size; }
+	DXGI_FORMAT index_format() const { return _index_format; }
+	int index_count() const { return (int)_indices.size(); }
 
 	void submit();
 private:
@@ -142,9 +166,9 @@ private:
 
 	vector<CBuffer> _constant_buffers;
 
-	int _vert_size;
+	int _vertex_size;
 	vector<float> _vertices;
-	int _index_size;
+	DXGI_FORMAT _index_format;
 	vector<int> _indices;
 	GraphicsObjectHandle _vb;
 	GraphicsObjectHandle _ib;
