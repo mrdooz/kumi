@@ -535,6 +535,8 @@ void Graphics::render() {
 	// aaah, lambdas, thank you!
 	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.key < b.first.key; });
 
+	ID3D11DeviceContext *ctx = _immediate_context._context;
+
 	// delete commands are sorted before render commands, so we can just save the
 	// deleted items when we find them
 	set<void *> deleted_items;
@@ -552,12 +554,9 @@ void Graphics::render() {
 
 			Technique *technique = (Technique *)cmd.second;
 
-			if (deleted_items.find(cmd.second) != deleted_items.end())
-				break;
 			Shader *vertex_shader = technique->vertex_shader();
 			Shader *pixel_shader = technique->pixel_shader();
 
-			ID3D11DeviceContext *ctx = _immediate_context._context;
 			ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
 			ctx->GSSetShader(NULL, 0, 0);
 			ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
@@ -570,9 +569,8 @@ void Graphics::render() {
 
 			ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
 			ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
+			ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
 
-			//set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
-			//set_cbuffer_params(technique, pixel_shader, data->material_id, 0);
 			set_samplers(technique, pixel_shader);
 			set_resource_views(technique, pixel_shader);
 
@@ -604,6 +602,7 @@ void Graphics::render() {
 
 				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
 				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
+				ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
 
 				set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
 				set_cbuffer_params(technique, pixel_shader, data->material_id, 0);

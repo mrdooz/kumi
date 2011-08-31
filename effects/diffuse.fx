@@ -26,7 +26,8 @@ ps_input vs_main(vs_input input)
 
 float4 ps_main(ps_input input) : SV_Target
 {
-	return dot(float3(0,0,-1), input.normal);
+//	return float4(1,0,1,0);
+	return dot(float3(1,0.5,-1), input.normal);
 	return float4(input.normal, 1);
 	//return float4(1,1,1,1);
 	return DiffuseColor;

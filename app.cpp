@@ -393,40 +393,14 @@ UINT App::run(void *userdata) {
 			//DEMO_ENGINE.tick();
 
 			RESOURCE_WATCHER.process_deferred();
-			//static int hax = 0;
-			//GRAPHICS.set_clear_color(XMFLOAT4(0.5f + 0.5f * sin(hax++/1000.0f), 0.3f, 0.3f, 0));
 			GRAPHICS.clear();
-
-			//System::instance().tick();
-			//graphics.clear();
-			//_debug_writer->reset_frame();
-			//IMGui::instance().init_frame();
-
-			//DebugRenderer::instance().start_frame();
 
 			if (_scene) {
 				for (size_t i = 0; i < _scene->meshes.size(); ++i)
 					_scene->meshes[i]->submit();
 			}
 
-			{
-				GRAPHICS.find_technique2("cef")->submit();
-/*
-				ID3D11DeviceContext *context = GRAPHICS.context();
-				context->PSSetSamplers(0, 1, &_cef_desc.sampler_state);
-				_cef_effect->set_shaders(context);
-				_cef_effect->set_resource("g_texture", _cef_texture.srv);
-				GRAPHICS.set_vb(context, _cef_vb, sizeof(PosTex));
-				context->IASetInputLayout(_cef_layout);
-				context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-				float blend_factor[] = { 1, 1, 1, 1 };
-				context->OMSetBlendState(_cef_desc.blend_state, blend_factor, 0xffffffff);
-				context->RSSetState(_cef_desc.rasterizer_state);
-				context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
-				context->Draw(6, 0);
-*/
-			}
+			GRAPHICS.find_technique2("cef")->submit();
 
 /*
 			if (_test_effect) {
@@ -453,12 +427,6 @@ UINT App::run(void *userdata) {
 
 				}
 			}
-
-			float blend_factor[] = { 1, 1, 1, 1 };
-			ID3D11DeviceContext *context = GRAPHICS.context();
-			context->OMSetBlendState(_cef_desc.blend_state, blend_factor, 0xffffffff);
-			context->RSSetState(_cef_desc.rasterizer_state);
-			context->OMSetDepthStencilState(_cef_desc.depth_stencil_state, 0xffffffff);
 */
 			GRAPHICS.render();
 			GRAPHICS.present();
