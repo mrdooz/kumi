@@ -2,6 +2,7 @@
 #define _GRAPHICS_HPP_
 
 #include "utils.hpp"
+#include "property_manager.hpp"
 #include <stack>
 #include <type_traits>
 
@@ -119,6 +120,7 @@ struct MeshRenderData {
 	D3D_PRIMITIVE_TOPOLOGY topology;
 	GraphicsObjectHandle technique;
 	uint16 material_id;
+	PropertyManager::Id mesh_id;
 };
 
 enum RenderCommand {
@@ -214,7 +216,7 @@ private:
 	Graphics();
 	~Graphics();
 
-	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id);
+	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id);
 	void set_samplers(Technique *technique, Shader *shader);
 	void set_resource_views(Technique *technique, Shader *shader);
 

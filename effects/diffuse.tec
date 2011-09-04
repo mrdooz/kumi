@@ -21,7 +21,7 @@ technique diffuse {
 	};
 	
 	depth_stencil_desc {
-		depth_enable = false;
+		depth_enable = true;
 	};
 	
 	blend_desc {

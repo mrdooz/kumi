@@ -268,7 +268,7 @@ bool App::init(HINSTANCE hinstance)
 	_hinstance = hinstance;
 	_width = GetSystemMetrics(SM_CXSCREEN) / 2;
 	_height = GetSystemMetrics(SM_CYSCREEN) / 2;
-	
+
 	CefSettings settings;
 	settings.multi_threaded_message_loop = false;
 /*
@@ -279,6 +279,13 @@ bool App::init(HINSTANCE hinstance)
 
 	KumiLoader loader;
 	loader.load("c:\\temp\\torus.kumi", _io, &_scene);
+
+	for (size_t i = 0; i < _scene->meshes.size(); ++i) {
+		XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
+		XMFLOAT4X4 tmp;
+		XMStoreFloat4x4(&tmp, mtx);
+		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
+	}
 
 	if (!GRAPHICS.load_technique("effects/diffuse.tec").is_valid()) {
 		// log error
@@ -380,7 +387,10 @@ UINT App::run(void *userdata) {
 					XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
 					XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
 
-				XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(XM_PIDIV4, 640/480.0f, 1, 1000));
+				XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(
+					XMConvertToRadians(camera->fov),
+					camera->aspect_ratio,
+					camera->near_plane, camera->far_plane));
 
 				XMFLOAT4X4 lookat_tmp, proj_tmp;
 				XMStoreFloat4x4(&lookat_tmp, lookat);

@@ -57,6 +57,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 	const int mesh_count = step_read<int>(&buf);
 	for (int i = 0; i < mesh_count; ++i) {
 		Mesh *mesh = new Mesh(step_read<const char *>(&buf));
+		mesh->obj_to_world = step_read<XMFLOAT4X4>(&buf);
 		scene->meshes.push_back(mesh);
 		const int sub_meshes = step_read<int>(&buf);
 		for (int j = 0; j < sub_meshes; ++j) {
@@ -75,7 +76,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 			const int ib_size = *ib;
 			submesh->data.index_count = ib_size / index_format_to_size(submesh->data.index_format);
 			submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 1));
-
+			submesh->data.mesh_id = (PropertyManager::Id)mesh;
 		}
 	}
 
@@ -94,6 +95,10 @@ bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
 		camera->target = step_read<XMFLOAT3>(&buf);
 		camera->up = step_read<XMFLOAT3>(&buf);
 		camera->roll = step_read<float>(&buf);
+		camera->aspect_ratio = step_read<float>(&buf);
+		camera->fov = step_read<float>(&buf);
+		camera->near_plane = step_read<float>(&buf);
+		camera->far_plane = step_read<float>(&buf);
 	}
 
 	return true;

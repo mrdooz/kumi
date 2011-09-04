@@ -470,7 +470,7 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 	ctx->PSSetShaderResources(0, num_views, &views[0]);
 }
 
-void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, uint16 mesh_id) {
+void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id) {
 
 	ID3D11DeviceContext *ctx = _immediate_context._context;
 
@@ -487,15 +487,13 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 			break;
 		case PropertySource::kMesh:
 			{
-				XMFLOAT4X4 mtx;
-				XMStoreFloat4x4(&mtx, XMMatrixIdentity());
+				XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_mesh_property<XMFLOAT4X4>(mesh_id, p.name.c_str());
 				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
 			}
 			break;
 		case PropertySource::kSystem:
 			{
 				XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
-				//XMStoreFloat4x4(&mtx, XMMatrixIdentity());
 				memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
 			}
 			break;
@@ -604,8 +602,8 @@ void Graphics::render() {
 				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
 				ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
 
-				set_cbuffer_params(technique, vertex_shader, data->material_id, 0);
-				set_cbuffer_params(technique, pixel_shader, data->material_id, 0);
+				set_cbuffer_params(technique, vertex_shader, data->material_id, data->mesh_id);
+				set_cbuffer_params(technique, pixel_shader, data->material_id, data->mesh_id);
 				set_samplers(technique, pixel_shader);
 				set_resource_views(technique, pixel_shader);
 

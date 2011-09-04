@@ -9,9 +9,10 @@ struct SubMesh {
 };
 
 struct Mesh {
-	Mesh(const string &name) : name(name) {}
+	Mesh(const string &name) : name(name) { }
 	void submit();
 	string name;
+	XMFLOAT4X4 obj_to_world;
 	std::vector<SubMesh *> submeshes;
 };
 
@@ -20,6 +21,9 @@ struct Camera {
 	string name;
 	XMFLOAT3 pos, target, up;
 	float roll;
+	float aspect_ratio;
+	float fov;
+	float near_plane, far_plane;
 };
 
 struct Scene {
