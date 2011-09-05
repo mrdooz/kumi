@@ -58,6 +58,8 @@ typedef uint64_t uint64;
 #include <deque>
 #include <tuple>
 #include <hash_map>
+#include <type_traits>
+#include <stack>
 
 #include <concurrent_queue.h>
 

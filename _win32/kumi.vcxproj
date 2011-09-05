@@ -95,7 +95,7 @@
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
     <ClCompile Include="..\property_manager.cpp" />
-    <ClCompile Include="..\resource_watcher.cpp" />
+    <ClCompile Include="..\resource_manager.cpp" />
     <ClCompile Include="..\scene.cpp" />
     <ClCompile Include="..\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -107,6 +107,8 @@
     <ClCompile Include="..\technique.cpp" />
     <ClCompile Include="..\technique_parser.cpp" />
     <ClCompile Include="..\test\demo.cpp" />
+    <ClCompile Include="..\test\path_follow.cpp" />
+    <ClCompile Include="..\test\volumetric.cpp" />
     <ClCompile Include="..\threading.cpp" />
     <ClCompile Include="..\utils.cpp" />
   </ItemGroup>
@@ -120,19 +122,22 @@
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />
     <ClInclude Include="..\graphics.hpp" />
+    <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\io.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
     <ClInclude Include="..\property_manager.hpp" />
-    <ClInclude Include="..\resource_watcher.hpp" />
+    <ClInclude Include="..\resource_manager.hpp" />
     <ClInclude Include="..\scene.hpp" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\string_utils.hpp" />
     <ClInclude Include="..\technique.hpp" />
     <ClInclude Include="..\technique_parser.hpp" />
     <ClInclude Include="..\test\demo.hpp" />
+    <ClInclude Include="..\test\path_follow.hpp" />
+    <ClInclude Include="..\test\volumetric.hpp" />
     <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\utils.hpp" />
     <ClInclude Include="..\v8_handler.hpp" />

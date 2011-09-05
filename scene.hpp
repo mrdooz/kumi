@@ -10,7 +10,7 @@ struct SubMesh {
 
 struct Mesh {
 	Mesh(const string &name) : name(name) { }
-	void submit();
+	void submit(uint16 seq_nr);
 	string name;
 	XMFLOAT4X4 obj_to_world;
 	std::vector<SubMesh *> submeshes;
@@ -29,6 +29,8 @@ struct Camera {
 struct Scene {
 
 	~Scene();
+
+	void submit_meshes(uint16 seq_nr);
 
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;

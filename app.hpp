@@ -163,7 +163,6 @@ protected:
 
 	GraphicsObjectHandle _cef_texture;
 	GraphicsObjectHandle _cef_staging;
-	Scene *_scene;
 	Io *_io;
 };
 

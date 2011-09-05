@@ -3,45 +3,95 @@
 
 #include "utils.hpp"
 #include "property_manager.hpp"
-#include <stack>
-#include <type_traits>
+#include "id_buffer.hpp"
 
 struct Io;
 struct Shader;
 struct Material;
 class Technique;
 
-using std::stack;
 using std::vector;
 using std::pair;
 
 enum FileEvent;
 
-namespace mpl = boost::mpl;
+class GraphicsObjectHandle {
+	friend class Graphics;
+	enum { 
+		cTypeBits = 8,
+		cGenerationBits = 8,
+		cIdBits = 12 
+	};
+	enum Type {
+		kInvalid = -1,
+		kContext,
+		kVertexBuffer,
+		kIndexBuffer,
+		kConstantBuffer,
+		kTexture,
+		kShader,
+		kInputLayout,
+		kBlendState,
+		kRasterizerState,
+		kSamplerState,
+		kDepthStencilState,
+		kTechnique,
+		kVertexShader,
+		kPixelShader,
+		kShaderResourceView,
+	};	
+	GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
+	union {
+		struct {
+			uint32 _type : 8;
+			uint32 _generation : 8;
+			uint32 _id : 12;
+		};
+		uint32 _data;
+	};
+public:
+	GraphicsObjectHandle() : _data(kInvalid) {}
+	GraphicsObjectHandle(uint32 data) : _data(data) {}
+	bool is_valid() const { return _data != kInvalid; }
+	operator int() const { return _data; }
+	uint32 id() const { return _id; }
+};
+
+static_assert(sizeof(GraphicsObjectHandle) <= sizeof(uint32_t), "GraphicsObjectHandle too large");
+
 
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
 	enum Cmd {
 		kDelete,	// submitted when the object is deleted to avoid using stale data
+		kSetRenderTarget,
 		kRenderMesh,
 		kRenderTechnique,
+		kNumCommands
 	};
+	static_assert(kNumCommands < (1 << 16), "Too many commands");
+
 	union {
 		struct {
-			uint64_t fullscreen_layer : 2;
-			uint64_t depth : 16;
-			uint64_t shader : 10;
-			uint64_t material : 16;
-			uint64_t cmd : 8;
-			uint64_t padding : 12;
+			union {
+				uint16 depth;
+				uint16 seq_nr;
+			};
+			uint16 cmd;
+			union {
+				struct {
+					uint32 shader : 10;
+					uint32 material : 16;
+					uint32 padding : 6;
+				};
+				uint32 handle : 32;  // a GraphicsObjectHandle
+			};
 		};
-		uint64_t key;
+		uint64 data;
 	};
 };
 
-extern RenderKey g_DeleteKey;
-
-static_assert(sizeof(RenderKey) == sizeof(uint64_t), "RenderKey too large");
+static_assert(sizeof(RenderKey) <= sizeof(uint64_t), "RenderKey too large");
 
 struct RenderTargetData {
 	void reset() {
@@ -75,41 +125,6 @@ struct TextureData {
 	CComPtr<ID3D11ShaderResourceView> srv;
 };
 
-class GraphicsObjectHandle {
-	friend class Graphics;
-	enum { 
-		cTypeBits = 8,
-		cGenerationBits = 8,
-		cIdBits = 12 
-	};
-	enum Type {
-		kInvalid = -1,
-		kContext,
-		kVertexBuffer,
-		kIndexBuffer,
-		kConstantBuffer,
-		kTexture,
-		kShader,
-		kInputLayout,
-		kBlendState,
-		kRasterizerState,
-		kSamplerState,
-		kDepthStencilState,
-		kTechnique,
-		kVertexShader,
-		kPixelShader,
-		kShaderResourceView,
-	};	
-	GraphicsObjectHandle(uint32_t type, uint32_t generation, uint32_t id) : _type(type), _generation(generation), _id(id) {}
-	uint32_t _type : 8;
-	uint32_t _generation : 8;
-	uint32_t _id : 12;
-public:
-	GraphicsObjectHandle() : _type(kInvalid) {}
-	bool is_valid() const { return _type != kInvalid; }
-	uint32_t id() const { return _id; }
-};
-
 struct MeshRenderData {
 	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
 	GraphicsObjectHandle vb, ib;
@@ -121,10 +136,6 @@ struct MeshRenderData {
 	GraphicsObjectHandle technique;
 	uint16 material_id;
 	PropertyManager::Id mesh_id;
-};
-
-enum RenderCommand {
-
 };
 
 class Context {
@@ -183,6 +194,7 @@ public:
   float fps() const { return _fps; }
   int width() const { return _width; }
   int height() const { return _height; }
+	void size(int *width, int *height) const { *width = _width; *height = _height; }
 
 	GraphicsObjectHandle create_constant_buffer(int size);
 	GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
@@ -208,6 +220,7 @@ public:
 
 	// TODO: this should be on the context
 	void submit_command(RenderKey key, void *data);
+	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
 	void render();
 
 private:
@@ -253,95 +266,6 @@ private:
   int32_t _frame_count;
   float _fps;
 	Context _immediate_context;
-
-	template<class Traits, int N>
-	struct IdBufferBase {
-
-		typedef typename Traits::Type T;
-
-		enum { Size = N };
-		IdBufferBase() {
-			ZeroMemory(&_buffer, sizeof(_buffer));
-		}
-
-		int find_free_index() {
-			if (!reclaimed_indices.empty()) {
-				int tmp = reclaimed_indices.top();
-				reclaimed_indices.pop();
-				return tmp;
-			}
-			for (int i = 0; i < N; ++i) {
-				if (!Traits::get(_buffer[i]))
-					return i;
-			}
-			return -1;
-		}
-
-		typename Traits::Type &operator[](int idx) {
-			assert(idx >= 0 && idx < N);
-			return _buffer[idx];
-		}
-
-		void reclaim_index(int idx) {
-			_reclaimed_indices.push(idx);
-
-		}
-
-		typename Traits::Type get(GraphicsObjectHandle handle) {
-			return Traits::get(_buffer[handle.id()]);
-		}
-
-		typename Traits::Elem _buffer[N];
-		stack<int> reclaimed_indices;
-	};
-
-	template<class Traits, int N>
-	struct SearchableIdBuffer : public IdBufferBase<Traits, N> {
-
-		typename Traits::Elem &operator[](int idx) {
-			assert(idx >= 0 && idx < N);
-			return _buffer[idx];
-		}
-
-		int find_by_token(const typename Traits::Token &t) {
-			for (int i = 0; i < Size; ++i) {
-				if (Traits::get_token(_buffer[i]) == t)
-					return i;
-			}
-			return -1;
-		}
-	};
-
-	template<class T, class U>
-	struct PairTraits {
-		typedef T Type;
-		typedef U Token;
-		typedef std::pair<T, U> Elem;
-		static T& get(Elem &t) {
-			return t.first;
-		}
-
-		static U get_token(const Elem &e) {
-			return e.second;
-		}
-	};
-
-	template<class T>
-	struct SingleTraits {
-		typedef T Type;
-		typedef T Elem;
-		static T& get(Elem& t) {
-			return t;
-		}
-	};
-
-	template<typename T, int N, typename SearchToken = void>
-	struct IdBuffer : public
-		mpl::if_<typename std::tr1::is_void<SearchToken>::type,
-		IdBufferBase<SingleTraits<T>, N>,
-		SearchableIdBuffer<PairTraits<T, SearchToken>, N> >::type
-	{
-	};
 
 	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
 	IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;

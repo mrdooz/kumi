@@ -81,6 +81,7 @@ bool DemoEngine::tick() {
 	for (size_t i = 0; i < _active_effects.size(); ++i) {
 		EffectInstance *e = _active_effects[i];
 		e->_effect->update(_current_time_ms, _current_time_ms - e->_start_time, ticks_per_s, num_ticks, frac);
+		e->_effect->render();
 	}
 
 	_last_time = now;

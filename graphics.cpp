@@ -431,7 +431,6 @@ GraphicsObjectHandle Graphics::find_technique(const char *name) {
 	return GraphicsObjectHandle();
 }
 
-
 void Graphics::submit_command(RenderKey key, void *data) {
 	_render_commands.push_back(make_pair(key, data));
 }
@@ -531,7 +530,7 @@ void Graphics::render() {
 	_immediate_context._context->RSSetViewports(1, &_viewport);
 
 	// aaah, lambdas, thank you!
-	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.key < b.first.key; });
+	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.data < b.first.data; });
 
 	ID3D11DeviceContext *ctx = _immediate_context._context;
 
@@ -545,6 +544,11 @@ void Graphics::render() {
 		case RenderKey::kDelete:
 				deleted_items.insert(cmd.second);
 				break;
+
+		case RenderKey::kSetRenderTarget: {
+			int a = 10;
+			break;
+		}
 
 		case RenderKey::kRenderTechnique: {
 			if (deleted_items.find(cmd.second) != deleted_items.end())

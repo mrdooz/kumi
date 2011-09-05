@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "demo.hpp"
 
-
 bool SimpleEffect::init() {
 	return true;
 }

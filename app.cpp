@@ -15,6 +15,8 @@
 #include "property_manager.hpp"
 
 #include "test/demo.hpp"
+#include "test/path_follow.hpp"
+#include "test/volumetric.hpp"
 
 using std::swap;
 
@@ -233,7 +235,6 @@ App::App()
 	, _draw_plane(false)
 	, _ref_count(1)
 	, _io(nullptr)
-	, _scene(nullptr)
 	, m_MainHwnd(NULL),
 	m_BrowserHwnd(NULL),
 	m_EditHwnd(NULL),
@@ -277,24 +278,11 @@ bool App::init(HINSTANCE hinstance)
 */
 	B_ERR_BOOL(create_window());
 
-	KumiLoader loader;
-	loader.load("c:\\temp\\torus.kumi", _io, &_scene);
-
-	for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-		XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
-		XMFLOAT4X4 tmp;
-		XMStoreFloat4x4(&tmp, mtx);
-		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
-	}
-
-	if (!GRAPHICS.load_technique("effects/diffuse.tec").is_valid()) {
-		// log error
-	}
 	if (!GRAPHICS.load_technique("effects/cef.tec").is_valid()) {
 		// log error
 	}
 
-	SimpleEffect *effect = new SimpleEffect(GraphicsObjectHandle(), "simple effect");
+	VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
 	B_ERR_BOOL(DEMO_ENGINE.init());
@@ -380,35 +368,10 @@ UINT App::run(void *userdata) {
 
 			CefDoMessageLoopWork();
 
-			if (_scene && !_scene->cameras.empty()) {
-				Camera *camera = _scene->cameras[0];
-				XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
-					XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
-					XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
-					XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
-
-				XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(
-					XMConvertToRadians(camera->fov),
-					camera->aspect_ratio,
-					camera->near_plane, camera->far_plane));
-
-				XMFLOAT4X4 lookat_tmp, proj_tmp;
-				XMStoreFloat4x4(&lookat_tmp, lookat);
-				XMStoreFloat4x4(&proj_tmp, proj);
-
-				PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
-				PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
-			}
-
-			//DEMO_ENGINE.tick();
+			DEMO_ENGINE.tick();
 
 			RESOURCE_WATCHER.process_deferred();
 			GRAPHICS.clear();
-
-			if (_scene) {
-				for (size_t i = 0; i < _scene->meshes.size(); ++i)
-					_scene->meshes[i]->submit();
-			}
 
 			GRAPHICS.find_technique2("cef")->submit();
 

@@ -33,9 +33,6 @@
     <ClCompile Include="..\async_file_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\resource_watcher.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\graphics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -90,6 +87,15 @@
     <ClCompile Include="..\threading.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\test\path_follow.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\test\volumetric.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\resource_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -102,9 +108,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\async_file_loader.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\resource_watcher.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\graphics.hpp">
@@ -165,6 +168,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\threading.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\path_follow.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\volumetric.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\id_buffer.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\resource_manager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
