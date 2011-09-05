@@ -20,7 +20,7 @@ void split_path(const char *path, std::string *drive, std::string *dir, std::str
 	if (fname) *fname = fname_buf;
 	if (ext) *ext = ext_buf;
 }
-/*
+
 bool load_file(const char *filename, void **buf, size_t *size)
 {
 	ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
@@ -47,7 +47,7 @@ bool file_exists(const char *filename)
 
 	return !!(status.st_mode & _S_IFREG);
 }
-*/
+
 bool save_bmp_mono(const char *filename, uint8_t *ptr, int width, int height)
 {
 	uint8_t *buf = new uint8_t[width*height*4];

@@ -2,17 +2,16 @@
 #include "app.hpp"
 #include "graphics.hpp"
 #include "logger.hpp"
-#include "resource_watcher.hpp"
 #include "effect_wrapper.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 #include "v8_handler.hpp"
 #include "demo_engine.hpp"
 #include "technique.hpp"
-#include "io.hpp"
 #include "kumi_loader.hpp"
 #include "scene.hpp"
 #include "property_manager.hpp"
+#include "resource_manager.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
@@ -234,7 +233,6 @@ App::App()
 	, _cur_camera(1)
 	, _draw_plane(false)
 	, _ref_count(1)
-	, _io(nullptr)
 	, m_MainHwnd(NULL),
 	m_BrowserHwnd(NULL),
 	m_EditHwnd(NULL),
@@ -243,14 +241,12 @@ App::App()
 	m_StopHwnd(NULL),
 	m_ReloadHwnd(NULL)
 {
-	_io = new DiskIo;
 	find_app_root();
 	DISPATCHER.set_thread(threading::kMainThread, this);
 }
 
 App::~App()
 {
-	SAFE_DELETE(_io);
 }
 
 App& App::instance()
@@ -277,6 +273,8 @@ bool App::init(HINSTANCE hinstance)
 		return false;
 */
 	B_ERR_BOOL(create_window());
+
+	RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
 
 	if (!GRAPHICS.load_technique("effects/cef.tec").is_valid()) {
 		// log error
@@ -370,7 +368,6 @@ UINT App::run(void *userdata) {
 
 			DEMO_ENGINE.tick();
 
-			RESOURCE_WATCHER.process_deferred();
 			GRAPHICS.clear();
 
 			GRAPHICS.find_technique2("cef")->submit();
@@ -632,10 +629,3 @@ void App::find_app_root()
 	_app_root = starting_dir;
 }
 
-Io *App::io() {
-	return _io;
-}
-
-void App::set_io(Io *io) {
-	_io = io;
-}

@@ -16,7 +16,6 @@ class EffectBase;
 class EffectWrapper;
 
 struct Scene;
-struct Io;
 
 struct RenderStates {
 	RenderStates() : blend_state(nullptr), depth_stencil_state(nullptr), rasterizer_state(nullptr), sampler_state(nullptr) {}
@@ -47,9 +46,6 @@ public:
   virtual UINT run(void *userdata);
 
 	void debug_text(const char *fmt, ...);
-
-	Io *io();
-	void set_io(Io *io);
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(App);
@@ -163,7 +159,6 @@ protected:
 
 	GraphicsObjectHandle _cef_texture;
 	GraphicsObjectHandle _cef_staging;
-	Io *_io;
 };
 
 #define APP App::instance()

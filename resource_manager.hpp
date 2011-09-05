@@ -27,6 +27,7 @@ private:
 	string resolve_filename(const char *filename);
 	static ResouceManager *_instance;
 	bool _copy_on_load;
+	string _copy_dest;
 	vector<string> _paths;
 };
 

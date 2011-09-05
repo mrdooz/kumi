@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "file_watcher.hpp"
-#include "resource_watcher.hpp"
 #include "async_file_loader.hpp"
 #include "utils.hpp"
 #include "logger.hpp"

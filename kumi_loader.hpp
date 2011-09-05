@@ -1,11 +1,10 @@
 #pragma once
 
-struct Io;
 struct Scene;
 
 class KumiLoader {
 public:
-	bool load(const char *filename, Io *io, Scene **scene);
+	bool load(const char *filename, Scene **scene);
 private:
 	bool load_meshes(const char *buf, Scene *scene);
 	bool load_cameras(const char *buf, Scene *scene);

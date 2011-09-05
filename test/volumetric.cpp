@@ -1,14 +1,13 @@
 #include "stdafx.h"
 #include "volumetric.hpp"
 #include "../kumi_loader.hpp"
-#include "../io.hpp"
 #include "../app.hpp"
 #include "../scene.hpp"
 
 bool VolumetricEffect::init() {
 
 	KumiLoader loader;
-	loader.load("c:\\temp\\torus.kumi", APP.io(), &_scene);
+	loader.load("meshes\\torus.kumi", &_scene);
 
 	for (size_t i = 0; i < _scene->meshes.size(); ++i) {
 		XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
@@ -22,7 +21,7 @@ bool VolumetricEffect::init() {
 	int w, h;
 	GRAPHICS.size(&w, &h);
 	_render_target = GRAPHICS.create_render_target(w, h);
-	B_ERR_BOOL(_render_target.is_valid());
+	//B_ERR_BOOL(_render_target.is_valid());
 
 	return true;
 }

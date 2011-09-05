@@ -1,12 +1,12 @@
 #include "stdafx.h"
 #include "technique.hpp"
 #include "technique_parser.hpp"
-#include "io.hpp"
 #include "file_utils.hpp"
 #include "graphics.hpp"
 #include "dx_utils.hpp"
 #include "app.hpp"
 #include "file_watcher.hpp"
+#include "resource_manager.hpp"
 
 using namespace boost::assign;
 using namespace std;
@@ -30,7 +30,7 @@ Technique::~Technique() {
 Technique *Technique::create_from_file(const char *filename) {
 	void *buf;
 	size_t len;
-	if (!APP.io()->load_file(filename, &buf, &len))
+	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
 		return NULL;
 
 	TechniqueParser parser;
@@ -191,7 +191,6 @@ bool Technique::compile_shader(Shader *shader) {
 
 bool Technique::init_shader(Shader *shader) {
 
-	Io *io = APP.io();
 	bool force = true;
 
 #define CHECKED_EXEC(x) if (ok) { bool res = (x); if (!res) LOG_ERROR(#x); }
@@ -201,12 +200,14 @@ bool Technique::init_shader(Shader *shader) {
 		[=](void *token, FileEvent event, const string &old_name, const string &new_name) {
 
 			bool ok = true;
+			const char *obj = shader->filename.c_str();
+			const char *src = shader->source.c_str();
 			// compile the shader if the source is newer, or the object file doesn't exist
 			if (force || 
-				io->file_exists(shader->source.c_str()) && (!io->file_exists(shader->filename.c_str()) || io->mdate(shader->source.c_str()) > io->mdate(shader->filename.c_str()))) {
+				RESOURCE_MANAGER.file_exists(src) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src) > RESOURCE_MANAGER.mdate(obj))) {
 					CHECKED_EXEC(compile_shader(shader));
 			} else {
-				ok = io->file_exists(shader->filename.c_str());
+				ok = RESOURCE_MANAGER.file_exists(obj);
 			}
 
 			void *buf;
@@ -214,7 +215,7 @@ bool Technique::init_shader(Shader *shader) {
 
 
 			set<string> used_params;
-			CHECKED_EXEC(io->load_file(shader->filename.c_str(), &buf, &len));
+			CHECKED_EXEC(RESOURCE_MANAGER.load_file(obj, &buf, &len));
 			CHECKED_EXEC(do_reflection(shader, buf, len, &used_params));
 
 			// remove any unused parameters

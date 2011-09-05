@@ -1,9 +1,9 @@
 #include "stdafx.h"
 #include "kumi_loader.hpp"
-#include "io.hpp"
 #include "material_manager.hpp"
 #include "scene.hpp"
 #include "dx_utils.hpp"
+#include "resource_manager.hpp"
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -137,19 +137,19 @@ bool KumiLoader::load_materials(const char *buf) {
 	return true;
 }
 
-bool KumiLoader::load(const char *filename, Io *io, Scene **scene) {
+bool KumiLoader::load(const char *filename, Scene **scene) {
 
 	MainHeader header;
 	MainHeader *p = &header;
-	B_ERR_BOOL(io->load_partial(filename, 0, sizeof(header), (void **)&p));
+	B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, 0, sizeof(header), (void **)&p));
 
 	const int scene_data_size = header.binary_ofs;
 	const char *scene_data = new char[scene_data_size];
-	B_ERR_BOOL(io->load_partial(filename, 0, scene_data_size, (void **)&scene_data));
+	B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, 0, scene_data_size, (void **)&scene_data));
 
 	const int buffer_data_size = header.total_size - header.binary_ofs;
 	char *buffer_data = new char[buffer_data_size];
-	B_ERR_BOOL(io->load_partial(filename, header.binary_ofs, buffer_data_size, (void **)&buffer_data));
+	B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, header.binary_ofs, buffer_data_size, (void **)&buffer_data));
 
 	// apply the string fix-up
 	apply_fixup((int *)(scene_data + header.string_ofs), scene_data, scene_data);

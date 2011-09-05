@@ -4,8 +4,8 @@
 #include "technique.hpp"
 #include "material_manager.hpp"
 #include "file_watcher.hpp"
-#include "io.hpp"
 #include "app.hpp"
+#include "resource_manager.hpp"
 
 using namespace std;
 
@@ -393,22 +393,26 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
 }
 
 GraphicsObjectHandle Graphics::load_technique(const char *filename) {
-	GraphicsObjectHandle ret;
-	if (!APP.io()->is_watchable()) {
-		// TODO: ...
 
+	GraphicsObjectHandle ret;
+
+	auto load_inner = [&](const char *filename){
+		int idx = _techniques.find_by_token(filename);
+		if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
+			if (Technique *technique = Technique::create_from_file(filename)) {
+				SAFE_DELETE(_techniques[idx].first);
+				_techniques[idx] = make_pair(technique, filename);
+				ret = GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
+			}
+		}
+	};
+
+	if (!RESOURCE_MANAGER.is_watchable()) {
+		load_inner(filename);
 	} else {
 		FILE_WATCHER.add_file_watch(filename, NULL, true, threading::kMainThread, 
-
 			[&](void *token, FileEvent event, const string &old_name, const string &new_name) {
-				int idx = _techniques.find_by_token(old_name);
-				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
-					if (Technique *technique = Technique::create_from_file(old_name.c_str())) {
-						SAFE_DELETE(_techniques[idx].first);
-						_techniques[idx] = make_pair(technique, filename);
-						ret = GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
-					}
-				}
+				load_inner(old_name.c_str());
 			}
 		);
 	}
