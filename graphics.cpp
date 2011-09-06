@@ -100,14 +100,12 @@ Graphics::Graphics()
 	, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
 	, _textures(delete_obj<TextureData *>)
 	, _render_targets(delete_obj<RenderTargetData *>)
-	, _default_render_target(new RenderTargetData)
 {
 	assert(!_instance);
 }
 
 Graphics::~Graphics()
 {
-	delete exch_null(_default_render_target);
 }
 
 HRESULT Graphics::create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
@@ -242,30 +240,34 @@ bool Graphics::create_back_buffers(int width, int height)
   _width = width;
   _height = height;
 
-	const bool existing_buffers = *_default_render_target;
-	_default_render_target->reset();
-
-  // release any existing buffers
-	if (existing_buffers)
+	int idx = _render_targets.find_by_token("default_rt");
+	RenderTargetData *rt = nullptr;
+	if (idx != -1) {
+		rt = _render_targets.get(idx);
+		rt->reset();
+		// release any existing buffers
 		_swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
+	} else {
+		rt = new RenderTargetData;
+		idx = _render_targets.find_free_index();
+	}
 
   // Get the dx11 back buffer
-	B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_default_render_target->texture.p)));
-  _default_render_target->texture->GetDesc(&_default_render_target->texture_desc);
+	B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&rt->texture.p)));
+  rt->texture->GetDesc(&rt->texture_desc);
 
-  B_ERR_HR(_device->CreateRenderTargetView(_default_render_target->texture, NULL, &_default_render_target->rtv));
-	_default_render_target->rtv->GetDesc(&_default_render_target->rtv_desc);
+  B_ERR_HR(_device->CreateRenderTargetView(rt->texture, NULL, &rt->rtv));
+	rt->rtv->GetDesc(&rt->rtv_desc);
 
   // depth buffer
   B_ERR_HR(_device->CreateTexture2D(
 		&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), 
-		NULL, &_default_render_target->depth_stencil.p));
+		NULL, &rt->depth_stencil.p));
 
-  B_ERR_HR(_device->CreateDepthStencilView(_default_render_target->depth_stencil, NULL, &_default_render_target->dsv.p));
-	_default_render_target->dsv->GetDesc(&_default_render_target->dsv_desc);
+  B_ERR_HR(_device->CreateDepthStencilView(rt->depth_stencil, NULL, &rt->dsv.p));
+	rt->dsv->GetDesc(&rt->dsv_desc);
 
-	int idx = _render_targets.find_free_index();
-	_render_targets[idx] = make_pair(_default_render_target, "default_rt");
+	_render_targets[idx] = make_pair(rt, "default_rt");
 	_default_rt_handle = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
@@ -343,7 +345,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 void Graphics::set_default_render_target()
 {
-	_immediate_context->OMSetRenderTargets(1, &(_default_render_target->rtv.p), _default_render_target->dsv);
+	RenderTargetData *rt = _render_targets.get(_default_rt_handle);
+	_immediate_context->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
 	_immediate_context->RSSetViewports(1, &_viewport);
 }
 
@@ -354,6 +357,12 @@ bool Graphics::close()
   return true;
 }
 
+void Graphics::clear(GraphicsObjectHandle h) {
+	RenderTargetData *rt = _render_targets.get(h);
+	_immediate_context->ClearRenderTargetView(rt->rtv, &_clear_color.x);
+	_immediate_context->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+}
+
 void Graphics::clear()
 {
   clear(_clear_color);
@@ -361,8 +370,9 @@ void Graphics::clear()
 
 void Graphics::clear(const XMFLOAT4& c)
 {
-	_immediate_context->ClearRenderTargetView(_default_render_target->rtv, &c.x);
-	_immediate_context->ClearDepthStencilView(_default_render_target->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+	RenderTargetData *rt = _render_targets.get(_default_rt_handle);
+	_immediate_context->ClearRenderTargetView(rt->rtv, &c.x);
+	_immediate_context->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 }
 
 void Graphics::present()
@@ -633,6 +643,7 @@ void Graphics::render() {
 			GraphicsObjectHandle h = cmd.first.handle;
 			if (RenderTargetData *rt = _render_targets.get(h)) {
 				ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
+				GRAPHICS.clear(h);
 			}
 			int a = 10;
 			break;
@@ -707,4 +718,3 @@ void Graphics::render() {
 
 	_render_commands.clear();
 }
-

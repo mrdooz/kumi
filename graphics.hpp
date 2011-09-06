@@ -119,6 +119,7 @@ public:
 	bool	close();
   void	clear(const XMFLOAT4& c);
   void	clear();
+	void	clear(GraphicsObjectHandle h);
   void	set_clear_color(const XMFLOAT4& c) { _clear_color = c; }
 	void	present();
 	void	resize(const int width, const int height);
@@ -210,7 +211,6 @@ private:
 	CComPtr<ID3D11Device> _device;
 	CComPtr<IDXGISwapChain> _swap_chain;
 
-	RenderTargetData *_default_render_target;
 	GraphicsObjectHandle _default_rt_handle;
 
   CComPtr<ID3D11Debug> _d3d_debug;
