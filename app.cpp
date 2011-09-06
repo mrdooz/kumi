@@ -275,7 +275,8 @@ bool App::init(HINSTANCE hinstance)
 	B_ERR_BOOL(create_window());
 
 	RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
-
+	RESOURCE_MANAGER.add_path("D:\\syncplicity");
+	
 	if (!GRAPHICS.load_technique("effects/cef.tec").is_valid()) {
 		// log error
 	}

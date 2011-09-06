@@ -20,8 +20,8 @@ bool VolumetricEffect::init() {
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
-	_render_target = GRAPHICS.create_render_target(w, h);
-	//B_ERR_BOOL(_render_target.is_valid());
+	_render_target = GRAPHICS.create_render_target(w, h, "tjong");
+	B_ERR_BOOL(_render_target.is_valid());
 
 	return true;
 }

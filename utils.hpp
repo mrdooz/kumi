@@ -80,6 +80,17 @@ void assoc_delete(T* t) {
 	t->clear();
 }
 
+template<class T>
+void release_obj(T t) {
+	if (t)
+		t->Release();
+}
+
+template<class T>
+void delete_obj(T t) {
+	delete t;
+}
+
 // I'm not sure if this is crazy overkill or not.. I guess what I want is lazy evaluation of function arguments
 #define either_or(a, b) [&]() ->decltype((a)) { auto t = (a); return t ? t : (b); }()
 

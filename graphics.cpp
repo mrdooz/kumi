@@ -24,8 +24,49 @@ namespace
 	}
 }
 
+struct RenderTargetData {
+	RenderTargetData() {
+		reset();
+	}
 
-static_assert(sizeof(GraphicsObjectHandle) == sizeof(uint32_t), "Invalid size for GraphicsObjectHandle");
+	void reset() {
+		texture = NULL;
+		depth_buffer = NULL;
+		rtv = NULL;
+		dsv = NULL;
+		srv = NULL;
+	}
+
+	operator bool() { return texture || depth_buffer || rtv || dsv || srv; }
+
+	D3D11_TEXTURE2D_DESC texture_desc;
+	D3D11_TEXTURE2D_DESC depth_buffer_desc;
+	D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
+	D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+	CComPtr<ID3D11Texture2D> texture;
+	CComPtr<ID3D11Texture2D> depth_buffer;
+	CComPtr<ID3D11RenderTargetView> rtv;
+	CComPtr<ID3D11DepthStencilView> dsv;
+	CComPtr<ID3D11ShaderResourceView> srv;
+};
+
+struct TextureData {
+	~TextureData() {
+		reset();
+	}
+
+	void reset() {
+		texture.Release();
+		srv.Release();
+	}
+	operator bool() { return texture || srv; }
+	D3D11_TEXTURE2D_DESC texture_desc;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+	CComPtr<ID3D11Texture2D> texture;
+	CComPtr<ID3D11ShaderResourceView> srv;
+};
+
 
 Graphics* Graphics::_instance = NULL;
 
@@ -45,6 +86,20 @@ Graphics::Graphics()
   , _fps(0)
 	, _vs_profile("vs_4_0")
 	, _ps_profile("ps_4_0")
+	, _vertex_shaders(release_obj<ID3D11VertexShader *>)
+	, _pixel_shaders(release_obj<ID3D11PixelShader *>)
+	, _vertex_buffers(release_obj<ID3D11Buffer *>)
+	, _index_buffers(release_obj<ID3D11Buffer *>)
+	, _constant_buffers(release_obj<ID3D11Buffer *>)
+	, _techniques(delete_obj<Technique *>)
+	, _input_layouts(release_obj<ID3D11InputLayout *>)
+	, _blend_states(release_obj<ID3D11BlendState *>)
+	, _depth_stencil_states(release_obj<ID3D11DepthStencilState *>)
+	, _rasterizer_states(release_obj<ID3D11RasterizerState *>)
+	, _sampler_states(release_obj<ID3D11SamplerState *>)
+	, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
+	, _textures(delete_obj<TextureData *>)
+	, _render_targets(delete_obj<RenderTargetData *>)
 {
 	assert(!_instance);
 }
@@ -77,7 +132,20 @@ void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t 
 	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-GraphicsObjectHandle Graphics::create_render_target(int width, int height) {
+GraphicsObjectHandle Graphics::create_render_target(int width, int height, const char *name) {
+	RenderTargetData *data = new RenderTargetData;
+	if (!create_render_target(width, height, data)) {
+		delete exch_null(data);
+		return GraphicsObjectHandle();
+	}
+
+	int idx = name ? _render_targets.find_by_token(name) : -1;
+	if (idx != -1 || (idx = _render_targets.find_free_index()) != -1) {
+		if (_render_targets[idx].first)
+			_render_targets[idx].first->reset();
+		_render_targets[idx] = make_pair(data, name);
+		return GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
+	}
 	return GraphicsObjectHandle();
 }
 
@@ -110,13 +178,16 @@ bool Graphics::create_render_target(int width, int height, RenderTargetData *out
 }
 
 GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name) {
-	TextureData data;
-	if (!create_texture(desc, &data))
+	TextureData *data = new TextureData;
+	if (!create_texture(desc, data)) {
+		delete exch_null(data);
 		return GraphicsObjectHandle();
+	}
 
 	int idx = name ? _textures.find_by_token(name) : -1;
 	if (idx != -1 || (idx = _textures.find_free_index()) != -1) {
-		_textures[idx].first.reset();
+		if (_textures[idx].first)
+			_textures[idx].first->reset();
 		_textures[idx] = make_pair(data, name);
 		return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
 	}
@@ -467,7 +538,7 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 	vector<ID3D11ShaderResourceView *> views(num_views);
 	for (int i = 0; i < num_views; ++i) {
 		const ResourceViewParam &v = shader->resource_view_params[i];
-		views[v.bind_point] = _textures[_textures.find_by_token(v.name)].first.srv;
+		views[v.bind_point] = _textures[_textures.find_by_token(v.name)].first->srv;
 	}
 
 	ctx->PSSetShaderResources(0, num_views, &views[0]);
@@ -518,15 +589,15 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-	return SUCCEEDED(_immediate_context._context->Map(_textures.get(h).texture, sub, type, flags, res));
+	return SUCCEEDED(_immediate_context._context->Map(_textures.get(h)->texture, sub, type, flags, res));
 }
 
 void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
-	_immediate_context._context->Unmap(_textures.get(h).texture, sub);
+	_immediate_context._context->Unmap(_textures.get(h)->texture, sub);
 }
 
 void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {
-	_immediate_context._context->CopyResource(_textures.get(dst).texture, _textures.get(src).texture);
+	_immediate_context._context->CopyResource(_textures.get(dst)->texture, _textures.get(src)->texture);
 }
 
 void Graphics::render() {

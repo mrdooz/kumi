@@ -85,7 +85,6 @@
     <ClCompile Include="..\file_utils.cpp" />
     <ClCompile Include="..\file_watcher.cpp" />
     <ClCompile Include="..\graphics.cpp" />
-    <ClCompile Include="..\io.cpp" />
     <ClCompile Include="..\kumi.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
@@ -123,7 +122,6 @@
     <ClInclude Include="..\file_watcher.hpp" />
     <ClInclude Include="..\graphics.hpp" />
     <ClInclude Include="..\id_buffer.hpp" />
-    <ClInclude Include="..\io.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\material_manager.hpp" />

@@ -29,6 +29,7 @@ class GraphicsObjectHandle {
 		kIndexBuffer,
 		kConstantBuffer,
 		kTexture,
+		kRenderTarget,
 		kShader,
 		kInputLayout,
 		kBlendState,
@@ -93,37 +94,8 @@ struct RenderKey {
 
 static_assert(sizeof(RenderKey) <= sizeof(uint64_t), "RenderKey too large");
 
-struct RenderTargetData {
-	void reset() {
-		texture = NULL;
-		depth_buffer = NULL;
-		rtv = NULL;
-		dsv = NULL;
-		srv = NULL;
-	}
-	D3D11_TEXTURE2D_DESC texture_desc;
-	D3D11_TEXTURE2D_DESC depth_buffer_desc;
-	D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
-	D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
-	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-	CComPtr<ID3D11Texture2D> texture;
-	CComPtr<ID3D11Texture2D> depth_buffer;
-	CComPtr<ID3D11RenderTargetView> rtv;
-	CComPtr<ID3D11DepthStencilView> dsv;
-	CComPtr<ID3D11ShaderResourceView> srv;
-};
-
-struct TextureData {
-	void reset() {
-		texture.Release();
-		srv.Release();
-	}
-	operator bool() { return texture || srv; }
-	D3D11_TEXTURE2D_DESC texture_desc;
-	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-	CComPtr<ID3D11Texture2D> texture;
-	CComPtr<ID3D11ShaderResourceView> srv;
-};
+struct RenderTargetData;
+struct TextureData;
 
 struct MeshRenderData {
 	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
@@ -171,10 +143,7 @@ public:
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
-	bool create_render_target(int width, int height, RenderTargetData *out);
-	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
-
-	GraphicsObjectHandle create_render_target(int width, int height);
+	GraphicsObjectHandle create_render_target(int width, int height, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
 
 	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
@@ -229,6 +198,9 @@ private:
 	Graphics();
 	~Graphics();
 
+	bool create_render_target(int width, int height, RenderTargetData *out);
+	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
+
 	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id);
 	void set_samplers(Technique *technique, Shader *shader);
 	void set_resource_views(Technique *technique, Shader *shader);
@@ -281,7 +253,8 @@ private:
 	IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
 	IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 	IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
-	IdBuffer<TextureData, IdCount, string> _textures;
+	IdBuffer<TextureData *, IdCount, string> _textures;
+	IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;

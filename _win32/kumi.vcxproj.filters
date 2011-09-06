@@ -69,9 +69,6 @@
     <ClCompile Include="..\technique_parser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\io.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\kumi_loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -150,9 +147,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\technique_parser.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\io.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\kumi_loader.hpp">
