@@ -20,7 +20,7 @@ bool VolumetricEffect::init() {
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
-	_render_target = GRAPHICS.create_render_target(w, h, "tjong");
+	_render_target = GRAPHICS.create_render_target(w, h, true, "tjong");
 	B_ERR_BOOL(_render_target.is_valid());
 
 	return true;
@@ -65,6 +65,11 @@ bool VolumetricEffect::render() {
 		// Use the same sequence number for all the meshes to sort by technique
 		uint16 seq_nr = GRAPHICS.next_seq_nr();
 		_scene->submit_meshes(seq_nr);
+
+		// set original render target
+		key.handle = GRAPHICS.default_rt_handle();
+		key.seq_nr = GRAPHICS.next_seq_nr();
+		GRAPHICS.submit_command(key, NULL);
 	}
 
 	return true;

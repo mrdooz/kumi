@@ -31,13 +31,13 @@ struct RenderTargetData {
 
 	void reset() {
 		texture = NULL;
-		depth_buffer = NULL;
+		depth_stencil = NULL;
 		rtv = NULL;
 		dsv = NULL;
 		srv = NULL;
 	}
 
-	operator bool() { return texture || depth_buffer || rtv || dsv || srv; }
+	operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
 
 	D3D11_TEXTURE2D_DESC texture_desc;
 	D3D11_TEXTURE2D_DESC depth_buffer_desc;
@@ -45,7 +45,7 @@ struct RenderTargetData {
 	D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
 	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
 	CComPtr<ID3D11Texture2D> texture;
-	CComPtr<ID3D11Texture2D> depth_buffer;
+	CComPtr<ID3D11Texture2D> depth_stencil;
 	CComPtr<ID3D11RenderTargetView> rtv;
 	CComPtr<ID3D11DepthStencilView> dsv;
 	CComPtr<ID3D11ShaderResourceView> srv;
@@ -100,12 +100,14 @@ Graphics::Graphics()
 	, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
 	, _textures(delete_obj<TextureData *>)
 	, _render_targets(delete_obj<RenderTargetData *>)
+	, _default_render_target(new RenderTargetData)
 {
 	assert(!_instance);
 }
 
 Graphics::~Graphics()
 {
+	delete exch_null(_default_render_target);
 }
 
 HRESULT Graphics::create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
@@ -132,9 +134,9 @@ void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t 
 	context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-GraphicsObjectHandle Graphics::create_render_target(int width, int height, const char *name) {
+GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool shader_resource, const char *name) {
 	RenderTargetData *data = new RenderTargetData;
-	if (!create_render_target(width, height, data)) {
+	if (!create_render_target(width, height, shader_resource, data)) {
 		delete exch_null(data);
 		return GraphicsObjectHandle();
 	}
@@ -149,13 +151,14 @@ GraphicsObjectHandle Graphics::create_render_target(int width, int height, const
 	return GraphicsObjectHandle();
 }
 
-bool Graphics::create_render_target(int width, int height, RenderTargetData *out)
+bool Graphics::create_render_target(int width, int height, bool shader_resource, RenderTargetData *out)
 {
 	out->reset();
 
 	// create the render target
 	ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
-	out->texture_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1, D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+	out->texture_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1, 
+		D3D11_BIND_RENDER_TARGET | shader_resource * D3D11_BIND_SHADER_RESOURCE);
 	B_WRN_HR(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
 
 	// create the render target view
@@ -164,15 +167,17 @@ bool Graphics::create_render_target(int width, int height, RenderTargetData *out
 
 	// create the depth stencil texture
 	out->depth_buffer_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL);
-	B_WRN_HR(_device->CreateTexture2D(&out->depth_buffer_desc, NULL, &out->depth_buffer.p));
+	B_WRN_HR(_device->CreateTexture2D(&out->depth_buffer_desc, NULL, &out->depth_stencil.p));
 
 	// create depth stencil view
 	out->dsv_desc = CD3D11_DEPTH_STENCIL_VIEW_DESC(D3D11_DSV_DIMENSION_TEXTURE2D, DXGI_FORMAT_D24_UNORM_S8_UINT);
-	B_WRN_HR(_device->CreateDepthStencilView(out->depth_buffer, &out->dsv_desc, &out->dsv.p));
+	B_WRN_HR(_device->CreateDepthStencilView(out->depth_stencil, &out->dsv_desc, &out->dsv.p));
 
-	// create the shader resource view
-	out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
-	B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+	if (shader_resource) {
+		// create the shader resource view
+		out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
+		B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+	}
 
 	return true;
 }
@@ -218,7 +223,7 @@ bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data
 		return false;
 
 	D3D11_MAPPED_SUBRESOURCE resource;
-	B_ERR_HR(_immediate_context._context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
+	B_ERR_HR(_immediate_context->Map(out->texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource));
 	uint8_t *src = (uint8_t *)data;
 	uint8_t *dst = (uint8_t *)resource.pData;
 	const int w = std::min<int>(width, data_width);
@@ -228,7 +233,7 @@ bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data
 		src += data_pitch;
 		dst += resource.RowPitch;
 	}
-	_immediate_context._context->Unmap(out->texture, 0);
+	_immediate_context->Unmap(out->texture, 0);
 	return true;
 }
 
@@ -237,26 +242,31 @@ bool Graphics::create_back_buffers(int width, int height)
   _width = width;
   _height = height;
 
-  // release any existing buffers
-  const bool existing_buffers = _back_buffer || _render_target_view;
-  _back_buffer = NULL;
-  _render_target_view = NULL;
-  _depth_stencil = NULL;
-  _depth_stencil_view = NULL;
+	const bool existing_buffers = *_default_render_target;
+	_default_render_target->reset();
 
-  if (existing_buffers)
-    _swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
+  // release any existing buffers
+	if (existing_buffers)
+		_swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
 
   // Get the dx11 back buffer
-	B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_back_buffer)));
-  D3D11_TEXTURE2D_DESC back_buffer_desc;
-  _back_buffer->GetDesc(&back_buffer_desc);
+	B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&_default_render_target->texture.p)));
+  _default_render_target->texture->GetDesc(&_default_render_target->texture_desc);
 
-  B_ERR_HR(_device->CreateRenderTargetView(_back_buffer, NULL, &_render_target_view));
+  B_ERR_HR(_device->CreateRenderTargetView(_default_render_target->texture, NULL, &_default_render_target->rtv));
+	_default_render_target->rtv->GetDesc(&_default_render_target->rtv_desc);
 
   // depth buffer
-  B_ERR_HR(_device->CreateTexture2D(&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), NULL, &_depth_stencil));
-  B_ERR_HR(_device->CreateDepthStencilView(_depth_stencil, NULL, &_depth_stencil_view));
+  B_ERR_HR(_device->CreateTexture2D(
+		&CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), 
+		NULL, &_default_render_target->depth_stencil.p));
+
+  B_ERR_HR(_device->CreateDepthStencilView(_default_render_target->depth_stencil, NULL, &_default_render_target->dsv.p));
+	_default_render_target->dsv->GetDesc(&_default_render_target->dsv_desc);
+
+	int idx = _render_targets.find_free_index();
+	_render_targets[idx] = make_pair(_default_render_target, "default_rt");
+	_default_rt_handle = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
 
@@ -315,7 +325,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 	// Create the DX11 device
 	B_ERR_HR(D3D11CreateDeviceAndSwapChain(
-		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context._context.p));
+		adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context.p));
 
 	B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
@@ -333,9 +343,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 void Graphics::set_default_render_target()
 {
-	ID3D11RenderTargetView* render_targets[] = { _render_target_view };
-	_immediate_context._context->OMSetRenderTargets(1, render_targets, _depth_stencil_view);
-	_immediate_context._context->RSSetViewports(1, &_viewport);
+	_immediate_context->OMSetRenderTargets(1, &(_default_render_target->rtv.p), _default_render_target->dsv);
+	_immediate_context->RSSetViewports(1, &_viewport);
 }
 
 bool Graphics::close()
@@ -352,8 +361,8 @@ void Graphics::clear()
 
 void Graphics::clear(const XMFLOAT4& c)
 {
-	_immediate_context._context->ClearRenderTargetView(_render_target_view, &c.x);
-	_immediate_context._context->ClearDepthStencilView(_depth_stencil_view, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+	_immediate_context->ClearRenderTargetView(_default_render_target->rtv, &c.x);
+	_immediate_context->ClearDepthStencilView(_default_render_target->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 }
 
 void Graphics::present()
@@ -512,7 +521,7 @@ void Graphics::submit_command(RenderKey key, void *data) {
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
-	ID3D11DeviceContext *ctx = _immediate_context._context;
+	ID3D11DeviceContext *ctx = _immediate_context;
 
 	const int num_samplers = (int)shader->sampler_params.size();
 	if (!num_samplers)
@@ -529,7 +538,7 @@ void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
 void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 
-	ID3D11DeviceContext *ctx = _immediate_context._context;
+	ID3D11DeviceContext *ctx = _immediate_context;
 
 	const int num_views = (int)shader->resource_view_params.size();
 	if (!num_views)
@@ -546,7 +555,7 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 
 void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id) {
 
-	ID3D11DeviceContext *ctx = _immediate_context._context;
+	ID3D11DeviceContext *ctx = _immediate_context;
 
 	vector<CBuffer> &cbuffers = technique->get_cbuffers();
 
@@ -589,25 +598,25 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-	return SUCCEEDED(_immediate_context._context->Map(_textures.get(h)->texture, sub, type, flags, res));
+	return SUCCEEDED(_immediate_context->Map(_textures.get(h)->texture, sub, type, flags, res));
 }
 
 void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
-	_immediate_context._context->Unmap(_textures.get(h)->texture, sub);
+	_immediate_context->Unmap(_textures.get(h)->texture, sub);
 }
 
 void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {
-	_immediate_context._context->CopyResource(_textures.get(dst)->texture, _textures.get(src)->texture);
+	_immediate_context->CopyResource(_textures.get(dst)->texture, _textures.get(src)->texture);
 }
 
 void Graphics::render() {
 
-	_immediate_context._context->RSSetViewports(1, &_viewport);
+	_immediate_context->RSSetViewports(1, &_viewport);
 
 	// aaah, lambdas, thank you!
 	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.data < b.first.data; });
 
-	ID3D11DeviceContext *ctx = _immediate_context._context;
+	ID3D11DeviceContext *ctx = _immediate_context;
 
 	// delete commands are sorted before render commands, so we can just save the
 	// deleted items when we find them
@@ -621,6 +630,10 @@ void Graphics::render() {
 				break;
 
 		case RenderKey::kSetRenderTarget: {
+			GraphicsObjectHandle h = cmd.first.handle;
+			if (RenderTargetData *rt = _render_targets.get(h)) {
+				ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
+			}
 			int a = 10;
 			break;
 		}
@@ -666,7 +679,7 @@ void Graphics::render() {
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
 
-				ID3D11DeviceContext *ctx = _immediate_context._context;
+				ID3D11DeviceContext *ctx = _immediate_context;
 				ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
 				ctx->GSSetShader(NULL, 0, 0);
 				ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);

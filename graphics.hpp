@@ -110,14 +110,6 @@ struct MeshRenderData {
 	PropertyManager::Id mesh_id;
 };
 
-class Context {
-	friend class Graphics;
-public:
-
-private:
-	CComPtr<ID3D11DeviceContext> _context;
-};
-
 class Graphics {
 public:
 
@@ -135,7 +127,7 @@ public:
 	const char *ps_profile() const { return _ps_profile.c_str(); }
 
 	ID3D11Device* device() { return _device; }
-  ID3D11DeviceContext* context() { return _immediate_context._context; }
+  ID3D11DeviceContext* context() { return _immediate_context; }
 
   const D3D11_VIEWPORT& viewport() const { return _viewport; }
 
@@ -143,7 +135,7 @@ public:
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
-	GraphicsObjectHandle create_render_target(int width, int height, const char *name);
+	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
 
 	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
@@ -187,6 +179,8 @@ public:
 	HRESULT create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer);
 	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
+	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
+
 	// TODO: this should be on the context
 	void submit_command(RenderKey key, void *data);
 	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
@@ -198,7 +192,7 @@ private:
 	Graphics();
 	~Graphics();
 
-	bool create_render_target(int width, int height, RenderTargetData *out);
+	bool create_render_target(int width, int height, bool shader_resource, RenderTargetData *out);
 	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
 	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id);
@@ -215,15 +209,9 @@ private:
   D3D_FEATURE_LEVEL _feature_level;
 	CComPtr<ID3D11Device> _device;
 	CComPtr<IDXGISwapChain> _swap_chain;
-	CComPtr<ID3D11RenderTargetView> _render_target_view;
-	CComPtr<ID3D11Texture2D> _depth_stencil;
-	CComPtr<ID3D11DepthStencilView> _depth_stencil_view;
 
-	CComPtr<ID3D11Texture2D> _back_buffer;
-	CComPtr<ID3D11ShaderResourceView> _shared_texture_view;
-	CComPtr<ID3D11Texture2D> _shared_texture;
-	CComPtr<IDXGIKeyedMutex> _keyed_mutex_10;
-	CComPtr<IDXGIKeyedMutex> _keyed_mutex_11;
+	RenderTargetData *_default_render_target;
+	GraphicsObjectHandle _default_rt_handle;
 
   CComPtr<ID3D11Debug> _d3d_debug;
 
@@ -237,7 +225,7 @@ private:
   DWORD _start_fps_time;
   int32_t _frame_count;
   float _fps;
-	Context _immediate_context;
+	CComPtr<ID3D11DeviceContext> _immediate_context;
 
 	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
 	IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;
