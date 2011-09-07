@@ -72,20 +72,23 @@ struct RenderKey {
 	};
 	static_assert(kNumCommands < (1 << 16), "Too many commands");
 
+	RenderKey() : data(0) {}
+
 	union {
+		// Written for little endianess
 		struct {
 			union {
-				uint16 depth;
-				uint16 seq_nr;
+				struct {
+					uint32 padding : 6;
+					uint32 material : 16;
+					uint32 shader : 10;
+				};
+				uint32 handle : 32;  // a GraphicsObjectHandle
 			};
 			uint16 cmd;
 			union {
-				struct {
-					uint32 shader : 10;
-					uint32 material : 16;
-					uint32 padding : 6;
-				};
-				uint32 handle : 32;  // a GraphicsObjectHandle
+				uint16 seq_nr;
+				uint16 depth;
 			};
 		};
 		uint64 data;
