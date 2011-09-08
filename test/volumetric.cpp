@@ -16,11 +16,11 @@ bool VolumetricEffect::init() {
 		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
 	}
 
-	B_ERR_BOOL(GRAPHICS.load_technique("effects/diffuse.tec").is_valid());
+	B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", NULL));
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
-	_render_target = GRAPHICS.create_render_target(w, h, true, "tjong");
+	_render_target = GRAPHICS.create_render_target(w, h, true, "rt_volumetric");
 	B_ERR_BOOL(_render_target.is_valid());
 
 	return true;
@@ -60,7 +60,7 @@ bool VolumetricEffect::render() {
 		key.cmd = RenderKey::kSetRenderTarget;
 		key.handle = _render_target;
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(key, NULL);
+	//	GRAPHICS.submit_command(key, NULL);
 
 		// Use the same sequence number for all the meshes to sort by technique
 		uint16 seq_nr = GRAPHICS.next_seq_nr();
@@ -69,7 +69,7 @@ bool VolumetricEffect::render() {
 		// set original render target
 		key.handle = GRAPHICS.default_rt_handle();
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(key, NULL);
+		//GRAPHICS.submit_command(key, NULL);
 	}
 
 	return true;

@@ -127,7 +127,8 @@ public:
 	Technique();
 	~Technique();
 
-	static Technique *create_from_file(const char *filename);
+	//static Technique *create_from_file(const char *filename);
+	static bool create_from_file(const char *filename, vector<Technique *> *techniques);
 	const string &name() const { return _name; }
 
 	GraphicsObjectHandle input_layout() const { return _input_layout; }

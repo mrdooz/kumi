@@ -12,9 +12,9 @@ class TechniqueParser {
 public:
 	TechniqueParser();
 	~TechniqueParser();
-	bool parse_main(const char *start, const char *end, Technique *technique);
+	bool parse(const char *start, const char *end, vector<Technique *> *techniques);
 private:
-	bool parse_inner(Scope *scope, Technique *technique);
+	bool parse_inner(Scope *scope, vector<Technique *> *techniques);
 	bool parse_technique(Scope *scope, Technique *technique);
 	bool parse_shader(Scope *scope, Shader *shader);
 	bool parse_params(Scope *scope, Shader *shader);

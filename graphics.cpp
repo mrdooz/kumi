@@ -482,18 +482,28 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
 	return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::load_technique(const char *filename) {
+bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques) {
 
-	GraphicsObjectHandle ret;
+	bool res = true;
+	vector<GraphicsObjectHandle> tmp;
 
 	auto load_inner = [&](const char *filename){
-		int idx = _techniques.find_by_token(filename);
-		if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
-			if (Technique *technique = Technique::create_from_file(filename)) {
-				SAFE_DELETE(_techniques[idx].first);
-				_techniques[idx] = make_pair(technique, filename);
-				ret = GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx);
+		vector<Technique *> techniques;
+		if (Technique::create_from_file(filename, &techniques)) {
+			for (size_t i = 0; i < techniques.size(); ++i) {
+				Technique *t = techniques[i];
+				Rollback rb([&](){delete exch_null(t);});
+				int idx = _techniques.find_by_token(t->name());
+				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
+					SAFE_DELETE(_techniques[idx].first);
+					_techniques[idx] = make_pair(t, filename);
+					tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
+					rb.commit();
+				}
+
 			}
+		} else {
+			res = false;
 		}
 	};
 
@@ -506,7 +516,10 @@ GraphicsObjectHandle Graphics::load_technique(const char *filename) {
 			}
 		);
 	}
-	return ret;
+
+	if (techniques)
+		*techniques = tmp;
+	return res;
 }
 
 Technique *Graphics::find_technique2(const char *name) {

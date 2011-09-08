@@ -27,6 +27,28 @@ Technique::~Technique() {
 	SAFE_DELETE(_pixel_shader);
 }
 
+bool Technique::create_from_file(const char *filename, vector<Technique *> *techniques) {
+	void *buf;
+	size_t len;
+	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
+		return false;
+
+	techniques->clear();
+	TechniqueParser parser;
+	vector<Technique *> tmp;
+	bool ok = parser.parse((const char *)buf, (const char *)buf + len, &tmp);
+	for (size_t i = 0; i < tmp.size(); ++i) {
+		bool res = tmp[i]->init();
+		if (res)
+			techniques->push_back(tmp[i]);
+		else
+			delete exch_null(tmp[i]);
+		ok &= res;
+	}
+
+	return ok;
+}
+/*
 Technique *Technique::create_from_file(const char *filename) {
 	void *buf;
 	size_t len;
@@ -42,6 +64,7 @@ Technique *Technique::create_from_file(const char *filename) {
 
 	return t;
 }
+*/
 
 bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params)
 {

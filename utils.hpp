@@ -33,13 +33,24 @@ private:
 	HANDLE _h;
 };
 
-
 struct ScopedObj
 {
 	typedef std::function<void()> Fn;
 	ScopedObj(const Fn& fn) : fn(fn) {}
 	~ScopedObj() { fn(); }
 	Fn fn;
+};
+
+struct Rollback {
+	Rollback(const std::function<void()> &rollback) : _rollback(rollback), _commit(false) {}
+	~Rollback() {
+		if (!_commit)
+			_rollback();
+	}
+	void commit() { _commit = true; }
+
+	std::function<void()> _rollback;
+	bool _commit;
 };
 
 #define SCOPED_CS(cs) ScopedCs lock(cs);

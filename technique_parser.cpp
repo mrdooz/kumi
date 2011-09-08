@@ -998,27 +998,33 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 	return false;
 }
 
-bool TechniqueParser::parse_inner(Scope *scope, Technique *technique) {
+
+bool TechniqueParser::parse_inner(Scope *scope, vector<Technique *> *techniques) {
 
 	switch (scope->next_symbol()) {
 
 	case kSymTechnique: {
-		technique->_name = scope->next_identifier();
+		Technique *t = new Technique;
+		Rollback rb([&](){delete exch_null(t);});
+		t->_name = scope->next_identifier();
 		EXPECT(scope, kSymBlockOpen);
-		parse_technique(scope, technique);
+		parse_technique(scope, t);
 		EXPECT(scope, kSymBlockClose);
 		EXPECT(scope, kSymSemicolon);
-		return true;
+		rb.commit();
+		techniques->push_back(t);
 		break;
 	}
 
 	default:
 		return false;
 	}
+
+	return true;
 }
 
-bool TechniqueParser::parse_main(const char *start, const char *end, Technique *technique) {
+bool TechniqueParser::parse(const char *start, const char *end, vector<Technique *> *techniques) {
 	
 	Scope scope(_symbol_trie, start, end-1);
-	return parse_inner(&scope, technique);
+	return parse_inner(&scope, techniques);
 }

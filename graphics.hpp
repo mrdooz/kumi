@@ -10,6 +10,8 @@ struct Shader;
 struct Material;
 class Technique;
 
+using std::map;
+using std::string;
 using std::vector;
 using std::pair;
 
@@ -169,7 +171,7 @@ public:
 	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
-	GraphicsObjectHandle load_technique(const char *filename);
+	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques);
 	GraphicsObjectHandle find_technique(const char *name);
 	Technique *find_technique2(const char *name);
 
@@ -249,6 +251,8 @@ private:
 
 	typedef pair<RenderKey, void *> RenderCmd;
 	vector<RenderCmd > _render_commands;
+
+	std::map<string, vector<string> > _techniques_by_file;
 
 	string _vs_profile;
 	string _ps_profile;

@@ -1,0 +1,87 @@
+technique diffuse {
+	
+	vertex_shader {
+		file effects/diffuse.vso;
+		params [
+			{ float4x4 view system; },
+			{ float4x4 proj system; },
+			{ float4x4 world mesh; }
+		];
+	};
+	
+	pixel_shader {
+		file effects/diffuse.pso;
+		params [
+			{ float4 DiffuseColor material; }
+		];
+	};
+	
+	rasterizer_desc {
+		cull_mode = back;
+	};
+	
+	depth_stencil_desc {
+		depth_enable = true;
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+};
+
+technique cef {
+	
+	vertex_shader {
+		file effects/cef.vso;
+		entry_point vs_main;
+	};
+	
+	pixel_shader {
+		params [
+			{ texture2d cef_texture system; },
+			{ sampler cef_sampler technique; }
+		];
+
+		file effects/cef.pso;
+		entry_point ps_main;
+	};
+
+	// 0,1
+	// 2,3
+	// 0, 1, 2
+	// 2, 1, 3
+	vertices {
+		format pos_tex;
+		data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (1, -1, 1, 1, 1)];
+	};
+	
+	indices {
+		// format index32;
+		// TODO: topology
+		data [0, 1, 2, 2, 1, 3];
+	};
+	
+	sampler_desc cef_sampler {
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = true;
+			src_blend = src_alpha;
+			dest_blend = inv_src_alpha;
+			blend_op = add;
+			src_blend_alpha = one;
+			dest_blend_alpha = zero;
+			blend_op_alpha = add;
+		};
+	};
+	
+	rasterizer_desc {
+	};
+	
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+};
