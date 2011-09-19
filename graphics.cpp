@@ -2,6 +2,7 @@
 #include "graphics.hpp"
 #include "logger.hpp"
 #include "technique.hpp"
+#include "technique_parser.hpp"
 #include "material_manager.hpp"
 #include "file_watcher.hpp"
 #include "app.hpp"
@@ -80,10 +81,9 @@ Graphics& Graphics::instance()
 Graphics::Graphics()
 	: _width(-1)
 	, _height(-1)
-  , _clear_color(0,0,0,1)
-  , _start_fps_time(0xffffffff)
-  , _frame_count(0)
-  , _fps(0)
+	, _start_fps_time(0xffffffff)
+	, _frame_count(0)
+	, _fps(0)
 	, _vs_profile("vs_4_0")
 	, _ps_profile("ps_4_0")
 	, _vertex_shaders(release_obj<ID3D11VertexShader *>)
@@ -357,15 +357,10 @@ bool Graphics::close()
   return true;
 }
 
-void Graphics::clear(GraphicsObjectHandle h) {
+void Graphics::clear(GraphicsObjectHandle h, const XMFLOAT4 &c) {
 	RenderTargetData *rt = _render_targets.get(h);
-	_immediate_context->ClearRenderTargetView(rt->rtv, &_clear_color.x);
+	_immediate_context->ClearRenderTargetView(rt->rtv, &c.x);
 	_immediate_context->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
-}
-
-void Graphics::clear()
-{
-  clear(_clear_color);
 }
 
 void Graphics::clear(const XMFLOAT4& c)
@@ -482,6 +477,30 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
 	return GraphicsObjectHandle();
 }
 
+static bool create_techniques_from_file(const char *filename, vector<Technique *> *techniques) {
+	void *buf;
+	size_t len;
+	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
+		return false;
+
+	techniques->clear();
+	TechniqueParser parser;
+	vector<Technique *> tmp;
+	bool res = parser.parse((const char *)buf, (const char *)buf + len, &tmp);
+	if (res) {
+		for (size_t i = 0; i < tmp.size(); ++i) {
+			if (tmp[i]->init()) {
+				techniques->push_back(tmp[i]);
+			} else {
+				delete exch_null(tmp[i]);
+				res = false;
+				break;
+			}
+		}
+	}
+	return res;
+}
+
 bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques) {
 
 	bool res = true;
@@ -489,7 +508,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 
 	auto load_inner = [&](const char *filename){
 		vector<Technique *> techniques;
-		if (Technique::create_from_file(filename, &techniques)) {
+		if (create_techniques_from_file(filename, &techniques)) {
 			for (size_t i = 0; i < techniques.size(); ++i) {
 				Technique *t = techniques[i];
 				Rollback rb([&](){delete exch_null(t);});
@@ -522,7 +541,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 	return res;
 }
 
-Technique *Graphics::find_technique2(const char *name) {
+Technique *Graphics::find_technique(const char *name) {
 	for (int i = 0; i < _techniques.Size; ++i) {
 		if (_techniques[i].first && _techniques[i].first->name() == name)
 			return _techniques[i].first;
@@ -530,16 +549,8 @@ Technique *Graphics::find_technique2(const char *name) {
 	return NULL;
 }
 
-GraphicsObjectHandle Graphics::find_technique(const char *name) {
-	for (int i = 0; i < _techniques.Size; ++i) {
-		if (_techniques[i].first && _techniques[i].first->name() == name)
-			return GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, i);
-	}
-	return GraphicsObjectHandle();
-}
-
-void Graphics::submit_command(RenderKey key, void *data) {
-	_render_commands.push_back(make_pair(key, data));
+void Graphics::submit_command(RenderKey key, void *data, void *data2) {
+	_render_commands.push_back(RenderCmd(key, data, data2));
 }
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
@@ -570,7 +581,18 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 	vector<ID3D11ShaderResourceView *> views(num_views);
 	for (int i = 0; i < num_views; ++i) {
 		const ResourceViewParam &v = shader->resource_view_params[i];
-		views[v.bind_point] = _textures[_textures.find_by_token(v.name)].first->srv;
+		// look for the named texture, and if that doesn't exist, look for a render target
+		int idx = _textures.find_by_token(v.name);
+		if (idx != -1) {
+			views[v.bind_point] = _textures[idx].first->srv;
+		} else {
+			idx = _render_targets.find_by_token(v.name);
+			if (idx != -1) {
+				views[v.bind_point] = _render_targets[idx].first->srv;
+			} else {
+				LOG_WARNING_LN("Texture not found: %s", v.name);
+			}
+		}
 	}
 
 	ctx->PSSetShaderResources(0, num_views, &views[0]);
@@ -637,7 +659,7 @@ void Graphics::render() {
 	_immediate_context->RSSetViewports(1, &_viewport);
 
 	// aaah, lambdas, thank you!
-	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.first.data < b.first.data; });
+	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
 
 	ID3D11DeviceContext *ctx = _immediate_context;
 
@@ -647,26 +669,32 @@ void Graphics::render() {
 
 	for (size_t i = 0; i < _render_commands.size(); ++i) {
 		const RenderCmd &cmd = _render_commands[i];
-		switch (cmd.first.cmd) {
+		RenderKey key = cmd.key;
+		void *data = cmd.data;
+		void *data2 = cmd.data2;
+		switch (key.cmd) {
+
 		case RenderKey::kDelete:
-				deleted_items.insert(cmd.second);
+				deleted_items.insert(data);
 				break;
 
 		case RenderKey::kSetRenderTarget: {
-			GraphicsObjectHandle h = cmd.first.handle;
+			GraphicsObjectHandle h = key.handle;
 			if (RenderTargetData *rt = _render_targets.get(h)) {
 				ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
-				GRAPHICS.clear(h);
+				if (data) {
+					XMFLOAT4 *f = (XMFLOAT4 *)cmd.data;
+					GRAPHICS.clear(h, *f);
+				}
 			}
-			int a = 10;
 			break;
 		}
 
 		case RenderKey::kRenderTechnique: {
-			if (deleted_items.find(cmd.second) != deleted_items.end())
+			if (deleted_items.find(data) != deleted_items.end())
 				break;
 
-			Technique *technique = (Technique *)cmd.second;
+			Technique *technique = (Technique *)data;
 
 			Shader *vertex_shader = technique->vertex_shader();
 			Shader *pixel_shader = technique->pixel_shader();
@@ -695,11 +723,12 @@ void Graphics::render() {
 
 		case RenderKey::kRenderMesh:
 			{
-				if (deleted_items.find(cmd.second) != deleted_items.end())
+				if (deleted_items.find(data) != deleted_items.end())
 					break;
-				const MeshRenderData *data = (const MeshRenderData *)cmd.second;
-				const Material &material = MATERIAL_MANAGER.get_material(data->material_id);
-				Technique *technique = _techniques.get(find_technique(material.technique.c_str()));
+				MeshRenderData *render_data = (MeshRenderData *)data;
+				const uint16 material_id = data2 ? (uint16)data2 : render_data->material_id;
+				const Material &material = MATERIAL_MANAGER.get_material(material_id);
+				Technique *technique = find_technique(material.technique.c_str());
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
 
@@ -708,22 +737,22 @@ void Graphics::render() {
 				ctx->GSSetShader(NULL, 0, 0);
 				ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
 
-				set_vb(ctx, _vertex_buffers.get(data->vb), data->vertex_size);
-				ctx->IASetIndexBuffer(_index_buffers.get(data->ib), data->index_format, 0);
+				set_vb(ctx, _vertex_buffers.get(render_data->vb), render_data->vertex_size);
+				ctx->IASetIndexBuffer(_index_buffers.get(render_data->ib), render_data->index_format, 0);
 				ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
 
-				ctx->IASetPrimitiveTopology(data->topology);
+				ctx->IASetPrimitiveTopology(render_data->topology);
 
 				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
 				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
 				ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
 
-				set_cbuffer_params(technique, vertex_shader, data->material_id, data->mesh_id);
-				set_cbuffer_params(technique, pixel_shader, data->material_id, data->mesh_id);
+				set_cbuffer_params(technique, vertex_shader, material_id, render_data->mesh_id);
+				set_cbuffer_params(technique, pixel_shader, material_id, render_data->mesh_id);
 				set_samplers(technique, pixel_shader);
 				set_resource_views(technique, pixel_shader);
 
-				ctx->DrawIndexed(data->index_count, 0, 0);
+				ctx->DrawIndexed(render_data->index_count, 0, 0);
 			}
 			break;
 		}

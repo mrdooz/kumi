@@ -19,8 +19,8 @@
 #define LOG_VERBOSE_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Verbose, fmt, __VA_ARGS__ );
 #define LOG_INFO(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Info, fmt, __VA_ARGS__ );
 #define LOG_INFO_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Info, fmt, __VA_ARGS__ );
-#define LOG_WARNING(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ );
-#define LOG_WARNING_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ );
+#define LOG_WARNING(fmt, ...) do { LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ ); } while(false)
+#define LOG_WARNING_LN(fmt, ...) do { LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ ); } while(false)
 #define LOG_WARNING_LN_ONESHOT(fmt, ...) LOG_MGR.debug_output(true, true, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ );
 #define LOG_ERROR(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Error, fmt, __VA_ARGS__ );
 #define LOG_ERROR_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Error, fmt, __VA_ARGS__ );

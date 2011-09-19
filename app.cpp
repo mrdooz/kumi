@@ -370,9 +370,9 @@ UINT App::run(void *userdata) {
 
 			DEMO_ENGINE.tick();
 
-			GRAPHICS.clear();
+			GRAPHICS.clear(XMFLOAT4(0,0,0,1));
 
-			GRAPHICS.find_technique2("cef")->submit();
+			GRAPHICS.find_technique("cef")->submit();
 
 /*
 			if (_test_effect) {

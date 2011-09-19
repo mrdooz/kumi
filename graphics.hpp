@@ -122,10 +122,8 @@ public:
 
 	bool	init(const HWND hwnd, const int width, const int height);
 	bool	close();
-  void	clear(const XMFLOAT4& c);
-  void	clear();
-	void	clear(GraphicsObjectHandle h);
-  void	set_clear_color(const XMFLOAT4& c) { _clear_color = c; }
+	void	clear(const XMFLOAT4& c);
+	void	clear(GraphicsObjectHandle h, const XMFLOAT4 &c);
 	void	present();
 	void	resize(const int width, const int height);
 
@@ -172,8 +170,7 @@ public:
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
 	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques);
-	GraphicsObjectHandle find_technique(const char *name);
-	Technique *find_technique2(const char *name);
+	Technique *find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
 	GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
@@ -188,7 +185,7 @@ public:
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
 	// TODO: this should be on the context
-	void submit_command(RenderKey key, void *data);
+	void submit_command(RenderKey key, void *data, void *data2 = NULL);
 	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
 	void render();
 
@@ -218,18 +215,17 @@ private:
 
 	GraphicsObjectHandle _default_rt_handle;
 
-  CComPtr<ID3D11Debug> _d3d_debug;
+	CComPtr<ID3D11Debug> _d3d_debug;
 
-  CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
-  CComPtr<ID3D11DepthStencilState> _default_depth_stencil_state;
-  CComPtr<ID3D11SamplerState> _default_sampler_state;
-  float _default_blend_factors[4];
-  CComPtr<ID3D11BlendState> _default_blend_state;
+	CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
+	CComPtr<ID3D11DepthStencilState> _default_depth_stencil_state;
+	CComPtr<ID3D11SamplerState> _default_sampler_state;
+	float _default_blend_factors[4];
+	CComPtr<ID3D11BlendState> _default_blend_state;
 
-	XMFLOAT4 _clear_color;
-  DWORD _start_fps_time;
-  int32_t _frame_count;
-  float _fps;
+	DWORD _start_fps_time;
+	int32_t _frame_count;
+	float _fps;
 	CComPtr<ID3D11DeviceContext> _immediate_context;
 
 	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
@@ -249,7 +245,12 @@ private:
 	IdBuffer<TextureData *, IdCount, string> _textures;
 	IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
 
-	typedef pair<RenderKey, void *> RenderCmd;
+	struct RenderCmd {
+		RenderCmd(RenderKey key, void *data, void *data2) : key(key), data(data), data2(data2) {}
+		RenderKey key;
+		void *data;
+		void *data2;
+	};
 	vector<RenderCmd > _render_commands;
 
 	std::map<string, vector<string> > _techniques_by_file;

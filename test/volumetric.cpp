@@ -3,6 +3,8 @@
 #include "../kumi_loader.hpp"
 #include "../app.hpp"
 #include "../scene.hpp"
+#include "../material_manager.hpp"
+#include "../technique.hpp"
 
 bool VolumetricEffect::init() {
 
@@ -16,12 +18,16 @@ bool VolumetricEffect::init() {
 		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
 	}
 
-	B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", NULL));
+	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL));
+
+	material_occlude = GRAPHICS.find_technique("volumetric_occluder")->material_id("black");
+	material_shaft = GRAPHICS.find_technique("volumetric_shaft")->material_id("default");
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
-	_render_target = GRAPHICS.create_render_target(w, h, true, "rt_volumetric");
-	B_ERR_BOOL(_render_target.is_valid());
+	_occluder_rt = GRAPHICS.create_render_target(w, h, true, "volumetric_occluder");
+	_shaft_rt = GRAPHICS.create_render_target(w, h, true, "volumetric_shaft");
+	B_ERR_BOOL(_occluder_rt.is_valid() && _shaft_rt.is_valid());
 
 	return true;
 }
@@ -53,23 +59,34 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
 
 bool VolumetricEffect::render() {
 
+	static XMFLOAT4 clear_white(1, 1, 1, 1);
+	static XMFLOAT4 clear_black(1, 1, 1, 1);
+
 	if (_scene) {
 
 		RenderKey key;
 		key.data = 0;
 		key.cmd = RenderKey::kSetRenderTarget;
-		key.handle = _render_target;
+		key.handle = _occluder_rt;
 		key.seq_nr = GRAPHICS.next_seq_nr();
-	//	GRAPHICS.submit_command(key, NULL);
+		GRAPHICS.submit_command(key, (void *)&clear_white);
+
+		// Render the occluders
 
 		// Use the same sequence number for all the meshes to sort by technique
-		uint16 seq_nr = GRAPHICS.next_seq_nr();
-		_scene->submit_meshes(seq_nr);
+		_scene->submit_meshes(GRAPHICS.next_seq_nr(), material_occlude);
 
-		// set original render target
+		// Render the light streaks
+		key.handle = _shaft_rt;
+		key.seq_nr = GRAPHICS.next_seq_nr();
+		GRAPHICS.submit_command(key, (void *)&clear_black);
+
+		GRAPHICS.find_technique("volumetric_shaft")->submit();
+
+		// Add it together
 		key.handle = GRAPHICS.default_rt_handle();
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		//GRAPHICS.submit_command(key, NULL);
+		GRAPHICS.submit_command(key, NULL);
 	}
 
 	return true;

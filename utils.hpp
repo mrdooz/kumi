@@ -53,14 +53,14 @@ struct Rollback {
 	bool _commit;
 };
 
-#define SCOPED_CS(cs) ScopedCs lock(cs);
 
 // Macro for creating "local" names
 #define GEN_NAME2(prefix, line) prefix##line
 #define GEN_NAME(prefix, line) GEN_NAME2(prefix, line)
 #define MAKE_SCOPED(type) type GEN_NAME(ANON, __LINE__)
 
-#define SCOPED_OBJ(x) MAKE_SCOPED(ScopedObj)((x));
+#define SCOPED_OBJ(x) MAKE_SCOPED(ScopedObj)(x);
+#define SCOPED_CS(cs) ScopedCs lock(cs);
 
 // A macro to disallow the copy constructor and operator= functions
 // This should be used in the private: declarations for a class

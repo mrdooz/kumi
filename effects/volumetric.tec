@@ -1,7 +1,8 @@
-technique diffuse {
+technique volumetric_occluder {
 	
 	vertex_shader {
-		file effects/diffuse.vso;
+		file effects/volumetric.fx;
+		entry_point vs_occluder;
 		params [
 			{ float4x4 view system; },
 			{ float4x4 proj system; },
@@ -10,42 +11,35 @@ technique diffuse {
 	};
 	
 	pixel_shader {
-		file effects/diffuse.pso;
-		params [
-			{ float4 DiffuseColor material; }
-		];
+		file effects/volumetric.fx;
+		entry_point ps_occluder;
 	};
 	
-	rasterizer_desc {
-		cull_mode = back;
-	};
-	
-	depth_stencil_desc {
-		depth_enable = true;
-	};
-	
-	blend_desc {
-		render_target[0] = {
-			blend_enable = false;
-		};
+	material black {
 	};
 };
 
-technique cef {
+technique volumetric_shaft {
 	
 	vertex_shader {
-		file effects/cef.vso;
-		entry_point vs_main;
+		file effects/volumetric.fx;
+		entry_point vs_shaft;
+		params [
+			{ float4x4 view system; },
+			{ float4x4 proj system; },
+			{ float4x4 world mesh; }
+		];
 	};
 	
 	pixel_shader {
+		file effects/volumetric.fx;
+		entry_point ps_shaft;
+		
 		params [
-			{ texture2d cef_texture system; },
-			{ sampler cef_sampler technique; }
+			{ texture2d volumetric_occluder system; },
+			{ sampler shaft_sampler technique; }
 		];
 
-		file effects/cef.pso;
-		entry_point ps_main;
 	};
 
 	// 0,1
@@ -62,26 +56,31 @@ technique cef {
 		// TODO: topology
 		data [0, 1, 2, 2, 1, 3];
 	};
+
 	
-	sampler_desc cef_sampler {
+	material default {
+	};
+
+	sampler_desc shaft_sampler {
+	};
+
+};
+
+technique volumetric_add {
+	
+	vertex_shader {
+		file effects/volumetric.fx;
+		entry_point vs_add;
+		params [
+			{ float4x4 view system; },
+			{ float4x4 proj system; },
+			{ float4x4 world mesh; }
+		];
 	};
 	
-	blend_desc {
-		render_target[0] = {
-			blend_enable = true;
-			src_blend = src_alpha;
-			dest_blend = inv_src_alpha;
-			blend_op = add;
-			src_blend_alpha = one;
-			dest_blend_alpha = zero;
-			blend_op_alpha = add;
-		};
-	};
-	
-	rasterizer_desc {
-	};
-	
-	depth_stencil_desc {
-		depth_enable = false;
+	pixel_shader {
+		file effects/volumetric.fx;
+		entry_point ps_add;
 	};
 };
+

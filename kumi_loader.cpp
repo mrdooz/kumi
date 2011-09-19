@@ -112,8 +112,10 @@ bool KumiLoader::load_materials(const char *buf) {
 
 	int count = step_read<int>(&buf);
 	for (int i = 0; i < count; ++i) {
-		Material material(step_read<const char *>(&buf));
-		material.technique = step_read<const char *>(&buf);
+		string name, technique;
+		name = step_read<const char *>(&buf);
+		technique = step_read<const char *>(&buf);
+		Material material(technique, name);
 		int props = step_read<int>(&buf);
 		for (int j = 0; j < props; ++j) {
 			const char *name = step_read<const char *>(&buf);

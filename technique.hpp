@@ -84,8 +84,8 @@ struct Shader {
 	bool is_valid() const { return valid; }
 
 	bool valid;
-	string filename;
-	string source;
+	string source_filename;
+	string obj_filename;
 	string entry_point;
 	vector<CBufferParam> cbuffer_params;
 	vector<SamplerParam> sampler_params;
@@ -127,8 +127,6 @@ public:
 	Technique();
 	~Technique();
 
-	//static Technique *create_from_file(const char *filename);
-	static bool create_from_file(const char *filename, vector<Technique *> *techniques);
 	const string &name() const { return _name; }
 
 	GraphicsObjectHandle input_layout() const { return _input_layout; }
@@ -148,10 +146,12 @@ public:
 	DXGI_FORMAT index_format() const { return _index_format; }
 	int index_count() const { return (int)_indices.size(); }
 
+	uint16 material_id(const char *name) const;
+
 	void submit();
+	bool init();
 private:
 
-	bool init();
 	bool init_shader(Shader *shader);
 	bool compile_shader(Shader *shader);
 	bool do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params);
@@ -166,6 +166,8 @@ private:
 	GraphicsObjectHandle _input_layout;
 
 	vector<CBuffer> _constant_buffers;
+
+	vector<pair<string, uint16>> _materials;
 
 	int _vertex_size;
 	vector<float> _vertices;

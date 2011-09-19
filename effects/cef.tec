@@ -1,7 +1,7 @@
 technique cef {
 	
 	vertex_shader {
-		file effects/cef.vso;
+		file effects/cef.fx;
 		entry_point vs_main;
 	};
 	
@@ -11,8 +11,8 @@ technique cef {
 			{ sampler cef_sampler technique; }
 		];
 
-		file effects/cef.pso;
 		entry_point ps_main;
+		file effects/cef.fx;
 	};
 
 	// 0,1

@@ -5,6 +5,7 @@
 #include "string_utils.hpp"
 #include "file_utils.hpp"
 #include "dx_utils.hpp"
+#include "material_manager.hpp"
 #include <hash_set>
 
 using namespace std;
@@ -40,6 +41,8 @@ enum Symbol {
 		kSymFormat,
 		kSymData,
 	kSymIndices,
+
+	kSymMaterial,
 
 	kSymFloat,
 	kSymFloat2,
@@ -116,6 +119,8 @@ struct {
 		{ kSymEntryPoint, "entry_point" },
 		{ kSymParams, "params" },
 
+	{ kSymMaterial, "material" },
+
 	{ kSymVertices, "vertices" },
 	{ kSymFormat, "format" },
 	{ kSymData, "data" },
@@ -174,6 +179,15 @@ struct {
 			{ kSymBlendOpAlpha, "blend_op_alpha" },
 			{ kSymRenderTargetWriteMask, "render_target_write_mask" },
 };
+
+static auto valid_property_types = map_list_of
+	(kSymFloat, PropertyType::kFloat)
+	(kSymFloat2, PropertyType::kFloat2)
+	(kSymFloat3, PropertyType::kFloat3)
+	(kSymFloat4, PropertyType::kFloat4)
+	(kSymFloat4x4, PropertyType::kFloat4x4)
+	(kSymTexture2d, PropertyType::kTexture2d)
+	(kSymSampler, PropertyType::kSampler);
 
 class Trie {
 public:
@@ -236,20 +250,19 @@ private:
 
 }
 
-static void parse_value(const string &value, CBufferParam *param) {
-	switch (param->type) {
+static bool parse_value(const string &value, PropertyType::Enum type, float *out) {
+	const char *v = value.c_str();
+	switch (type) {
 	case PropertyType::kFloat:
-		sscanf(value.c_str(), "%f", &param->default_value._float[0]);
-		break;
+		return (sscanf(v, "%f", &out[0]) == 1);
 	case PropertyType::kFloat2:
-		sscanf(value.c_str(), "%f %f", &param->default_value._float[0], &param->default_value._float[1]);
-		break;
+		return sscanf(v, "%f %f", &out[0], &out[1]) == 2 || sscanf(v, "%f, %f", &out[0], &out[1]) == 2;
 	case PropertyType::kFloat3:
-		sscanf(value.c_str(), "%f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2]);
-		break;
+		return sscanf(v, "%f %f %f", &out[0], &out[1], &out[2]) == 3 || sscanf(v, "%f, %f, %f", &out[0], &out[1], &out[2]) == 3;
 	case PropertyType::kFloat4:
-		sscanf(value.c_str(), "%f %f %f %f", &param->default_value._float[0], &param->default_value._float[1], &param->default_value._float[2], &param->default_value._float[3]);
-		break;
+		return sscanf(v, "%f %f %f %f", &out[0], &out[1], &out[2], &out[3]) == 4 || sscanf(v, "%f, %f, %f, %f", &out[0], &out[1], &out[2], &out[3]) == 4;
+	default:
+		return false;
 	}
 }
 
@@ -443,14 +456,6 @@ struct Scope {
 	} while(false)
 
 bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
-	static auto valid_types = map_list_of
-		(kSymFloat, PropertyType::kFloat)
-		(kSymFloat2, PropertyType::kFloat2)
-		(kSymFloat3, PropertyType::kFloat3)
-		(kSymFloat4, PropertyType::kFloat4)
-		(kSymFloat4x4, PropertyType::kFloat4x4)
-		(kSymTexture2d, PropertyType::kTexture2d)
-		(kSymSampler, PropertyType::kSampler);
 
 	static auto valid_sources = map_list_of
 		("material", PropertySource::kMaterial)
@@ -460,7 +465,7 @@ bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 		("technique", PropertySource::kTechnique);
 
 	// type, name and source are required. the default value is optional
-	PropertyType::Enum type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_types, PropertyType::kUnknown);
+	PropertyType::Enum type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_property_types, PropertyType::kUnknown);
 	if (type == PropertyType::kUnknown)
 		return false;
 
@@ -485,7 +490,7 @@ bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 	if (cbuffer_param && scope->consume_if(kSymParamDefault)) {
 		string value = scope->string_until(';');
 		EXPECT(scope, kSymSemicolon);
-		parse_value(value, &shader->cbuffer_params.back());
+		parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
 	}
 
 	return true;
@@ -503,19 +508,54 @@ bool TechniqueParser::parse_params(Scope *scope, Shader *shader) {
 	return false;
 }
 
+bool TechniqueParser::parse_material(Scope *scope, Material *material) {
+
+	static auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
+
+	Symbol type;
+	while (scope->consume_in(tmp, &type)) {
+		PropertyType::Enum prop_type = lookup_default<Symbol, PropertyType::Enum>(type, valid_property_types, PropertyType::kUnknown);
+		string name = scope->next_identifier();
+		EXPECT(scope, kSymEquals);
+		string value = scope->string_until(';');
+		float out[16];
+		if (!parse_value(value, prop_type, out))
+			return false;
+		EXPECT(scope, kSymSemicolon);
+		switch (prop_type) {
+		case PropertyType::kFloat:
+			material->properties.push_back(MaterialProperty(name, out[0]));
+			break;
+		case PropertyType::kFloat4:
+			material->properties.push_back(MaterialProperty(name, XMFLOAT4(out[0], out[1], out[2], out[3])));
+			break;
+		default:
+			return false;
+		}
+	}
+	return true;
+}
+
 bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
+	const string &ext = shader->type() == Shader::kVertexShader ? ".vso" : ".pso";
+	string entry_point = shader->type() == Shader::kVertexShader ? "vs_main" : "ps_main";
 	while (true) {
 		switch (scope->consume_in(list_of(kSymFile)(kSymEntryPoint)(kSymParams))) {
 
-			case kSymFile:
-				shader->filename = scope->string_until(';');
-				shader->source = replace_extension(shader->filename.c_str(), "fx");
+			case kSymFile: {
+				shader->source_filename = scope->string_until(';');
+				// Use the default entry point name until we get a real tag
+				shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
 				EXPECT(scope, kSymSemicolon);
 				break;
+			}
 
 			case kSymEntryPoint:
-				shader->entry_point = scope->string_until(';');
+				entry_point = shader->entry_point = scope->string_until(';');
+				// update the obj filename
+				if (!shader->source_filename.empty())
+					shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
 				EXPECT(scope, kSymSemicolon);
 				break;
 
@@ -906,6 +946,7 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
 	static auto valid = list_of
 		(kSymVertexShader)(kSymPixelShader)
+		(kSymMaterial)
 		(kSymVertices)(kSymIndices)
 		(kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
 
@@ -931,6 +972,17 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 				}
 				EXPECT(scope, kSymBlockClose);
 				EXPECT(scope, kSymSemicolon);
+				break;
+			}
+
+			case kSymMaterial: {
+				Material mat(technique->name(), scope->next_identifier());
+				EXPECT(scope, kSymBlockOpen);
+				if (!parse_material(scope, &mat))
+					return false;
+				EXPECT(scope, kSymBlockClose);
+				EXPECT(scope, kSymSemicolon);
+				technique->_materials.push_back(make_pair(mat.name, MATERIAL_MANAGER.add_material(mat)));
 				break;
 			}
 
@@ -1001,23 +1053,25 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
 bool TechniqueParser::parse_inner(Scope *scope, vector<Technique *> *techniques) {
 
-	switch (scope->next_symbol()) {
+	while (!scope->end()) {
+		switch (scope->next_symbol()) {
 
-	case kSymTechnique: {
-		Technique *t = new Technique;
-		Rollback rb([&](){delete exch_null(t);});
-		t->_name = scope->next_identifier();
-		EXPECT(scope, kSymBlockOpen);
-		parse_technique(scope, t);
-		EXPECT(scope, kSymBlockClose);
-		EXPECT(scope, kSymSemicolon);
-		rb.commit();
-		techniques->push_back(t);
-		break;
-	}
+		case kSymTechnique: {
+			Technique *t = new Technique;
+			Rollback rb([&](){delete exch_null(t);});
+			t->_name = scope->next_identifier();
+			EXPECT(scope, kSymBlockOpen);
+			parse_technique(scope, t);
+			EXPECT(scope, kSymBlockClose);
+			EXPECT(scope, kSymSemicolon);
+			rb.commit();
+			techniques->push_back(t);
+			break;
+		}
 
-	default:
-		return false;
+		default:
+			return false;
+		}
 	}
 
 	return true;

@@ -17,7 +17,7 @@ struct MaterialProperty {
 };
 
 struct Material {
-	Material(const string &name) : name(name) {}
+	Material(const string &technique, const string &name) : technique(technique), name(name) {}
 	string technique;
 	string name;
 	std::vector<MaterialProperty> properties;

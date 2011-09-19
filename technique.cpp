@@ -27,45 +27,6 @@ Technique::~Technique() {
 	SAFE_DELETE(_pixel_shader);
 }
 
-bool Technique::create_from_file(const char *filename, vector<Technique *> *techniques) {
-	void *buf;
-	size_t len;
-	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
-		return false;
-
-	techniques->clear();
-	TechniqueParser parser;
-	vector<Technique *> tmp;
-	bool ok = parser.parse((const char *)buf, (const char *)buf + len, &tmp);
-	for (size_t i = 0; i < tmp.size(); ++i) {
-		bool res = tmp[i]->init();
-		if (res)
-			techniques->push_back(tmp[i]);
-		else
-			delete exch_null(tmp[i]);
-		ok &= res;
-	}
-
-	return ok;
-}
-/*
-Technique *Technique::create_from_file(const char *filename) {
-	void *buf;
-	size_t len;
-	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
-		return NULL;
-
-	TechniqueParser parser;
-	Technique *t = new Technique;
-	bool ok = parser.parse_main((const char *)buf, (const char *)buf + len, t);
-	ok &= t->init();
-	if (!ok)
-		delete exch_null(t);
-
-	return t;
-}
-*/
-
 bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
@@ -197,7 +158,7 @@ bool Technique::compile_shader(Shader *shader) {
 	sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s", 
 		profile,
 		shader->entry_point.c_str(),
-		shader->filename.c_str(), shader->source.c_str());
+		shader->obj_filename.c_str(), shader->source_filename.c_str());
 
 	DWORD exit_code = 1;
 
@@ -218,13 +179,13 @@ bool Technique::init_shader(Shader *shader) {
 
 #define CHECKED_EXEC(x) if (ok) { bool res = (x); if (!res) LOG_ERROR(#x); }
 
-	FILE_WATCHER.add_file_watch(shader->source.c_str(), NULL, true, threading::kMainThread, 
+	FILE_WATCHER.add_file_watch(shader->source_filename.c_str(), NULL, true, threading::kMainThread, 
 
 		[=](void *token, FileEvent event, const string &old_name, const string &new_name) {
 
 			bool ok = true;
-			const char *obj = shader->filename.c_str();
-			const char *src = shader->source.c_str();
+			const char *obj = shader->obj_filename.c_str();
+			const char *src = shader->source_filename.c_str();
 			// compile the shader if the source is newer, or the object file doesn't exist
 			if (force || 
 				RESOURCE_MANAGER.file_exists(src) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src) > RESOURCE_MANAGER.mdate(obj))) {
@@ -249,8 +210,8 @@ bool Technique::init_shader(Shader *shader) {
 
 			if (ok) {
 				switch (shader->type()) {
-				case Shader::kVertexShader: shader->shader = GRAPHICS.create_vertex_shader(buf, len, shader->filename); break;
-				case Shader::kPixelShader: shader->shader = GRAPHICS.create_pixel_shader(buf, len, shader->filename); break;
+				case Shader::kVertexShader: shader->shader = GRAPHICS.create_vertex_shader(buf, len, shader->obj_filename); break;
+				case Shader::kPixelShader: shader->shader = GRAPHICS.create_pixel_shader(buf, len, shader->obj_filename); break;
 				case Shader::kGeometryShader: break;
 				}
 			}
@@ -280,10 +241,19 @@ bool Technique::init() {
 
 void Technique::submit() {
 	_key.cmd = RenderKey::kRenderTechnique;
+	_key.seq_nr = GRAPHICS.next_seq_nr();
 	GRAPHICS.submit_command(_key, (void *)this);
 }
 
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
 	auto it = find_if(_sampler_states.begin(), _sampler_states.end(), [&](const pair<string, GraphicsObjectHandle> &p) { return p.first == name; });
 	return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
+}
+
+uint16 Technique::material_id(const char *name) const {
+	for (size_t i = 0; i < _materials.size(); ++i) {
+		if (_materials[i].first == name)
+			return _materials[i].second;
+	}
+	return ~0;
 }

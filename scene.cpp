@@ -12,10 +12,11 @@ SubMesh::~SubMesh() {
 	GRAPHICS.submit_command(key, (void *)&data);
 }
 
-void Mesh::submit(uint16 seq_nr) {
+void Mesh::submit(uint16 seq_nr, uint16 material_id) {
 	for (size_t i = 0; i < submeshes.size(); ++i) {
-		submeshes[i]->key.seq_nr = seq_nr;
-		GRAPHICS.submit_command(submeshes[i]->key, (void *)&submeshes[i]->data);
+		SubMesh *s = submeshes[i];
+		s->key.seq_nr = seq_nr;
+		GRAPHICS.submit_command(s->key, (void *)&s->data, material_id != (uint16)~0 ? (void*)material_id : 0);
 	}
 }
 
@@ -24,7 +25,7 @@ Scene::~Scene() {
 	seq_delete(&cameras);
 }
 
-void Scene::submit_meshes(uint16 seq_nr) {
+void Scene::submit_meshes(uint16 seq_nr, uint16 material_id) {
 	for (size_t i = 0; i < meshes.size(); ++i)
-		meshes[i]->submit(seq_nr);
+		meshes[i]->submit(seq_nr, material_id);
 }

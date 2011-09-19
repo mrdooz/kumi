@@ -6,6 +6,7 @@ namespace technique_parser_details {
 }
 
 struct Scope;
+struct Material;
 
 // my take on a recursive descent parser
 class TechniqueParser {
@@ -19,6 +20,7 @@ private:
 	bool parse_shader(Scope *scope, Shader *shader);
 	bool parse_params(Scope *scope, Shader *shader);
 	bool parse_param(Scope *scope, Shader *shader);
+	bool parse_material(Scope *scope, Material *material);
 	bool parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc);
 	bool parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc);
 	bool parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc);

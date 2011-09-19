@@ -1,7 +1,7 @@
 technique diffuse {
 	
 	vertex_shader {
-		file effects/diffuse.vso;
+		file effects/diffuse.fx;
 		params [
 			{ float4x4 view system; },
 			{ float4x4 proj system; },
@@ -10,7 +10,7 @@ technique diffuse {
 	};
 	
 	pixel_shader {
-		file effects/diffuse.pso;
+		file effects/diffuse.fx;
 		params [
 			{ float4 DiffuseColor material; }
 		];

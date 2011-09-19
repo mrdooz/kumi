@@ -9,6 +9,13 @@ string replace_extension(const char *org, const char *new_ext) {
 	return string(org, dot - org + 1) + new_ext;
 }
 
+string strip_extension(const char *str) {
+	const char *dot = strrchr(str, '.');
+	if (!dot)
+		return str;
+	return string(str, dot - str);
+}
+
 void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext) {
 	char drive_buf[_MAX_DRIVE];
 	char dir_buf[_MAX_DIR];

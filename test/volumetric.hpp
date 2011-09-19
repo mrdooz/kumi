@@ -13,6 +13,9 @@ public:
 	virtual bool render() override;
 	virtual bool close() override;
 private:
-	GraphicsObjectHandle _render_target;
+	GraphicsObjectHandle _occluder_rt;
+	GraphicsObjectHandle _shaft_rt;
 	Scene *_scene;
+
+	uint16 material_add, material_occlude, material_shaft;
 };
