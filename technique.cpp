@@ -249,11 +249,3 @@ GraphicsObjectHandle Technique::sampler_state(const char *name) const {
 	auto it = find_if(_sampler_states.begin(), _sampler_states.end(), [&](const pair<string, GraphicsObjectHandle> &p) { return p.first == name; });
 	return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
 }
-
-uint16 Technique::material_id(const char *name) const {
-	for (size_t i = 0; i < _materials.size(); ++i) {
-		if (_materials[i].first == name)
-			return _materials[i].second;
-	}
-	return ~0;
-}

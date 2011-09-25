@@ -7,6 +7,7 @@
 #include "file_watcher.hpp"
 #include "app.hpp"
 #include "resource_manager.hpp"
+#include "graphics_submit.hpp"
 
 using namespace std;
 
@@ -23,6 +24,8 @@ namespace
 		init_data.pSysMem = data;
 		return device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
 	}
+
+	const int cEffectDataSize = 1024 * 1024;
 }
 
 struct RenderTargetData {
@@ -100,6 +103,8 @@ Graphics::Graphics()
 	, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
 	, _textures(delete_obj<TextureData *>)
 	, _render_targets(delete_obj<RenderTargetData *>)
+	, _effect_data(new uint8[cEffectDataSize])
+	, _effect_data_ofs(0)
 {
 	assert(!_instance);
 }
@@ -515,7 +520,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 				int idx = _techniques.find_by_token(t->name());
 				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
 					SAFE_DELETE(_techniques[idx].first);
-					_techniques[idx] = make_pair(t, filename);
+					_techniques[idx] = make_pair(t, t->name());
 					tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
 					rb.commit();
 				}
@@ -541,16 +546,13 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 	return res;
 }
 
-Technique *Graphics::find_technique(const char *name) {
-	for (int i = 0; i < _techniques.Size; ++i) {
-		if (_techniques[i].first && _techniques[i].first->name() == name)
-			return _techniques[i].first;
-	}
-	return NULL;
+GraphicsObjectHandle Graphics::find_technique(const char *name) {
+	int idx = _techniques.find_by_token(name);
+	return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::submit_command(RenderKey key, void *data, void *data2) {
-	_render_commands.push_back(RenderCmd(key, data, data2));
+void Graphics::submit_command(RenderKey key, void *data) {
+	_render_commands.push_back(RenderCmd(key, data));
 }
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
@@ -671,7 +673,6 @@ void Graphics::render() {
 		const RenderCmd &cmd = _render_commands[i];
 		RenderKey key = cmd.key;
 		void *data = cmd.data;
-		void *data2 = cmd.data2;
 		switch (key.cmd) {
 
 		case RenderKey::kDelete:
@@ -694,7 +695,8 @@ void Graphics::render() {
 			if (deleted_items.find(data) != deleted_items.end())
 				break;
 
-			Technique *technique = (Technique *)data;
+			TechniqueRenderData *d = (TechniqueRenderData *)data;
+			Technique *technique = _techniques.get(d->technique);
 
 			Shader *vertex_shader = technique->vertex_shader();
 			Shader *pixel_shader = technique->pixel_shader();
@@ -726,9 +728,9 @@ void Graphics::render() {
 				if (deleted_items.find(data) != deleted_items.end())
 					break;
 				MeshRenderData *render_data = (MeshRenderData *)data;
-				const uint16 material_id = data2 ? (uint16)data2 : render_data->material_id;
+				const uint16 material_id = render_data->material_id;
 				const Material &material = MATERIAL_MANAGER.get_material(material_id);
-				Technique *technique = find_technique(material.technique.c_str());
+				Technique *technique = _techniques.get(render_data->technique);
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
 
@@ -759,4 +761,14 @@ void Graphics::render() {
 	}
 
 	_render_commands.clear();
+	_effect_data_ofs = 0;
+}
+
+void *Graphics::alloc_command_data(size_t size) {
+	if (size + _effect_data_ofs >= cEffectDataSize)
+		return nullptr;
+
+	void *ptr = &_effect_data.get()[_effect_data_ofs];
+	_effect_data_ofs += size;
+	return ptr;
 }

@@ -4,6 +4,8 @@
 #include "utils.hpp"
 #include "property_manager.hpp"
 #include "id_buffer.hpp"
+#include "graphics_object_handle.hpp"
+#include "graphics_submit.hpp"
 
 struct Io;
 struct Shader;
@@ -17,103 +19,8 @@ using std::pair;
 
 enum FileEvent;
 
-class GraphicsObjectHandle {
-	friend class Graphics;
-	enum { 
-		cTypeBits = 8,
-		cGenerationBits = 8,
-		cIdBits = 12 
-	};
-	enum Type {
-		kInvalid = -1,
-		kContext,
-		kVertexBuffer,
-		kIndexBuffer,
-		kConstantBuffer,
-		kTexture,
-		kRenderTarget,
-		kShader,
-		kInputLayout,
-		kBlendState,
-		kRasterizerState,
-		kSamplerState,
-		kDepthStencilState,
-		kTechnique,
-		kVertexShader,
-		kPixelShader,
-		kShaderResourceView,
-	};	
-	GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
-	union {
-		struct {
-			uint32 _type : 8;
-			uint32 _generation : 8;
-			uint32 _id : 12;
-		};
-		uint32 _data;
-	};
-public:
-	GraphicsObjectHandle() : _data(kInvalid) {}
-	GraphicsObjectHandle(uint32 data) : _data(data) {}
-	bool is_valid() const { return _data != kInvalid; }
-	operator int() const { return _data; }
-	uint32 id() const { return _id; }
-};
-
-static_assert(sizeof(GraphicsObjectHandle) <= sizeof(uint32_t), "GraphicsObjectHandle too large");
-
-
-// from http://realtimecollisiondetection.net/blog/?p=86
-struct RenderKey {
-	enum Cmd {
-		kDelete,	// submitted when the object is deleted to avoid using stale data
-		kSetRenderTarget,
-		kRenderMesh,
-		kRenderTechnique,
-		kNumCommands
-	};
-	static_assert(kNumCommands < (1 << 16), "Too many commands");
-
-	RenderKey() : data(0) {}
-
-	union {
-		// Written for little endianess
-		struct {
-			union {
-				struct {
-					uint32 padding : 6;
-					uint32 material : 16;
-					uint32 shader : 10;
-				};
-				uint32 handle : 32;  // a GraphicsObjectHandle
-			};
-			uint16 cmd;
-			union {
-				uint16 seq_nr;
-				uint16 depth;
-			};
-		};
-		uint64 data;
-	};
-};
-
-static_assert(sizeof(RenderKey) <= sizeof(uint64_t), "RenderKey too large");
-
 struct RenderTargetData;
 struct TextureData;
-
-struct MeshRenderData {
-	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
-	GraphicsObjectHandle vb, ib;
-	DXGI_FORMAT index_format;
-	int index_count;
-	int vertex_size;
-	int vertex_count;
-	D3D_PRIMITIVE_TOPOLOGY topology;
-	GraphicsObjectHandle technique;
-	uint16 material_id;
-	PropertyManager::Id mesh_id;
-};
 
 class Graphics {
 public:
@@ -170,7 +77,7 @@ public:
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
 	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques);
-	Technique *find_technique(const char *name);
+	GraphicsObjectHandle find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
 	GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
@@ -184,8 +91,8 @@ public:
 
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
-	// TODO: this should be on the context
-	void submit_command(RenderKey key, void *data, void *data2 = NULL);
+	void *alloc_command_data(size_t size);
+	void submit_command(RenderKey key, void *data);
 	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
 	void render();
 
@@ -246,10 +153,9 @@ private:
 	IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
 
 	struct RenderCmd {
-		RenderCmd(RenderKey key, void *data, void *data2) : key(key), data(data), data2(data2) {}
+		RenderCmd(RenderKey key, void *data) : key(key), data(data) {}
 		RenderKey key;
 		void *data;
-		void *data2;
 	};
 	vector<RenderCmd > _render_commands;
 
@@ -257,6 +163,9 @@ private:
 
 	string _vs_profile;
 	string _ps_profile;
+
+	std::unique_ptr<uint8> _effect_data;
+	int _effect_data_ofs;
 };
 
 #define GRAPHICS Graphics::instance()

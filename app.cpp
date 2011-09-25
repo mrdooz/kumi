@@ -372,7 +372,7 @@ UINT App::run(void *userdata) {
 
 			GRAPHICS.clear(XMFLOAT4(0,0,0,1));
 
-			GRAPHICS.find_technique("cef")->submit();
+			//GRAPHICS.find_technique("cef")->submit();
 
 /*
 			if (_test_effect) {

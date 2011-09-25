@@ -123,6 +123,8 @@
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />
     <ClInclude Include="..\graphics.hpp" />
+    <ClInclude Include="..\graphics_object_handle.hpp" />
+    <ClInclude Include="..\graphics_submit.hpp" />
     <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />

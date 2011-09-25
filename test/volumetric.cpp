@@ -8,6 +8,8 @@
 
 bool VolumetricEffect::init() {
 
+	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL));
+
 	KumiLoader loader;
 	loader.load("meshes\\torus.kumi", &_scene);
 
@@ -18,10 +20,14 @@ bool VolumetricEffect::init() {
 		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
 	}
 
-	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL));
+	_material_occlude = MATERIAL_MANAGER.find_material("volumetric_occluder::black");
+	_technique_occlude = GRAPHICS.find_technique("volumetric_occluder");
 
-	_material_occlude = GRAPHICS.find_technique("volumetric_occluder")->material_id("black");
-	_material_shaft = GRAPHICS.find_technique("volumetric_shaft")->material_id("default");
+	Material shaft_material("");
+	_material_shaft = MATERIAL_MANAGER.add_material(shaft_material);
+	_technique_shaft = GRAPHICS.find_technique("volumetric_shaft");
+	
+	_technique_add = GRAPHICS.find_technique("volumetric_add");
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
@@ -74,14 +80,22 @@ bool VolumetricEffect::render() {
 		// Render the occluders
 
 		// Use the same sequence number for all the meshes to sort by technique
-		_scene->submit_meshes(GRAPHICS.next_seq_nr(), _material_occlude);
+		_scene->submit_meshes(GRAPHICS.next_seq_nr(), _material_occlude, _technique_occlude);
 
 		// Render the light streaks
 		key.handle = _shaft_rt;
 		key.seq_nr = GRAPHICS.next_seq_nr();
 		GRAPHICS.submit_command(key, (void *)&clear_black);
 
-		GRAPHICS.find_technique("volumetric_shaft")->submit();
+		RenderKey t_key;
+		t_key.data = 0;
+		t_key.cmd = RenderKey::kRenderTechnique;
+		t_key.seq_nr = GRAPHICS.next_seq_nr();
+		TechniqueRenderData *d = (TechniqueRenderData *)GRAPHICS.alloc_command_data(sizeof(TechniqueRenderData));
+		d->technique = _technique_shaft;
+		d->material_id = _material_shaft;
+		GRAPHICS.submit_command(t_key, d);
+
 
 		// Add it together
 		key.handle = GRAPHICS.default_rt_handle();

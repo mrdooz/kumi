@@ -4,6 +4,7 @@
 #include "scene.hpp"
 #include "dx_utils.hpp"
 #include "resource_manager.hpp"
+#include "graphics.hpp"
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -63,8 +64,11 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 		for (int j = 0; j < sub_meshes; ++j) {
 			const char *material_name = step_read<const char *>(&buf);
 			SubMesh *submesh = new SubMesh;
-			submesh->data.material_id = _material_ids[material_name];
 			mesh->submeshes.push_back(submesh);
+			submesh->data.material_id = _material_ids[material_name];
+			// set the default technique for the material
+			GraphicsObjectHandle h = GRAPHICS.find_technique(_default_techniques[material_name].c_str());
+			submesh->data.technique = h;
 			const int vb_flags = step_read<int>(&buf);
 			submesh->data.vertex_size = step_read<int>(&buf);
 			submesh->data.index_format = index_size_to_format(step_read<int>(&buf));
@@ -115,7 +119,8 @@ bool KumiLoader::load_materials(const char *buf) {
 		string name, technique;
 		name = step_read<const char *>(&buf);
 		technique = step_read<const char *>(&buf);
-		Material material(technique, name);
+		_default_techniques[name] = technique;
+		Material material(name);
 		int props = step_read<int>(&buf);
 		for (int j = 0; j < props; ++j) {
 			const char *name = step_read<const char *>(&buf);

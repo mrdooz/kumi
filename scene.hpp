@@ -1,5 +1,5 @@
 #pragma once
-#include "graphics.hpp"
+#include "graphics_submit.hpp"
 
 struct SubMesh {
 	SubMesh();
@@ -10,7 +10,7 @@ struct SubMesh {
 
 struct Mesh {
 	Mesh(const string &name) : name(name) { }
-	void submit(uint16 seq_nr, uint16 material_id);
+	void submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
 	string name;
 	XMFLOAT4X4 obj_to_world;
 	std::vector<SubMesh *> submeshes;
@@ -30,7 +30,7 @@ struct Scene {
 
 	~Scene();
 
-	void submit_meshes(uint16 seq_nr, uint16 material_id = ~0);
+	void submit_meshes(uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;

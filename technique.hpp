@@ -3,6 +3,7 @@
 #include "utils.hpp"
 #include "property_manager.hpp"
 #include "graphics.hpp"
+#include "graphics_submit.hpp"
 
 using std::vector;
 using std::string;
@@ -146,8 +147,6 @@ public:
 	DXGI_FORMAT index_format() const { return _index_format; }
 	int index_count() const { return (int)_indices.size(); }
 
-	uint16 material_id(const char *name) const;
-
 	void submit();
 	bool init();
 private:
@@ -166,8 +165,6 @@ private:
 	GraphicsObjectHandle _input_layout;
 
 	vector<CBuffer> _constant_buffers;
-
-	vector<pair<string, uint16>> _materials;
 
 	int _vertex_size;
 	vector<float> _vertices;

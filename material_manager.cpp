@@ -20,6 +20,14 @@ const Material &MaterialManager::get_material(uint16 id) {
 	return _materials[id];
 }
 
+uint16 MaterialManager::find_material(const string &material_name) {
+	for (size_t i = 0; i < _materials.size(); ++i) {
+		if (_materials[i].name == material_name)
+			return i;
+	}
+	return -1;
+}
+
 uint16 MaterialManager::add_material(const Material &material) {
 	uint16 key = _materials.size();
 	_materials.push_back(material);

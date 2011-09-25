@@ -976,13 +976,15 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 			}
 
 			case kSymMaterial: {
-				Material mat(technique->name(), scope->next_identifier());
+				string technique_name = technique->name();
+				// materials are prefixed by the technique name
+				Material mat(technique_name + "::" + scope->next_identifier());
 				EXPECT(scope, kSymBlockOpen);
 				if (!parse_material(scope, &mat))
 					return false;
 				EXPECT(scope, kSymBlockClose);
 				EXPECT(scope, kSymSemicolon);
-				technique->_materials.push_back(make_pair(mat.name, MATERIAL_MANAGER.add_material(mat)));
+				MATERIAL_MANAGER.add_material(mat);
 				break;
 			}
 

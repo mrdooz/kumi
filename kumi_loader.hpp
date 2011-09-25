@@ -11,4 +11,5 @@ private:
 	bool load_lights(const char *buf, Scene *scene);
 	bool load_materials(const char *buf);
 	std::unordered_map<string, uint16> _material_ids;
+	std::unordered_map<string, string> _default_techniques;
 };
