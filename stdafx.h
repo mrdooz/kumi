@@ -22,7 +22,6 @@ typedef uint64_t uint64;
 #include <io.h>
 #include <sys/stat.h>
 
-#include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
@@ -57,7 +56,7 @@ typedef uint64_t uint64;
 #include <map>
 #include <deque>
 #include <tuple>
-#include <hash_map>
+#include <unordered_map>
 #include <type_traits>
 #include <stack>
 

@@ -30,5 +30,5 @@ private:
 	bool parse_indices(Scope *scope, Technique *technique);
 
 	technique_parser_details::Trie *_symbol_trie;
-	hash_map<technique_parser_details::Symbol, string > _symbol_to_string;
+	std::unordered_map<technique_parser_details::Symbol, string > _symbol_to_string;
 };

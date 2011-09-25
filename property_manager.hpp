@@ -1,7 +1,5 @@
 #pragma once
 
-using std::hash_map;
-
 namespace PropertyType {
 	enum Enum {
 		kUnknown,
@@ -55,9 +53,9 @@ public:
 private:
 
 	struct PropertyBag {
-		hash_map<string, float> float_values;
-		hash_map<string, XMFLOAT4> float4_values;
-		hash_map<string, XMFLOAT4X4> matrix_values;
+		std::unordered_map<string, float> float_values;
+		std::unordered_map<string, XMFLOAT4> float4_values;
+		std::unordered_map<string, XMFLOAT4X4> matrix_values;
 	};
 
 	template<typename T>
@@ -82,8 +80,8 @@ private:
 	};
 
 	PropertyBag _system_properties;
-	hash_map<Id, PropertyBag> _material_properties;
-	hash_map<Id, PropertyBag> _mesh_properties;
+	std::unordered_map<Id, PropertyBag> _material_properties;
+	std::unordered_map<Id, PropertyBag> _mesh_properties;
 
 	PropertyManager();
 	static PropertyManager *_instance;

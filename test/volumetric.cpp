@@ -20,8 +20,8 @@ bool VolumetricEffect::init() {
 
 	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL));
 
-	material_occlude = GRAPHICS.find_technique("volumetric_occluder")->material_id("black");
-	material_shaft = GRAPHICS.find_technique("volumetric_shaft")->material_id("default");
+	_material_occlude = GRAPHICS.find_technique("volumetric_occluder")->material_id("black");
+	_material_shaft = GRAPHICS.find_technique("volumetric_shaft")->material_id("default");
 
 	int w, h;
 	GRAPHICS.size(&w, &h);
@@ -74,7 +74,7 @@ bool VolumetricEffect::render() {
 		// Render the occluders
 
 		// Use the same sequence number for all the meshes to sort by technique
-		_scene->submit_meshes(GRAPHICS.next_seq_nr(), material_occlude);
+		_scene->submit_meshes(GRAPHICS.next_seq_nr(), _material_occlude);
 
 		// Render the light streaks
 		key.handle = _shaft_rt;

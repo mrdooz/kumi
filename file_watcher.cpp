@@ -19,6 +19,7 @@ using std::get;
 using boost::scoped_ptr;
 
 using namespace threading;
+using namespace std;
 
 struct DirWatch;
 
@@ -41,7 +42,7 @@ struct DirWatch {
 	HANDLE _handle;
 	uint8_t _buf[4096];
 	OVERLAPPED _overlapped;
-	hash_map<string, DWORD> _last_event;
+	unordered_map<string, DWORD> _last_event;
 	struct Callback {
 		Callback(ThreadId id, const CbFileChanged &cb, void *token) : thread(id), cb(cb), token(token) {}
 		ThreadId thread;
@@ -68,7 +69,7 @@ struct WatcherThread : public Thread {
 
 	static void CALLBACK on_completion(DWORD error_code, DWORD bytes_transfered, OVERLAPPED *overlapped);
 
-	static hash_map<string, DeferredFileEvent> _events;
+	static unordered_map<string, DeferredFileEvent> _events;
 
 	static map<string, int> _deferred_file_events_ref_count;
 
@@ -89,7 +90,7 @@ map<string, int> WatcherThread::_watched_files;
 //map<CbFileChanged, vector<string> > WatcherThread::_files_by_callback;
 WatcherThread::DirWatches WatcherThread::_dir_watches;
 //deque<DeferredFileEvent> WatcherThread::_events;
-hash_map<string, DeferredFileEvent> WatcherThread::_events;
+unordered_map<string, DeferredFileEvent> WatcherThread::_events;
 bool WatcherThread::_terminating = false;
 
 FileWatcher *FileWatcher::_instance = nullptr;
