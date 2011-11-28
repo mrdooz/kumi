@@ -6,6 +6,8 @@
 #include "id_buffer.hpp"
 #include "graphics_object_handle.hpp"
 #include "graphics_submit.hpp"
+#include "threading.hpp"
+#include "graphics_interface.hpp"
 
 struct Io;
 struct Shader;
@@ -22,7 +24,7 @@ enum FileEvent;
 struct RenderTargetData;
 struct TextureData;
 
-class Graphics {
+class Graphics : public GraphicsInterface {
 public:
 
 	static Graphics& instance();
@@ -92,7 +94,7 @@ public:
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
 	void *alloc_command_data(size_t size);
-	void submit_command(RenderKey key, void *data);
+	void submit_command(const TrackedLocation &location, RenderKey key, void *data);
 	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
 	void render();
 
@@ -107,7 +109,8 @@ private:
 
 	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id);
 	void set_samplers(Technique *technique, Shader *shader);
-	void set_resource_views(Technique *technique, Shader *shader);
+	void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
+	void unbind_resource_views(int resource_bitmask);
 
   bool create_back_buffers(int width, int height);
 	static Graphics* _instance;
@@ -153,7 +156,8 @@ private:
 	IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
 
 	struct RenderCmd {
-		RenderCmd(RenderKey key, void *data) : key(key), data(data) {}
+		RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
+		TrackedLocation location;
 		RenderKey key;
 		void *data;
 	};

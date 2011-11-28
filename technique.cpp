@@ -1,12 +1,8 @@
 #include "stdafx.h"
 #include "technique.hpp"
-#include "technique_parser.hpp"
-#include "file_utils.hpp"
-#include "graphics.hpp"
 #include "dx_utils.hpp"
-#include "app.hpp"
-#include "file_watcher.hpp"
-#include "resource_manager.hpp"
+#include "graphics_interface.hpp"
+#include "resource_interface.hpp"
 
 using namespace boost::assign;
 using namespace std;
@@ -27,7 +23,7 @@ Technique::~Technique() {
 	SAFE_DELETE(_pixel_shader);
 }
 
-bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params)
+bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params)
 {
 	ID3D11ShaderReflection* reflector = NULL; 
 	B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
@@ -57,7 +53,7 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 			inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
 		}
 
-		_input_layout = GRAPHICS.create_input_layout(&inputs[0], inputs.size(), buf, len);
+		_input_layout = graphics->create_input_layout(&inputs[0], inputs.size(), buf, len);
 		if (!_input_layout.is_valid())
 			return false;
 	}
@@ -82,7 +78,7 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 		}
 		if (!found) {
 			cb_idx = _constant_buffers.size();
-			_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, GRAPHICS.create_constant_buffer(cb_desc.Size)));
+			_constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, graphics->create_constant_buffer(cb_desc.Size)));
 		}
 
 		// extract all the used variable's cbuffer, starting offset and size
@@ -140,18 +136,21 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len, set<string>
 }
 
 
-bool Technique::compile_shader(Shader *shader) {
+bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
 
 	STARTUPINFOA startup_info;
 	ZeroMemory(&startup_info, sizeof(startup_info));
 	startup_info.cb = sizeof(STARTUPINFO);
 	// redirect the child's output handles to the log manager's
+	// TODO
+/*
 	startup_info.dwFlags = STARTF_USESTDHANDLES;
 	startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
+*/
 	PROCESS_INFORMATION process_info;
 	ZeroMemory(&process_info, sizeof(process_info));
 
-	const char *profile = shader->type() == Shader::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
+	const char *profile = shader->type() == Shader::kVertexShader ? res->vs_profile() : res->ps_profile();
 
 	//fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
 	char cmd_line[MAX_PATH];
@@ -173,78 +172,75 @@ bool Technique::compile_shader(Shader *shader) {
 	return exit_code == 0;
 }
 
-bool Technique::init_shader(Shader *shader) {
+bool Technique::reload_shaders() {
+	return true;
+}
+
+bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader) {
 
 	bool force = true;
 
-#define CHECKED_EXEC(x) if (ok) { bool res = (x); if (!res) LOG_ERROR(#x); }
+	bool ok = true;
+	const char *obj = shader->obj_filename.c_str();
+	const char *src = shader->source_filename.c_str();
+	// compile the shader if the source is newer, or the object file doesn't exist
+	if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
+			if (!compile_shader(graphics, shader))
+				return false;
+	} else {
+		if (!res->file_exists(obj))
+			return false;
+	}
 
-	FILE_WATCHER.add_file_watch(shader->source_filename.c_str(), NULL, true, threading::kMainThread, 
+	void *buf;
+	size_t len;
 
-		[=](void *token, FileEvent event, const string &old_name, const string &new_name) {
+	set<string> used_params;
+	if (!res->load_file(obj, &buf, &len))
+		return false;
 
-			bool ok = true;
-			const char *obj = shader->obj_filename.c_str();
-			const char *src = shader->source_filename.c_str();
-			// compile the shader if the source is newer, or the object file doesn't exist
-			if (force || 
-				RESOURCE_MANAGER.file_exists(src) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src) > RESOURCE_MANAGER.mdate(obj))) {
-					CHECKED_EXEC(compile_shader(shader));
-			} else {
-				ok = RESOURCE_MANAGER.file_exists(obj);
-			}
+	if (!do_reflection(graphics, shader, buf, len, &used_params))
+		return false;
 
-			void *buf;
-			size_t len;
+	// remove any unused parameters
+	vector<CBufferParam> &params = shader->cbuffer_params;
+	params.erase(
+		remove_if(params.begin(), params.end(), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); }),
+		params.end());
 
-
-			set<string> used_params;
-			CHECKED_EXEC(RESOURCE_MANAGER.load_file(obj, &buf, &len));
-			CHECKED_EXEC(do_reflection(shader, buf, len, &used_params));
-
-			// remove any unused parameters
-			vector<CBufferParam> &params = shader->cbuffer_params;
-			params.erase(
-				remove_if(params.begin(), params.end(), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); }),
-				params.end());
-
-			if (ok) {
-				switch (shader->type()) {
-				case Shader::kVertexShader: shader->shader = GRAPHICS.create_vertex_shader(buf, len, shader->obj_filename); break;
-				case Shader::kPixelShader: shader->shader = GRAPHICS.create_pixel_shader(buf, len, shader->obj_filename); break;
-				case Shader::kGeometryShader: break;
-				}
-			}
-			shader->valid = ok;
-		}
-	);
-
-	return shader->is_valid();
-}
-
-bool Technique::init() {
-
-	if (_vertex_shader)
-		B_ERR_BOOL(init_shader(_vertex_shader));
-
-	if (_pixel_shader)
-		B_ERR_BOOL(init_shader(_pixel_shader));
-
-	_rasterizer_state = GRAPHICS.create_rasterizer_state(_rasterizer_desc);
-	_blend_state = GRAPHICS.create_blend_state(_blend_desc);
-	_depth_stencil_state = GRAPHICS.create_depth_stencil_state(_depth_stencil_desc);
-	for (size_t i = 0; i < _sampler_descs.size(); ++i)
-		_sampler_states.push_back(make_pair(_sampler_descs[i].first, GRAPHICS.create_sampler_state(_sampler_descs[i].second)));
+	switch (shader->type()) {
+		case Shader::kVertexShader: shader->shader = graphics->create_vertex_shader(buf, len, shader->obj_filename); break;
+		case Shader::kPixelShader: shader->shader = graphics->create_pixel_shader(buf, len, shader->obj_filename); break;
+		case Shader::kGeometryShader: break;
+	}
+	shader->valid = ok;
 
 	return true;
 }
 
+bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
+
+	if (_vertex_shader)
+		B_ERR_BOOL(init_shader(graphics, res, _vertex_shader));
+
+	if (_pixel_shader)
+		B_ERR_BOOL(init_shader(graphics, res, _pixel_shader));
+
+	_rasterizer_state = graphics->create_rasterizer_state(_rasterizer_desc);
+	_blend_state = graphics->create_blend_state(_blend_desc);
+	_depth_stencil_state = graphics->create_depth_stencil_state(_depth_stencil_desc);
+	for (size_t i = 0; i < _sampler_descs.size(); ++i)
+		_sampler_states.push_back(make_pair(_sampler_descs[i].first, graphics->create_sampler_state(_sampler_descs[i].second)));
+
+	return true;
+}
+/*
 void Technique::submit() {
 	_key.cmd = RenderKey::kRenderTechnique;
 	_key.seq_nr = GRAPHICS.next_seq_nr();
-	GRAPHICS.submit_command(_key, (void *)this);
+	GRAPHICS.submit_command(FROM_HERE, _key, (void *)this);
 }
-
+*/
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
 	auto it = find_if(_sampler_states.begin(), _sampler_states.end(), [&](const pair<string, GraphicsObjectHandle> &p) { return p.first == name; });
 	return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;

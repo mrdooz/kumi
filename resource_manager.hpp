@@ -4,10 +4,12 @@
 // easy use of dropbox etc while developing, and a zipfile or something
 // for the final release
 
+#include "resource_interface.hpp"
+
 using std::vector;
 using std::string;
 
-class ResouceManager {
+class ResouceManager : public ResourceInterface {
 public:
 	ResouceManager();
 

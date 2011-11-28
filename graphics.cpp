@@ -491,10 +491,10 @@ static bool create_techniques_from_file(const char *filename, vector<Technique *
 	techniques->clear();
 	TechniqueParser parser;
 	vector<Technique *> tmp;
-	bool res = parser.parse((const char *)buf, (const char *)buf + len, &tmp);
+	bool res = parser.parse(&GRAPHICS, (const char *)buf, (const char *)buf + len, &tmp);
 	if (res) {
 		for (size_t i = 0; i < tmp.size(); ++i) {
-			if (tmp[i]->init()) {
+			if (tmp[i]->init(&GRAPHICS, &RESOURCE_MANAGER)) {
 				techniques->push_back(tmp[i]);
 			} else {
 				delete exch_null(tmp[i]);
@@ -551,8 +551,8 @@ GraphicsObjectHandle Graphics::find_technique(const char *name) {
 	return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::submit_command(RenderKey key, void *data) {
-	_render_commands.push_back(RenderCmd(key, data));
+void Graphics::submit_command(const TrackedLocation &location, RenderKey key, void *data) {
+	_render_commands.push_back(RenderCmd(location, key, data));
 }
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
@@ -572,7 +572,18 @@ void Graphics::set_samplers(Technique *technique, Shader *shader) {
 	ctx->PSSetSamplers(0, num_samplers, &samplers[0]);
 }
 
-void Graphics::set_resource_views(Technique *technique, Shader *shader) {
+void Graphics::unbind_resource_views(int resource_bitmask) {
+
+	ID3D11ShaderResourceView *null_view = nullptr;
+
+	ID3D11DeviceContext *ctx = _immediate_context;
+	for (int i = 0; i < 8; ++i) {
+		if (resource_bitmask & (1 << i))
+			ctx->PSSetShaderResources(i, 1, &null_view);
+	}
+}
+
+void Graphics::set_resource_views(Technique *technique, Shader *shader, int *resources_set) {
 
 	ID3D11DeviceContext *ctx = _immediate_context;
 
@@ -598,6 +609,11 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader) {
 	}
 
 	ctx->PSSetShaderResources(0, num_views, &views[0]);
+
+	*resources_set = 0;
+	for (int i = 0; i < num_views; ++i) 
+		*resources_set |= (1 << i) * (views[i] != nullptr);
+
 }
 
 void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id) {
@@ -716,9 +732,11 @@ void Graphics::render() {
 			ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
 
 			set_samplers(technique, pixel_shader);
-			set_resource_views(technique, pixel_shader);
+			int resource_mask = 0;
+			set_resource_views(technique, pixel_shader, &resource_mask);
 
 			ctx->DrawIndexed(technique->index_count(), 0, 0);
+			unbind_resource_views(resource_mask);
 
 			break;
 			}
@@ -752,9 +770,11 @@ void Graphics::render() {
 				set_cbuffer_params(technique, vertex_shader, material_id, render_data->mesh_id);
 				set_cbuffer_params(technique, pixel_shader, material_id, render_data->mesh_id);
 				set_samplers(technique, pixel_shader);
-				set_resource_views(technique, pixel_shader);
+				int resource_mask;
+				set_resource_views(technique, pixel_shader, &resource_mask);
 
 				ctx->DrawIndexed(render_data->index_count, 0, 0);
+				unbind_resource_views(resource_mask);
 			}
 			break;
 		}

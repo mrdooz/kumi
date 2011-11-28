@@ -31,6 +31,7 @@ struct Scene {
 	~Scene();
 
 	void submit_meshes(uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+	void submit_mesh(const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;

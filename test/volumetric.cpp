@@ -5,6 +5,7 @@
 #include "../scene.hpp"
 #include "../material_manager.hpp"
 #include "../technique.hpp"
+#include "../material.hpp"
 
 bool VolumetricEffect::init() {
 
@@ -66,16 +67,18 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
 bool VolumetricEffect::render() {
 
 	static XMFLOAT4 clear_white(1, 1, 1, 1);
-	static XMFLOAT4 clear_black(1, 1, 1, 1);
+	static XMFLOAT4 clear_black(0, 0, 0, 1);
 
 	if (_scene) {
 
+		_scene->submit_mesh("Sphere001", GRAPHICS.next_seq_nr(), _material_occlude, _technique_occlude);
+/*
 		RenderKey key;
 		key.data = 0;
 		key.cmd = RenderKey::kSetRenderTarget;
 		key.handle = _occluder_rt;
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(key, (void *)&clear_white);
+		GRAPHICS.submit_command(FROM_HERE, key, (void *)&clear_white);
 
 		// Render the occluders
 
@@ -85,7 +88,7 @@ bool VolumetricEffect::render() {
 		// Render the light streaks
 		key.handle = _shaft_rt;
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(key, (void *)&clear_black);
+		GRAPHICS.submit_command(FROM_HERE, key, (void *)&clear_black);
 
 		RenderKey t_key;
 		t_key.data = 0;
@@ -94,13 +97,14 @@ bool VolumetricEffect::render() {
 		TechniqueRenderData *d = (TechniqueRenderData *)GRAPHICS.alloc_command_data(sizeof(TechniqueRenderData));
 		d->technique = _technique_shaft;
 		d->material_id = _material_shaft;
-		GRAPHICS.submit_command(t_key, d);
+		GRAPHICS.submit_command(FROM_HERE, t_key, d);
 
 
 		// Add it together
 		key.handle = GRAPHICS.default_rt_handle();
 		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(key, NULL);
+		GRAPHICS.submit_command(FROM_HERE, key, NULL);
+*/
 	}
 
 	return true;

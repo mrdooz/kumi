@@ -1,12 +1,16 @@
 #pragma once
 
 #include "utils.hpp"
-#include "property_manager.hpp"
-#include "graphics.hpp"
-#include "graphics_submit.hpp"
+#include "property.hpp"
+#include "graphics_object_handle.hpp"
+
+struct GraphicsInterface;
+struct ResourceInterface;
 
 using std::vector;
 using std::string;
+
+struct Material;
 
 namespace PropertySource {
 	enum Enum {
@@ -108,9 +112,6 @@ struct PixelShader : public Shader {
 	virtual Type type() const { return kPixelShader; }
 };
 
-
-struct Io;
-
 struct CBuffer {
 	CBuffer(const string &name, int size, GraphicsObjectHandle handle) 
 		: name(name), handle(handle) 
@@ -147,16 +148,19 @@ public:
 	DXGI_FORMAT index_format() const { return _index_format; }
 	int index_count() const { return (int)_indices.size(); }
 
-	void submit();
-	bool init();
+	//TODO
+	//void submit();
+	bool init(GraphicsInterface *graphics, ResourceInterface *res);
+	bool reload_shaders();
 private:
 
-	bool init_shader(Shader *shader);
-	bool compile_shader(Shader *shader);
-	bool do_reflection(Shader *shader, void *buf, size_t len, set<string> *used_params);
+	bool init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader);
+	bool compile_shader(GraphicsInterface *graphics, Shader *shader);
+	bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params);
 
-	RenderKey _key;
-	MeshRenderData _render_data;
+	//TODO
+	//RenderKey _key;
+	//MeshRenderData _render_data;
 
 	string _name;
 	Shader *_vertex_shader;
@@ -174,12 +178,14 @@ private:
 	GraphicsObjectHandle _ib;
 
 	GraphicsObjectHandle _rasterizer_state;
-	vector<pair<string, GraphicsObjectHandle> > _sampler_states;
+	std::vector<std::pair<std::string, GraphicsObjectHandle> > _sampler_states;
 	GraphicsObjectHandle _blend_state;
 	GraphicsObjectHandle _depth_stencil_state;
 
 	CD3D11_RASTERIZER_DESC _rasterizer_desc;
-	vector<pair<string, CD3D11_SAMPLER_DESC>> _sampler_descs;
+	std::vector<std::pair<std::string, CD3D11_SAMPLER_DESC>> _sampler_descs;
 	CD3D11_BLEND_DESC _blend_desc;
 	CD3D11_DEPTH_STENCIL_DESC _depth_stencil_desc;
+
+	vector<Material *> _materials;
 };

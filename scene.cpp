@@ -9,7 +9,7 @@ SubMesh::SubMesh()
 
 SubMesh::~SubMesh() {
 	key.cmd = RenderKey::kDelete;
-	GRAPHICS.submit_command(key, (void *)&data);
+	GRAPHICS.submit_command(FROM_HERE, key, (void *)&data);
 }
 
 void Mesh::submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
@@ -22,7 +22,7 @@ void Mesh::submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique
 			p->material_id = (uint16)material_id;
 		if (technique.is_valid())
 			p->technique = technique;
-		GRAPHICS.submit_command(s->key, p);
+		GRAPHICS.submit_command(FROM_HERE, s->key, p);
 	}
 }
 
@@ -34,4 +34,20 @@ Scene::~Scene() {
 void Scene::submit_meshes(uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
 	for (size_t i = 0; i < meshes.size(); ++i)
 		meshes[i]->submit(seq_nr, material_id, technique);
+}
+
+void Scene::submit_mesh(const char *name, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+	static Mesh *prev_mesh = nullptr;
+	if (prev_mesh && prev_mesh->name == name) {
+		prev_mesh->submit(seq_nr, material_id, technique);
+	} else {
+		for (size_t i = 0; i < meshes.size(); ++i) {
+			Mesh *cur = meshes[i];
+			if (cur->name == name) {
+				cur->submit(seq_nr, material_id, technique);
+				prev_mesh = cur;
+				break;
+			}
+		}
+	}
 }

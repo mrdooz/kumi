@@ -2,6 +2,16 @@
 #include <concurrent_queue.h>
 #include "utils.hpp"
 
+struct TrackedLocation {
+	TrackedLocation() {}
+	TrackedLocation(const char *function, const char *file, int line) : function(function), file(file), line(line) {}
+	std::string function;
+	std::string file;
+	int line;
+};
+
+#define FROM_HERE TrackedLocation(__FUNCTION__, __FILE__, __LINE__)
+
 namespace threading {
 	enum ThreadId {
 		kMainThread,
@@ -20,15 +30,6 @@ namespace threading {
 		Fn fn;
 	};
 
-	struct TrackedLocation {
-		TrackedLocation() {}
-		TrackedLocation(const char *function, const char *file, int line) : function(function), file(file), line(line) {}
-		std::string function;
-		std::string file;
-		int line;
-	};
-
-#define FROM_HERE TrackedLocation(__FUNCTION__, __FILE__, __LINE__)
 #define MAKE_DEFERRED(x) Deferred(#x, x)
 
 	class Thread {

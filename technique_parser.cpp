@@ -1,15 +1,42 @@
 #include "stdafx.h"
-#include "technique.hpp"
 #include "technique_parser.hpp"
-#include "property_manager.hpp"
+#include "technique.hpp"
 #include "string_utils.hpp"
 #include "file_utils.hpp"
-#include "dx_utils.hpp"
-#include "material_manager.hpp"
-#include <hash_set>
+#include "property.hpp"
+#include "material.hpp"
+#include "graphics_interface.hpp"
 
 using namespace std;
 using namespace boost::assign;
+
+static DXGI_FORMAT index_size_to_format(int size) {
+	if (size == 2) return DXGI_FORMAT_R16_UINT;
+	if (size == 4) return DXGI_FORMAT_R32_UINT;
+	return DXGI_FORMAT_UNKNOWN;
+}
+
+static int index_format_to_size(DXGI_FORMAT fmt) {
+	if (fmt == DXGI_FORMAT_R16_UINT) return 2;
+	if (fmt == DXGI_FORMAT_R32_UINT) return 4;
+	return 0;
+}
+
+static bool parse_float(const char *str, float *v) {
+	return sscanf(str, "%f", v) == 1;
+}
+
+static bool parse_float2(const char *str, float *v1, float *v2) {
+	return sscanf(str, "%f %f", v1, v2) == 2 || sscanf(str, "%f, %f", v1, v2) == 2;
+}
+
+static bool parse_float3(const char *str, float *v1, float *v2, float *v3) {
+	return sscanf(str, "%f %f %f", v1, v2, v3) == 3 || sscanf(str, "%f, %f, %f", v1, v2, v3) == 3;
+}
+
+static bool parse_float4(const char *str, float *v1, float *v2, float *v3, float *v4) {
+	return sscanf(str, "%f %f %f %f", v1, v2, v3, v4) == 4 || sscanf(str, "%f, %f, %f, %f", v1, v2, v3, v4) == 4;
+}
 
 namespace technique_parser_details {
 
@@ -254,13 +281,13 @@ static bool parse_value(const string &value, PropertyType::Enum type, float *out
 	const char *v = value.c_str();
 	switch (type) {
 	case PropertyType::kFloat:
-		return (sscanf(v, "%f", &out[0]) == 1);
+		return parse_float(v, &out[0]);
 	case PropertyType::kFloat2:
-		return sscanf(v, "%f %f", &out[0], &out[1]) == 2 || sscanf(v, "%f, %f", &out[0], &out[1]) == 2;
+		return parse_float2(v, &out[0], &out[1]);
 	case PropertyType::kFloat3:
-		return sscanf(v, "%f %f %f", &out[0], &out[1], &out[2]) == 3 || sscanf(v, "%f, %f, %f", &out[0], &out[1], &out[2]) == 3;
+		return parse_float3(v, &out[0], &out[1], &out[2]);
 	case PropertyType::kFloat4:
-		return sscanf(v, "%f %f %f %f", &out[0], &out[1], &out[2], &out[3]) == 4 || sscanf(v, "%f, %f, %f, %f", &out[0], &out[1], &out[2], &out[3]) == 4;
+		return parse_float4(v, &out[0], &out[1], &out[2], &out[3]);
 	default:
 		return false;
 	}
@@ -640,6 +667,7 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 		if (scope->consume_in(valid, &symbol)) {
 			EXPECT(scope, kSymEquals);
 			string value = scope->next_identifier();
+			const char *v = value.c_str();
 			EXPECT(scope, kSymSemicolon);
 
 			switch (symbol) {
@@ -655,7 +683,7 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 					break;
 
 				case kSymMipLODBias:
-					sscanf(value.c_str(), "%f", &desc->MipLODBias);
+					parse_float(v, &desc->MipLODBias);
 					break;
 
 				case kSymMaxAnisotropy:
@@ -667,16 +695,15 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 					break;
 
 				case kSymBorderColor:
-					sscanf(value.c_str(), "%f %f %f %f", 
-						&desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
+					parse_float4(v, &desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
 					break;
 
 				case kSymMinLOD:
-					sscanf(value.c_str(), "%f", &desc->MinLOD);
+					parse_float(v, &desc->MinLOD);
 					break;
 
 				case kSymMaxLOD:
-					sscanf(value.c_str(), "%f", &desc->MaxLOD);
+					parse_float(v, &desc->MaxLOD);
 					break;
 			}
 		} else {
@@ -841,7 +868,7 @@ bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 	return false;
 }
 
-bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
+bool TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
 
@@ -879,14 +906,14 @@ bool TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 		default:
 			if (technique->_vertex_size == -1)
 				return false;
-			technique->_vb = GRAPHICS.create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
+			technique->_vb = graphics->create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
 			return true;
 		}
 	}
 	return true;
 }
 
-bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
+bool TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
 
@@ -932,9 +959,9 @@ bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 				v.reserve(technique->_indices.size());
 				for (size_t i = 0; i < technique->_indices.size(); ++i)
 					v.push_back((uint16)technique->_indices[i]);
-				technique->_ib = GRAPHICS.create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
+				technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
 			} else {
-				technique->_ib = GRAPHICS.create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+				technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
 			}
 			return true;
 		}
@@ -942,7 +969,7 @@ bool TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 	return true;
 }
 
-bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
+bool TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid = list_of
 		(kSymVertexShader)(kSymPixelShader)
@@ -978,13 +1005,15 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 			case kSymMaterial: {
 				string technique_name = technique->name();
 				// materials are prefixed by the technique name
-				Material mat(technique_name + "::" + scope->next_identifier());
+				Material *mat = new Material(technique_name + "::" + scope->next_identifier());
 				EXPECT(scope, kSymBlockOpen);
-				if (!parse_material(scope, &mat))
+				if (!parse_material(scope, mat))
 					return false;
 				EXPECT(scope, kSymBlockClose);
 				EXPECT(scope, kSymSemicolon);
-				MATERIAL_MANAGER.add_material(mat);
+				technique->_materials.push_back(mat);
+				//TODO
+				//MATERIAL_MANAGER.add_material(mat);
 				break;
 			}
 
@@ -1027,7 +1056,7 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
 			case kSymVertices:
 				EXPECT(scope, kSymBlockOpen);
-				if (!parse_vertices(scope, technique)) {
+				if (!parse_vertices(graphics, scope, technique)) {
 					// TODO: delete buffer
 					return false;
 				}
@@ -1037,7 +1066,7 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
 			case kSymIndices:
 				EXPECT(scope, kSymBlockOpen);
-				if (!parse_indices(scope, technique)) {
+				if (!parse_indices(graphics, scope, technique)) {
 					// TODO: delete buffer
 					return false;
 				}
@@ -1053,7 +1082,7 @@ bool TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 }
 
 
-bool TechniqueParser::parse_inner(Scope *scope, vector<Technique *> *techniques) {
+bool TechniqueParser::parse_inner(GraphicsInterface *graphics, Scope *scope, vector<Technique *> *techniques) {
 
 	while (!scope->end()) {
 		switch (scope->next_symbol()) {
@@ -1063,7 +1092,7 @@ bool TechniqueParser::parse_inner(Scope *scope, vector<Technique *> *techniques)
 			Rollback rb([&](){delete exch_null(t);});
 			t->_name = scope->next_identifier();
 			EXPECT(scope, kSymBlockOpen);
-			parse_technique(scope, t);
+			parse_technique(graphics, scope, t);
 			EXPECT(scope, kSymBlockClose);
 			EXPECT(scope, kSymSemicolon);
 			rb.commit();
@@ -1079,8 +1108,8 @@ bool TechniqueParser::parse_inner(Scope *scope, vector<Technique *> *techniques)
 	return true;
 }
 
-bool TechniqueParser::parse(const char *start, const char *end, vector<Technique *> *techniques) {
+bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques) {
 	
 	Scope scope(_symbol_trie, start, end-1);
-	return parse_inner(&scope, techniques);
+	return parse_inner(graphics, &scope, techniques);
 }

@@ -81,6 +81,7 @@
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
     </ClCompile>
     <ClCompile Include="..\async_file_loader.cpp" />
+    <ClCompile Include="..\bitmap_utils.cpp" />
     <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
     <ClCompile Include="..\effect_wrapper.cpp" />
@@ -116,6 +117,7 @@
   <ItemGroup>
     <ClInclude Include="..\app.hpp" />
     <ClInclude Include="..\async_file_loader.hpp" />
+    <ClInclude Include="..\bitmap_utils.hpp" />
     <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />
     <ClInclude Include="..\dynamic_vb.hpp" />
@@ -123,14 +125,18 @@
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />
     <ClInclude Include="..\graphics.hpp" />
+    <ClInclude Include="..\graphics_interface.hpp" />
     <ClInclude Include="..\graphics_object_handle.hpp" />
     <ClInclude Include="..\graphics_submit.hpp" />
     <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
+    <ClInclude Include="..\material.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
+    <ClInclude Include="..\property.hpp" />
     <ClInclude Include="..\property_manager.hpp" />
+    <ClInclude Include="..\resource_interface.hpp" />
     <ClInclude Include="..\resource_manager.hpp" />
     <ClInclude Include="..\scene.hpp" />
     <ClInclude Include="..\stdafx.h" />

@@ -64,6 +64,10 @@ technique volumetric_shaft {
 	sampler_desc shaft_sampler {
 	};
 
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+
 };
 
 technique volumetric_add {

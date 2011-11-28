@@ -24,7 +24,7 @@ ps_input vs_occluder(vs_input input)
 
 float4 ps_occluder(ps_input input) : SV_Target
 {
-	float c = 0.0f;
+	float c = 0.3f;
 	return float4(c, c, c, 1);
 }
 
@@ -41,9 +41,42 @@ void vs_shaft(
 	o_tex = i_tex;
 }
 
+/*
+float l_in(float s, float theta)
+{
+	float num = beta_r(theta) + beta_m(theta);
+	float denom = b_m + b_r;
+	
+	return num/denom * e_sun(1-exp(-(b_r+b_m)*s));
+}
+
+float pi = 3.1415926;
+
+float beta_r(float theta)
+{
+	float ct = cos(theta);
+	return 3 / 16*pi*b_r*(1+ct*ct);
+}
+
+float beta_m(float theta)
+{
+	1 / 4*pi*b_m*((1-g)*1-g);
+}
+
+float f_ex(float s)
+{
+	return exp(-(b_m+b_r)*s);
+}
+
+float4 light_scattering(float s, float theta)
+{
+	return l_0 * f_ex(s) + l_in(s, theta);
+}
+*/
 float4 ps_shaft(in float4 pos : SV_POSITION, in float2 tex : TEXCOORD) : SV_Target
 {
-	return volumetric_occluder.Sample(shaft_sampler, tex);
+	float4 tmp = volumetric_occluder.Sample(shaft_sampler, tex);
+	return 0.5f * tmp;
 }
 
 ps_input vs_add(vs_input input)

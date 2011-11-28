@@ -59,6 +59,7 @@ typedef uint64_t uint64;
 #include <unordered_map>
 #include <type_traits>
 #include <stack>
+#include <hash_set>
 
 #include <concurrent_queue.h>
 
