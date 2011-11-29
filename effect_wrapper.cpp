@@ -40,9 +40,9 @@ EffectWrapper *EffectWrapper::create_from_file(const char *filename, const char 
 bool EffectWrapper::load_shaders(const char *buf, int len, const char *vs, const char *gs, const char *ps)
 {
 	return 
-		either_or(!vs, load_inner(buf, len, vs, VertexShader)) && 
-		either_or(!gs, load_inner(buf, len, gs, GeometryShader)) && 
-		either_or(!ps, load_inner(buf, len, ps, PixelShader));
+		either_or(!vs, load_inner(buf, len, vs, kVertexShader)) && 
+		either_or(!gs, load_inner(buf, len, gs, kGeometryShader)) && 
+		either_or(!ps, load_inner(buf, len, ps, kPixelShader));
 }
 
 bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point, ShaderType type)
@@ -75,7 +75,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 	ID3D11Device *device = GRAPHICS.device();
 	switch (type)
 	{
-	case VertexShader:
+	case kVertexShader:
 		if (FAILED(D3DCompile(buf, len, "", NULL, NULL, entry_point, vs, D3D10_SHADER_ENABLE_STRICTNESS, 0, &_vs._blob, &error_blob))) {
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;
@@ -84,7 +84,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 		B_ERR_BOOL(_vs.do_reflection());
 		break;
 
-	case GeometryShader:
+	case kGeometryShader:
 		if (FAILED(D3DCompile(buf, len, "", NULL, NULL, entry_point, gs, D3D10_SHADER_ENABLE_STRICTNESS, 0, &_gs._blob, &error_blob))) {
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;
@@ -93,7 +93,7 @@ bool EffectWrapper::load_inner(const char *buf, int len, const char* entry_point
 		B_ERR_BOOL(_gs.do_reflection());
 		break;
 
-	case PixelShader:
+	case kPixelShader:
 		if (FAILED(D3DCompile(buf, len, "", NULL, NULL, entry_point, ps, D3D10_SHADER_ENABLE_STRICTNESS, 0, &_ps._blob, &error_blob))) {
 			LOG_ERROR_LN("%s", error_blob->GetBufferPointer());
 			return false;

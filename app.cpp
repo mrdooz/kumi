@@ -12,6 +12,8 @@
 #include "scene.hpp"
 #include "property_manager.hpp"
 #include "resource_manager.hpp"
+#include "material_manager.hpp"
+#include "renderer.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
@@ -272,15 +274,22 @@ bool App::init(HINSTANCE hinstance)
 	if (!CefInitialize(settings))
 		return false;
 */
+
+	B_ERR_BOOL(ResourceManager::create());
+	B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
+
 	B_ERR_BOOL(create_window());
 
 	RESOURCE_MANAGER.add_path("C:\\syncplicity");
 	RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
 	RESOURCE_MANAGER.add_path("D:\\syncplicity");
 
-	if (!GRAPHICS.load_techniques("effects/cef.tec", NULL)) {
+	vector<Material *> materials;
+	if (!GRAPHICS.load_techniques("effects/cef.tec", NULL, &materials)) {
 		// log error
 	}
+	for (auto it = begin(materials); it != end(materials); ++it)
+		MATERIAL_MANAGER.add_material(**it);
 
 	VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
 	DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
@@ -400,7 +409,7 @@ UINT App::run(void *userdata) {
 				}
 			}
 */
-			GRAPHICS.render();
+			RENDERER.render();
 			GRAPHICS.present();
 		}
 	}

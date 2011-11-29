@@ -3,11 +3,8 @@
 #include "logger.hpp"
 #include "technique.hpp"
 #include "technique_parser.hpp"
-#include "material_manager.hpp"
-#include "file_watcher.hpp"
-#include "app.hpp"
-#include "resource_manager.hpp"
-#include "graphics_submit.hpp"
+#include "resource_interface.hpp"
+#include "property_manager.hpp"
 
 using namespace std;
 
@@ -24,64 +21,24 @@ namespace
 		init_data.pSysMem = data;
 		return device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
 	}
-
-	const int cEffectDataSize = 1024 * 1024;
 }
 
-struct RenderTargetData {
-	RenderTargetData() {
-		reset();
-	}
-
-	void reset() {
-		texture = NULL;
-		depth_stencil = NULL;
-		rtv = NULL;
-		dsv = NULL;
-		srv = NULL;
-	}
-
-	operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
-
-	D3D11_TEXTURE2D_DESC texture_desc;
-	D3D11_TEXTURE2D_DESC depth_buffer_desc;
-	D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
-	D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
-	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-	CComPtr<ID3D11Texture2D> texture;
-	CComPtr<ID3D11Texture2D> depth_stencil;
-	CComPtr<ID3D11RenderTargetView> rtv;
-	CComPtr<ID3D11DepthStencilView> dsv;
-	CComPtr<ID3D11ShaderResourceView> srv;
-};
-
-struct TextureData {
-	~TextureData() {
-		reset();
-	}
-
-	void reset() {
-		texture.Release();
-		srv.Release();
-	}
-	operator bool() { return texture || srv; }
-	D3D11_TEXTURE2D_DESC texture_desc;
-	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-	CComPtr<ID3D11Texture2D> texture;
-	CComPtr<ID3D11ShaderResourceView> srv;
-};
 
 
 Graphics* Graphics::_instance = NULL;
 
-Graphics& Graphics::instance()
-{
-	if (_instance == NULL)
-		_instance = new Graphics();
+Graphics& Graphics::instance() {
+	assert(_instance);
 	return *_instance;
 }
 
-Graphics::Graphics()
+bool Graphics::create(ResourceInterface *ri) {
+	assert(!_instance);
+	_instance = new Graphics(ri);
+	return true;
+}
+
+Graphics::Graphics(ResourceInterface *ri)
 	: _width(-1)
 	, _height(-1)
 	, _start_fps_time(0xffffffff)
@@ -89,22 +46,7 @@ Graphics::Graphics()
 	, _fps(0)
 	, _vs_profile("vs_4_0")
 	, _ps_profile("ps_4_0")
-	, _vertex_shaders(release_obj<ID3D11VertexShader *>)
-	, _pixel_shaders(release_obj<ID3D11PixelShader *>)
-	, _vertex_buffers(release_obj<ID3D11Buffer *>)
-	, _index_buffers(release_obj<ID3D11Buffer *>)
-	, _constant_buffers(release_obj<ID3D11Buffer *>)
-	, _techniques(delete_obj<Technique *>)
-	, _input_layouts(release_obj<ID3D11InputLayout *>)
-	, _blend_states(release_obj<ID3D11BlendState *>)
-	, _depth_stencil_states(release_obj<ID3D11DepthStencilState *>)
-	, _rasterizer_states(release_obj<ID3D11RasterizerState *>)
-	, _sampler_states(release_obj<ID3D11SamplerState *>)
-	, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
-	, _textures(delete_obj<TextureData *>)
-	, _render_targets(delete_obj<RenderTargetData *>)
-	, _effect_data(new uint8[cEffectDataSize])
-	, _effect_data_ofs(0)
+	, _ri(ri)
 {
 	assert(!_instance);
 }
@@ -144,11 +86,11 @@ GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool 
 		return GraphicsObjectHandle();
 	}
 
-	int idx = name ? _render_targets.find_by_token(name) : -1;
-	if (idx != -1 || (idx = _render_targets.find_free_index()) != -1) {
-		if (_render_targets[idx].first)
-			_render_targets[idx].first->reset();
-		_render_targets[idx] = make_pair(data, name);
+	int idx = name ? _res._render_targets.find_by_token(name) : -1;
+	if (idx != -1 || (idx = _res._render_targets.find_free_index()) != -1) {
+		if (_res._render_targets[idx].first)
+			_res._render_targets[idx].first->reset();
+		_res._render_targets[idx] = make_pair(data, name);
 		return GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 	}
 	return GraphicsObjectHandle();
@@ -192,11 +134,11 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
 		return GraphicsObjectHandle();
 	}
 
-	int idx = name ? _textures.find_by_token(name) : -1;
-	if (idx != -1 || (idx = _textures.find_free_index()) != -1) {
-		if (_textures[idx].first)
-			_textures[idx].first->reset();
-		_textures[idx] = make_pair(data, name);
+	int idx = name ? _res._textures.find_by_token(name) : -1;
+	if (idx != -1 || (idx = _res._textures.find_free_index()) != -1) {
+		if (_res._textures[idx].first)
+			_res._textures[idx].first->reset();
+		_res._textures[idx] = make_pair(data, name);
 		return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
 	}
 	return GraphicsObjectHandle();
@@ -245,16 +187,16 @@ bool Graphics::create_back_buffers(int width, int height)
   _width = width;
   _height = height;
 
-	int idx = _render_targets.find_by_token("default_rt");
+	int idx = _res._render_targets.find_by_token("default_rt");
 	RenderTargetData *rt = nullptr;
 	if (idx != -1) {
-		rt = _render_targets.get(idx);
+		rt = _res._render_targets.get(idx);
 		rt->reset();
 		// release any existing buffers
 		_swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
 	} else {
 		rt = new RenderTargetData;
-		idx = _render_targets.find_free_index();
+		idx = _res._render_targets.find_free_index();
 	}
 
   // Get the dx11 back buffer
@@ -272,7 +214,7 @@ bool Graphics::create_back_buffers(int width, int height)
   B_ERR_HR(_device->CreateDepthStencilView(rt->depth_stencil, NULL, &rt->dsv.p));
 	rt->dsv->GetDesc(&rt->dsv_desc);
 
-	_render_targets[idx] = make_pair(rt, "default_rt");
+	_res._render_targets[idx] = make_pair(rt, "default_rt");
 	_default_rt_handle = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
@@ -350,7 +292,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
 void Graphics::set_default_render_target()
 {
-	RenderTargetData *rt = _render_targets.get(_default_rt_handle);
+	RenderTargetData *rt = _res._render_targets.get(_default_rt_handle);
 	_immediate_context->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
 	_immediate_context->RSSetViewports(1, &_viewport);
 }
@@ -363,14 +305,14 @@ bool Graphics::close()
 }
 
 void Graphics::clear(GraphicsObjectHandle h, const XMFLOAT4 &c) {
-	RenderTargetData *rt = _render_targets.get(h);
+	RenderTargetData *rt = _res._render_targets.get(h);
 	_immediate_context->ClearRenderTargetView(rt->rtv, &c.x);
 	_immediate_context->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 }
 
 void Graphics::clear(const XMFLOAT4& c)
 {
-	RenderTargetData *rt = _render_targets.get(_default_rt_handle);
+	RenderTargetData *rt = _res._render_targets.get(_default_rt_handle);
 	_immediate_context->ClearRenderTargetView(rt->rtv, &c.x);
 	_immediate_context->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
 }
@@ -399,41 +341,41 @@ void Graphics::resize(const int width, const int height)
 GraphicsObjectHandle Graphics::create_constant_buffer(int size) {
 	CD3D11_BUFFER_DESC desc(size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DEFAULT);
 
-	const int idx = _constant_buffers.find_free_index();
-	if (idx != -1 && SUCCEEDED(create_buffer_inner(_device, desc, NULL, &_constant_buffers[idx])))
+	const int idx = _res._constant_buffers.find_free_index();
+	if (idx != -1 && SUCCEEDED(create_buffer_inner(_device, desc, NULL, &_res._constant_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
-	const int idx = _vertex_buffers.find_free_index();
-	if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_vertex_buffers[idx])))
+	const int idx = _res._vertex_buffers.find_free_index();
+	if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_res._vertex_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
-	const int idx = _index_buffers.find_free_index();
-	if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_index_buffers[idx])))
+	const int idx = _res._index_buffers.find_free_index();
+	if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_res._index_buffers[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
-	const int idx = _input_layouts.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_input_layouts[idx])))
+	const int idx = _res._input_layouts.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_res._input_layouts[idx])))
 			return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len, const string &id) {
 
-	int idx = _vertex_shaders.find_by_token(id);
-	if (idx != -1 || (idx = _vertex_shaders.find_free_index()) != -1) {
+	int idx = _res._vertex_shaders.find_by_token(id);
+	if (idx != -1 || (idx = _res._vertex_shaders.find_free_index()) != -1) {
 		ID3D11VertexShader *vs = nullptr;
 		if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
-			SAFE_RELEASE(_vertex_shaders[idx].first);
-			_vertex_shaders[idx].first = vs;
+			SAFE_RELEASE(_res._vertex_shaders[idx].first);
+			_res._vertex_shaders[idx].first = vs;
 			return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
 		}
 	}
@@ -442,12 +384,12 @@ GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int l
 
 GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len, const string &id) {
 
-	int idx = _pixel_shaders.find_by_token(id);
-	if (idx != -1 || (idx = _pixel_shaders.find_free_index()) != -1) {
+	int idx = _res._pixel_shaders.find_by_token(id);
+	if (idx != -1 || (idx = _res._pixel_shaders.find_free_index()) != -1) {
 		ID3D11PixelShader *ps = nullptr;
 		if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
-			SAFE_RELEASE(_pixel_shaders[idx].first);
-			_pixel_shaders[idx].first = ps;
+			SAFE_RELEASE(_res._pixel_shaders[idx].first);
+			_res._pixel_shaders[idx].first = ps;
 			return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
 		}
 	}
@@ -455,37 +397,37 @@ GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int le
 }
 
 GraphicsObjectHandle Graphics::create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc) {
-	const int idx = _rasterizer_states.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_rasterizer_states[idx])))
+	const int idx = _res._rasterizer_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_res._rasterizer_states[idx])))
 		return GraphicsObjectHandle(GraphicsObjectHandle::kRasterizerState, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_blend_state(const D3D11_BLEND_DESC &desc) {
-	const int idx = _blend_states.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_blend_states[idx])))
+	const int idx = _res._blend_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_res._blend_states[idx])))
 		return GraphicsObjectHandle(GraphicsObjectHandle::kBlendState, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc) {
-	const int idx = _depth_stencil_states.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_depth_stencil_states[idx])))
+	const int idx = _res._depth_stencil_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_res._depth_stencil_states[idx])))
 		return GraphicsObjectHandle(GraphicsObjectHandle::kDepthStencilState, 0, idx);
 	return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &desc) {
-	const int idx = _sampler_states.find_free_index();
-	if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_sampler_states[idx])))
+	const int idx = _res._sampler_states.find_free_index();
+	if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_res._sampler_states[idx])))
 		return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
 	return GraphicsObjectHandle();
 }
 
-static bool create_techniques_from_file(const char *filename, vector<Technique *> *techniques) {
+static bool create_techniques_from_file(ResourceInterface *ri, const char *filename, vector<Technique *> *techniques) {
 	void *buf;
 	size_t len;
-	if (!RESOURCE_MANAGER.load_file(filename, &buf, &len))
+	if (!ri->load_file(filename, &buf, &len))
 		return false;
 
 	techniques->clear();
@@ -494,7 +436,7 @@ static bool create_techniques_from_file(const char *filename, vector<Technique *
 	bool res = parser.parse(&GRAPHICS, (const char *)buf, (const char *)buf + len, &tmp);
 	if (res) {
 		for (size_t i = 0; i < tmp.size(); ++i) {
-			if (tmp[i]->init(&GRAPHICS, &RESOURCE_MANAGER)) {
+			if (tmp[i]->init(&GRAPHICS, ri)) {
 				techniques->push_back(tmp[i]);
 			} else {
 				delete exch_null(tmp[i]);
@@ -506,21 +448,36 @@ static bool create_techniques_from_file(const char *filename, vector<Technique *
 	return res;
 }
 
-bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques) {
+bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, vector<Material *> *materials) {
 
 	bool res = true;
 	vector<GraphicsObjectHandle> tmp;
 
+	vector<Technique *> techniques_inner;
+	if (create_techniques_from_file(_ri, filename, &techniques_inner)) {
+		for (size_t i = 0; i < techniques_inner.size(); ++i) {
+			Technique *t = techniques_inner[i];
+			Rollback rb([&](){delete exch_null(t);});
+			int idx = _res._techniques.find_by_token(t->name());
+			if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
+				SAFE_DELETE(_res._techniques[idx].first);
+				_res._techniques[idx] = make_pair(t, t->name());
+				tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
+				rb.commit();
+			}
+		}
+	}
+/*
 	auto load_inner = [&](const char *filename){
 		vector<Technique *> techniques;
 		if (create_techniques_from_file(filename, &techniques)) {
 			for (size_t i = 0; i < techniques.size(); ++i) {
 				Technique *t = techniques[i];
 				Rollback rb([&](){delete exch_null(t);});
-				int idx = _techniques.find_by_token(t->name());
-				if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
-					SAFE_DELETE(_techniques[idx].first);
-					_techniques[idx] = make_pair(t, t->name());
+				int idx = _res._techniques.find_by_token(t->name());
+				if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
+					SAFE_DELETE(_res._techniques[idx].first);
+					_res._techniques[idx] = make_pair(t, t->name());
 					tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
 					rb.commit();
 				}
@@ -530,7 +487,9 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 			res = false;
 		}
 	};
-
+*/
+	// TODO
+/*
 	if (!RESOURCE_MANAGER.is_watchable()) {
 		load_inner(filename);
 	} else {
@@ -540,20 +499,17 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 			}
 		);
 	}
-
+*/
 	if (techniques)
 		*techniques = tmp;
 	return res;
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
-	int idx = _techniques.find_by_token(name);
+	int idx = _res._techniques.find_by_token(name);
 	return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::submit_command(const TrackedLocation &location, RenderKey key, void *data) {
-	_render_commands.push_back(RenderCmd(location, key, data));
-}
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
@@ -566,7 +522,7 @@ void Graphics::set_samplers(Technique *technique, Shader *shader) {
 	vector<ID3D11SamplerState *> samplers(num_samplers);
 	for (int i = 0; i < num_samplers; ++i) {
 		const SamplerParam &s = shader->sampler_params[i];
-		samplers[s.bind_point] = _sampler_states.get(technique->sampler_state(s.name.c_str()));
+		samplers[s.bind_point] = _res._sampler_states.get(technique->sampler_state(s.name.c_str()));
 	}
 
 	ctx->PSSetSamplers(0, num_samplers, &samplers[0]);
@@ -595,13 +551,13 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 	for (int i = 0; i < num_views; ++i) {
 		const ResourceViewParam &v = shader->resource_view_params[i];
 		// look for the named texture, and if that doesn't exist, look for a render target
-		int idx = _textures.find_by_token(v.name);
+		int idx = _res._textures.find_by_token(v.name);
 		if (idx != -1) {
-			views[v.bind_point] = _textures[idx].first->srv;
+			views[v.bind_point] = _res._textures[idx].first->srv;
 		} else {
-			idx = _render_targets.find_by_token(v.name);
+			idx = _res._render_targets.find_by_token(v.name);
 			if (idx != -1) {
-				views[v.bind_point] = _render_targets[idx].first->srv;
+				views[v.bind_point] = _res._render_targets[idx].first->srv;
 			} else {
 				LOG_WARNING_LN("Texture not found: %s", v.name);
 			}
@@ -616,14 +572,13 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 
 }
 
-void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id) {
+void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id) {
 
 	ID3D11DeviceContext *ctx = _immediate_context;
 
 	vector<CBuffer> &cbuffers = technique->get_cbuffers();
 
 	// copy the parameters into the technique's cbuffer staging area
-	// TODO: lots of hacks here..
 	for (size_t i = 0; i < shader->cbuffer_params.size(); ++i) {
 		const CBufferParam &p = shader->cbuffer_params[i];
 		const CBuffer &cb = cbuffers[p.cbuffer];
@@ -651,7 +606,7 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 	// commit the staging area
 	for (size_t i = 0; i < cbuffers.size(); ++i) {
 		const CBuffer &cb = cbuffers[i];
-		ID3D11Buffer *buffer = _constant_buffers.get(cb.handle);
+		ID3D11Buffer *buffer = _res._constant_buffers.get(cb.handle);
 		ctx->UpdateSubresource(buffer, 0, NULL, &cb.staging[0], 0, 0);
 		if (shader->type() == Shader::kVertexShader)
 			ctx->VSSetConstantBuffers(0, 1, &buffer);
@@ -661,134 +616,14 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-	return SUCCEEDED(_immediate_context->Map(_textures.get(h)->texture, sub, type, flags, res));
+	return SUCCEEDED(_immediate_context->Map(_res._textures.get(h)->texture, sub, type, flags, res));
 }
 
 void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
-	_immediate_context->Unmap(_textures.get(h)->texture, sub);
+	_immediate_context->Unmap(_res._textures.get(h)->texture, sub);
 }
 
 void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {
-	_immediate_context->CopyResource(_textures.get(dst)->texture, _textures.get(src)->texture);
+	_immediate_context->CopyResource(_res._textures.get(dst)->texture, _res._textures.get(src)->texture);
 }
 
-void Graphics::render() {
-
-	_immediate_context->RSSetViewports(1, &_viewport);
-
-	// aaah, lambdas, thank you!
-	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
-
-	ID3D11DeviceContext *ctx = _immediate_context;
-
-	// delete commands are sorted before render commands, so we can just save the
-	// deleted items when we find them
-	set<void *> deleted_items;
-
-	for (size_t i = 0; i < _render_commands.size(); ++i) {
-		const RenderCmd &cmd = _render_commands[i];
-		RenderKey key = cmd.key;
-		void *data = cmd.data;
-		switch (key.cmd) {
-
-		case RenderKey::kDelete:
-				deleted_items.insert(data);
-				break;
-
-		case RenderKey::kSetRenderTarget: {
-			GraphicsObjectHandle h = key.handle;
-			if (RenderTargetData *rt = _render_targets.get(h)) {
-				ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
-				if (data) {
-					XMFLOAT4 *f = (XMFLOAT4 *)cmd.data;
-					GRAPHICS.clear(h, *f);
-				}
-			}
-			break;
-		}
-
-		case RenderKey::kRenderTechnique: {
-			if (deleted_items.find(data) != deleted_items.end())
-				break;
-
-			TechniqueRenderData *d = (TechniqueRenderData *)data;
-			Technique *technique = _techniques.get(d->technique);
-
-			Shader *vertex_shader = technique->vertex_shader();
-			Shader *pixel_shader = technique->pixel_shader();
-
-			ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
-			ctx->GSSetShader(NULL, 0, 0);
-			ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
-
-			set_vb(ctx, _vertex_buffers.get(technique->vb()), technique->vertex_size());
-			ctx->IASetIndexBuffer(_index_buffers.get(technique->ib()), technique->index_format(), 0);
-			ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
-
-			ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-			ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
-			ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
-			ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
-
-			set_samplers(technique, pixel_shader);
-			int resource_mask = 0;
-			set_resource_views(technique, pixel_shader, &resource_mask);
-
-			ctx->DrawIndexed(technique->index_count(), 0, 0);
-			unbind_resource_views(resource_mask);
-
-			break;
-			}
-
-		case RenderKey::kRenderMesh:
-			{
-				if (deleted_items.find(data) != deleted_items.end())
-					break;
-				MeshRenderData *render_data = (MeshRenderData *)data;
-				const uint16 material_id = render_data->material_id;
-				const Material &material = MATERIAL_MANAGER.get_material(material_id);
-				Technique *technique = _techniques.get(render_data->technique);
-				Shader *vertex_shader = technique->vertex_shader();
-				Shader *pixel_shader = technique->pixel_shader();
-
-				ID3D11DeviceContext *ctx = _immediate_context;
-				ctx->VSSetShader(_vertex_shaders.get(vertex_shader->shader), NULL, 0);
-				ctx->GSSetShader(NULL, 0, 0);
-				ctx->PSSetShader(_pixel_shaders.get(pixel_shader->shader), NULL, 0);
-
-				set_vb(ctx, _vertex_buffers.get(render_data->vb), render_data->vertex_size);
-				ctx->IASetIndexBuffer(_index_buffers.get(render_data->ib), render_data->index_format, 0);
-				ctx->IASetInputLayout(_input_layouts.get(technique->input_layout()));
-
-				ctx->IASetPrimitiveTopology(render_data->topology);
-
-				ctx->RSSetState(_rasterizer_states.get(technique->rasterizer_state()));
-				ctx->OMSetDepthStencilState(_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
-				ctx->OMSetBlendState(_blend_states.get(technique->blend_state()), default_blend_factors(), default_sample_mask());
-
-				set_cbuffer_params(technique, vertex_shader, material_id, render_data->mesh_id);
-				set_cbuffer_params(technique, pixel_shader, material_id, render_data->mesh_id);
-				set_samplers(technique, pixel_shader);
-				int resource_mask;
-				set_resource_views(technique, pixel_shader, &resource_mask);
-
-				ctx->DrawIndexed(render_data->index_count, 0, 0);
-				unbind_resource_views(resource_mask);
-			}
-			break;
-		}
-	}
-
-	_render_commands.clear();
-	_effect_data_ofs = 0;
-}
-
-void *Graphics::alloc_command_data(size_t size) {
-	if (size + _effect_data_ofs >= cEffectDataSize)
-		return nullptr;
-
-	void *ptr = &_effect_data.get()[_effect_data_ofs];
-	_effect_data_ofs += size;
-	return ptr;
-}

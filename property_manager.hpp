@@ -69,7 +69,6 @@ private:
 	std::unordered_map<Id, PropertyBag> _material_properties;
 	std::unordered_map<Id, PropertyBag> _mesh_properties;
 
-	PropertyManager();
 	static PropertyManager *_instance;
 };
 

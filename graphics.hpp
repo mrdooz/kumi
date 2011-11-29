@@ -2,17 +2,17 @@
 #define _GRAPHICS_HPP_
 
 #include "utils.hpp"
-#include "property_manager.hpp"
+//#include "property_manager.hpp"
 #include "id_buffer.hpp"
 #include "graphics_object_handle.hpp"
-#include "graphics_submit.hpp"
-#include "threading.hpp"
+//#include "graphics_submit.hpp"
+//#include "threading.hpp"
 #include "graphics_interface.hpp"
+#include "technique.hpp"
 
 struct Io;
 struct Shader;
 struct Material;
-class Technique;
 
 using std::map;
 using std::string;
@@ -24,9 +24,91 @@ enum FileEvent;
 struct RenderTargetData;
 struct TextureData;
 
+struct RenderTargetData {
+	RenderTargetData() {
+		reset();
+	}
+
+	void reset() {
+		texture = NULL;
+		depth_stencil = NULL;
+		rtv = NULL;
+		dsv = NULL;
+		srv = NULL;
+	}
+
+	operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
+
+	D3D11_TEXTURE2D_DESC texture_desc;
+	D3D11_TEXTURE2D_DESC depth_buffer_desc;
+	D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
+	D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+	CComPtr<ID3D11Texture2D> texture;
+	CComPtr<ID3D11Texture2D> depth_stencil;
+	CComPtr<ID3D11RenderTargetView> rtv;
+	CComPtr<ID3D11DepthStencilView> dsv;
+	CComPtr<ID3D11ShaderResourceView> srv;
+};
+
+struct TextureData {
+	~TextureData() {
+		reset();
+	}
+
+	void reset() {
+		texture.Release();
+		srv.Release();
+	}
+	operator bool() { return texture || srv; }
+	D3D11_TEXTURE2D_DESC texture_desc;
+	D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+	CComPtr<ID3D11Texture2D> texture;
+	CComPtr<ID3D11ShaderResourceView> srv;
+};
+
+
 class Graphics : public GraphicsInterface {
 public:
 
+	struct BackedResources {
+		BackedResources()
+			: _vertex_shaders(release_obj<ID3D11VertexShader *>)
+			, _pixel_shaders(release_obj<ID3D11PixelShader *>)
+			, _vertex_buffers(release_obj<ID3D11Buffer *>)
+			, _index_buffers(release_obj<ID3D11Buffer *>)
+			, _constant_buffers(release_obj<ID3D11Buffer *>)
+			, _techniques(delete_obj<Technique *>)
+			, _input_layouts(release_obj<ID3D11InputLayout *>)
+			, _blend_states(release_obj<ID3D11BlendState *>)
+			, _depth_stencil_states(release_obj<ID3D11DepthStencilState *>)
+			, _rasterizer_states(release_obj<ID3D11RasterizerState *>)
+			, _sampler_states(release_obj<ID3D11SamplerState *>)
+			, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
+			, _textures(delete_obj<TextureData *>)
+			, _render_targets(delete_obj<RenderTargetData *>)
+		{
+		}
+
+		enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
+		IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;
+		IdBuffer<ID3D11PixelShader *, IdCount, string> _pixel_shaders;
+		IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
+		IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
+		IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
+		IdBuffer<Technique *, IdCount, string> _techniques;
+		IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
+
+		IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
+		IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
+		IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
+		IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
+		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
+		IdBuffer<TextureData *, IdCount, string> _textures;
+		IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
+	};
+
+	static bool create(ResourceInterface *ri);
 	static Graphics& instance();
 
 	bool	init(const HWND hwnd, const int width, const int height);
@@ -47,6 +129,8 @@ public:
 	void set_default_render_target();
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
+
+	BackedResources *get_backed_resources() { return &_res; }
 
 	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
@@ -78,7 +162,7 @@ public:
 	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
-	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques);
+	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, vector<Material *> *materials);
 	GraphicsObjectHandle find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
@@ -93,24 +177,19 @@ public:
 
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
-	void *alloc_command_data(size_t size);
-	void submit_command(const TrackedLocation &location, RenderKey key, void *data);
-	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
-	void render();
+	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id);
+	void set_samplers(Technique *technique, Shader *shader);
+	void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
+	void unbind_resource_views(int resource_bitmask);
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(Graphics);
 
-	Graphics();
+	Graphics(ResourceInterface *ri);
 	~Graphics();
 
 	bool create_render_target(int width, int height, bool shader_resource, RenderTargetData *out);
 	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
-
-	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, PropertyManager::Id mesh_id);
-	void set_samplers(Technique *technique, Shader *shader);
-	void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
-	void unbind_resource_views(int resource_bitmask);
 
   bool create_back_buffers(int width, int height);
 	static Graphics* _instance;
@@ -138,23 +217,15 @@ private:
 	float _fps;
 	CComPtr<ID3D11DeviceContext> _immediate_context;
 
-	enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
-	IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;
-	IdBuffer<ID3D11PixelShader *, IdCount, string> _pixel_shaders;
-	IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
-	IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
-	IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
-	IdBuffer<Technique *, IdCount, string> _techniques;
-	IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
+	ResourceInterface *_ri;
+	BackedResources _res;
 
-	IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
-	IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
-	IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
-	IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
-	IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
-	IdBuffer<TextureData *, IdCount, string> _textures;
-	IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
+	std::map<string, vector<string> > _techniques_by_file;
 
+	string _vs_profile;
+	string _ps_profile;
+
+/*
 	struct RenderCmd {
 		RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
 		TrackedLocation location;
@@ -162,14 +233,10 @@ private:
 		void *data;
 	};
 	vector<RenderCmd > _render_commands;
-
-	std::map<string, vector<string> > _techniques_by_file;
-
-	string _vs_profile;
-	string _ps_profile;
-
+	
 	std::unique_ptr<uint8> _effect_data;
 	int _effect_data_ofs;
+*/
 };
 
 #define GRAPHICS Graphics::instance()

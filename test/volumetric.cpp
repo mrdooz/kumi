@@ -6,10 +6,14 @@
 #include "../material_manager.hpp"
 #include "../technique.hpp"
 #include "../material.hpp"
+#include "../renderer.hpp"
 
 bool VolumetricEffect::init() {
 
-	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL));
+	vector<Material *> materials;
+	B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL, &materials));
+	for (auto it = begin(materials); it != end(materials); ++it)
+		MATERIAL_MANAGER.add_material(**it);
 
 	KumiLoader loader;
 	loader.load("meshes\\torus.kumi", &_scene);
@@ -71,7 +75,7 @@ bool VolumetricEffect::render() {
 
 	if (_scene) {
 
-		_scene->submit_mesh("Sphere001", GRAPHICS.next_seq_nr(), _material_occlude, _technique_occlude);
+		_scene->submit_mesh("Sphere001", RENDERER.next_seq_nr(), _material_occlude, _technique_occlude);
 /*
 		RenderKey key;
 		key.data = 0;

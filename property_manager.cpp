@@ -8,7 +8,3 @@ PropertyManager& PropertyManager::instance() {
 		_instance = new PropertyManager();
 	return *_instance;
 }
-
-PropertyManager::PropertyManager() {
-
-}

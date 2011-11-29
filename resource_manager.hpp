@@ -9,11 +9,12 @@
 using std::vector;
 using std::string;
 
-class ResouceManager : public ResourceInterface {
+class ResourceManager : public ResourceInterface {
 public:
-	ResouceManager();
+	ResourceManager();
 
-	static ResouceManager &instance();
+	static bool create();
+	static ResourceManager &instance();
 
 	void copy_on_load(bool enable, const char *dest);
 
@@ -27,10 +28,10 @@ public:
 
 private:
 	string resolve_filename(const char *filename);
-	static ResouceManager *_instance;
+	static ResourceManager *_instance;
 	bool _copy_on_load;
 	string _copy_dest;
 	vector<string> _paths;
 };
 
-#define RESOURCE_MANAGER ResouceManager::instance()
+#define RESOURCE_MANAGER ResourceManager::instance()

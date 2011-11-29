@@ -3,7 +3,7 @@
 #include "file_utils.hpp"
 #include "resource_manager.hpp"
 
-ResouceManager *ResouceManager::_instance = nullptr;
+ResourceManager *ResourceManager::_instance = nullptr;
 
 static bool file_exists(const char *filename)
 {
@@ -31,23 +31,28 @@ static string normalize_path(const char *path) {
 }
 
 
-ResouceManager::ResouceManager() 
+ResourceManager::ResourceManager() 
 	: _copy_on_load(false)
 {
 	_paths.push_back("./");
 }
 
-ResouceManager &ResouceManager::instance() {
-	if (!_instance)
-		_instance = new ResouceManager;
+ResourceManager &ResourceManager::instance() {
+	assert(_instance);
 	return *_instance;
 }
 
-void ResouceManager::add_path(const char *path) {
+bool ResourceManager::create() {
+	assert(!_instance);
+	_instance = new ResourceManager();
+	return true;
+}
+
+void ResourceManager::add_path(const char *path) {
 	_paths.push_back(normalize_path(path));
 }
 
-bool ResouceManager::load_file(const char *filename, void **buf, size_t *len) {
+bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
 
 	const string &full_path = resolve_filename(filename);
 	if (full_path.empty())
@@ -56,7 +61,7 @@ bool ResouceManager::load_file(const char *filename, void **buf, size_t *len) {
 	return ::load_file(full_path.c_str(), buf, len);
 }
 
-bool ResouceManager::load_partial(const char *filename, size_t ofs, size_t len, void **buf) {
+bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, void **buf) {
 	const string &full_path = resolve_filename(filename);
 
 	ScopedHandle h(CreateFileA(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
@@ -90,18 +95,18 @@ bool ResouceManager::load_partial(const char *filename, size_t ofs, size_t len, 
 
 }
 
-bool ResouceManager::file_exists(const char *filename) {
+bool ResourceManager::file_exists(const char *filename) {
 	return !resolve_filename(filename).empty();
 }
 
-__time64_t ResouceManager::mdate(const char *filename) {
+__time64_t ResourceManager::mdate(const char *filename) {
 	struct _stat s;
 	_stat(filename, &s);
 	return s.st_mtime;
 
 }
 
-bool ResouceManager::is_watchable() const {
+bool ResourceManager::is_watchable() const {
 #ifdef _DISTRIBUTION_
 	return false;
 #else
@@ -109,13 +114,13 @@ bool ResouceManager::is_watchable() const {
 #endif
 }
 
-void ResouceManager::copy_on_load(bool enable, const char *dest) {
+void ResourceManager::copy_on_load(bool enable, const char *dest) {
 	_copy_on_load = enable;
 	if (enable)
 		_copy_dest;
 }
 
-string ResouceManager::resolve_filename(const char *filename) {
+string ResourceManager::resolve_filename(const char *filename) {
 #if _DEBUG
 	// warn about duplicates
 	int count = 0;

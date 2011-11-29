@@ -80,7 +80,7 @@ private:
 	typedef map< string, D3D11_SHADER_INPUT_BIND_DESC > BoundTextures;
 	typedef map< string, D3D11_SHADER_INPUT_BIND_DESC > BoundSamplers;
 
-	enum ShaderType { VertexShader, GeometryShader, PixelShader};
+	enum ShaderType { kVertexShader, kGeometryShader, kPixelShader};
 
 	bool	load_inner(const char *buf, int len, const char* entry_point, ShaderType type);
 
