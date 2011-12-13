@@ -1108,8 +1108,16 @@ bool TechniqueParser::parse_inner(GraphicsInterface *graphics, Scope *scope, vec
 	return true;
 }
 
-bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques) {
+bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials) {
 	
 	Scope scope(_symbol_trie, start, end-1);
-	return parse_inner(graphics, &scope, techniques);
+	bool res = parse_inner(graphics, &scope, techniques);
+
+	// collect the materials
+	if (materials) {
+		materials->clear();
+		for (auto it = std::begin(*techniques); it != std::end(*techniques); ++it)
+			copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
+	}
+	return res;
 }

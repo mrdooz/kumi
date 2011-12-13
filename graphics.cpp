@@ -424,7 +424,7 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
 	return GraphicsObjectHandle();
 }
 
-static bool create_techniques_from_file(ResourceInterface *ri, const char *filename, vector<Technique *> *techniques) {
+static bool create_techniques_from_file(ResourceInterface *ri, const char *filename, vector<Technique *> *techniques, vector<Material *> *materials) {
 	void *buf;
 	size_t len;
 	if (!ri->load_file(filename, &buf, &len))
@@ -433,7 +433,7 @@ static bool create_techniques_from_file(ResourceInterface *ri, const char *filen
 	techniques->clear();
 	TechniqueParser parser;
 	vector<Technique *> tmp;
-	bool res = parser.parse(&GRAPHICS, (const char *)buf, (const char *)buf + len, &tmp);
+	bool res = parser.parse(&GRAPHICS, (const char *)buf, (const char *)buf + len, &tmp, materials);
 	if (res) {
 		for (size_t i = 0; i < tmp.size(); ++i) {
 			if (tmp[i]->init(&GRAPHICS, ri)) {
@@ -454,7 +454,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 	vector<GraphicsObjectHandle> tmp;
 
 	vector<Technique *> techniques_inner;
-	if (create_techniques_from_file(_ri, filename, &techniques_inner)) {
+	if (create_techniques_from_file(_ri, filename, &techniques_inner, materials)) {
 		for (size_t i = 0; i < techniques_inner.size(); ++i) {
 			Technique *t = techniques_inner[i];
 			Rollback rb([&](){delete exch_null(t);});
@@ -467,6 +467,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 			}
 		}
 	}
+
 /*
 	auto load_inner = [&](const char *filename){
 		vector<Technique *> techniques;

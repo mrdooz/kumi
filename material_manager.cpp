@@ -25,6 +25,7 @@ uint16 MaterialManager::find_material(const string &material_name) {
 		if (_materials[i].name == material_name)
 			return i;
 	}
+	assert(!"unable to find material");
 	return -1;
 }
 

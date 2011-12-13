@@ -20,7 +20,7 @@ class TechniqueParser {
 public:
 	TechniqueParser();
 	~TechniqueParser();
-	bool parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques);
+	bool parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials);
 private:
 	bool parse_inner(GraphicsInterface *graphics, Scope *scope, vector<Technique *> *techniques);
 	bool parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique);

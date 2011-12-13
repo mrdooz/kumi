@@ -32,9 +32,8 @@ void Renderer::render() {
 
 	ctx->RSSetViewports(1, &GRAPHICS.viewport());
 
-	// aaah, lambdas, thank you!
+	// sort by keys
 	sort(_render_commands.begin(), _render_commands.end(), [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
-
 
 	// delete commands are sorted before render commands, so we can just save the
 	// deleted items when we find them
@@ -44,60 +43,60 @@ void Renderer::render() {
 		const RenderCmd &cmd = _render_commands[i];
 		RenderKey key = cmd.key;
 		void *data = cmd.data;
+
 		switch (key.cmd) {
 
-		case RenderKey::kDelete:
-			deleted_items.insert(data);
-			break;
-
-		case RenderKey::kSetRenderTarget: {
-			GraphicsObjectHandle h = key.handle;
-			if (RenderTargetData *rt = res->_render_targets.get(h)) {
-				ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
-				if (data) {
-					XMFLOAT4 *f = (XMFLOAT4 *)cmd.data;
-					GRAPHICS.clear(h, *f);
-				}
-			}
-			break;
-		}
-
-		case RenderKey::kRenderTechnique: {
-			if (deleted_items.find(data) != deleted_items.end())
+			case RenderKey::kDelete:
+				deleted_items.insert(data);
 				break;
 
-			TechniqueRenderData *d = (TechniqueRenderData *)data;
-			Technique *technique = res->_techniques.get(d->technique);
+			case RenderKey::kSetRenderTarget: {
+				GraphicsObjectHandle h = key.handle;
+				if (RenderTargetData *rt = res->_render_targets.get(h)) {
+					ctx->OMSetRenderTargets(1, &(rt->rtv.p), rt->dsv);
+					if (data) {
+						const XMFLOAT4 &f = *(XMFLOAT4 *)cmd.data;
+						GRAPHICS.clear(h, f);
+					}
+				}
+				break;
+			}
 
-			Shader *vertex_shader = technique->vertex_shader();
-			Shader *pixel_shader = technique->pixel_shader();
+			case RenderKey::kRenderTechnique: {
+				if (deleted_items.find(data) != deleted_items.end())
+					break;
 
-			ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->shader), NULL, 0);
-			ctx->GSSetShader(NULL, 0, 0);
-			ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->shader), NULL, 0);
+				TechniqueRenderData *d = (TechniqueRenderData *)data;
+				Technique *technique = res->_techniques.get(d->technique);
 
-			GRAPHICS.set_vb(ctx, res->_vertex_buffers.get(technique->vb()), technique->vertex_size());
-			ctx->IASetIndexBuffer(res->_index_buffers.get(technique->ib()), technique->index_format(), 0);
-			ctx->IASetInputLayout(res->_input_layouts.get(technique->input_layout()));
+				Shader *vertex_shader = technique->vertex_shader();
+				Shader *pixel_shader = technique->pixel_shader();
 
-			ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+				ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->shader), NULL, 0);
+				ctx->GSSetShader(NULL, 0, 0);
+				ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->shader), NULL, 0);
 
-			ctx->RSSetState(res->_rasterizer_states.get(technique->rasterizer_state()));
-			ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
-			ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+				GRAPHICS.set_vb(ctx, res->_vertex_buffers.get(technique->vb()), technique->vertex_size());
+				ctx->IASetIndexBuffer(res->_index_buffers.get(technique->ib()), technique->index_format(), 0);
+				ctx->IASetInputLayout(res->_input_layouts.get(technique->input_layout()));
 
-			GRAPHICS.set_samplers(technique, pixel_shader);
-			int resource_mask = 0;
-			GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
+				ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-			ctx->DrawIndexed(technique->index_count(), 0, 0);
-			GRAPHICS.unbind_resource_views(resource_mask);
+				ctx->RSSetState(res->_rasterizer_states.get(technique->rasterizer_state()));
+				ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
+				ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-			break;
-		}
+				GRAPHICS.set_samplers(technique, pixel_shader);
+				int resource_mask = 0;
+				GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
 
-		case RenderKey::kRenderMesh:
-			{
+				ctx->DrawIndexed(technique->index_count(), 0, 0);
+				GRAPHICS.unbind_resource_views(resource_mask);
+
+				break;
+			}
+
+			case RenderKey::kRenderMesh: {
 				if (deleted_items.find(data) != deleted_items.end())
 					break;
 				MeshRenderData *render_data = (MeshRenderData *)data;
@@ -129,8 +128,8 @@ void Renderer::render() {
 
 				ctx->DrawIndexed(render_data->index_count, 0, 0);
 				GRAPHICS.unbind_resource_views(resource_mask);
+				break;
 			}
-			break;
 		}
 	}
 
