@@ -76,39 +76,39 @@ bool VolumetricEffect::render() {
 	if (_scene) {
 
 		_scene->submit_mesh("Sphere001", RENDERER.next_seq_nr(), _material_occlude, _technique_occlude);
-/*
+
 		RenderKey key;
 		key.data = 0;
 		key.cmd = RenderKey::kSetRenderTarget;
 		key.handle = _occluder_rt;
-		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(FROM_HERE, key, (void *)&clear_white);
+		key.seq_nr = RENDERER.next_seq_nr();
+		RENDERER.submit_command(FROM_HERE, key, (void *)&clear_white);
 
 		// Render the occluders
 
 		// Use the same sequence number for all the meshes to sort by technique
-		_scene->submit_meshes(GRAPHICS.next_seq_nr(), _material_occlude, _technique_occlude);
+		_scene->submit_meshes(RENDERER.next_seq_nr(), _material_occlude, _technique_occlude);
 
 		// Render the light streaks
 		key.handle = _shaft_rt;
-		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(FROM_HERE, key, (void *)&clear_black);
+		key.seq_nr = RENDERER.next_seq_nr();
+		RENDERER.submit_command(FROM_HERE, key, (void *)&clear_black);
 
 		RenderKey t_key;
 		t_key.data = 0;
 		t_key.cmd = RenderKey::kRenderTechnique;
-		t_key.seq_nr = GRAPHICS.next_seq_nr();
-		TechniqueRenderData *d = (TechniqueRenderData *)GRAPHICS.alloc_command_data(sizeof(TechniqueRenderData));
+		t_key.seq_nr = RENDERER.next_seq_nr();
+		TechniqueRenderData *d = (TechniqueRenderData *)RENDERER.alloc_command_data(sizeof(TechniqueRenderData));
 		d->technique = _technique_shaft;
 		d->material_id = _material_shaft;
-		GRAPHICS.submit_command(FROM_HERE, t_key, d);
+		RENDERER.submit_command(FROM_HERE, t_key, d);
 
 
 		// Add it together
 		key.handle = GRAPHICS.default_rt_handle();
-		key.seq_nr = GRAPHICS.next_seq_nr();
-		GRAPHICS.submit_command(FROM_HERE, key, NULL);
-*/
+		key.seq_nr = RENDERER.next_seq_nr();
+		RENDERER.submit_command(FROM_HERE, key, NULL);
+
 	}
 
 	return true;

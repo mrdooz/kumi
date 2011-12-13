@@ -6,9 +6,18 @@
 #include "property.hpp"
 #include "material.hpp"
 #include "graphics_interface.hpp"
+#include <exception>
 
 using namespace std;
 using namespace boost::assign;
+
+struct parser_exception : public exception {
+	parser_exception(const string& str) : str(str) {}
+	virtual const char *what() const { return str.c_str(); }
+	string str;
+};
+
+#define THROW_ON_FALSE(x) if (!(x)) throw parser_exception(__FUNCTION__ ":" #x);
 
 static DXGI_FORMAT index_size_to_format(int size) {
 	if (size == 2) return DXGI_FORMAT_R16_UINT;
@@ -22,20 +31,36 @@ static int index_format_to_size(DXGI_FORMAT fmt) {
 	return 0;
 }
 
-static bool parse_float(const char *str, float *v) {
-	return sscanf(str, "%f", v) == 1;
+static void parse_int(const char *str, int *v) {
+	THROW_ON_FALSE(sscanf(str, "%d", v) == 1);
 }
 
-static bool parse_float2(const char *str, float *v1, float *v2) {
-	return sscanf(str, "%f %f", v1, v2) == 2 || sscanf(str, "%f, %f", v1, v2) == 2;
+static void parse_float(const char *str, float *v) {
+	THROW_ON_FALSE(sscanf(str, "%f", v) == 1);
 }
 
-static bool parse_float3(const char *str, float *v1, float *v2, float *v3) {
-	return sscanf(str, "%f %f %f", v1, v2, v3) == 3 || sscanf(str, "%f, %f, %f", v1, v2, v3) == 3;
+static float parse_float(const string &str) {
+	float v;
+	THROW_ON_FALSE(sscanf(str.c_str(), "%f", &v) == 1);
+	return v;
 }
 
-static bool parse_float4(const char *str, float *v1, float *v2, float *v3, float *v4) {
-	return sscanf(str, "%f %f %f %f", v1, v2, v3, v4) == 4 || sscanf(str, "%f, %f, %f, %f", v1, v2, v3, v4) == 4;
+static int parse_int(const string &str) {
+	int a;
+	parse_int(str.c_str(), &a);
+	return a;
+}
+
+static void parse_float2(const char *str, float *v1, float *v2) {
+	THROW_ON_FALSE(sscanf(str, "%f %f", v1, v2) == 2 || sscanf(str, "%f, %f", v1, v2) == 2);
+}
+
+static void parse_float3(const char *str, float *v1, float *v2, float *v3) {
+	THROW_ON_FALSE(sscanf(str, "%f %f %f", v1, v2, v3) == 3 || sscanf(str, "%f, %f, %f", v1, v2, v3) == 3);
+}
+
+static void parse_float4(const char *str, float *v1, float *v2, float *v3, float *v4) {
+	THROW_ON_FALSE(sscanf(str, "%f %f %f %f", v1, v2, v3, v4) == 4 || sscanf(str, "%f, %f, %f, %f", v1, v2, v3, v4) == 4);
 }
 
 namespace technique_parser_details {
@@ -232,6 +257,10 @@ public:
 		cur->symbol = symbol;
 	}
 
+	Symbol find_symbol(const string &str) {
+		return find_symbol(str.c_str(), str.size(), nullptr);
+	}
+
 	Symbol find_symbol(const char *str, int max_len, int *match_length) {
 		// traverse the trie, and return the longest matching string
 		Node *cur = &root;
@@ -249,13 +278,15 @@ public:
 
 		if (cur == NULL || cur->symbol == kSymUnknown) {
 			if (last_match) {
-				*match_length = last_len;
+				if (match_length)
+					*match_length = last_len;
 				return last_match->symbol;
 			}
 			return kSymUnknown;
 		}
 
-		*match_length = len;
+		if (match_length)
+			*match_length = len;
 		return cur->symbol;
 	}
 
@@ -277,25 +308,32 @@ private:
 
 }
 
-static bool parse_value(const string &value, PropertyType::Enum type, float *out) {
+static void parse_value(const string &value, PropertyType::Enum type, float *out) {
 	const char *v = value.c_str();
 	switch (type) {
-	case PropertyType::kFloat:
-		return parse_float(v, &out[0]);
-	case PropertyType::kFloat2:
-		return parse_float2(v, &out[0], &out[1]);
-	case PropertyType::kFloat3:
-		return parse_float3(v, &out[0], &out[1], &out[2]);
-	case PropertyType::kFloat4:
-		return parse_float4(v, &out[0], &out[1], &out[2], &out[3]);
-	default:
-		return false;
+		case PropertyType::kFloat:
+			parse_float(v, &out[0]);
+			break;
+		case PropertyType::kFloat2:
+			parse_float2(v, &out[0], &out[1]);
+			break;
+		case PropertyType::kFloat3:
+			parse_float3(v, &out[0], &out[1], &out[2]);
+			break;
+		case PropertyType::kFloat4:
+			parse_float4(v, &out[0], &out[1], &out[2], &out[3]);
+			break;
+		default:
+			// throw?
+			break;
 	}
 }
 
 using namespace technique_parser_details;
 
-TechniqueParser::TechniqueParser() : _symbol_trie(new Trie()) {
+TechniqueParser::TechniqueParser() 
+	: _symbol_trie(new Trie()) 
+{
 	for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
 		_symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
 		_symbol_to_string[g_symbols[i].symbol] = g_symbols[i].str;
@@ -303,21 +341,50 @@ TechniqueParser::TechniqueParser() : _symbol_trie(new Trie()) {
 }
 
 TechniqueParser::~TechniqueParser() {
-	SAFE_DELETE(_symbol_trie);
 }
 
 struct Scope {
 	// start and end point to the first and last character of the scope (inclusive)
-	Scope() : _symbol_trie(nullptr), _org_start(nullptr), _start(nullptr), _end(nullptr) {}
-	Scope(Trie *symbol_trie, const char *start, const char *end) : _symbol_trie(symbol_trie), _org_start(start), _start(start), _end(end) {}
-	bool is_valid() const { return _start != nullptr; }
+	Scope(TechniqueParser *parser, const char *start, const char *end) : _parser(parser), _org_start(start), _start(start), _end(end) {}
+
+	bool is_valid() const { return _org_start != nullptr; }
 	bool end() const { return _start >= _end; }
-	bool advance(const Scope &inner) {
+	Scope &advance(const Scope &inner) {
 		// advance the scope to point to the character after the inner scope
 		if (inner._start < _start || inner._end >= _end)
-			return false;
+			THROW_ON_FALSE(false);
 		_start = inner._end + 1;
-		return true;
+		return *this;
+	}
+
+	Scope create_delimited_scope(char open, char close) {
+		int balance = 0;
+		const char *p = _start;
+		const char *start_inner = nullptr, *end_inner = nullptr;
+		while (true) {
+			if (p >= _end)
+				break;
+			char ch = *p;
+			if (ch == open) {
+				if (balance++ == 0)
+					start_inner = p + 1;
+			} else if (ch == close) {
+				if (--balance == 0) {
+					end_inner = p;
+					return Scope(_parser, start_inner, end_inner).skip_whitespace();
+				}
+			}
+			++p;
+		}
+		throw parser_exception(__FUNCTION__);
+	}
+
+	Scope &munch(Symbol symbol) {
+		if (next_symbol() != symbol) {
+			log_error(_parser->_symbol_to_string[symbol].c_str());
+			throw parser_exception(__FUNCTION__);
+		}
+		return *this;
 	}
 
 	bool consume_if(Symbol symbol) {
@@ -350,14 +417,14 @@ struct Scope {
 
 	Symbol next_symbol() {
 		int len = 0;
-		Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
+		Symbol s = _parser->_symbol_trie->find_symbol(_start, _end - _start + 1, &len);
 
 		_start += len;
 		skip_whitespace();
 		return s;
 	}
 
-	void skip_whitespace() {
+	Scope &skip_whitespace() {
 		bool removed;
 		do {
 			removed = false;
@@ -365,10 +432,10 @@ struct Scope {
 				++_start;
 
 			if (_start == _end)
-				return;
+				return *this;
 
 			int len = 0;
-			Symbol s = _symbol_trie->find_symbol(_start, _end - _start + 1, &len);
+			Symbol s = _parser->_symbol_trie->find_symbol(_start, _end - _start + 1, &len);
 
 			// skip comments
 			if (s == kSymSingleLineComment) {
@@ -387,11 +454,12 @@ struct Scope {
 				while (_start < _end && _start[0] != '*' && _start[1] != '/')
 					++_start;
 				if (_start == _end)
-					return;
+					return *this;
 				_start += 2;
 			}
 
 		} while(removed);
+		return *this;
 	}
 
 	int next_int() {
@@ -403,11 +471,11 @@ struct Scope {
 	}
 
 	float next_float() {
-		float r = (float)next_int();
-		float frac = 0;
+		double r = (double)next_int();
+		double frac = 0;
 		if (*_start == '.') {
 			++_start;
-			float mul = 0.1f;
+			double mul = 0.1;
 			while (_start <= _end && isdigit((byte)*_start)) {
 				frac += *_start - '0' * mul;
 				mul /= 10;
@@ -415,7 +483,7 @@ struct Scope {
 			}
 		}
 		skip_whitespace();
-		return r + frac;
+		return (float)(r + frac);
 	}
 
 	string next_identifier() {
@@ -427,6 +495,15 @@ struct Scope {
 		_start = tmp;
 		skip_whitespace();
 		return res;
+	}
+
+	Scope &next_identifier(string *res) {
+		*res = next_identifier();
+		return *this;
+	}
+
+	char next_char() {
+		return *_start++;
 	}
 
 	bool expect(Symbol symbol) {
@@ -466,23 +543,20 @@ struct Scope {
 			string(_start, min(_end - _start + 1, 20)).c_str()).c_str());
 	}
 
-	technique_parser_details::Trie *_symbol_trie;
+	TechniqueParser *_parser;
 	const char *_org_start;
 	const char *_start;
 	const char *_end;
 };
 
-#define EXPECT(scope, symbol)                                         \
-	do {                                                                \
-		if (scope->peek() != symbol) {                                    \
-				scope->log_error(_symbol_to_string[symbol].c_str());          \
-				return false;                                                 \
-		} else {                                                          \
-			scope->next_symbol();                                           \
-		}                                                                 \
-	} while(false)
+template<typename Key, typename Value>
+Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
+	auto it = candidates.find(str);
+	THROW_ON_FALSE(it != candidates.end());
+	return it->second;
+}
 
-bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
+void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 
 	static auto valid_sources = map_list_of
 		("material", PropertySource::kMaterial)
@@ -491,16 +565,15 @@ bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 		("mesh", PropertySource::kMesh)
 		("technique", PropertySource::kTechnique);
 
+	THROW_ON_FALSE(param.size() >= 3);
+
 	// type, name and source are required. the default value is optional
-	PropertyType::Enum type = lookup_default<Symbol, PropertyType::Enum>(scope->next_symbol(), valid_property_types, PropertyType::kUnknown);
-	if (type == PropertyType::kUnknown)
-		return false;
+	Symbol sym_type = _symbol_trie->find_symbol(param[0]);
+	PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
 
-	string name = scope->next_identifier();
-	PropertySource::Enum source = lookup_default<string, PropertySource::Enum>(scope->next_identifier(), valid_sources, PropertySource::kUnknown);
-	if (source == PropertySource::kUnknown)
-		return false;
-
+	string name = param[1];
+	PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[2], valid_sources);
+	
 	bool cbuffer_param = false;
 	if (type == PropertyType::kSampler) {
 		shader->sampler_params.push_back(SamplerParam(name, type, source));
@@ -511,6 +584,8 @@ bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 		cbuffer_param = true;
 	}
 
+	// TODO: add defaults again
+/*
 	EXPECT(scope, kSymSemicolon);
 
 	// check for default value
@@ -519,62 +594,78 @@ bool TechniqueParser::parse_param(Scope *scope, Shader *shader) {
 		EXPECT(scope, kSymSemicolon);
 		parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
 	}
-
-	return true;
+*/
 }
 
-bool TechniqueParser::parse_params(Scope *scope, Shader *shader) {
-	while (true) {
-		EXPECT(scope, kSymBlockOpen);
-		if (!parse_param(scope, shader))
-			return false;
-		EXPECT(scope, kSymBlockClose);
-		if (!scope->consume_if(kSymComma))
-			return true;
+template<typename T> T id(T t) { return t; }
+
+template <typename T>
+void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string &)> fn = id<string>) {
+	// a list is a list of tuples, where items within the tuple are whitespace delimited, and
+	// tuples are delimited by ';'
+	const char *item_start = scope->_start;
+	vector<T> cur;
+	while (!scope->end()) {
+		char ch = scope->next_char();
+		if (ch == ';') {
+			cur.push_back(fn(string(item_start, scope->_start - item_start - 1)));
+			items->push_back(cur);
+			cur.clear();
+			item_start = scope->skip_whitespace()._start;
+		} else if (isspace((uint8_t)ch)) {
+			cur.push_back(fn(string(item_start, scope->_start - item_start - 1)));
+			item_start = scope->skip_whitespace()._start;
+		}
 	}
-	return false;
+
+	if (item_start < scope->_end) {
+		cur.push_back(fn(string(item_start, scope->_start - item_start)));
+		items->push_back(cur);
+	}
 }
 
-bool TechniqueParser::parse_material(Scope *scope, Material *material) {
+void TechniqueParser::parse_material(Scope *scope, Material *material) {
 
 	static auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
 
 	Symbol type;
 	while (scope->consume_in(tmp, &type)) {
-		PropertyType::Enum prop_type = lookup_default<Symbol, PropertyType::Enum>(type, valid_property_types, PropertyType::kUnknown);
+		PropertyType::Enum prop_type = lookup_throw<Symbol, PropertyType::Enum>(type, valid_property_types);
 		string name = scope->next_identifier();
-		EXPECT(scope, kSymEquals);
+		scope->munch(kSymEquals);
 		string value = scope->string_until(';');
 		float out[16];
-		if (!parse_value(value, prop_type, out))
-			return false;
-		EXPECT(scope, kSymSemicolon);
+		parse_value(value, prop_type, out);
+		scope->munch(kSymSemicolon);
 		switch (prop_type) {
-		case PropertyType::kFloat:
-			material->properties.push_back(MaterialProperty(name, out[0]));
-			break;
-		case PropertyType::kFloat4:
-			material->properties.push_back(MaterialProperty(name, XMFLOAT4(out[0], out[1], out[2], out[3])));
-			break;
-		default:
-			return false;
+			case PropertyType::kFloat:
+				material->properties.push_back(MaterialProperty(name, out[0]));
+				break;
+			case PropertyType::kFloat4:
+				material->properties.push_back(MaterialProperty(name, XMFLOAT4(out[0], out[1], out[2], out[3])));
+				break;
+			default:
+				THROW_ON_FALSE(false);
 		}
 	}
-	return true;
 }
 
-bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
+void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
+	static auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams);
 	const string &ext = shader->type() == Shader::kVertexShader ? ".vso" : ".pso";
 	string entry_point = shader->type() == Shader::kVertexShader ? "vs_main" : "ps_main";
-	while (true) {
-		switch (scope->consume_in(list_of(kSymFile)(kSymEntryPoint)(kSymParams))) {
+	Symbol symbol;
+
+	while (scope->consume_in(tmp, &symbol)) {
+
+		switch (symbol) {
 
 			case kSymFile: {
 				shader->source_filename = scope->string_until(';');
 				// Use the default entry point name until we get a real tag
 				shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymSemicolon);
 				break;
 			}
 
@@ -583,45 +674,39 @@ bool TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 				// update the obj filename
 				if (!shader->source_filename.empty())
 					shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymSemicolon);
 				break;
 
-			case kSymParams:
-				EXPECT(scope, kSymListOpen);
-				parse_params(scope, shader);
-				EXPECT(scope, kSymListClose);
-				EXPECT(scope, kSymSemicolon);
-				break;
-
-			default:
-				return true;
-		}
-	}
-}
-
-bool TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc) {
-
-	while (!scope->end()) {
-		Symbol symbol;
-		if (scope->consume_in(list_of(kSymDepthEnable), &symbol)) {
-
-			EXPECT(scope, kSymEquals);
-			string value = scope->next_identifier();
-			EXPECT(scope, kSymSemicolon);
-
-			switch (symbol) {
-			case kSymDepthEnable:
-				lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthEnable);
+			case kSymParams : {
+				Scope inner = scope->create_delimited_scope('[', ']');
+				vector<vector<string>> params;
+				parse_list(&inner, &params);
+				for (auto it = begin(params); it != end(params); ++it)
+					parse_param(*it, shader);
+				scope->advance(inner).munch(kSymSemicolon);
 				break;
 			}
-		} else {
-			return true;
 		}
 	}
-	return false;
 }
 
-bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
+void TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc) {
+
+	static auto tmp = list_of(kSymDepthEnable);
+	Symbol symbol;
+
+	while (scope->consume_in(tmp, &symbol)) {
+		string value;
+		scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
+		switch (symbol) {
+			case kSymDepthEnable:
+				desc->DepthEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
+				break;
+		}
+	}
+}
+
+void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
 
 	static auto valid = list_of
 		(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)
@@ -662,58 +747,52 @@ bool TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 		("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
 		("always", D3D11_COMPARISON_ALWAYS);
 
-	while (!scope->end()) {
-		Symbol symbol;
-		if (scope->consume_in(valid, &symbol)) {
-			EXPECT(scope, kSymEquals);
-			string value = scope->next_identifier();
-			const char *v = value.c_str();
-			EXPECT(scope, kSymSemicolon);
+	Symbol symbol;
+	while (!scope->end() && scope->consume_in(valid, &symbol)) {
+		string value;
+		scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
+		const char *v = value.c_str();
 
-			switch (symbol) {
-				case kSymFilter:
-					lookup<string, D3D11_FILTER>(value, valid_filters, &desc->Filter);
-					break;
+		switch (symbol) {
+		case kSymFilter:
+			lookup<string, D3D11_FILTER>(value, valid_filters, &desc->Filter);
+			break;
 
-				case kSymAddressU:
-				case kSymAddressV:
-				case kSymAddressW:
-					lookup<string, D3D11_TEXTURE_ADDRESS_MODE>(value, valid_address, 
-						symbol == kSymAddressU ? &desc->AddressU : symbol == kSymAddressV ? &desc->AddressV : &desc->AddressW);
-					break;
+		case kSymAddressU:
+		case kSymAddressV:
+		case kSymAddressW:
+			(symbol == kSymAddressU ? desc->AddressU : symbol == kSymAddressV ? desc->AddressV : desc->AddressW) = 
+				lookup_throw<string, D3D11_TEXTURE_ADDRESS_MODE>(value, valid_address);
+			break;
 
-				case kSymMipLODBias:
-					parse_float(v, &desc->MipLODBias);
-					break;
+		case kSymMipLODBias:
+			parse_float(v, &desc->MipLODBias);
+			break;
 
-				case kSymMaxAnisotropy:
-					sscanf(value.c_str(), "%ud", &desc->MaxAnisotropy);
-					break;
+		case kSymMaxAnisotropy:
+			sscanf(value.c_str(), "%ud", &desc->MaxAnisotropy);
+			break;
 
-				case kSymComparisonFunc:
-					lookup<string, D3D11_COMPARISON_FUNC>(value, valid_cmp_func, &desc->ComparisonFunc);
-					break;
+		case kSymComparisonFunc:
+			desc->ComparisonFunc = lookup_throw<string, D3D11_COMPARISON_FUNC>(value, valid_cmp_func);
+			break;
 
-				case kSymBorderColor:
-					parse_float4(v, &desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
-					break;
+		case kSymBorderColor:
+			parse_float4(v, &desc->BorderColor[0], &desc->BorderColor[1], &desc->BorderColor[2], &desc->BorderColor[3]);
+			break;
 
-				case kSymMinLOD:
-					parse_float(v, &desc->MinLOD);
-					break;
+		case kSymMinLOD:
+			parse_float(v, &desc->MinLOD);
+			break;
 
-				case kSymMaxLOD:
-					parse_float(v, &desc->MaxLOD);
-					break;
-			}
-		} else {
-			return true;
+		case kSymMaxLOD:
+			parse_float(v, &desc->MaxLOD);
+			break;
 		}
 	}
-	return false;
 }
 
-bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
+void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
 
 	static auto valid = list_of
 		(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)
@@ -745,77 +824,61 @@ bool TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 		("min", D3D11_BLEND_OP_MIN)
 		("max", D3D11_BLEND_OP_MAX);
 
-	while (!scope->end()) {
-		Symbol symbol;
-		if (scope->consume_in(valid, &symbol)) {
-			EXPECT(scope, kSymEquals);
-			string value = scope->next_identifier();
-			EXPECT(scope, kSymSemicolon);
+	Symbol symbol;
+	while (!scope->end() && scope->consume_in(valid, &symbol)) {
+		string value;
+		scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
 
-			switch (symbol) {
-				case kSymBlendEnable:
-					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->BlendEnable);
-					break;
-				case kSymSrcBlend:
-				case kSymDestBlend:
-				case kSymSrcBlendAlpha:
-				case kSymDestBlendAlpha:
-					lookup<string, D3D11_BLEND>(value, valid_blend,
-						symbol == kSymSrcBlend ? &desc->SrcBlend : 
-						symbol == kSymDestBlend ? &desc->DestBlend :
-						symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
-						&desc->DestBlendAlpha);
-					break;
-				case kSymBlendOp:
-				case kSymBlendOpAlpha:
-					lookup<string, D3D11_BLEND_OP>(value, valid_blend_op,
-						symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
-					break;
-				case kSymRenderTargetWriteMask:
-					sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
-					break;
-			}
-		} else {
-			return true;
+		switch (symbol) {
+		case kSymBlendEnable:
+			desc->BlendEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
+			break;
+		case kSymSrcBlend:
+		case kSymDestBlend:
+		case kSymSrcBlendAlpha:
+		case kSymDestBlendAlpha:
+			lookup<string, D3D11_BLEND>(value, valid_blend,
+				symbol == kSymSrcBlend ? &desc->SrcBlend : 
+				symbol == kSymDestBlend ? &desc->DestBlend :
+				symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
+				&desc->DestBlendAlpha);
+			break;
+		case kSymBlendOp:
+		case kSymBlendOpAlpha:
+			lookup<string, D3D11_BLEND_OP>(value, valid_blend_op,
+				symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
+			break;
+		case kSymRenderTargetWriteMask:
+			sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
+			break;
 		}
 	}
-	return false;
 }
 
-bool TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
+void TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
 
 	static auto valid = list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget);
 
-	while (!scope->end()) {
-		Symbol symbol = scope->consume_in(valid);
+	Symbol symbol;
+	while (!scope->end() && scope->consume_in(valid, &symbol)) {
 		if (symbol == kSymAlphaToCoverageEnable || symbol == kSymIndependentBlendEnable) {
-			EXPECT(scope, kSymEquals);
-			string value = scope->next_identifier();
-			EXPECT(scope, kSymSemicolon);
+			string value;
+			scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
 			lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), 
 				symbol == kSymAlphaToCoverageEnable ? &desc->AlphaToCoverageEnable : &desc->IndependentBlendEnable);
 
 		} else if (symbol == kSymRenderTarget) {
-			EXPECT(scope, kSymListOpen);
+			scope->munch(kSymListOpen);
 			int target = scope->next_int();
-			if (target < 0 || target >= 8)
-				return false;
-			EXPECT(scope, kSymListClose);
-			EXPECT(scope, kSymEquals);
-			EXPECT(scope, kSymBlockOpen);
-			if (!parse_render_target(scope, &desc->RenderTarget[target]))
-				return false;
-			EXPECT(scope, kSymBlockClose);
-			EXPECT(scope, kSymSemicolon);
-
-		} else {
-			return true;
+			THROW_ON_FALSE(target >= 0 && target < 7);
+			scope->munch(kSymListClose).munch(kSymEquals).munch(kSymBlockOpen);
+			parse_render_target(scope, &desc->RenderTarget[target]);
+			scope->munch(kSymBlockClose).munch(kSymSemicolon);
 		}
 	}
-	return false;
 }
 
-bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
+void TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
 
 	static auto valid = list_of
 		(kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)
@@ -825,13 +888,12 @@ bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 	while (!scope->end()) {
 		Symbol symbol;
 		if (scope->consume_in(valid, &symbol)) {
-			EXPECT(scope, kSymEquals);
-			string value = scope->next_identifier();
-			EXPECT(scope, kSymSemicolon);
+			string value = scope->munch(kSymEquals).next_identifier();
+			scope->munch(kSymSemicolon);
 
 			switch (symbol) {
 				case kSymFillMode:
-					lookup<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID), &desc->FillMode);
+					desc->FillMode = lookup_throw<string, D3D11_FILL_MODE>(value, map_list_of("wireframe", D3D11_FILL_WIREFRAME)("solid", D3D11_FILL_SOLID));
 					break;
 				case kSymCullMode:
 					lookup<string, D3D11_CULL_MODE>(value, map_list_of("none", D3D11_CULL_NONE)("front", D3D11_CULL_FRONT)("back", D3D11_CULL_BACK), &desc->CullMode);
@@ -840,16 +902,16 @@ bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->FrontCounterClockwise);
 					break;
 				case kSymDepthBias:
-					sscanf(value.c_str(), "%d", &desc->DepthBias);
+					parse_int(value.c_str(), &desc->DepthBias);
 					break;
 				case kSymDepthBiasClamp:
-					sscanf(value.c_str(), "%f", &desc->DepthBiasClamp);
+					parse_float(value.c_str(), &desc->DepthBiasClamp);
 					break;
 				case kSymSlopeScaledDepthBias:
-					sscanf(value.c_str(), "%f", &desc->SlopeScaledDepthBias);
+					parse_float(value.c_str(), &desc->SlopeScaledDepthBias);
 					break;
 				case kSymDepthClipEnable:
-					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->DepthClipEnable);
+					desc->DepthClipEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
 					break;
 				case kSymScissorEnable:
 					lookup<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE), &desc->ScissorEnable);
@@ -862,114 +924,96 @@ bool TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 					break;
 			}
 		} else {
-			return true;
+			return;
 		}
 	}
-	return false;
+	THROW_ON_FALSE(false);
 }
 
-bool TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+	static auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
 
-	while (true) {
-		switch (scope->consume_in(valid_tags)) {
-
-		case kSymFormat: {
-			string format = scope->string_until(';');
-			if (format == "pos") {
-				technique->_vertex_size = 3 * sizeof(float);
-			} else if (format == "pos_tex") {
-				technique->_vertex_size = 5 * sizeof(float);
-			} else {
-				return false;
+	Symbol symbol;
+	while (scope->consume_in(valid_tags, &symbol)) {
+		switch (symbol) {
+			case kSymFormat: {
+				technique->_vertex_size = lookup_throw<string, int>(scope->string_until(';'), vertex_fmts);
+				scope->munch(kSymSemicolon);
+				break;
 			}
-			EXPECT(scope, kSymSemicolon);
-			break;
-		}
 
-		case kSymData:
-			EXPECT(scope, kSymListOpen);
-			while (scope->consume_if(kSymParenOpen)) {
-				int num_verts = technique->_vertex_size / sizeof(float);
-				for (int i = 0; i < num_verts; ++i) {
-					technique->_vertices.push_back(scope->next_float());
-					scope->consume_if(kSymComma);
+			case kSymData: {
+				Scope inner = scope->create_delimited_scope('[', ']');
+				scope->advance(inner).munch(kSymSemicolon);
+				vector<vector<float>> verts;
+				parse_list<float>(&inner, &verts, [&](const string &x){ return parse_float(x); });
+				for (auto it = begin(verts); it != end(verts); ++it) {
+					for (auto jt = begin(*it); jt != end(*it); ++jt) {
+						technique->_vertices.push_back(*jt);
+					}
 				}
-				EXPECT(scope, kSymParenClose);
-				scope->consume_if(kSymComma);
+				break;
 			}
-			EXPECT(scope, kSymListClose);
-			EXPECT(scope, kSymSemicolon);
-			break;
-
-		default:
-			if (technique->_vertex_size == -1)
-				return false;
-			technique->_vb = graphics->create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
-			return true;
 		}
 	}
-	return true;
+	THROW_ON_FALSE(technique->_vertex_size != -1);
+	technique->_vb = graphics->create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
 }
 
-bool TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+	static auto index_fmts = map_list_of("index16", DXGI_FORMAT_R16_UINT)("index32", DXGI_FORMAT_R32_UINT);
 
 	technique->_index_format = DXGI_FORMAT_UNKNOWN;
-	while (true) {
-		switch (scope->consume_in(valid_tags)) {
+	Symbol symbol;
 
-		case kSymFormat: {
-			string format = scope->string_until(';');
-			if (format == "index16") {
-				technique->_index_format = DXGI_FORMAT_R16_UINT;
-			} else if (format == "index32") {
-				technique->_index_format = DXGI_FORMAT_R32_UINT;
-			} else {
-				return false;
+	while (scope->consume_in(valid_tags, &symbol)) {
+
+		switch (symbol) {
+
+			case kSymFormat: {
+				string format = scope->string_until(';');
+				technique->_index_format = lookup_throw<string, DXGI_FORMAT>(format, index_fmts);
+				scope->munch(kSymSemicolon);
+				break;
 			}
-			EXPECT(scope, kSymSemicolon);
-			break;
-		}
 
-		case kSymData: {
-			int max_value = INT_MIN;
-			EXPECT(scope, kSymListOpen);
-			do {
-				technique->_indices.push_back(scope->next_int());
-				max_value = max(max_value, technique->_indices.back());
+			case kSymData: {
+				Scope inner = scope->create_delimited_scope('[', ']');
+				scope->advance(inner).munch(kSymSemicolon);
 
-			} while (scope->consume_if(kSymComma));
+				vector<vector<int>> indices_outer;
+				parse_list<int>(&inner, &indices_outer, [&](const string &x){ return parse_int(x); });
+				THROW_ON_FALSE(indices_outer.size() == 1);
+				const vector<int> &indices = indices_outer[0];
 
-			if (technique->_index_format == DXGI_FORMAT_UNKNOWN)
-				technique->_index_format = max_value < (1 << 16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+				int max_value = INT_MIN;
+				for (auto it = begin(indices); it != end(indices); ++it)
+					technique->_indices.push_back(max_value = max(max_value, *it));
 
-			EXPECT(scope, kSymListClose);
-			EXPECT(scope, kSymSemicolon);
-			break;
-		}
-		default:
-			if (technique->_index_format == DXGI_FORMAT_UNKNOWN) {
-				return false;
-			} else if (technique->_index_format == DXGI_FORMAT_R16_UINT) {
-				// create a local copy of the indices
-				vector<uint16> v;
-				v.reserve(technique->_indices.size());
-				for (size_t i = 0; i < technique->_indices.size(); ++i)
-					v.push_back((uint16)technique->_indices[i]);
-				technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
-			} else {
-				technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+				if (technique->_index_format == DXGI_FORMAT_UNKNOWN)
+					technique->_index_format = max_value < (1 << 16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
+
+				break;
 			}
-			return true;
 		}
 	}
-	return true;
+
+	THROW_ON_FALSE(technique->_index_format != DXGI_FORMAT_UNKNOWN);
+	if (technique->_index_format == DXGI_FORMAT_R16_UINT) {
+		// create a local copy of the indices
+		vector<uint16> v;
+		copy(technique->_indices.begin(), technique->_indices.end(), back_inserter(v));
+		technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
+	} else {
+		technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+	}
 }
 
-bool TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
 	static auto valid = list_of
 		(kSymVertexShader)(kSymPixelShader)
@@ -977,147 +1021,111 @@ bool TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope,
 		(kSymVertices)(kSymIndices)
 		(kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
 
-	while (!scope->end()) {
-		Symbol symbol;
-		if (scope->consume_in(valid, &symbol)) {
-			switch (symbol) {
+	Symbol symbol;
+	while (!scope->end() && scope->consume_in(valid, &symbol)) {
+		switch (symbol) {
 
 			case kSymVertexShader:
 			case kSymPixelShader: {
-				Shader **shader;
-				if (symbol == kSymVertexShader) {
-					shader = &technique->_vertex_shader;
-					*shader = new VertexShader;
-				} else {
-					shader = &technique->_pixel_shader;
-					*shader = new PixelShader;
-				}
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_shader(scope, *shader)) {
-					SAFE_DELETE(*shader);
-					return false;
-				}
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				bool vs = symbol == kSymVertexShader;
+				Rollback2<Shader> shader;
+				if (vs) 
+					shader.set(new VertexShader()); 
+				else 
+					shader.set(new PixelShader());
+				scope->munch(kSymBlockOpen);
+				parse_shader(scope, shader.get());
+				*(vs ? &technique->_vertex_shader : &technique->_pixel_shader) = shader.commit();
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 			}
 
 			case kSymMaterial: {
 				string technique_name = technique->name();
 				// materials are prefixed by the technique name
-				Material *mat = new Material(technique_name + "::" + scope->next_identifier());
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_material(scope, mat))
-					return false;
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
-				technique->_materials.push_back(mat);
-				//TODO
-				//MATERIAL_MANAGER.add_material(mat);
+				Rollback2<Material> mat(new Material(technique_name + "::" + scope->next_identifier()));
+				scope->munch(kSymBlockOpen);
+				parse_material(scope, mat.get());
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
+				technique->_materials.push_back(mat.commit());
 				break;
 			}
 
 			case kSymRasterizerDesc:
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_rasterizer_desc(scope, &technique->_rasterizer_desc))
-					return false;
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockOpen);
+				parse_rasterizer_desc(scope, &technique->_rasterizer_desc);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 
 			case kSymSamplerDesc: {
 				string name = scope->next_identifier();
-				EXPECT(scope, kSymBlockOpen);
+				scope->munch(kSymBlockOpen);
 
 				D3D11_SAMPLER_DESC desc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
-				if (!parse_sampler_desc(scope, &desc))
-					return false;
+				parse_sampler_desc(scope, &desc);
 				technique->_sampler_descs.push_back(make_pair(name, desc));
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 			}
 
 			case kSymDepthStencilDesc:
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_depth_stencil_desc(scope, &technique->_depth_stencil_desc))
-					return false;
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockOpen);
+				parse_depth_stencil_desc(scope, &technique->_depth_stencil_desc);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 
 			case kSymBlendDesc:
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_blend_desc(scope, &technique->_blend_desc))
-					return false;
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockOpen);
+				parse_blend_desc(scope, &technique->_blend_desc);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 
 			case kSymVertices:
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_vertices(graphics, scope, technique)) {
-					// TODO: delete buffer
-					return false;
-				}
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockOpen);
+				parse_vertices(graphics, scope, technique);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
 
 			case kSymIndices:
-				EXPECT(scope, kSymBlockOpen);
-				if (!parse_indices(graphics, scope, technique)) {
-					// TODO: delete buffer
-					return false;
-				}
-				EXPECT(scope, kSymBlockClose);
-				EXPECT(scope, kSymSemicolon);
+				scope->munch(kSymBlockOpen);
+				parse_indices(graphics, scope, technique);
+				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;
-			}
-		} else {
-			return true;
 		}
 	}
-	return false;
-}
-
-
-bool TechniqueParser::parse_inner(GraphicsInterface *graphics, Scope *scope, vector<Technique *> *techniques) {
-
-	while (!scope->end()) {
-		switch (scope->next_symbol()) {
-
-		case kSymTechnique: {
-			Technique *t = new Technique;
-			Rollback rb([&](){delete exch_null(t);});
-			t->_name = scope->next_identifier();
-			EXPECT(scope, kSymBlockOpen);
-			parse_technique(graphics, scope, t);
-			EXPECT(scope, kSymBlockClose);
-			EXPECT(scope, kSymSemicolon);
-			rb.commit();
-			techniques->push_back(t);
-			break;
-		}
-
-		default:
-			return false;
-		}
-	}
-
-	return true;
 }
 
 bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials) {
-	
-	Scope scope(_symbol_trie, start, end-1);
-	bool res = parse_inner(graphics, &scope, techniques);
 
-	// collect the materials
+	try {
+		Scope scope(this, start, end-1);
+
+		while (!scope.end()) {
+
+			switch (scope.next_symbol()) {
+
+				case kSymTechnique: {
+					Rollback2<Technique> t(new Technique);
+					scope.next_identifier(&t.get()->_name).munch(kSymBlockOpen);
+					parse_technique(graphics, &scope, t.get());
+					scope.munch(kSymBlockClose).munch(kSymSemicolon);
+					techniques->push_back(t.commit());
+					break;
+				}
+
+				default:
+					return false;
+			}
+		}
+	} catch (const parser_exception &/*e*/) {
+		return false;
+	}
+
 	if (materials) {
 		materials->clear();
 		for (auto it = std::begin(*techniques); it != std::end(*techniques); ++it)
-			copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
+		copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
 	}
-	return res;
+
+	return true;
 }

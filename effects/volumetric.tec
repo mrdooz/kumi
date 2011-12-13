@@ -3,10 +3,10 @@ technique volumetric_occluder {
 	vertex_shader {
 		file effects/volumetric.fx;
 		entry_point vs_occluder;
-		params [
-			{ float4x4 view system; },
-			{ float4x4 proj system; },
-			{ float4x4 world mesh; }
+		params [ 
+			float4x4 view system; 
+			float4x4 proj system; 
+			float4x4 world mesh; 
 		];
 	};
 	
@@ -25,9 +25,9 @@ technique volumetric_shaft {
 		file effects/volumetric.fx;
 		entry_point vs_shaft;
 		params [
-			{ float4x4 view system; },
-			{ float4x4 proj system; },
-			{ float4x4 world mesh; }
+			float4x4 view system;
+			float4x4 proj system;
+			float4x4 world mesh;
 		];
 	};
 	
@@ -36,8 +36,8 @@ technique volumetric_shaft {
 		entry_point ps_shaft;
 		
 		params [
-			{ texture2d volumetric_occluder system; },
-			{ sampler shaft_sampler technique; }
+			texture2d volumetric_occluder system;
+			sampler shaft_sampler technique;
 		];
 
 	};
@@ -48,13 +48,19 @@ technique volumetric_shaft {
 	// 2, 1, 3
 	vertices {
 		format pos_tex;
-		data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (1, -1, 1, 1, 1)];
+		//data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (1, -1, 1, 1, 1)];
+		data [ 
+			-1 +1 +1 +0 +0; 
+			+1 +1 +1 +1 +0;
+			-1 -1 +1 +0 +1;
+			+1 -1 +1 +1 +1;
+			];
 	};
 	
 	indices {
 		// format index32;
 		// TODO: topology
-		data [0, 1, 2, 2, 1, 3];
+		data [0 1 2 2 1 3];
 	};
 
 	
@@ -76,9 +82,9 @@ technique volumetric_add {
 		file effects/volumetric.fx;
 		entry_point vs_add;
 		params [
-			{ float4x4 view system; },
-			{ float4x4 proj system; },
-			{ float4x4 world mesh; }
+			float4x4 view system;
+			float4x4 proj system;
+			float4x4 world mesh;
 		];
 	};
 	

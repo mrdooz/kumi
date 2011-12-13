@@ -7,8 +7,8 @@ technique cef {
 	
 	pixel_shader {
 		params [
-			{ texture2d cef_texture system; },
-			{ sampler cef_sampler technique; }
+			texture2d cef_texture system;
+			sampler cef_sampler technique;
 		];
 
 		entry_point ps_main;
@@ -21,13 +21,18 @@ technique cef {
 	// 2, 1, 3
 	vertices {
 		format pos_tex;
-		data [(-1, 1, 1, 0, 0), (+1, 1, 1, 1, 0), (-1, -1, 1, 0, 1), (1, -1, 1, 1, 1)];
+		data [ 
+			-1 +1 +1 +0 +0; 
+			+1 +1 +1 +1 +0;
+			-1 -1 +1 +0 +1;
+			+1 -1 +1 +1 +1;
+			];
 	};
 	
 	indices {
 		// format index32;
 		// TODO: topology
-		data [0, 1, 2, 2, 1, 3];
+		data [0 1 2 2 1 3];
 	};
 	
 	sampler_desc cef_sampler {

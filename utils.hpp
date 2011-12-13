@@ -51,6 +51,19 @@ struct Rollback {
 	bool _commit;
 };
 
+template< typename T>
+class Rollback2 {
+public:
+	Rollback2() : _p(nullptr) {}
+	Rollback2(T *p) : _p(p) {}
+	~Rollback2() { if (_p) delete _p; }
+	void set(T *p) { _p = p; }
+	T *get() { return _p; }
+	T *commit() { T *tmp = _p; _p = nullptr; return tmp; }
+private:
+	T *_p;
+};
+
 
 // Macro for creating "local" names
 #define GEN_NAME2(prefix, line) prefix##line

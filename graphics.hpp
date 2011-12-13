@@ -2,11 +2,8 @@
 #define _GRAPHICS_HPP_
 
 #include "utils.hpp"
-//#include "property_manager.hpp"
 #include "id_buffer.hpp"
 #include "graphics_object_handle.hpp"
-//#include "graphics_submit.hpp"
-//#include "threading.hpp"
 #include "graphics_interface.hpp"
 #include "technique.hpp"
 

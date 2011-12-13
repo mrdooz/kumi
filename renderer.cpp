@@ -15,7 +15,6 @@ Renderer::Renderer()
 	: _effect_data(new uint8[cEffectDataSize])
 	, _effect_data_ofs(0)
 {
-
 }
 
 Renderer &Renderer::instance() {
