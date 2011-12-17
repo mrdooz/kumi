@@ -77,6 +77,7 @@ bool VolumetricEffect::render() {
 
 	if (_scene) {
 
+		// set render target
 		RenderKey key;
 		key.data = 0;
 		key.cmd = RenderKey::kSetRenderTarget;
@@ -84,6 +85,7 @@ bool VolumetricEffect::render() {
 		key.seq_nr = RENDERER.next_seq_nr();
 		RENDERER.submit_command(FROM_HERE, key, (void *)&clear_white);
 
+		// render skydome
 		_scene->submit_mesh("Sphere001", RENDERER.next_seq_nr(), _material_sky, _technique_sky);
 
 		// Render the occluders
@@ -105,11 +107,15 @@ bool VolumetricEffect::render() {
 		d->material_id = _material_shaft;
 		RENDERER.submit_command(FROM_HERE, t_key, d);
 
-
-		// Add it together
+		// render scene as usual to default render target
+		key.cmd = RenderKey::kSetRenderTarget;
 		key.handle = GRAPHICS.default_rt_handle();
 		key.seq_nr = RENDERER.next_seq_nr();
 		RENDERER.submit_command(FROM_HERE, key, NULL);
+
+		_scene->submit_meshes(RENDERER.next_seq_nr());
+
+		// add shafts
 
 	}
 
