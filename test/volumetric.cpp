@@ -25,11 +25,13 @@ bool VolumetricEffect::init() {
 		PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
 	}
 
+	_material_sky= MATERIAL_MANAGER.find_material("sky::sky");
+	_technique_sky = GRAPHICS.find_technique("sky");
+
 	_material_occlude = MATERIAL_MANAGER.find_material("volumetric_occluder::black");
 	_technique_occlude = GRAPHICS.find_technique("volumetric_occluder");
 
-	Material shaft_material("");
-	_material_shaft = MATERIAL_MANAGER.add_material(shaft_material);
+	_material_shaft = MATERIAL_MANAGER.add_material(Material(""));
 	_technique_shaft = GRAPHICS.find_technique("volumetric_shaft");
 	
 	_technique_add = GRAPHICS.find_technique("volumetric_add");
@@ -75,14 +77,14 @@ bool VolumetricEffect::render() {
 
 	if (_scene) {
 
-		_scene->submit_mesh("Sphere001", RENDERER.next_seq_nr(), _material_occlude, _technique_occlude);
-
 		RenderKey key;
 		key.data = 0;
 		key.cmd = RenderKey::kSetRenderTarget;
 		key.handle = _occluder_rt;
 		key.seq_nr = RENDERER.next_seq_nr();
 		RENDERER.submit_command(FROM_HERE, key, (void *)&clear_white);
+
+		_scene->submit_mesh("Sphere001", RENDERER.next_seq_nr(), _material_sky, _technique_sky);
 
 		// Render the occluders
 

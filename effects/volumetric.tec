@@ -1,3 +1,24 @@
+technique sky {
+	vertex_shader {
+		file effects/volumetric.fx;
+		entry_point vs_sky;
+		params [ 
+			float4x4 view system; 
+			float4x4 proj system; 
+			float4x4 world mesh; 
+		];
+	};
+	
+	pixel_shader {
+		file effects/volumetric.fx;
+		entry_point ps_sky;
+	};
+	
+	material sky {
+	};
+
+};
+
 technique volumetric_occluder {
 	
 	vertex_shader {

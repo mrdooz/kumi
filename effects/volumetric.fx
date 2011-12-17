@@ -28,6 +28,21 @@ float4 ps_occluder(ps_input input) : SV_Target
 	return float4(c, c, c, 1);
 }
 
+ps_input vs_sky(vs_input input)
+{
+	ps_input output = (ps_input)0;
+	output.pos = mul(input.pos, world);
+	output.pos = mul(output.pos, view);
+	output.pos = mul(output.pos, proj);
+	return output;
+}
+
+float4 ps_sky(ps_input input) : SV_Target
+{
+	float c = 0.3f;
+	return float4(1, 0, 0, 1);
+}
+
 Texture2D volumetric_occluder;
 sampler shaft_sampler;
 

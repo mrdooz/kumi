@@ -17,6 +17,6 @@ private:
 	GraphicsObjectHandle _shaft_rt;
 	Scene *_scene;
 
-	uint16 _material_occlude, _material_add, _material_shaft;
-	GraphicsObjectHandle _technique_occlude, _technique_add, _technique_shaft;
+	uint16 _material_occlude, _material_add, _material_shaft, _material_sky;
+	GraphicsObjectHandle _technique_occlude, _technique_add, _technique_shaft, _technique_sky;
 };
