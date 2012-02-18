@@ -68,6 +68,7 @@ public:
   void add_watch(const string &fullname, ThreadId thread_id, const CbFileChanged &cb, void *token);
   void remove_watch(const CbFileChanged &cb);
   void terminate();
+  virtual void on_idle();
 private:
   friend struct DirWatch;
   virtual UINT run(void *userdata);
@@ -167,6 +168,9 @@ bool WatcherThread::is_watching_file(const char *filename)
 {
   auto it = _watched_files.find(filename);
   return it != _watched_files.end() && it->second > 0;
+}
+
+void WatcherThread::on_idle() {
 }
 
 UINT WatcherThread::run(void *userdata)
@@ -325,7 +329,7 @@ FileWatcher &FileWatcher::instance() {
 void FileWatcher::add_file_watch(const char *filename, void *token, ThreadId thread_id, const CbFileChanged &fn) {
   if (!_thread) {
     _thread = new WatcherThread;
-    if (!_thread->start(this))
+    if (!_thread->start())
       return;
   }
 

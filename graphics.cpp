@@ -424,8 +424,8 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
   return GraphicsObjectHandle();
 }
 
-static void technique_changed_callback(const char *filename) {
-
+static bool technique_changed_callback(const char *filename) {
+	return true;
 }
 
 static bool create_techniques_from_file(ResourceInterface *ri, const char *filename, vector<Technique *> *techniques, vector<Material *> *materials) {
@@ -438,11 +438,7 @@ static bool create_techniques_from_file(ResourceInterface *ri, const char *filen
   if (!ri->supports_file_watch()) {
     //load_inner(filename);
   } else {
-    FILE_WATCHER.add_file_watch(filename, NULL, true, threading::kMainThread, 
-      [&](void *token, FileEvent event, const string &old_name, const string &new_name) {
-        load_inner(old_name.c_str());
-      }
-    );
+		ri->watch_file(filename, true, technique_changed_callback);
   }
 
 

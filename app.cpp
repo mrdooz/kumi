@@ -356,6 +356,9 @@ bool App::create_window()
   return true;
 }
 
+void App::on_idle() {
+}
+
 UINT App::run(void *userdata) {
   MSG msg = {0};
 

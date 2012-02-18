@@ -115,6 +115,11 @@ bool ResourceManager::supports_file_watch() const {
 #endif
 }
 
+void ResourceManager::watch_file(const char *filename, bool initial_callback, const cbFileChanged &cb) {
+  if (initial_callback)
+    cb(filename);
+}
+
 void ResourceManager::copy_on_load(bool enable, const char *dest) {
   _copy_on_load = enable;
   if (enable)
@@ -152,9 +157,5 @@ string ResourceManager::resolve_filename(const char *filename) {
   if (!res.empty())
     _resolved_paths[filename] = res;
   return res;
-
-}
-
-void ResourceManager::watch_file(const char *filename, const cbFileChanged &cb) {
 
 }

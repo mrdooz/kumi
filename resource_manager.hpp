@@ -20,10 +20,9 @@ public:
   __time64_t mdate(const char *filename);
   virtual bool load_partial(const char *filename, size_t ofs, size_t len, void **buf);
   virtual bool load_file(const char *filename, void **buf, size_t *len);
-  virtual void file_changed(const char *filename);
 
   virtual bool supports_file_watch() const;
-  virtual void watch_file(const char *filename, const cbFileChanged &cb);
+  virtual void watch_file(const char *filename, bool initial_callback, const cbFileChanged &cb);
 
   void copy_on_load(bool enable, const char *dest);
   void add_path(const char *path);
