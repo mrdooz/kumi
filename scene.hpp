@@ -1,6 +1,8 @@
 #pragma once
 #include "graphics_submit.hpp"
 
+struct TrackedLocation;
+
 struct SubMesh {
 	SubMesh();
 	~SubMesh();
@@ -10,7 +12,7 @@ struct SubMesh {
 
 struct Mesh {
 	Mesh(const string &name) : name(name) { }
-	void submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
+	void submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
 	string name;
 	XMFLOAT4X4 obj_to_world;
 	std::vector<SubMesh *> submeshes;
@@ -30,8 +32,8 @@ struct Scene {
 
 	~Scene();
 
-	void submit_meshes(uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
-	void submit_mesh(const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+	void submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+	void submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;

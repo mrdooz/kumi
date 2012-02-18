@@ -87,7 +87,7 @@ private:
 	virtual void OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor) OVERRIDE;
 
 	CefRefPtr<CefBrowser> GetBrowser() { return m_Browser; }
-	CefWindowHandle GetBrowserHwnd() { return m_BrowserHwnd; }
+	CefWindowHandle GetBrowserHwnd() { return _browser_hwnd; }
 
 	std::string GetLogFile();
 
@@ -115,19 +115,19 @@ protected:
 	CefRefPtr<CefBrowser> m_Browser;
 
 	// The main frame window handle
-	CefWindowHandle m_MainHwnd;
+	CefWindowHandle _main_hwnd;
 
 	// The child browser window handle
-	CefWindowHandle m_BrowserHwnd;
+	CefWindowHandle _browser_hwnd;
 
 	// The edit window handle
-	CefWindowHandle m_EditHwnd;
+	CefWindowHandle _edit_hwnd;
 
 	// The button window handles
-	CefWindowHandle m_BackHwnd;
-	CefWindowHandle m_ForwardHwnd;
-	CefWindowHandle m_StopHwnd;
-	CefWindowHandle m_ReloadHwnd;
+	CefWindowHandle _back_hwnd;
+	CefWindowHandle _forward_hwnd;
+	CefWindowHandle _stop_hwnd;
+	CefWindowHandle _reload_hwnd;
 
 	// Support for logging.
 	std::string m_LogFile;

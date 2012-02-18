@@ -16,6 +16,8 @@ public:
 private:
 	static Renderer *_instance;
 
+	void validate_command(RenderKey key, const void *data);
+
 	struct RenderCmd {
 		RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
 		TrackedLocation location;

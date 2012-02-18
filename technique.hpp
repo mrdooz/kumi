@@ -62,6 +62,7 @@ struct Shader {
 	};
 
 	Shader(const string &entry_point) : entry_point(entry_point), valid(false) {}
+	virtual ~Shader() {}
 
 	CBufferParam *find_cbuffer_param(const char *name) {
 		return find_by_name(name, cbuffer_params);

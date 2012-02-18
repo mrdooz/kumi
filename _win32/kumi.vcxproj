@@ -39,7 +39,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(CEF)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CEF)\include;$(ProjectDir)..\;$(IncludePath)</IncludePath>
     <LibraryPath>$(CEF)\$(Configuration)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">

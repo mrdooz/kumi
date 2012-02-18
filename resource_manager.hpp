@@ -11,27 +11,31 @@ using std::string;
 
 class ResourceManager : public ResourceInterface {
 public:
-	ResourceManager();
+  ResourceManager();
 
-	static bool create();
-	static ResourceManager &instance();
+  static bool create();
+  static ResourceManager &instance();
 
-	void copy_on_load(bool enable, const char *dest);
+  bool file_exists(const char *filename);
+  __time64_t mdate(const char *filename);
+  virtual bool load_partial(const char *filename, size_t ofs, size_t len, void **buf);
+  virtual bool load_file(const char *filename, void **buf, size_t *len);
+  virtual void file_changed(const char *filename);
 
-	void add_path(const char *path);
+  virtual bool supports_file_watch() const;
+  virtual void watch_file(const char *filename, const cbFileChanged &cb);
 
-	bool load_file(const char *filename, void **buf, size_t *len);
-	bool load_partial(const char *filename, size_t ofs, size_t len, void **buf);
-	bool file_exists(const char *filename);
-	__time64_t mdate(const char *filename);
-	bool is_watchable() const;
+  void copy_on_load(bool enable, const char *dest);
+  void add_path(const char *path);
+
+  string resolve_filename(const char *filename);
 
 private:
-	string resolve_filename(const char *filename);
-	static ResourceManager *_instance;
-	bool _copy_on_load;
-	string _copy_dest;
-	vector<string> _paths;
+  static ResourceManager *_instance;
+  bool _copy_on_load;
+  string _copy_dest;
+  vector<string> _paths;
+  map<string, string> _resolved_paths;
 };
 
 #define RESOURCE_MANAGER ResourceManager::instance()

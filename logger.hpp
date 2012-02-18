@@ -48,6 +48,8 @@ bool check_hr(HRESULT hr, const char *exp, string *out);
 #define RET_ERR_DX(x) RET(x, CHK_DX, LOG_ERROR_LN);
 #define RET_ERR_BOOL(x) RET(x, CHK_BOOL, LOG_ERROR_LN);
 
+//#define ERR(x) { bool ok; LOG_INNER(x, CHK_HR, LOG_ERROR_LN, ok); if (!ok) return ok; }
+
 #define B_ERR_HR(x) { bool ok; LOG_INNER(x, CHK_HR, LOG_ERROR_LN, ok); if (!ok) return ok; }
 #define B_ERR_BOOL(x) { bool ok; LOG_INNER(x, CHK_BOOL, LOG_ERROR_LN, ok); if (!ok) return ok; }
 #define B_ERR_INT(x) { bool ok; LOG_INNER(x, CHK_INT, LOG_ERROR_LN, ok); if (!ok) return ok; }

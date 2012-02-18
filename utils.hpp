@@ -70,6 +70,7 @@ private:
 #define GEN_NAME(prefix, line) GEN_NAME2(prefix, line)
 #define MAKE_SCOPED(type) type GEN_NAME(ANON, __LINE__)
 
+#define SCOPED_CONC_CS(x) MAKE_SCOPED(Concurrency::critical_section::scoped_lock)(x);
 #define SCOPED_OBJ(x) MAKE_SCOPED(ScopedObj)(x);
 #define SCOPED_CS(cs) ScopedCs lock(cs);
 

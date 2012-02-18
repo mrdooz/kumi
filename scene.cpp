@@ -13,7 +13,7 @@ SubMesh::~SubMesh() {
 	RENDERER.submit_command(FROM_HERE, key, (void *)&data);
 }
 
-void Mesh::submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Mesh::submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
 	for (size_t i = 0; i < submeshes.size(); ++i) {
 		SubMesh *s = submeshes[i];
 		s->key.seq_nr = seq_nr;
@@ -23,7 +23,7 @@ void Mesh::submit(uint16 seq_nr, int material_id, GraphicsObjectHandle technique
 			p->material_id = (uint16)material_id;
 		if (technique.is_valid())
 			p->technique = technique;
-		RENDERER.submit_command(FROM_HERE, s->key, p);
+		RENDERER.submit_command(location, s->key, p);
 	}
 }
 
@@ -32,20 +32,22 @@ Scene::~Scene() {
 	seq_delete(&cameras);
 }
 
-void Scene::submit_meshes(uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Scene::submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id, 
+                          GraphicsObjectHandle technique) {
 	for (size_t i = 0; i < meshes.size(); ++i)
-		meshes[i]->submit(seq_nr, material_id, technique);
+		meshes[i]->submit(location, seq_nr, material_id, technique);
 }
 
-void Scene::submit_mesh(const char *name, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Scene::submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id, 
+                        GraphicsObjectHandle technique) {
 	static Mesh *prev_mesh = nullptr;
 	if (prev_mesh && prev_mesh->name == name) {
-		prev_mesh->submit(seq_nr, material_id, technique);
+		prev_mesh->submit(location, seq_nr, material_id, technique);
 	} else {
 		for (size_t i = 0; i < meshes.size(); ++i) {
 			Mesh *cur = meshes[i];
 			if (cur->name == name) {
-				cur->submit(seq_nr, material_id, technique);
+				cur->submit(location, seq_nr, material_id, technique);
 				prev_mesh = cur;
 				break;
 			}

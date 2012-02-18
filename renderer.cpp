@@ -145,6 +145,36 @@ void *Renderer::alloc_command_data(size_t size) {
 	return ptr;
 }
 
+void Renderer::validate_command(RenderKey key, const void *data) {
+
+	Graphics::BackedResources *res = GRAPHICS.get_backed_resources();
+
+	switch (key.cmd) {
+
+	case RenderKey::kSetRenderTarget:
+		break;
+
+	case RenderKey::kRenderMesh: {
+		MeshRenderData *render_data = (MeshRenderData *)data;
+		const uint16 material_id = render_data->material_id;
+		const Material &material = MATERIAL_MANAGER.get_material(material_id);
+		Technique *technique = res->_techniques.get(render_data->technique);
+		assert(technique);
+		Shader *vertex_shader = technique->vertex_shader();
+		assert(vertex_shader);
+		Shader *pixel_shader = technique->pixel_shader();
+		assert(pixel_shader);
+		break;
+	}
+
+	case RenderKey::kRenderTechnique:
+		break;
+	}
+}
+
 void Renderer::submit_command(const TrackedLocation &location, RenderKey key, void *data) {
+#if _DEBUG
+	validate_command(key, data);
+#endif
 	_render_commands.push_back(RenderCmd(location, key, data));
 }

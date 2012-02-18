@@ -3,87 +3,106 @@
 #include "utils.hpp"
 
 struct TrackedLocation {
-	TrackedLocation() {}
-	TrackedLocation(const char *function, const char *file, int line) : function(function), file(file), line(line) {}
-	std::string function;
-	std::string file;
-	int line;
+  TrackedLocation() {}
+  TrackedLocation(const char *function, const char *file, int line) : function(function), file(file), line(line) {}
+  std::string function;
+  std::string file;
+  int line;
 };
 
 #define FROM_HERE TrackedLocation(__FUNCTION__, __FILE__, __LINE__)
 
 namespace threading {
-	enum ThreadId {
-		kMainThread,
-		kIoThread,
-		kFileMonitorThread,
+  enum ThreadId {
+    kMainThread,
+    kIoThread,
+    kFileMonitorThread,
 
-		kThreadCount,
-	};
+    kThreadCount,
+  };
 
-	struct Deferred {
-		typedef std::function<void()> Fn;
-		Deferred() {}
-		Deferred(const std::string &name, const Fn &fn) : name(name), fn(fn) {}
-		void operator()() { fn(); }
-		std::string name;
-		Fn fn;
-	};
+  struct NamedCallback {
+    typedef std::function<void()> Fn;
+    NamedCallback() {}
+    NamedCallback(const std::string &name, const Fn &fn) : name(name), fn(fn) {}
+    void operator()() { fn(); }
+    std::string name;
+    Fn fn;
+  };
 
-#define MAKE_DEFERRED(x) Deferred(#x, x)
+  struct DeferredCall {
+    DeferredCall() : handle(INVALID_HANDLE_VALUE) {}
+    DeferredCall(const TrackedLocation &location, HANDLE handle, const NamedCallback &callback) 
+      : location(location), handle(handle), callback(callback) {}
+    DeferredCall(const TrackedLocation &location, const NamedCallback &callback) 
+      : location(location), handle(INVALID_HANDLE_VALUE), callback(callback) {}
+    TrackedLocation location;
+    HANDLE handle;
+    NamedCallback callback;
+  };
 
-	class Thread {
-	public:
-		friend class Dispatcher;
-		virtual ~Thread();
+#define NAMED_CALLBACK(x) NamedCallback(#x, x)
 
-		bool started() const { return _thread != INVALID_HANDLE_VALUE; }
-		bool start(void *userdata);
-		virtual UINT run(void *userdata) = 0;
-	protected:
-		Thread();
-		static UINT __stdcall run_trampoline(void *thread);
+  class Thread {
+  public:
+    friend class Dispatcher;
 
-		void process_deferred();
+    bool start();
+    int join();    // joining will also delete the thread
+    bool started() const;
 
-		HANDLE _thread;
-	private:
-		struct DeferredData {
-			DeferredData() : handle(INVALID_HANDLE_VALUE) {}
-			DeferredData(const TrackedLocation &location, HANDLE handle, const Deferred &callback) : location(location), handle(handle), callback(callback) {}
-			TrackedLocation location;
-			HANDLE handle;
-			Deferred callback;
-		};
-		Concurrency::concurrent_queue<DeferredData> _deferred;
-		void add_deferred(const TrackedLocation &location, HANDLE h, const Deferred &df);
-	};
+    // a thread's run loop consists of processing its messages, and then calling the on_idle handler
+    virtual void on_idle() = 0;
 
-	class Dispatcher {
-	public:
+    ThreadId thread_id() const;
+  protected:
+    Thread();
+    virtual ~Thread();
+    static UINT __stdcall run(void *data);
+    virtual void add_deferred(const DeferredCall &call);
+    void process_deferred();
 
-		void set_thread(ThreadId id, Thread *thread);
+    HANDLE _thread;
+    ThreadId _thread_id;
+    HANDLE _quit_event;
+    Concurrency::concurrent_queue<DeferredCall> _deferred;
+  };
 
-		static Dispatcher &instance();
+  // Sleep threads spent a lot of time sleeping, so when a deferred call is added, we set the _deferred_event
+  // to wake these guys up
+  class SleepyThread : public Thread {
+  protected:
+    SleepyThread();
+    ~SleepyThread();
+  protected:
+    virtual void add_deferred(const DeferredCall &call);
+    HANDLE _deferred_event;
+  };
 
-		// queue the function on the specified thread's queue
-		void invoke(const TrackedLocation &location, ThreadId id, const Deferred &df);
+  class Dispatcher {
+  public:
 
-		void invoke_and_wait(const TrackedLocation &location, ThreadId id, const Deferred &df);
+    void set_thread(ThreadId id, Thread *thread);
 
-	private:
+    static Dispatcher &instance();
 
-		CriticalSection _thread_cs;
-		Thread *_threads[kThreadCount];
-		static Dispatcher *_instance;
-	};
+    // queue the function on the specified thread's queue
+    void invoke(const TrackedLocation &location, ThreadId id, const NamedCallback &df);
+    void invoke_and_wait(const TrackedLocation &location, ThreadId id, const NamedCallback &df);
 
-	struct MessageLoop {
-	public:
-	private:
+  private:
+    Dispatcher();
 
-	};
+    Concurrency::critical_section _thread_cs;
+    Thread *_threads[kThreadCount];
+    static Dispatcher *_instance;
+  };
 
+  struct MessageLoop {
+  public:
+  private:
+
+  };
 }
 
 #define DISPATCHER threading::Dispatcher::instance()
