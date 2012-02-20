@@ -2,6 +2,10 @@
 #include "utils.hpp"
 #include "file_utils.hpp"
 #include "resource_manager.hpp"
+#include "file_watcher.hpp"
+#include "threading.hpp"
+
+using namespace std::tr1::placeholders;
 
 ResourceManager *ResourceManager::_instance = nullptr;
 
@@ -52,11 +56,16 @@ void ResourceManager::add_path(const char *path) {
   _paths.push_back(normalize_path(path));
 }
 
-bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
-
+bool ResourceManager::load_file(const char *filename, std::vector<uint8> *buf) {
   const string &full_path = resolve_filename(filename);
-  if (full_path.empty())
-    return false;
+  if (full_path.empty()) return false;
+
+  return ::load_file(full_path.c_str(), buf);
+}
+
+bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
+  const string &full_path = resolve_filename(filename);
+  if (full_path.empty()) return false;
 
   return ::load_file(full_path.c_str(), buf, len);
 }
@@ -115,11 +124,6 @@ bool ResourceManager::supports_file_watch() const {
 #endif
 }
 
-void ResourceManager::watch_file(const char *filename, bool initial_callback, const cbFileChanged &cb) {
-  if (initial_callback)
-    cb(filename);
-}
-
 void ResourceManager::copy_on_load(bool enable, const char *dest) {
   _copy_on_load = enable;
   if (enable)
@@ -157,5 +161,21 @@ string ResourceManager::resolve_filename(const char *filename) {
   if (!res.empty())
     _resolved_paths[filename] = res;
   return res;
+
+}
+
+void ResourceManager::add_file_watch(const char *filename, bool initial_callback, const cbFileChanged &cb) {
+  if (initial_callback)
+    cb(filename);
+
+  FILE_WATCHER.add_file_watch(filename, NULL, threading::kMainThread, 
+    bind(&ResourceManager::file_changed, this, _1, _2, _3, _4));
+}
+
+void ResourceManager::remove_file_watch(const cbFileChanged &cb) {
+
+}
+
+void ResourceManager::file_changed(void *token, FileWatcher::FileEvent, const string &old_name, const string &new_name) {
 
 }

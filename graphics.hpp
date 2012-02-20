@@ -159,7 +159,7 @@ public:
 	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
-	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, vector<Material *> *materials);
+	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
@@ -189,6 +189,9 @@ private:
 	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
   bool create_back_buffers(int width, int height);
+
+  void technique_file_changed(const char *filename);
+
 	static Graphics* _instance;
 
 	int _width;

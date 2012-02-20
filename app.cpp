@@ -287,12 +287,9 @@ bool App::init(HINSTANCE hinstance)
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\syncplicity");
 
-  vector<Material *> materials;
-  if (!GRAPHICS.load_techniques("effects/cef.tec", NULL, &materials)) {
+  if (!GRAPHICS.load_techniques("effects/cef.tec", NULL, true)) {
     // log error
   }
-  for (auto it = begin(materials); it != end(materials); ++it)
-    MATERIAL_MANAGER.add_material(**it);
 
   VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);

@@ -20,15 +20,16 @@ private:
 
 class ScopedHandle {
 public:
-	ScopedHandle(HANDLE h) : _h(h) {}
+	ScopedHandle(HANDLE h) : _handle(h) {}
 	~ScopedHandle() {
-		if (_h != INVALID_HANDLE_VALUE)
-			CloseHandle(_h);
+		if (_handle != INVALID_HANDLE_VALUE)
+			CloseHandle(_handle);
 	}
-	operator HANDLE() { return _h; }
-	HANDLE handle() const { return _h; }
+  operator bool() { return _handle != INVALID_HANDLE_VALUE; }
+	operator HANDLE() { return _handle; }
+	HANDLE handle() const { return _handle; }
 private:
-	HANDLE _h;
+	HANDLE _handle;
 };
 
 struct ScopedObj
@@ -123,6 +124,13 @@ T exch_null(T &t)
 	T tmp = t;
 	t = nullptr;
 	return tmp;
+}
+template <class T>
+T exch(T &t, const T &v)
+{
+  T tmp = t;
+  t = v;
+  return tmp;
 }
 
 template<typename T>

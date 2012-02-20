@@ -34,7 +34,7 @@ struct RenderStates {
 };
 
 class App : public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
-            public threading::Thread
+            public threading::GreedyThread
 {
 public:
 
@@ -68,18 +68,21 @@ private:
   virtual CefRefPtr<CefRenderHandler> GetRenderHandler() OVERRIDE { return this; }
 
   // CefLifeSpanHandler methods
-  virtual bool OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatures& popupFeatures, CefWindowInfo& windowInfo,
-    const CefString& url, CefRefPtr<CefClient>& client, CefBrowserSettings& settings) OVERRIDE;
+  virtual bool OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatures& popupFeatures, 
+                             CefWindowInfo& windowInfo, const CefString& url, CefRefPtr<CefClient>& client, 
+                             CefBrowserSettings& settings) OVERRIDE;
   virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) OVERRIDE;
   virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
 
   // CefLoadHandler methods
   virtual void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame) OVERRIDE;
   virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) OVERRIDE;
-  virtual bool OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, const CefString& failedUrl, CefString& errorText) OVERRIDE;
+  virtual bool OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
+                           const CefString& failedUrl, CefString& errorText) OVERRIDE;
 
   // CefRenderHandler methods
-  virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer);
+  virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, 
+                       const void* buffer);
   virtual bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect);
   virtual bool GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect);
   virtual bool GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY);

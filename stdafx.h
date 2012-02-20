@@ -70,9 +70,7 @@ typedef uint64_t uint64;
 #include <xnamath.h>
 
 // these files don't change that much, so we can include them here
-#include "fast_delegate.hpp"
 #include "logger.hpp"
 
 #include <cef.h>
 
-using namespace fastdelegate;

@@ -1,6 +1,6 @@
 #pragma once
 
-typedef FastDelegate3<const char * /*filename*/, const void * /*buf*/, size_t /*len*/> CbFileLoaded;
+typedef std::function<void (const char *, const void *, size_t)> CbFileLoaded;
 
 class AsyncFileLoader
 {

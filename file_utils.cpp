@@ -28,17 +28,29 @@ void split_path(const char *path, std::string *drive, std::string *dir, std::str
 	if (ext) *ext = ext_buf;
 }
 
+bool load_file(const char *filename, std::vector<uint8> *buf) {
+  ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+  if (!h) return false;
+
+  DWORD size = GetFileSize(h, NULL);
+  buf->resize(size);
+  DWORD res;
+  if (!ReadFile(h, &(*buf)[0], size, &res, NULL)) 
+    return false;
+  return true;
+}
+
 bool load_file(const char *filename, void **buf, size_t *size)
 {
 	ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-	if (h.handle() == INVALID_HANDLE_VALUE)
-		return false;
+  if (!h) 
+    return false;
 
 	*size = GetFileSize(h, NULL);
 	*buf = new uint8_t[*size];
 	DWORD res;
-	if (!ReadFile(h, *buf, *size, &res, NULL))
-		return false;
+	if (!ReadFile(h, *buf, *size, &res, NULL)) 
+    return false;
 
 	return true;
 }

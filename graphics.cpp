@@ -5,8 +5,10 @@
 #include "technique_parser.hpp"
 #include "resource_interface.hpp"
 #include "property_manager.hpp"
+#include "material_manager.hpp"
 
 using namespace std;
+using namespace std::tr1::placeholders;
 
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "DXGUID.lib")
@@ -423,7 +425,7 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
     return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
   return GraphicsObjectHandle();
 }
-
+#if 0
 static bool technique_changed_callback(const char *filename) {
 	return true;
 }
@@ -438,7 +440,7 @@ static bool create_techniques_from_file(ResourceInterface *ri, const char *filen
   if (!ri->supports_file_watch()) {
     //load_inner(filename);
   } else {
-		ri->watch_file(filename, true, technique_changed_callback);
+		ri->add_file_watch(filename, true, technique_changed_callback);
   }
 
 
@@ -459,24 +461,52 @@ static bool create_techniques_from_file(ResourceInterface *ri, const char *filen
   }
   return res;
 }
+#endif
+void Graphics::technique_file_changed(const char *filename) {
 
-bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, vector<Material *> *materials) {
+}
 
+bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, bool add_materials) {
   bool res = true;
-  vector<GraphicsObjectHandle> tmp;
+  vector<Material *> materials;
 
   vector<Technique *> loaded_techniques;
-  if (create_techniques_from_file(_ri, filename, &loaded_techniques, materials)) {
-    for (auto i = begin(loaded_techniques); i != end(loaded_techniques); ++i) {
-      Technique *t = *i;
-      Rollback rb([&](){delete exch_null(t);});
-      int idx = _res._techniques.find_by_token(t->name());
-      if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
-        SAFE_DELETE(_res._techniques[idx].first);
-        _res._techniques[idx] = make_pair(t, t->name());
-        tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
-        rb.commit();
-      }
+  vector<uint8> buf;
+  if (!_ri->load_file(filename, &buf))
+    return false;
+
+  TechniqueParser parser;
+  vector<Technique *> tmp;
+  if (!parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials))
+    return false;
+
+  if (_ri->supports_file_watch())
+    _ri->add_file_watch(filename, false, bind(&Graphics::technique_file_changed, this, _1));
+
+  if (add_materials) {
+    for (auto it = begin(materials); it != end(materials); ++it)
+      MATERIAL_MANAGER.add_material(**it);
+  }
+
+  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(&GRAPHICS, _ri); });
+  // delete all the techniques that fail to initialize
+  if (fails != end(tmp)) {
+    for (auto i = fails; i != end(tmp); ++i) {
+      delete exch_null(*i);
+    }
+    tmp.erase(fails, end(tmp));
+  }
+
+  vector<GraphicsObjectHandle> t2;
+  for (auto i = begin(tmp); i != end(tmp); ++i) {
+    Technique *t = *i;
+    Rollback rb([&](){delete exch_null(t);});
+    int idx = _res._techniques.find_by_token(t->name());
+    if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
+      SAFE_DELETE(_res._techniques[idx].first);
+      _res._techniques[idx] = make_pair(t, t->name());
+      t2.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
+      rb.commit();
     }
   }
 
@@ -503,7 +533,7 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
 */
 
   if (techniques)
-    *techniques = tmp;
+    *techniques = t2;
   return res;
 }
 

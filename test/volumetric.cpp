@@ -9,15 +9,6 @@
 #include "../material.hpp"
 #include "../renderer.hpp"
 
-static bool load_techniques(const char *filename) {
-
-  vector<Material *> materials;
-  B_ERR_BOOL(GRAPHICS.load_techniques(filename, NULL, &materials));
-  for (auto it = begin(materials); it != end(materials); ++it)
-    MATERIAL_MANAGER.add_material(**it);
-  return true;
-}
-
 VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
   , _scene(nullptr) {
@@ -25,8 +16,8 @@ VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::stri
 
 bool VolumetricEffect::init() {
 
-  B_ERR_BOOL(load_techniques("effects/volumetric.tec"));
-  B_ERR_BOOL(load_techniques("effects/diffuse.tec"));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL, true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", NULL, true));
 
   KumiLoader loader;
   loader.load("meshes\\torus.kumi", &RESOURCE_MANAGER, &_scene);
