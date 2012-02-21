@@ -40,7 +40,7 @@ bool VolumetricEffect::init() {
   _material_occlude = m.find_material("volumetric_occluder::black");
   _technique_occlude = g.find_technique("volumetric_occluder");
 
-  _material_shaft = m.add_material(Material(""));
+  _material_shaft = m.add_material(new Material("volumetric_shaft::"), false);
   _technique_shaft = g.find_technique("volumetric_shaft");
 
   _technique_add = g.find_technique("volumetric_add");

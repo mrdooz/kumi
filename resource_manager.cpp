@@ -165,20 +165,20 @@ string ResourceManager::resolve_filename(const char *filename) {
 
 }
 
-void ResourceManager::add_file_watch(const char *filename, bool initial_callback, const cbFileChanged &cb) {
+void ResourceManager::add_file_watch(const char *filename, bool initial_callback, void *token, const cbFileChanged &cb) {
   if (initial_callback)
-    cb(filename);
+    cb(filename, token);
 
-  FILE_WATCHER.add_file_watch(filename, NULL, threading::kMainThread, 
+  FILE_WATCHER.add_file_watch(filename, token, threading::kMainThread, 
     bind(&ResourceManager::file_changed, this, _1, _2, _3, _4));
 
-  _watched_files[filename].push_back(cb);
+  _watched_files[filename].push_back(make_pair(cb, token));
 }
 
 void ResourceManager::remove_file_watch(const cbFileChanged &cb) {
   for (auto i = begin(_watched_files); i != end(_watched_files); ++i) {
     auto &v = i->second;
-    v.erase(remove_if(begin(v), end(v), [&](cbFileChanged c) { return cb == c; }), end(v));
+    v.erase(remove_if(begin(v), end(v), [&](const pair<cbFileChanged, void*> &x) { return cb == x.first; }), end(v));
   }
 }
 
@@ -191,7 +191,9 @@ void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, co
       return;
     // call all the callbacks registered for the changed file
     auto &v = i->second;
-    for (auto j = begin(v); j != end(v); ++j)
-      (*j)(old_name.c_str());
+    for (auto j = begin(v); j != end(v); ++j) {
+      const pair<cbFileChanged, void*> &x = *j;
+      x.first(old_name.c_str(), x.second);
+    }
   }
 }

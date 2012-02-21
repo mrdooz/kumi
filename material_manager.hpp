@@ -6,7 +6,7 @@ public:
 	static MaterialManager &instance();
 
 	uint16 find_material(const string &name);
-	uint16 add_material(const Material *material, bool delete_existing);
+	uint16 add_material(Material *material, bool delete_existing);
   void remove_material(const std::string &name);
 	const Material *get_material(uint16 id);
 

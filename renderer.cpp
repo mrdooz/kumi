@@ -100,7 +100,7 @@ void Renderer::render() {
 					break;
 				MeshRenderData *render_data = (MeshRenderData *)data;
 				const uint16 material_id = render_data->material_id;
-				const Material &material = MATERIAL_MANAGER.get_material(material_id);
+				const Material *material = MATERIAL_MANAGER.get_material(material_id);
 				Technique *technique = res->_techniques.get(render_data->technique);
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
@@ -157,7 +157,7 @@ void Renderer::validate_command(RenderKey key, const void *data) {
 	case RenderKey::kRenderMesh: {
 		MeshRenderData *render_data = (MeshRenderData *)data;
 		const uint16 material_id = render_data->material_id;
-		const Material &material = MATERIAL_MANAGER.get_material(material_id);
+		const Material *material = MATERIAL_MANAGER.get_material(material_id);
 		Technique *technique = res->_techniques.get(render_data->technique);
 		assert(technique);
 		Shader *vertex_shader = technique->vertex_shader();

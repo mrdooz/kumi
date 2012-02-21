@@ -23,7 +23,7 @@ const Material *MaterialManager::get_material(uint16 id) {
 }
 
 void MaterialManager::remove_material(const std::string &name) {
-  auto it = find(begin(_materials), end(_materials), [&](const Material *m) { return m->name == name; });
+  auto it = _materials.find(name);
   if (it == end(_materials))
     return;
 
@@ -32,15 +32,15 @@ void MaterialManager::remove_material(const std::string &name) {
 }
 
 uint16 MaterialManager::find_material(const string &name) {
-  auto it = find(begin(_materials), end(_materials), [&](const Material *m) { return m->name == name; });
+  auto it = _materials.find(name);
   return it != end(_materials) ? it->second->id : -1;
 }
 
-uint16 MaterialManager::add_material(const Material *material, bool delete_existing) {
+uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
 
   // don't allow duplicate material names. this shouldn't impose any real limitations, as material names are
   // prefixed with the technique name when they are loaded
-  auto it = find(begin(_materials), end(_materials), [&](const Material *m) { return m->name == material->name; });
+  auto it = _materials.find(material->name);
   uint16 prev_key = ~0;
   if (it != end(_materials)) {
     if (delete_existing) {
@@ -52,13 +52,12 @@ uint16 MaterialManager::add_material(const Material *material, bool delete_exist
     }
   }
 
-  uint16 key = prev_key == ~0 ? _next_material_id++ : prev_key;
+  uint16 key = prev_key == (uint16)~0 ? _next_material_id++ : prev_key;
   material->id = key;
-  _materials.insert(make_pair(material->name, unique_ptr(material)));
-  _materials.push_back(material);
+  _materials.insert(make_pair(material->name, unique_ptr<Material>(material)));
 
-  for (size_t i = 0; i < material.properties.size(); ++i) {
-    const MaterialProperty &p = material.properties[i];
+  for (auto i = begin(material->properties); i != end(material->properties); ++i) {
+    const MaterialProperty &p = *i;
     switch (p.type) {
     case PropertyType::kFloat:
       PROPERTY_MANAGER.set_material_property(key, p.name.c_str(), p._float[0]);

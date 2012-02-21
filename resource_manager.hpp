@@ -24,7 +24,7 @@ public:
   virtual bool load_file(const char *filename, std::vector<uint8> *buf);
 
   virtual bool supports_file_watch() const;
-  virtual void add_file_watch(const char *filename, bool initial_callback, const cbFileChanged &cb);
+  virtual void add_file_watch(const char *filename, bool initial_callback, void *token, const cbFileChanged &cb);
   virtual void remove_file_watch(const cbFileChanged &cb);
 
   void copy_on_load(bool enable, const char *dest);
@@ -41,7 +41,7 @@ private:
   vector<string> _paths;
   map<string, string> _resolved_paths;
 
-  map<string, vector<cbFileChanged> > _watched_files;
+  map<string, vector<std::pair<cbFileChanged, void*>>> _watched_files;
 };
 
 #define RESOURCE_MANAGER ResourceManager::instance()

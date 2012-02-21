@@ -190,7 +190,7 @@ private:
 
   bool create_back_buffers(int width, int height);
 
-  void technique_file_changed(const char *filename);
+  void technique_file_changed(const char *filename, void *token);
 
 	static Graphics* _instance;
 

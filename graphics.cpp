@@ -462,7 +462,7 @@ static bool create_techniques_from_file(ResourceInterface *ri, const char *filen
   return res;
 }
 #endif
-void Graphics::technique_file_changed(const char *filename) {
+void Graphics::technique_file_changed(const char *filename, void *token) {
 
 }
 
@@ -481,11 +481,11 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     return false;
 
   if (_ri->supports_file_watch())
-    _ri->add_file_watch(filename, false, bind(&Graphics::technique_file_changed, this, _1));
+    _ri->add_file_watch(filename, false, NULL, bind(&Graphics::technique_file_changed, this, _1, _2));
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
-      MATERIAL_MANAGER.add_material(**it);
+      MATERIAL_MANAGER.add_material(*it, true);
   }
 
   auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(&GRAPHICS, _ri); });
