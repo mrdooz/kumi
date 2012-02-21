@@ -40,6 +40,8 @@ private:
   string _copy_dest;
   vector<string> _paths;
   map<string, string> _resolved_paths;
+
+  map<string, vector<cbFileChanged> > _watched_files;
 };
 
 #define RESOURCE_MANAGER ResourceManager::instance()

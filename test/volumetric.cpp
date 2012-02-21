@@ -16,8 +16,8 @@ VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::stri
 
 bool VolumetricEffect::init() {
 
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", NULL, true));
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", NULL, true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
 
   KumiLoader loader;
   loader.load("meshes\\torus.kumi", &RESOURCE_MANAGER, &_scene);

@@ -6,6 +6,7 @@
 #include "threading.hpp"
 
 using namespace std::tr1::placeholders;
+using namespace std;
 
 ResourceManager *ResourceManager::_instance = nullptr;
 
@@ -170,12 +171,27 @@ void ResourceManager::add_file_watch(const char *filename, bool initial_callback
 
   FILE_WATCHER.add_file_watch(filename, NULL, threading::kMainThread, 
     bind(&ResourceManager::file_changed, this, _1, _2, _3, _4));
+
+  _watched_files[filename].push_back(cb);
 }
 
 void ResourceManager::remove_file_watch(const cbFileChanged &cb) {
-
+  for (auto i = begin(_watched_files); i != end(_watched_files); ++i) {
+    auto &v = i->second;
+    v.erase(remove_if(begin(v), end(v), [&](cbFileChanged c) { return cb == c; }), end(v));
+  }
 }
 
-void ResourceManager::file_changed(void *token, FileWatcher::FileEvent, const string &old_name, const string &new_name) {
+void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, 
+                                   const string &new_name) {
 
+  if ((uint32)event & (FileWatcher::kFileEventCreate | FileWatcher::kFileEventModify)) {
+    auto i = _watched_files.find(old_name);
+    if (i == _watched_files.end())
+      return;
+    // call all the callbacks registered for the changed file
+    auto &v = i->second;
+    for (auto j = begin(v); j != end(v); ++j)
+      (*j)(old_name.c_str());
+  }
 }

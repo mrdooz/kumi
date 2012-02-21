@@ -287,7 +287,7 @@ bool App::init(HINSTANCE hinstance)
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\syncplicity");
 
-  if (!GRAPHICS.load_techniques("effects/cef.tec", NULL, true)) {
+  if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
     // log error
   }
 

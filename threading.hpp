@@ -71,26 +71,13 @@ namespace threading {
     static UINT __stdcall run(void *data);
   };
 
-  // Sleep threads spent a lot of time sleeping, so when a deferred call is added, we set the _deferred_event
-  // to wake these guys up
+  // Sleeps for a user specific time before calling on_idle
   class SleepyThread : public Thread {
   public:
     virtual bool start();
   protected:
     SleepyThread();
     ~SleepyThread();
-    static UINT __stdcall run(void *data);
-    virtual void add_deferred(const DeferredCall &call);
-    HANDLE _deferred_event;
-  };
-
-  // Sleeps for a user specific time before calling on_idle
-  class CustomSleepyThread : public Thread {
-  public:
-    virtual bool start();
-  protected:
-    CustomSleepyThread();
-    ~CustomSleepyThread();
     static UINT __stdcall run(void *data);
     virtual void add_deferred(const DeferredCall &call);
     HANDLE _deferred_event;

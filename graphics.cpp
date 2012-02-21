@@ -466,7 +466,7 @@ void Graphics::technique_file_changed(const char *filename) {
 
 }
 
-bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, bool add_materials) {
+bool Graphics::load_techniques(const char *filename, bool add_materials) {
   bool res = true;
   vector<Material *> materials;
 
@@ -497,43 +497,21 @@ bool Graphics::load_techniques(const char *filename, vector<GraphicsObjectHandle
     tmp.erase(fails, end(tmp));
   }
 
-  vector<GraphicsObjectHandle> t2;
+  auto &v = _techniques_by_file[filename];
+  v.clear();
+
   for (auto i = begin(tmp); i != end(tmp); ++i) {
     Technique *t = *i;
-    Rollback rb([&](){delete exch_null(t);});
     int idx = _res._techniques.find_by_token(t->name());
     if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
       SAFE_DELETE(_res._techniques[idx].first);
       _res._techniques[idx] = make_pair(t, t->name());
-      t2.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
-      rb.commit();
+      v.push_back(t->name());
+    } else {
+      SAFE_DELETE(t);
     }
   }
 
-/*
-  auto load_inner = [&](const char *filename){
-    vector<Technique *> techniques;
-    if (create_techniques_from_file(filename, &techniques)) {
-      for (size_t i = 0; i < techniques.size(); ++i) {
-        Technique *t = techniques[i];
-        Rollback rb([&](){delete exch_null(t);});
-        int idx = _res._techniques.find_by_token(t->name());
-        if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
-          SAFE_DELETE(_res._techniques[idx].first);
-          _res._techniques[idx] = make_pair(t, t->name());
-          tmp.push_back(GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx));
-          rb.commit();
-        }
-
-      }
-    } else {
-      res = false;
-    }
-  };
-*/
-
-  if (techniques)
-    *techniques = t2;
   return res;
 }
 

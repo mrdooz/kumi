@@ -38,7 +38,8 @@ struct DeferredFileEvent {
 struct DirWatch {
   DirWatch(const string &path, HANDLE handle, WatcherThread *watcher)
     : _path(path)
-    , _handle(handle) { 
+    , _handle(handle)
+    , _watcher(watcher) { 
     ZeroMemory(&_overlapped, sizeof(_overlapped)); 
     _overlapped.hEvent = this;
   }
@@ -63,7 +64,7 @@ struct DirWatch {
   WatcherThread *_watcher;
 };
 
-class WatcherThread : public CustomSleepyThread {
+class WatcherThread : public SleepyThread {
 public:
   WatcherThread();
   ~WatcherThread();

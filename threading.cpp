@@ -138,6 +138,7 @@ UINT GreedyThread::run(void *data) {
 SleepyThread::SleepyThread() 
   : Thread()
   , _deferred_event(CreateEvent(NULL, FALSE, FALSE, NULL))
+  , _sleep_interval(INFINITE)
 {
 }
 
@@ -158,48 +159,6 @@ UINT SleepyThread::run(void *data) {
 
   HANDLE events[] = { self->_cancel_event, self->_deferred_event };
   DWORD res;
-  while ((res = WaitForMultipleObjects(ARRAYSIZE(events), events, FALSE, INFINITE) != WAIT_OBJECT_0)) {
-    self->process_deferred();
-    self->on_idle();
-  }
-
-  return 0;
-}
-
-void SleepyThread::add_deferred(const DeferredCall &call) {
-  _deferred.push(call);
-  SetEvent(_deferred_event);
-}
-
-//////////////////////////////////////////////////////////////////////////
-//
-// CustomSleepyThread
-//
-//////////////////////////////////////////////////////////////////////////
-CustomSleepyThread::CustomSleepyThread() 
-  : Thread()
-  , _deferred_event(CreateEvent(NULL, FALSE, FALSE, NULL))
-  , _sleep_interval(INFINITE)
-{
-}
-
-CustomSleepyThread::~CustomSleepyThread() {
-  CloseHandle(_deferred_event);
-}
-
-bool CustomSleepyThread::start() {
-  if (_thread != INVALID_HANDLE_VALUE)
-    return false;
-
-  _thread = (HANDLE)_beginthreadex(NULL, 0, &CustomSleepyThread::run, this, 0, NULL);
-  return _thread != INVALID_HANDLE_VALUE;
-}
-
-UINT CustomSleepyThread::run(void *data) {
-  CustomSleepyThread *self = (CustomSleepyThread *)data;
-
-  HANDLE events[] = { self->_cancel_event, self->_deferred_event };
-  DWORD res;
   while ((res = WaitForMultipleObjectsEx(ARRAYSIZE(events), events, FALSE, self->_sleep_interval, TRUE) 
          != WAIT_OBJECT_0)) {
     self->process_deferred();
@@ -209,7 +168,7 @@ UINT CustomSleepyThread::run(void *data) {
   return 0;
 }
 
-void CustomSleepyThread::add_deferred(const DeferredCall &call) {
+void SleepyThread::add_deferred(const DeferredCall &call) {
   _deferred.push(call);
   SetEvent(_deferred_event);
 }

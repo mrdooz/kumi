@@ -159,7 +159,7 @@ public:
 	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
 	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
 
-	bool load_techniques(const char *filename, vector<GraphicsObjectHandle> *techniques, bool add_materials);
+	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
 
 	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
@@ -225,18 +225,6 @@ private:
 	string _vs_profile;
 	string _ps_profile;
 
-/*
-	struct RenderCmd {
-		RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
-		TrackedLocation location;
-		RenderKey key;
-		void *data;
-	};
-	vector<RenderCmd > _render_commands;
-	
-	std::unique_ptr<uint8> _effect_data;
-	int _effect_data_ofs;
-*/
 };
 
 #define GRAPHICS Graphics::instance()
