@@ -468,6 +468,15 @@ void Graphics::technique_file_changed(const char *filename, void *token) {
 
 void Graphics::shader_file_changed(const char *filename, void *token) {
   Technique *t = (Technique *)token;
+  if (Shader *shader = t->vertex_shader()) {
+    if (!t->init_shader(this, _ri, shader))
+      LOG_WARNING_LN("Error initializing shader: %s", filename);
+  }
+
+  if (Shader *shader = t->pixel_shader()) {
+    if (!t->init_shader(this, _ri, shader))
+      LOG_WARNING_LN("Error initializing shader: %s", filename);
+  }
 }
 
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
@@ -489,7 +498,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
       MATERIAL_MANAGER.add_material(*it, true);
   }
 
-  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(&GRAPHICS, _ri); });
+  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(this, _ri); });
   // delete all the techniques that fail to initialize
   if (fails != end(tmp)) {
     for (auto i = fails; i != end(tmp); ++i) {

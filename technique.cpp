@@ -90,7 +90,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
         used_params->insert(var_desc.Name);
         CBufferParam *param = shader->find_cbuffer_param(var_desc.Name);
         if (!param) {
-          LOG_ERROR("Shader parameter %s not found", var_desc.Name);
+          LOG_ERROR_LN("Shader parameter %s not found", var_desc.Name);
           return false;
         }
         param->cbuffer = cb_idx;

@@ -171,9 +171,9 @@ public:
 	//void submit();
 	bool init(GraphicsInterface *graphics, ResourceInterface *res);
 	bool reload_shaders();
+  bool init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader);
 private:
 
-	bool init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader);
 	bool compile_shader(GraphicsInterface *graphics, Shader *shader);
 	bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params);
 

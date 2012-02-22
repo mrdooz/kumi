@@ -33,3 +33,4 @@ float4 ps_main(ps_input input) : SV_Target
 	//return float4(1,1,1,1);
 	return dot(float3(1,0.5,-1), input.normal) * DiffuseColor;
 }
+
