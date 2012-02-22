@@ -2,7 +2,7 @@
 
 struct GraphicsInterface;
 class Technique;
-struct Shader;
+class Shader;
 
 using std::vector;
 using std::string;

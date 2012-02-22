@@ -11,6 +11,7 @@ using std::vector;
 using std::string;
 
 struct Material;
+class Technique;
 
 namespace PropertySource {
 	enum Enum {
@@ -54,26 +55,27 @@ struct ResourceViewParam : public ParamBase {
 	int bind_point;
 };
 
-struct Shader {
+class Shader {
+public:
 	enum Type {
 		kVertexShader,
 		kPixelShader,
 		kGeometryShader,
 	};
 
-	Shader(const string &entry_point) : entry_point(entry_point), valid(false) {}
+	Shader(const string &entry_point) : _entry_point(entry_point), _valid(false) {}
 	virtual ~Shader() {}
 
 	CBufferParam *find_cbuffer_param(const char *name) {
-		return find_by_name(name, cbuffer_params);
+		return find_by_name(name, _cbuffer_params);
 	}
 
 	SamplerParam *find_sampler_param(const char *name) {
-		return find_by_name(name, sampler_params);
+		return find_by_name(name, _sampler_params);
 	}
 
 	ResourceViewParam *find_resource_view_param(const char *name) {
-		return find_by_name(name, resource_view_params);
+		return find_by_name(name, _resource_view_params);
 	}
 
 	template<class T>
@@ -87,16 +89,32 @@ struct Shader {
 
 	virtual void set_buffers() = 0;
 	virtual Type type() const = 0;
-	bool is_valid() const { return valid; }
+	bool is_valid() const { return _valid; }
+  void set_source_filename(const string &filename) { _source_filename = filename; }
+  const string &source_filename() const { return _source_filename; }
+  void set_entry_point(const string &entry_point) { _entry_point = entry_point; }
+  const string &entry_point() const { return _entry_point; }
+  void set_obj_filename(const string &filename) { _obj_filename = filename; }
+  const string &obj_filename() const { return _obj_filename; }
 
-	bool valid;
-	string source_filename;
-	string obj_filename;
-	string entry_point;
-	vector<CBufferParam> cbuffer_params;
-	vector<SamplerParam> sampler_params;
-	vector<ResourceViewParam> resource_view_params;
-	GraphicsObjectHandle shader;
+  vector<CBufferParam> &cbuffer_params() { return _cbuffer_params; }
+  vector<SamplerParam> &sampler_params() { return _sampler_params; }
+  vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
+
+  void set_handle(GraphicsObjectHandle handle) { _handle = handle; }
+  GraphicsObjectHandle handle() const { return _handle; }
+  void validate() { _valid = true; } // tihi
+
+private:
+
+	bool _valid;
+	string _source_filename;
+	string _obj_filename;
+	string _entry_point;
+	vector<CBufferParam> _cbuffer_params;
+	vector<SamplerParam> _sampler_params;
+	vector<ResourceViewParam> _resource_view_params;
+	GraphicsObjectHandle _handle;
 };
 
 struct VertexShader : public Shader{

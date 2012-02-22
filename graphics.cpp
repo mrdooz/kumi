@@ -466,6 +466,10 @@ void Graphics::technique_file_changed(const char *filename, void *token) {
 
 }
 
+void Graphics::shader_file_changed(const char *filename, void *token) {
+  Technique *t = (Technique *)token;
+}
+
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
   bool res = true;
   vector<Material *> materials;
@@ -479,9 +483,6 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   vector<Technique *> tmp;
   if (!parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials))
     return false;
-
-  if (_ri->supports_file_watch())
-    _ri->add_file_watch(filename, false, NULL, bind(&Graphics::technique_file_changed, this, _1, _2));
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
@@ -502,6 +503,16 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 
   for (auto i = begin(tmp); i != end(tmp); ++i) {
     Technique *t = *i;
+
+    if (_ri->supports_file_watch()) {
+      if (Shader *vs = t->vertex_shader()) {
+        _ri->add_file_watch(vs->source_filename().c_str(), false, t, bind(&Graphics::shader_file_changed, this, _1, _2));
+      }
+      if (Shader *ps = t->pixel_shader()) {
+        _ri->add_file_watch(ps->source_filename().c_str(), false, t, bind(&Graphics::shader_file_changed, this, _1, _2));
+      }
+    }
+
     int idx = _res._techniques.find_by_token(t->name());
     if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
       SAFE_DELETE(_res._techniques[idx].first);
@@ -510,6 +521,10 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     } else {
       SAFE_DELETE(t);
     }
+  }
+
+  if (_ri->supports_file_watch()) {
+    _ri->add_file_watch(filename, false, NULL, bind(&Graphics::technique_file_changed, this, _1, _2));
   }
 
   return res;
@@ -525,13 +540,13 @@ void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
   ID3D11DeviceContext *ctx = _immediate_context;
 
-  const int num_samplers = (int)shader->sampler_params.size();
+  const int num_samplers = (int)shader->sampler_params().size();
   if (!num_samplers)
     return;
 
   vector<ID3D11SamplerState *> samplers(num_samplers);
   for (int i = 0; i < num_samplers; ++i) {
-    const SamplerParam &s = shader->sampler_params[i];
+    const SamplerParam &s = shader->sampler_params()[i];
     samplers[s.bind_point] = _res._sampler_states.get(technique->sampler_state(s.name.c_str()));
   }
 
@@ -553,13 +568,13 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 
   ID3D11DeviceContext *ctx = _immediate_context;
 
-  const int num_views = (int)shader->resource_view_params.size();
+  const int num_views = (int)shader->resource_view_params().size();
   if (!num_views)
     return;
 
   vector<ID3D11ShaderResourceView *> views(num_views);
   for (int i = 0; i < num_views; ++i) {
-    const ResourceViewParam &v = shader->resource_view_params[i];
+    const ResourceViewParam &v = shader->resource_view_params()[i];
     // look for the named texture, and if that doesn't exist, look for a render target
     int idx = _res._textures.find_by_token(v.name);
     if (idx != -1) {
@@ -589,8 +604,8 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
   vector<CBuffer> &cbuffers = technique->get_cbuffers();
 
   // copy the parameters into the technique's cbuffer staging area
-  for (size_t i = 0; i < shader->cbuffer_params.size(); ++i) {
-    const CBufferParam &p = shader->cbuffer_params[i];
+  for (size_t i = 0; i < shader->cbuffer_params().size(); ++i) {
+    const CBufferParam &p = shader->cbuffer_params()[i];
     const CBuffer &cb = cbuffers[p.cbuffer];
     switch (p.source) {
       case PropertySource::kMaterial:

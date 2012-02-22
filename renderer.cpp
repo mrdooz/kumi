@@ -71,9 +71,9 @@ void Renderer::render() {
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
 
-				ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->shader), NULL, 0);
+				ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->handle()), NULL, 0);
 				ctx->GSSetShader(NULL, 0, 0);
-				ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->shader), NULL, 0);
+				ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->handle()), NULL, 0);
 
 				GRAPHICS.set_vb(ctx, res->_vertex_buffers.get(technique->vb()), technique->vertex_size());
 				ctx->IASetIndexBuffer(res->_index_buffers.get(technique->ib()), technique->index_format(), 0);
@@ -105,9 +105,9 @@ void Renderer::render() {
 				Shader *vertex_shader = technique->vertex_shader();
 				Shader *pixel_shader = technique->pixel_shader();
 
-				ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->shader), NULL, 0);
+				ctx->VSSetShader(res->_vertex_shaders.get(vertex_shader->handle()), NULL, 0);
 				ctx->GSSetShader(NULL, 0, 0);
-				ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->shader), NULL, 0);
+				ctx->PSSetShader(res->_pixel_shaders.get(pixel_shader->handle()), NULL, 0);
 
 				GRAPHICS.set_vb(ctx, res->_vertex_buffers.get(render_data->vb), render_data->vertex_size);
 				ctx->IASetIndexBuffer(res->_index_buffers.get(render_data->ib), render_data->index_format, 0);

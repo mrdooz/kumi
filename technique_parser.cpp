@@ -576,11 +576,11 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 	
 	bool cbuffer_param = false;
 	if (type == PropertyType::kSampler) {
-		shader->sampler_params.push_back(SamplerParam(name, type, source));
+		shader->sampler_params().push_back(SamplerParam(name, type, source));
 	} else if (type == PropertyType::kTexture2d) {
-		shader->resource_view_params.push_back(ResourceViewParam(name, type, source));
+		shader->resource_view_params().push_back(ResourceViewParam(name, type, source));
 	} else {
-		shader->cbuffer_params.push_back(CBufferParam(name, type, source));
+		shader->cbuffer_params().push_back(CBufferParam(name, type, source));
 		cbuffer_param = true;
 	}
 
@@ -662,18 +662,18 @@ void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 		switch (symbol) {
 
 			case kSymFile: {
-				shader->source_filename = scope->string_until(';');
+				shader->set_source_filename(scope->string_until(';'));
 				// Use the default entry point name until we get a real tag
-				shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
+				shader->set_obj_filename(strip_extension(shader->source_filename().c_str()) + "_" + entry_point + ext);
 				scope->munch(kSymSemicolon);
 				break;
 			}
 
 			case kSymEntryPoint:
-				entry_point = shader->entry_point = scope->string_until(';');
+				 shader->set_entry_point(entry_point = scope->string_until(';'));
 				// update the obj filename
-				if (!shader->source_filename.empty())
-					shader->obj_filename = strip_extension(shader->source_filename.c_str()) + "_" + entry_point + ext;
+				if (!shader->source_filename().empty())
+					shader->set_obj_filename(strip_extension(shader->source_filename().c_str()) + "_" + entry_point + ext);
 				scope->munch(kSymSemicolon);
 				break;
 
