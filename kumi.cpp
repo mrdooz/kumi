@@ -5,6 +5,7 @@
 #include "logger.hpp"
 #include "app.hpp"
 
+#pragma comment(lib, "Ws2_32.lib")
 
 void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
@@ -41,13 +42,53 @@ HRESULT hr_meh()
 }
 
 int run_log_server() {
+
+  void *ctx = zmq_init(1);
+  void *s = zmq_socket(ctx, ZMQ_REP);
+  zmq_bind(socket, "ipc:///tmp/feeds/0");
+  //while (true) {
+    zmq_msg_t query;
+    zmq_msg_init(&query);
+    zmq_recv(socket, &query, 0);
+
+    MessageBoxA(NULL, (const char *)zmq_msg_data(&query), NULL, 0);
+
+  //}
+
+  zmq_close(s);
+  zmq_term(ctx);
+
   return 0;
 }
 
 bool start_log_server() {
 
-  char filename[MAX_PATH];
+  PROCESS_INFORMATION process_information;
+  ZeroMemory(&process_information, sizeof(process_information));
+  STARTUPINFOA startup_info;
+  ZeroMemory(&startup_info, sizeof(startup_info));
+  startup_info.cb = sizeof(startup_info);
+
+  char filename[MAX_PATH], cmdline[MAX_PATH];
   GetModuleFileNameA(NULL, filename, MAX_PATH);
+  sprintf(cmdline, "%s --log-server", filename);
+  BOOL res = CreateProcessA(filename, cmdline, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, 
+    &startup_info, &process_information);
+
+  void *ctx = zmq_init(1);
+  void *s = zmq_socket(ctx, ZMQ_REQ);
+  zmq_bind(socket, "ipc:///tmp/feeds/0");
+
+  zmq_msg_t q;
+  zmq_msg_init_size(&q, 7);
+  memcpy(zmq_msg_data(&q), "magnus", 7);
+  zmq_send(s, &q, 0);
+
+  zmq_close(s);
+  zmq_term(ctx);
+
+
+  return !!res;
 }
 
 int run_app(HINSTANCE instance) {
