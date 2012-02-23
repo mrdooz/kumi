@@ -1,5 +1,7 @@
 #pragma once
 
+#include <zmq.h>
+
 #include <windows.h>
 #include <atlbase.h>
 #include <process.h>

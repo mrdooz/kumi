@@ -16,89 +16,64 @@ void file_changed2(const char *filename, const void *buf, size_t len)
 
 void file_loaded(const char *filename, const void *buf, size_t len)
 {
-	string str((const char *)buf, len);
+  string str((const char *)buf, len);
 
 }
 
 bool bool_true()
 {
-	return true;
+  return true;
 }
 
 bool bool_false()
 {
-	return false;
+  return false;
 }
 
 HRESULT hr_ok()
 {
-	return S_OK;
+  return S_OK;
 }
 
 HRESULT hr_meh()
 {
-	return E_INVALIDARG;
+  return E_INVALIDARG;
 }
+
+int run_log_server() {
+  return 0;
+}
+
+bool start_log_server() {
+
+  char filename[MAX_PATH];
+  GetModuleFileNameA(NULL, filename, MAX_PATH);
+}
+
+int run_app(HINSTANCE instance) {
+
+  start_log_server();
+
+  CefSettings settings;
+  settings.multi_threaded_message_loop = false;
+  CefInitialize(settings);
+
+  if (!APP.init(instance))
+    return 1;
+
+  int res = APP.run(NULL);
+
+  APP.close();
+
+  return res;
+}
+
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
-	CefSettings settings;
-	settings.multi_threaded_message_loop = false;
-	CefInitialize(settings);
-
-	if (!APP.init(instance))
-		return 1;
-
-	APP.run(NULL);
-
-	APP.close();
-
-	return 0;
+  if (!strcmp(cmd_line, "--log-server")) {
+    return run_log_server();
+  } else {
+    return run_app(instance);
+  }
 }
-#if 0
-int main(int argc, char *argv[])
-{
-
-
-	const char *filename = "c:\\temp\\state1.txt";
-	RESOURCE_WATCHER.add_file_watch(filename, true, file_changed2);
-
-	RET_ERR_DX(hr_meh());
-
-	//LOG(bool_true(), CHK_BOOL, LOG_ERROR_LN);
-	//LOG(bool_false(), CHK_BOOL, LOG_ERROR_LN);
-
-/*
-	const char *filename = "c:\\temp\\state1.txt";
-	ASYNC_FILE_LOADER.load_file(filename, file_loaded);
-
-
-	HANDLE h = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	size_t size = GetFileSize(h, NULL);
-	char *buf = new char[size];
-	DWORD res;
-	ReadFile(h, buf, size, &res, NULL);
-	CloseHandle(h);
-
-	vector<Section> sections;
-	extract_sections(buf, size, &sections);
-
-	delete [] buf;
-
-	FILE_WATCHER.add_file_watch("c:\\temp\\state1.txt", file_changed);
-	while (!GetAsyncKeyState(VK_ESCAPE)) {
-		Sleep(1000);
-	}
-
-
-	FILE_WATCHER.remove_watch(file_changed);
-	FILE_WATCHER.close();
-*/
-
-	while (!GetAsyncKeyState(VK_ESCAPE)) {
-		Sleep(1000);
-	}
-
-	return 0;
-}
-#endif
