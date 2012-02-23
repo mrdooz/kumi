@@ -38,7 +38,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
       ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
-    //ShaderInputs inputs;
+    // ShaderInputs inputs;
     vector<D3D11_INPUT_ELEMENT_DESC> inputs;
     for (UINT i = 0; i < shader_desc.InputParameters; ++i) {
       D3D11_SIGNATURE_PARAMETER_DESC input;
@@ -203,11 +203,14 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   if (!do_reflection(graphics, shader, buf, len, &used_params))
     return false;
 
-  // remove any unused parameters
+  // mark unused parameters
   vector<CBufferParam> &params = shader->cbuffer_params();
-  params.erase(
-    remove_if(params.begin(), params.end(), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); }),
-    params.end());
+  auto first_unused = partition(begin(params), end(params), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); });
+  for (auto i = begin(params); i != first_unused; ++i)
+    i->used = true;
+
+  for (auto i = first_unused; i != end(params); ++i)
+    i->used = false;
 
   GraphicsObjectHandle handle;
   switch (shader->type()) {
