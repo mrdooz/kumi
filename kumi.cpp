@@ -4,8 +4,14 @@
 #include "utils.hpp"
 #include "logger.hpp"
 #include "app.hpp"
+#include "path_utils.hpp"
+#include <TlHelp32.h>
 
 #pragma comment(lib, "Ws2_32.lib")
+
+static string g_module_name;
+static const char *g_log_server_addr = "tcp://*:5556";
+
 
 void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
@@ -41,19 +47,46 @@ HRESULT hr_meh()
   return E_INVALIDARG;
 }
 
+bool start_process(const char *cmd_args);
+
+int count_instances(const char *name) {
+  int cnt = 0;
+  PROCESSENTRY32 entry;
+  entry.dwSize = sizeof(PROCESSENTRY32);
+  HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+  if (Process32First(snapshot, &entry)) {
+    while (Process32Next(snapshot, &entry)) {
+      if (!_stricmp(entry.szExeFile, name))
+        ++cnt;
+    }
+  }
+  CloseHandle(snapshot);
+  return cnt;
+}
+
+
 int run_log_server() {
 
   void *ctx = zmq_init(1);
   void *s = zmq_socket(ctx, ZMQ_REP);
-  zmq_bind(socket, "ipc:///tmp/feeds/0");
-  //while (true) {
-    zmq_msg_t query;
-    zmq_msg_init(&query);
-    zmq_recv(socket, &query, 0);
+  int res = zmq_bind(s, g_log_server_addr);
+  if (res < 0) {
+    const char *str = zmq_strerror(zmq_errno());
+    MessageBoxA(NULL, str, NULL, MB_ICONEXCLAMATION);
+    return zmq_errno();
+  }
 
-    MessageBoxA(NULL, (const char *)zmq_msg_data(&query), NULL, 0);
+  start_process("");
 
-  //}
+  while (true) {
+    zmq_msg_t r;
+    zmq_msg_init(&r);
+    zmq_recv(s, &r, 0);
+
+    MessageBoxA(NULL, (const char *)zmq_msg_data(&r), NULL, 0);
+    zmq_msg_close(&r);
+
+  }
 
   zmq_close(s);
   zmq_term(ctx);
@@ -61,8 +94,7 @@ int run_log_server() {
   return 0;
 }
 
-bool start_log_server() {
-
+bool start_process(const char *cmd_args) {
   PROCESS_INFORMATION process_information;
   ZeroMemory(&process_information, sizeof(process_information));
   STARTUPINFOA startup_info;
@@ -71,24 +103,39 @@ bool start_log_server() {
 
   char filename[MAX_PATH], cmdline[MAX_PATH];
   GetModuleFileNameA(NULL, filename, MAX_PATH);
-  sprintf(cmdline, "%s --log-server", filename);
-  BOOL res = CreateProcessA(filename, cmdline, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, 
+  if (strlen(cmd_args) > 0) 
+    sprintf(cmdline, "%s %s", filename, cmd_args);
+  else
+    strcpy(cmdline, filename);
+  return !!CreateProcessA(filename, cmdline, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, 
     &startup_info, &process_information);
+}
+
+bool start_log_server() {
+
+  start_process("--log-server");
 
   void *ctx = zmq_init(1);
   void *s = zmq_socket(ctx, ZMQ_REQ);
-  zmq_bind(socket, "ipc:///tmp/feeds/0");
+  int z_res;
+  if (zmq_bind(s, "tcp://127.0.0.1:5556") < 0) {
+    int err = zmq_errno();
+    int a = 10;
+  }
 
   zmq_msg_t q;
-  zmq_msg_init_size(&q, 7);
-  memcpy(zmq_msg_data(&q), "magnus", 7);
-  zmq_send(s, &q, 0);
+  z_res = zmq_msg_init_size(&q, 7);
+  strcpy((char *)zmq_msg_data(&q), "magnus");
+  z_res = zmq_send(s, &q, 0);
+  zmq_msg_close(&q);
+
+  zmq_msg_t reply;
+  z_res = zmq_recv(s, &reply, 0);
 
   zmq_close(s);
   zmq_term(ctx);
 
-
-  return !!res;
+  return true;
 }
 
 int run_app(HINSTANCE instance) {
@@ -109,9 +156,26 @@ int run_app(HINSTANCE instance) {
   return res;
 }
 
+bool init() {
+  char filename[MAX_PATH];
+  GetModuleFileNameA(NULL, filename, MAX_PATH);
+  g_module_name = filename;
+  return true;
+}
+
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
+  if (!init())
+    return 1;
+
+  // hopefully this should save me from killing myself :)
+  Path path(g_module_name);
+  int process_count = count_instances(path.get_filename().c_str());
+  if (process_count > 2)
+    return 1;
+
+
   if (!strcmp(cmd_line, "--log-server")) {
     return run_log_server();
   } else {

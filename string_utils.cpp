@@ -44,10 +44,11 @@ string trim(const string &str)
 	return leading || trailing ? str.substr(leading, str.size() - (leading + trailing)) : str;
 }
 
-wstring ansi_to_unicode(const char *str)
+#ifdef _UNICODE
+wstring ansi_to_host(const char *str)
 {
 	const int len = strlen(str);
-	TCHAR *buf = (TCHAR *)_alloca(len*2) + 1;
+	WCHAR *buf = (WCHAR *)_alloca(len*2) + 1;
 
 	wstring res;
 	if (MultiByteToWideChar(CP_ACP, 0, str, -1, buf, len * 2 + 1))
@@ -55,6 +56,12 @@ wstring ansi_to_unicode(const char *str)
 
 	return res;
 }
+#else
+string ansi_to_host(const char *str) {
+  return string(str);
+}
+#endif
+
 
 bool begins_with(const char *str, const char *sub_str) {
 	const size_t len_a = strlen(str);
