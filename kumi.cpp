@@ -11,7 +11,7 @@
 
 static string g_module_name;
 static const char *g_log_server_addr = "tcp://*:5556";
-
+static const char *g_client_addr = "tcp://127.0.0.1:5556";
 
 void file_changed(FileEvent event, const char *old_name, const char *new_name)
 {
@@ -64,36 +64,6 @@ int count_instances(const char *name) {
   return cnt;
 }
 
-
-int run_log_server() {
-
-  void *ctx = zmq_init(1);
-  void *s = zmq_socket(ctx, ZMQ_REP);
-  int res = zmq_bind(s, g_log_server_addr);
-  if (res < 0) {
-    const char *str = zmq_strerror(zmq_errno());
-    MessageBoxA(NULL, str, NULL, MB_ICONEXCLAMATION);
-    return zmq_errno();
-  }
-
-  start_process("");
-
-  while (true) {
-    zmq_msg_t r;
-    zmq_msg_init(&r);
-    zmq_recv(s, &r, 0);
-
-    MessageBoxA(NULL, (const char *)zmq_msg_data(&r), NULL, 0);
-    zmq_msg_close(&r);
-
-  }
-
-  zmq_close(s);
-  zmq_term(ctx);
-
-  return 0;
-}
-
 bool start_process(const char *cmd_args) {
   PROCESS_INFORMATION process_information;
   ZeroMemory(&process_information, sizeof(process_information));
@@ -111,6 +81,37 @@ bool start_process(const char *cmd_args) {
     &startup_info, &process_information);
 }
 
+
+int run_log_server() {
+
+  void *ctx = zmq_init(1);
+  void *s = zmq_socket(ctx, ZMQ_REP);
+  int res = zmq_bind(s, g_log_server_addr);
+  if (res < 0) {
+    const char *str = zmq_strerror(zmq_errno());
+    MessageBoxA(NULL, str, NULL, MB_ICONEXCLAMATION);
+    zmq_close(s);
+    zmq_term(ctx);
+    return zmq_errno();
+  }
+
+  start_process("");
+
+  while (true) {
+    zmq_msg_t r;
+    zmq_msg_init(&r);
+    zmq_recv(s, &r, 0);
+
+    MessageBoxA(NULL, (const char *)zmq_msg_data(&r), NULL, 0);
+    zmq_msg_close(&r);
+  }
+
+  zmq_close(s);
+  zmq_term(ctx);
+
+  return 0;
+}
+
 bool start_log_server() {
 
   start_process("--log-server");
@@ -118,9 +119,11 @@ bool start_log_server() {
   void *ctx = zmq_init(1);
   void *s = zmq_socket(ctx, ZMQ_REQ);
   int z_res;
-  if (zmq_bind(s, "tcp://127.0.0.1:5556") < 0) {
-    int err = zmq_errno();
-    int a = 10;
+  if (zmq_connect(s, g_client_addr) < 0) {
+    MessageBoxA(NULL, zmq_strerror(zmq_errno()), NULL, MB_ICONEXCLAMATION);
+    zmq_close(s);
+    zmq_term(ctx);
+    return false;
   }
 
   zmq_msg_t q;
@@ -160,6 +163,9 @@ bool init() {
   char filename[MAX_PATH];
   GetModuleFileNameA(NULL, filename, MAX_PATH);
   g_module_name = filename;
+
+  WSADATA wsaData;
+  WSAStartup(0x0202, &wsaData );
   return true;
 }
 
