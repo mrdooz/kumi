@@ -2,6 +2,7 @@
 
 struct GraphicsInterface {
 
+  virtual ~GraphicsInterface() {};
 	virtual const char *vs_profile() const = 0;
 	virtual const char *ps_profile() const = 0;
 
@@ -10,8 +11,8 @@ struct GraphicsInterface {
 	virtual GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data) = 0;
 	virtual GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data) = 0;
 
-	virtual GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id) = 0;
-	virtual GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id) = 0;
+	virtual GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const std::string &id) = 0;
+	virtual GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const std::string &id) = 0;
 
 	virtual GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc) = 0;
 	virtual GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc) = 0;

@@ -145,7 +145,7 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
   // TODO
   /*
   startup_info.dwFlags = STARTF_USESTDHANDLES;
-  startup_info.hStdOutput = startup_info.hStdError = LOG_MGR.handle();
+  startup_info.hStdOutput = startup_info.hStdError = LOGGER.handle();
   */
   PROCESS_INFORMATION process_info;
   ZeroMemory(&process_info, sizeof(process_info));
@@ -162,10 +162,13 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
 
   DWORD exit_code = 1;
 
-  if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, &startup_info, &process_info)) {
+  if (CreateProcessA(NULL, cmd_line, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW, NULL, NULL, 
+                     &startup_info, &process_info)) {
     WaitForSingleObject(process_info.hProcess, INFINITE);
     GetExitCodeProcess(process_info.hProcess, &exit_code);
-    FlushFileBuffers(LOG_MGR.handle());
+    FlushFileBuffers(LOGGER.handle());
+    CloseHandle(process_info.hProcess);
+    CloseHandle(process_info.hThread);
   } else {
     LOG_ERROR("Unable to launch fxc.exe");
   }
@@ -193,14 +196,13 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
       return false;
   }
 
-  void *buf;
-  size_t len;
-
   set<string> used_params;
-  if (!res->load_file(obj, &buf, &len))
+  vector<uint8> buf;
+  if (!res->load_file(obj, &buf))
     return false;
 
-  if (!do_reflection(graphics, shader, buf, len, &used_params))
+  int len = (int)buf.size();
+  if (!do_reflection(graphics, shader, buf.data(), len, &used_params))
     return false;
 
   // mark unused parameters
@@ -214,9 +216,13 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
 
   GraphicsObjectHandle handle;
   switch (shader->type()) {
-  case Shader::kVertexShader: handle = graphics->create_vertex_shader(buf, len, shader->obj_filename()); break;
-  case Shader::kPixelShader: handle = graphics->create_pixel_shader(buf, len, shader->obj_filename()); break;
-  case Shader::kGeometryShader: break;
+    case Shader::kVertexShader: 
+      handle = graphics->create_vertex_shader(buf.data(), len, shader->obj_filename()); 
+      break;
+    case Shader::kPixelShader: 
+      handle = graphics->create_pixel_shader(buf.data(), len, shader->obj_filename()); 
+      break;
+    case Shader::kGeometryShader: break;
   }
   shader->set_handle(handle);
   shader->validate();

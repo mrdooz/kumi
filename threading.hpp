@@ -33,10 +33,7 @@ namespace threading {
     TrackedLocation location;
     HANDLE handle;
     Fn callback;
-    //NamedCallback callback;
   };
-
-#define NAMED_CALLBACK(x) NamedCallback(#x, x)
 
   class Thread {
   public:
@@ -90,6 +87,7 @@ namespace threading {
     void set_thread(ThreadId id, Thread *thread);
 
     static Dispatcher &instance();
+    static void close();
 
     // queue the function on the specified thread's queue
     void invoke(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb);
@@ -98,7 +96,7 @@ namespace threading {
   private:
     Dispatcher();
 
-    Concurrency::critical_section _thread_cs;
+    CriticalSection _thread_cs;
     Thread *_threads[kThreadCount];
     static Dispatcher *_instance;
   };

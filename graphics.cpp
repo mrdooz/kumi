@@ -88,11 +88,11 @@ GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool 
     return GraphicsObjectHandle();
   }
 
-  int idx = name ? _res._render_targets.find_by_token(name) : -1;
+  int idx = name ? _res._render_targets.idx_from_token(name) : -1;
   if (idx != -1 || (idx = _res._render_targets.find_free_index()) != -1) {
-    if (_res._render_targets[idx].first)
-      _res._render_targets[idx].first->reset();
-    _res._render_targets[idx] = make_pair(data, name);
+    if (_res._render_targets[idx])
+      _res._render_targets[idx]->reset();
+    _res._render_targets.set_pair(idx, make_pair(data, name));
     return GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
   }
   return GraphicsObjectHandle();
@@ -136,11 +136,11 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
     return GraphicsObjectHandle();
   }
 
-  int idx = name ? _res._textures.find_by_token(name) : -1;
+  int idx = name ? _res._textures.idx_from_token(name) : -1;
   if (idx != -1 || (idx = _res._textures.find_free_index()) != -1) {
-    if (_res._textures[idx].first)
-      _res._textures[idx].first->reset();
-    _res._textures[idx] = make_pair(data, name);
+    if (_res._textures[idx])
+      _res._textures[idx]->reset();
+    _res._textures.set_pair(idx, make_pair(data, name));
     return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
   }
   return GraphicsObjectHandle();
@@ -189,7 +189,7 @@ bool Graphics::create_back_buffers(int width, int height)
   _width = width;
   _height = height;
 
-  int idx = _res._render_targets.find_by_token("default_rt");
+  int idx = _res._render_targets.idx_from_token("default_rt");
   RenderTargetData *rt = nullptr;
   if (idx != -1) {
     rt = _res._render_targets.get(idx);
@@ -216,7 +216,7 @@ bool Graphics::create_back_buffers(int width, int height)
   B_ERR_HR(_device->CreateDepthStencilView(rt->depth_stencil, NULL, &rt->dsv.p));
   rt->dsv->GetDesc(&rt->dsv_desc);
 
-  _res._render_targets[idx] = make_pair(rt, "default_rt");
+  _res._render_targets.set_pair(idx, make_pair(rt, "default_rt"));
   _default_rt_handle = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
@@ -247,7 +247,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   sd.Windowed = TRUE;
 
   // Create DXGI factory to enumerate adapters
-  CComPtr<IDXGIFactory1> dxgi_factory;
+  IDXGIFactory1 *dxgi_factory = nullptr;
   B_ERR_HR(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
 
   // Use the first adapter
@@ -259,10 +259,12 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
     adapters.push_back(adapter);
     DXGI_ADAPTER_DESC desc;
     adapter->GetDesc(&desc);
+    exch_null(adapter)->Release();
     if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0) {
       perfhud = i;
     }
   }
+  exch_null(dxgi_factory)->Release();
 
   B_ERR_BOOL(!adapters.empty());
 
@@ -276,11 +278,12 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   // Create the DX11 device
   B_ERR_HR(D3D11CreateDeviceAndSwapChain(
-    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain, &_device, &_feature_level, &_immediate_context.p));
+    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain.p, &_device.p,
+    &_feature_level, &_immediate_context.p));
 
   B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
-  B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&_d3d_debug));
+  B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&(_d3d_debug.p)));
 
   B_ERR_BOOL(create_back_buffers(width, height));
 
@@ -299,11 +302,8 @@ void Graphics::set_default_render_target()
   _immediate_context->RSSetViewports(1, &_viewport);
 }
 
-bool Graphics::close()
-{
-  delete this;
-  _instance = NULL;
-  return true;
+void Graphics::close() {
+  delete exch_null(_instance);
 }
 
 void Graphics::clear(GraphicsObjectHandle h, const XMFLOAT4 &c) {
@@ -372,12 +372,12 @@ GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DES
 
 GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len, const string &id) {
 
-  int idx = _res._vertex_shaders.find_by_token(id);
+  int idx = _res._vertex_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _res._vertex_shaders.find_free_index()) != -1) {
     ID3D11VertexShader *vs = nullptr;
     if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
-      SAFE_RELEASE(_res._vertex_shaders[idx].first);
-      _res._vertex_shaders[idx].first = vs;
+      SAFE_RELEASE(_res._vertex_shaders[idx]);
+      _res._vertex_shaders[idx] = vs;
       return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
     }
   }
@@ -386,12 +386,12 @@ GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int l
 
 GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len, const string &id) {
 
-  int idx = _res._pixel_shaders.find_by_token(id);
+  int idx = _res._pixel_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _res._pixel_shaders.find_free_index()) != -1) {
     ID3D11PixelShader *ps = nullptr;
     if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
-      SAFE_RELEASE(_res._pixel_shaders[idx].first);
-      _res._pixel_shaders[idx].first = ps;
+      SAFE_RELEASE(_res._pixel_shaders[idx]);
+      _res._pixel_shaders[idx] = ps;
       return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
     }
   }
@@ -480,18 +480,22 @@ void Graphics::shader_file_changed(const char *filename, void *token) {
 }
 
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
+
+  LOG_VERBOSE_LN("loading: %s", filename);
+
   bool res = true;
   vector<Material *> materials;
 
   vector<Technique *> loaded_techniques;
   vector<uint8> buf;
-  if (!_ri->load_file(filename, &buf))
-    return false;
+  B_ERR_BOOL(_ri->load_file(filename, &buf));
+  //LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
 
   TechniqueParser parser;
   vector<Technique *> tmp;
-  if (!parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials))
-    return false;
+  B_ERR_BOOL(parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
+
+  //LOG_VERBOSE_LN("parsed");
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
@@ -502,10 +506,13 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   // delete all the techniques that fail to initialize
   if (fails != end(tmp)) {
     for (auto i = fails; i != end(tmp); ++i) {
+      LOG_WARNING_LN("init failed for technique: %s", (*i)->name().c_str());
       delete exch_null(*i);
     }
     tmp.erase(fails, end(tmp));
   }
+
+  LOG_VERBOSE_LN("adding watches..");
 
   auto &v = _techniques_by_file[filename];
   v.clear();
@@ -522,10 +529,10 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
       }
     }
 
-    int idx = _res._techniques.find_by_token(t->name());
+    int idx = _res._techniques.idx_from_token(t->name());
     if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
-      SAFE_DELETE(_res._techniques[idx].first);
-      _res._techniques[idx] = make_pair(t, t->name());
+      SAFE_DELETE(_res._techniques[idx]);
+      _res._techniques.set_pair(idx, make_pair(t, t->name()));
       v.push_back(t->name());
     } else {
       SAFE_DELETE(t);
@@ -540,7 +547,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
-  int idx = _res._techniques.find_by_token(name);
+  int idx = _res._techniques.idx_from_token(name);
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
@@ -585,13 +592,13 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
   for (int i = 0; i < num_views; ++i) {
     const ResourceViewParam &v = shader->resource_view_params()[i];
     // look for the named texture, and if that doesn't exist, look for a render target
-    int idx = _res._textures.find_by_token(v.name);
+    int idx = _res._textures.idx_from_token(v.name);
     if (idx != -1) {
-      views[v.bind_point] = _res._textures[idx].first->srv;
+      views[v.bind_point] = _res._textures[idx]->srv;
     } else {
-      idx = _res._render_targets.find_by_token(v.name);
+      idx = _res._render_targets.idx_from_token(v.name);
       if (idx != -1) {
-        views[v.bind_point] = _res._render_targets[idx].first->srv;
+        views[v.bind_point] = _res._render_targets[idx]->srv;
       } else {
         LOG_WARNING_LN("Texture not found: %s", v.name.c_str());
       }

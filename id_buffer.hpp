@@ -3,27 +3,28 @@
 using std::stack;
 using std::vector;
 using std::pair;
-namespace mpl = boost::mpl;
 
 class GraphicsObjectHandle;
 
 template<class Traits, int N>
-struct IdBufferBase {
-
+class IdBufferBase {
+public:
 	typedef typename Traits::Type T;
-	typedef std::function<void(typename Traits::Type)> Deleter;
+  typedef typename Traits::Elem E;
+	typedef std::function<void(T)> Deleter;
 
 	enum { Size = N };
 
-	IdBufferBase(const Deleter &deleter = Deleter()) : _deleter(deleter) {
+	IdBufferBase(const Deleter &deleter) : _deleter(deleter) {
 		ZeroMemory(&_buffer, sizeof(_buffer));
 	}
 
-	~IdBufferBase() {
+	virtual ~IdBufferBase() {
 		if (_deleter) {
-			for (int i = 0; i < N; ++i) {
-				if (Traits::get(_buffer[i]))
-					_deleter(Traits::get(_buffer[i]));
+			for (int i = 0; i < Size; ++i) {
+        T t = Traits::get(_buffer[i]);
+				if (t)
+					_deleter(t);
 			}
 		}
 
@@ -38,48 +39,73 @@ struct IdBufferBase {
 			reclaimed_indices.pop();
 			return tmp;
 		}
-		for (int i = 0; i < N; ++i) {
+		for (int i = 0; i < Size; ++i) {
 			if (!Traits::get(_buffer[i]))
 				return i;
 		}
 		return -1;
 	}
 
-	typename Traits::Type &operator[](int idx) {
+	T &operator[](int idx) {
 		assert(idx >= 0 && idx < N);
-		return _buffer[idx];
+    return Traits::get(_buffer[idx]);
 	}
 
 	void reclaim_index(int idx) {
 		_reclaimed_indices.push(idx);
-
 	}
 
-	typename Traits::Type get(GraphicsObjectHandle handle) {
+	T get(GraphicsObjectHandle handle) {
 		return Traits::get(_buffer[handle.id()]);
 	}
-
+protected:
 	Deleter _deleter;
-	typename Traits::Elem _buffer[N];
+  E _buffer[N];
 	stack<int> reclaimed_indices;
 };
 
-template<class Traits, int N>
-struct SearchableIdBuffer : public IdBufferBase<Traits, N> {
+template<class T, class U>
+struct SearchableTraits {
 
+  typedef T Type;
+  typedef U Token;
+  typedef std::pair<T, U> Elem;
+
+  static T& get(Elem &t) {
+    return t.first;
+  }
+
+  static U get_token(const Elem &e) {
+    return e.second;
+  }
+};
+
+template<class T>
+struct SingleTraits {
+  typedef T Type;
+  typedef T Elem;
+  static T& get(Elem& t) {
+    return t;
+  }
+};
+
+template<typename T, typename U, int N>
+struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<T, U>, N> {
+
+  typedef SearchableTraits<T, U> Traits;
 	typedef IdBufferBase<Traits, N> Parent;
 
-	SearchableIdBuffer(const typename IdBufferBase<Traits, N>::Deleter &fn_deleter) 
+	SearchableIdBuffer(const typename Parent::Deleter &fn_deleter) 
 		: Parent(fn_deleter)
 	{
 	}
 
-	typename Traits::Elem &operator[](int idx) {
-		assert(idx >= 0 && idx < N);
-		return _buffer[idx];
-	}
+  void set_pair(int idx, const typename Traits::Elem &e) {
+    assert(idx >= 0 && idx < N);
+    _buffer[idx] = e;
+  }
 
-	int find_by_token(const typename Traits::Token &t) {
+	int idx_from_token(const typename Traits::Token &t) {
 		for (int i = 0; i < Size; ++i) {
 			if (Traits::get_token(_buffer[i]) == t)
 				return i;
@@ -88,43 +114,13 @@ struct SearchableIdBuffer : public IdBufferBase<Traits, N> {
 	}
 };
 
-template<class T, class U>
-struct PairTraits {
-	typedef T Type;
-	typedef U Token;
-	typedef std::pair<T, U> Elem;
-	static T& get(Elem &t) {
-		return t.first;
-	}
+template<typename T, int N>
+struct IdBuffer : IdBufferBase<SingleTraits<T>, N> {
+  typedef SingleTraits<T> Traits;
+  typedef IdBufferBase<Traits, N> Parent;
 
-	static U get_token(const Elem &e) {
-		return e.second;
-	}
-};
-
-template<class T>
-struct SingleTraits {
-	typedef T Type;
-	typedef T Elem;
-	static T& get(Elem& t) {
-		return t;
-	}
-};
-
-template<typename T, int N, typename SearchToken = void>
-struct IdBuffer : public
-	mpl::if_<typename std::tr1::is_void<SearchToken>::type,
-	IdBufferBase<SingleTraits<T>, N>,
-	SearchableIdBuffer<PairTraits<T, SearchToken>, N> >::type
-{
-	typedef typename mpl::if_<typename std::tr1::is_void<SearchToken>::type,
-		IdBufferBase<SingleTraits<T>, N>,
-		SearchableIdBuffer<PairTraits<T, SearchToken>, N> >::type Parent;
-
-	typedef typename IdBufferBase<SingleTraits<T>, N>::Deleter Deleter;
-
-	IdBuffer(const Deleter &fn_deleter = Deleter())
-		: Parent(fn_deleter)
-	{
-	}
+  IdBuffer(const typename Parent::Deleter &fn_deleter) 
+    : Parent(fn_deleter)
+  {
+  }
 };

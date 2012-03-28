@@ -43,6 +43,11 @@ struct DirWatch {
     ZeroMemory(&_overlapped, sizeof(_overlapped)); 
     _overlapped.hEvent = this;
   }
+
+  ~DirWatch() {
+    CloseHandle(_handle);
+  }
+
   void on_completion();
   bool start_watch();
 
@@ -70,7 +75,6 @@ public:
   ~WatcherThread();
   void add_watch(const string &fullname, ThreadId thread_id, const FileWatcher::CbFileChanged &cb, void *token);
   void remove_watch(const FileWatcher::CbFileChanged &cb);
-  void terminate();
   virtual void on_idle();
   virtual void has_joined();
 private:
@@ -85,8 +89,7 @@ private:
   typedef int RefCount;
   map<Filename, RefCount> _watched_files;
 
-  typedef map<string, DirWatch *> DirWatches;
-  DirWatches _dir_watches;
+  map<string, unique_ptr<DirWatch> > _dir_watches;
   DWORD _last_tick;
 };
 
@@ -219,7 +222,7 @@ void WatcherThread::on_completion(DWORD error_code, DWORD bytes_transfered, OVER
 
 void WatcherThread::has_joined() {
   for (auto i = begin(_dir_watches); i != end(_dir_watches); ++i) {
-    DirWatch *watch = i->second;
+    auto &watch = i->second;
     CancelIo(watch->_handle);
   }
   _dir_watches.clear();
@@ -238,7 +241,7 @@ void WatcherThread::add_watch(const string &fullname, ThreadId thread_id, const 
   string filename(string(fname) + ext);
 
   // Check if we need to create a new watch for the directory
-  DirWatches &dir_watches = _dir_watches;
+  auto &dir_watches = _dir_watches;
   if (dir_watches.find(path) == dir_watches.end()) {
 
     HANDLE h = CreateFileA(path.c_str(), FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -255,7 +258,7 @@ void WatcherThread::add_watch(const string &fullname, ThreadId thread_id, const 
       return;
     }
 
-    dir_watches[path] = w;
+    dir_watches[path].reset(w);
   }
 
   dir_watches[path]->_file_watches[fullname].push_back(DirWatch::Callback(thread_id, cb, token));
@@ -326,9 +329,13 @@ void FileWatcher::remove_watch(const CbFileChanged &fn) {
 }
 
 void FileWatcher::close() {
-  if (!_thread)
+  if (!_instance)
     return;
 
-  _thread->join();
-  delete exch_null(_thread);
+  if (_instance->_thread) {
+    _instance->_thread->join();
+    delete exch_null(_instance->_thread);
+  }
+
+  delete exch_null(_instance);
 }

@@ -2,6 +2,8 @@
 #include "file_utils.hpp"
 #include "utils.hpp"
 
+using namespace std;
+
 string replace_extension(const char *org, const char *new_ext) {
 	const char *dot = strrchr(org, '.');
 	if (!dot)
@@ -39,7 +41,7 @@ bool load_file(const char *filename, std::vector<uint8> *buf) {
     return false;
   return true;
 }
-
+/*
 bool load_file(const char *filename, void **buf, size_t *size)
 {
 	ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
@@ -54,7 +56,7 @@ bool load_file(const char *filename, void **buf, size_t *size)
 
 	return true;
 }
-
+*/
 bool file_exists(const char *filename)
 {
 	if (_access(filename, 0) != 0)

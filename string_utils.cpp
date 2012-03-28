@@ -45,7 +45,7 @@ string trim(const string &str)
 }
 
 #ifdef _UNICODE
-wstring ansi_to_host(const char *str)
+ustring ansi_to_host(const char *str)
 {
 	const int len = strlen(str);
 	WCHAR *buf = (WCHAR *)_alloca(len*2) + 1;
@@ -57,7 +57,7 @@ wstring ansi_to_host(const char *str)
 	return res;
 }
 #else
-string ansi_to_host(const char *str) {
+ustring ansi_to_host(const char *str) {
   return string(str);
 }
 #endif

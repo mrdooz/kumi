@@ -5,7 +5,6 @@
 #include "effect_wrapper.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
-#include "v8_handler.hpp"
 #include "demo_engine.hpp"
 #include "technique.hpp"
 #include "kumi_loader.hpp"
@@ -14,14 +13,24 @@
 #include "resource_manager.hpp"
 #include "material_manager.hpp"
 #include "renderer.hpp"
+#include "threading.hpp"
+#include "kumi.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
 #include "test/volumetric.hpp"
 
+#if USE_CEF
+#include "v8_handler.hpp"
+#endif
+
 using std::swap;
+using namespace threading;
 
 App* App::_instance = nullptr;
+
+const TCHAR *g_app_window_class = _T("KumiClass");
+const TCHAR *g_app_window_title = _T("kumi - magnus österlind");
 
 #ifndef GET_X_LPARAM
 #define GET_X_LPARAM(lParam)	((int)(short)LOWORD(lParam))
@@ -30,6 +39,7 @@ App* App::_instance = nullptr;
 #define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
 #endif
 
+#if USE_CEF
 #pragma comment(lib, "libcef.lib")
 #pragma comment(lib, "libcef_dll_wrapper.lib")
 
@@ -226,7 +236,7 @@ void App::SetNavState(bool canGoBack, bool canGoForward)
   EnableWindow(_back_hwnd, canGoBack);
   EnableWindow(_forward_hwnd, canGoForward);
 }
-
+#endif
 App::App()
   : _hinstance(NULL)
   , _width(-1)
@@ -237,6 +247,7 @@ App::App()
   , _cur_camera(1)
   , _draw_plane(false)
   , _ref_count(1)
+#if USE_CEF
   , _main_hwnd(NULL)
   , _browser_hwnd(NULL)
   , _edit_hwnd(NULL)
@@ -244,6 +255,7 @@ App::App()
   , _forward_hwnd(NULL)
   , _stop_hwnd(NULL)
   , _reload_hwnd(NULL)
+#endif
 {
   find_app_root();
   DISPATCHER.set_thread(threading::kMainThread, this);
@@ -262,7 +274,7 @@ App& App::instance()
 
 bool App::init(HINSTANCE hinstance)
 {
-  LOG_MGR.
+  LOGGER.
     open_output_file(_T("kumi.log")).
     break_on_error(true);
 
@@ -270,12 +282,10 @@ bool App::init(HINSTANCE hinstance)
   _width = GetSystemMetrics(SM_CXSCREEN) / 2;
   _height = GetSystemMetrics(SM_CYSCREEN) / 2;
 
+#if USE_CEF
   CefSettings settings;
   settings.multi_threaded_message_loop = false;
-  /*
-  if (!CefInitialize(settings))
-  return false;
-  */
+#endif
 
   B_ERR_BOOL(ResourceManager::create());
   B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
@@ -299,12 +309,12 @@ bool App::init(HINSTANCE hinstance)
   return true;
 }
 
-bool App::close()
-{
-  B_ERR_BOOL(GRAPHICS.close());
-  delete this;
-  _instance = nullptr;
-
+bool App::close() {
+  FileWatcher::close();
+  Graphics::close();
+  Logger::close();
+  Dispatcher::close();
+  delete exch_null(_instance);
   return true;
 }
 
@@ -325,24 +335,22 @@ void App::set_client_size()
 
 bool App::create_window()
 {
-  const TCHAR* kClassName = _T("KumiClass");
-
   WNDCLASSEX wcex;
   ZeroMemory(&wcex, sizeof(wcex));
 
   wcex.cbSize = sizeof(WNDCLASSEX);
   wcex.style          = CS_HREDRAW | CS_VREDRAW;
-  wcex.lpfnWndProc    = tramp_wnd_proc;
+  wcex.lpfnWndProc    = wnd_proc;
   wcex.hInstance      = _hinstance;
   wcex.hbrBackground  = 0;
-  wcex.lpszClassName  = kClassName;
+  wcex.lpszClassName  = g_app_window_class;
 
   B_ERR_INT(RegisterClassEx(&wcex));
 
   //const UINT window_style = WS_VISIBLE | WS_POPUP | WS_OVERLAPPEDWINDOW;
   const UINT window_style = WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS; //WS_VISIBLE | WS_POPUP;
 
-  _hwnd = CreateWindow(kClassName, _T("kumi - magnus österlind - 2011"), window_style,
+  _hwnd = CreateWindow(g_app_window_class, g_app_window_title, window_style,
     CW_USEDEFAULT, CW_USEDEFAULT, _width, _height, NULL, NULL,
     _hinstance, NULL);
 
@@ -378,7 +386,9 @@ UINT App::run(void *userdata) {
     } else {
       process_deferred();
 
+#if USE_CEF
       CefDoMessageLoopWork();
+#endif
 
       DEMO_ENGINE.tick();
 
@@ -419,14 +429,7 @@ UINT App::run(void *userdata) {
   return 0;
 }
 
-LRESULT App::tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-  //if( TwEventWin(hWnd, message, wParam, lParam) ) // send event message to AntTweakBar
-  //return 0;
-
-  return App::instance().wnd_proc(hWnd, message, wParam, lParam);
-}
-
+/*
 int funky(int a, float b, CefString c) {
   return 42;
 }
@@ -447,7 +450,7 @@ struct something {
   }
   int a;
 };
-
+*/
 
 /*
 void InitExtensionTest()
@@ -486,14 +489,17 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_SETFOCUS:
   case WM_KILLFOCUS:
     {
-      SetFocus(_hwnd);
+      SetFocus(_instance->_hwnd);
+#if USE_CEF
       if (GetBrowser())
         GetBrowser()->SetFocus(message == WM_SETFOCUS);
+#endif
     }
     return 0;
 
   case WM_SIZE:
     GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
+#if USE_CEF
     _cef_texture = GRAPHICS.create_texture(
       CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, 
       D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
@@ -513,6 +519,11 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
       EndDeferWindowPos(hdwp);
       GetBrowser()->SetSize(PET_VIEW, rect.right - rect.left, rect.bottom - rect.top);
     }
+#endif
+    break;
+
+  case WM_APP_CLOSE:
+    DestroyWindow(hWnd);
     break;
 
   case WM_ERASEBKGND:
@@ -525,9 +536,9 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 
   case WM_CREATE:
     {
-      _hwnd = hWnd;
-      B_ERR_BOOL(GRAPHICS.init(_hwnd, _width, _height));
-
+      _instance->_hwnd = hWnd;
+      B_ERR_BOOL(GRAPHICS.init(hWnd, _instance->_width, _instance->_height));
+#if USE_CEF
       CefWindowInfo info;
       info.m_bIsTransparent = TRUE;
       CefBrowserSettings settings;
@@ -537,6 +548,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
       info.SetAsOffScreen(hWnd);
       info.SetIsTransparent(TRUE);
       CefBrowser::CreateBrowser(info, CefRefPtr<CefClient>(this), "file://C:/temp/tjong.html", settings);
+#endif
       //InitExtensionTest();
       //CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "http://www.google.com", settings);
     }
@@ -549,28 +561,34 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_LBUTTONUP:
   case WM_MBUTTONUP:
   case WM_RBUTTONUP:
+#if USE_CEF
     if (GetBrowser()) {
       if (GetCapture() == hWnd)
         ReleaseCapture();
       cef_mouse_button_type_t btn = message == WM_LBUTTONUP ? MBT_LEFT : (message == WM_MBUTTONUP ? MBT_MIDDLE : MBT_RIGHT);
       GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, true, 1);
     }
+#endif
     break;
 
   case WM_LBUTTONDOWN:
   case WM_MBUTTONDOWN:
   case WM_RBUTTONDOWN:
+#if USE_CEF
     if (GetBrowser()) {
       SetCapture(hWnd);
       SetFocus(hWnd);
       cef_mouse_button_type_t btn = message == WM_LBUTTONDOWN ? MBT_LEFT : (message == WM_MBUTTONDOWN ? MBT_MIDDLE : MBT_RIGHT);
       GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, false, 1);
     }
+#endif
     break;
 
   case WM_MOUSEMOVE:
+#if USE_CEF
     if (GetBrowser())
       GetBrowser()->SendMouseMoveEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), false);
+#endif
     break;
 
   case WM_MOUSEWHEEL:
@@ -601,6 +619,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_CHAR:
   case WM_SYSCHAR:
   case WM_IME_CHAR:
+#if USE_CEF
     if (GetBrowser()) {
       const CefBrowser::KeyType type = 
         (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) ? KT_KEYDOWN :
@@ -615,6 +634,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
       else
         GetBrowser()->SendKeyEvent(type, wParam, lParam, sys_char, ime_char);
     }
+#endif
     break;
 
   }

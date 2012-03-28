@@ -18,13 +18,13 @@ public:
   };
 
   // token, event, old_name, new_name
-  typedef std::function<void (void *, FileEvent, const string &, const string & )> CbFileChanged;
+  typedef std::function<void (void *, FileEvent, const std::string &, const std::string & )> CbFileChanged;
 
   static FileWatcher &instance();
   // TODO: use a mask to specify what event's we're interested in
   void add_file_watch(const char *filename, void *token, threading::ThreadId thread_id, const CbFileChanged &fn);
   void remove_watch(const CbFileChanged &fn);
-  void close();
+  static void close();
 private:
   FileWatcher();
 

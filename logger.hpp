@@ -1,32 +1,88 @@
-#ifndef LOGGER_HPP
-#define LOGGER_HPP
+#pragma once
 #include <string>
 #include <deque>
 #include <map>
 #include <set>
 #include <windows.h>
+#include "utils.hpp"
 
-/**
- * The Logger is designed to be a stand alone, drop in logging component. The class itself
- * is a singleton, and logging is done via the LOG_xxx family of macros below
- */
+class Logger
+{
+public:
+  enum OuputDevice
+  {
+    Debugger    = (1 << 0),
+    File        = (1 << 1),
+  };
 
-// TODO: add some kind of global filter that we can toggle on/off (grep/regex)
+  enum Severity 
+  {
+    Verbose     = (1 << 0),
+    Info        = (1 << 1),
+    Warning     = (1 << 2),
+    Error       = (1 << 3),
+    Fatal       = (1 << 4),
+  };
 
-#define LOG_MGR LogMgr::instance()
+  void debug_output(const bool newLine, const bool one_shot, const char *file, const int line, const Severity severity, const char* const format, ...  );
 
-#define LOG_VERBOSE(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Verbose, fmt, __VA_ARGS__ );
-#define LOG_VERBOSE_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Verbose, fmt, __VA_ARGS__ );
-#define LOG_INFO(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Info, fmt, __VA_ARGS__ );
-#define LOG_INFO_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Info, fmt, __VA_ARGS__ );
-#define LOG_WARNING(fmt, ...) do { LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ ); } while(false)
-#define LOG_WARNING_LN(fmt, ...) do { LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ ); } while(false)
-#define LOG_WARNING_LN_ONESHOT(fmt, ...) LOG_MGR.debug_output(true, true, __FILE__, __LINE__, LogMgr::Warning, fmt, __VA_ARGS__ );
-#define LOG_ERROR(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Error, fmt, __VA_ARGS__ );
-#define LOG_ERROR_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Error, fmt, __VA_ARGS__ );
-#define LOG_ERROR_LN_ONESHOT(fmt, ...) LOG_MGR.debug_output(true, true, __FILE__, __LINE__, LogMgr::Error, fmt, __VA_ARGS__ );
-#define LOG_FATAL(fmt, ...) LOG_MGR.debug_output(false, false, __FILE__, __LINE__, LogMgr::Fatal, fmt, __VA_ARGS__ );
-#define LOG_FATAL_LN(fmt, ...) LOG_MGR.debug_output(true, false, __FILE__, __LINE__, LogMgr::Fatal, fmt, __VA_ARGS__ );
+  void enter_context(int context_id, const char *msg);
+  void leave_context(int context_id);
+
+  Logger& print_file_and_line(const bool value);
+  Logger& enable_output(OuputDevice output);
+  Logger& disable_output(OuputDevice output);
+  Logger& open_output_file(const TCHAR *filename);
+  Logger& break_on_error(const bool setting);
+
+  Logger& enable_severity(const OuputDevice output, const Severity severity);
+  Logger& disable_severity(const OuputDevice output, const Severity severity);
+
+  static Logger& instance();
+  static void close();
+
+  HANDLE handle() const { return _file; }
+
+  int get_next_context_id();
+
+private:
+  Logger();
+  ~Logger();
+
+  void	init_severity_map();
+
+  HANDLE _file;
+  int   _output_device;
+  bool _break_on_error;
+  bool _output_line_numbers;
+
+  std::set<std::string> one_shot_set_;
+  std::map<OuputDevice, std::map<Severity, bool> > severity_map_;
+  static Logger* _instance;
+
+  void *_context;
+  void *_socket;
+  bool _connected;
+  CriticalSection _cs_context_id;
+  int _next_context_id;
+
+};
+
+
+#define LOGGER Logger::instance()
+
+#define LOG_VERBOSE(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Verbose, fmt, __VA_ARGS__ );
+#define LOG_VERBOSE_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Verbose, fmt, __VA_ARGS__ );
+#define LOG_INFO(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Info, fmt, __VA_ARGS__ );
+#define LOG_INFO_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Info, fmt, __VA_ARGS__ );
+#define LOG_WARNING(fmt, ...) do { LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ ); } while(false)
+#define LOG_WARNING_LN(fmt, ...) do { LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ ); } while(false)
+#define LOG_WARNING_LN_ONESHOT(fmt, ...) LOGGER.debug_output(true, true, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ );
+#define LOG_ERROR(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
+#define LOG_ERROR_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
+#define LOG_ERROR_LN_ONESHOT(fmt, ...) LOGGER.debug_output(true, true, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
+#define LOG_FATAL(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Fatal, fmt, __VA_ARGS__ );
+#define LOG_FATAL_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Fatal, fmt, __VA_ARGS__ );
 
 using std::set;
 using std::map;
@@ -69,54 +125,15 @@ bool check_hr(HRESULT hr, const char *exp, string *out);
 #define LOG_INF_HR(x) LOG(x, CHK_HR, LOG_INFO_LN);
 #define LOG_INF_BOOL(x) LOG(x, CHK_BOOL, LOG_INFO_LN);
 
-class LogMgr 
-{
+class ScopedContext {
 public:
-  enum OuputDevice
-  {
-    Debugger    = (1 << 0),
-    File        = (1 << 1),
-  };
-
-  enum Severity 
-  {
-    Verbose     = (1 << 0),
-    Info        = (1 << 1),
-    Warning     = (1 << 2),
-    Error       = (1 << 3),
-    Fatal       = (1 << 4),
-  };
-
-  void debug_output(const bool newLine, const bool one_shot, const char *file, const int line, const Severity severity, const char* const format, ...  );
-
-	LogMgr& print_file_and_line(const bool value);
-  LogMgr& enable_output(OuputDevice output);
-  LogMgr& disable_output(OuputDevice output);
-  LogMgr& open_output_file(const TCHAR *filename);
-  LogMgr& break_on_error(const bool setting);
-
-  LogMgr& enable_severity(const OuputDevice output, const Severity severity);
-  LogMgr& disable_severity(const OuputDevice output, const Severity severity);
-
-  static LogMgr& instance();
-  static void close();
-
-	HANDLE handle() const { return _file; }
+  ScopedContext(int id, const char *fmt, ...);
+  ~ScopedContext();
 
 private:
-  LogMgr();
-  ~LogMgr();
-
-  void	init_severity_map();
-
-	HANDLE _file;
-  int   _output_device;
-  bool _break_on_error;
-	bool _output_line_numbers;
-
-  set<string> one_shot_set_;
-  map<OuputDevice, map<Severity, bool> > severity_map_;
-  static LogMgr* _instance;
+  int _id;
 };
 
-#endif
+#define LOG_CONTEXT(fmt, ...) \
+__declspec(thread) static int GEN_NAME(id, __LINE__) = __COUNTER__; \
+  MAKE_SCOPED(ScopedContext)(GEN_NAME(id, __LINE__), fmt, __VA_ARGS__);

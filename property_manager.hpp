@@ -39,9 +39,9 @@ public:
 private:
 
 	struct PropertyBag {
-		std::unordered_map<string, float> float_values;
-		std::unordered_map<string, XMFLOAT4> float4_values;
-		std::unordered_map<string, XMFLOAT4X4> matrix_values;
+		std::unordered_map<std::string, float> float_values;
+		std::unordered_map<std::string, XMFLOAT4> float4_values;
+		std::unordered_map<std::string, XMFLOAT4X4> matrix_values;
 	};
 
 	template<typename T>

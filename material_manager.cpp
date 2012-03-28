@@ -2,6 +2,7 @@
 #include "material_manager.hpp"
 #include "property_manager.hpp"
 #include "utils.hpp"
+#include "logger.hpp"
 
 using namespace std;
 

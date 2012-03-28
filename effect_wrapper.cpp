@@ -2,6 +2,7 @@
 #include "effect_wrapper.hpp"
 #include "graphics.hpp"
 #include "file_utils.hpp"
+#include "logger.hpp"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -23,17 +24,15 @@ EffectWrapper *EffectWrapper::create_from_buffer(const char *buf, int len, const
 
 EffectWrapper *EffectWrapper::create_from_file(const char *filename, const char *vs, const char *gs, const char *ps) 
 {
-	void *buf;
-	size_t len;
-	if (!load_file(filename, &buf, &len)) {
+  vector<uint8> buf;
+	if (!load_file(filename, &buf)) {
 		LOG_WARNING_LN("error loading file: %s", filename);
 		return NULL;
 	}
 
 	EffectWrapper *e = new EffectWrapper;
-	if (!e->load_shaders((const char *)buf, len, vs, gs, ps))
+	if (!e->load_shaders((const char *)buf.data(), buf.size(), vs, gs, ps))
 		delete exch_null(e);
-	delete [] buf;
 	return e;
 }
 

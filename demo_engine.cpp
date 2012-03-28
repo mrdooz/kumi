@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "demo_engine.hpp"
+#include "logger.hpp"
 
 using std::sort;
 
@@ -34,7 +35,8 @@ void DemoEngine::pause(bool pause) {
 bool DemoEngine::init() {
   B_ERR_BOOL(!!QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency));
 
-  sort(_effects.begin(), _effects.end(), [](const EffectInstance *a, const EffectInstance *b){ return a->_start_time < b->_start_time; });
+  sort(_effects.begin(), _effects.end(), 
+    [](const EffectInstance *a, const EffectInstance *b){ return a->_start_time < b->_start_time; });
 
   for (size_t i = 0; i < _effects.size(); ++i) {
     LOG_WRN_BOOL(_effects[i]->_effect->init());

@@ -44,14 +44,14 @@ static void apply_fixup(int *data, const void *ptr_base, const void *data_base) 
   }
 }
 
-template <class T>
-const T& read_and_step(const char **buf) {
+template <class T, class U>
+const T& read_and_step(const U **buf) {
   const T &tmp = *(const T *)*buf;
   *buf += sizeof(T);
   return tmp;
 }
 
-bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
+bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
@@ -87,7 +87,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   return true;
 }
 
-bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
+bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
@@ -109,7 +109,7 @@ bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
 }
 
 
-bool KumiLoader::load_materials(const char *buf) {
+bool KumiLoader::load_materials(const uint8 *buf) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
@@ -148,28 +148,27 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
 
   LOG_INFO_LN("loading %s", resource->resolve_filename(filename).c_str());
   MainHeader header;
-  MainHeader *p = &header;
-  B_ERR_BOOL(resource->load_partial(filename, 0, sizeof(header), (void **)&p));
+  B_ERR_BOOL(resource->load_inplace(filename, 0, sizeof(header), (void *)&header));
 
   const int scene_data_size = header.binary_ofs;
-  const char *scene_data = new char[scene_data_size];
-  B_ERR_BOOL(resource->load_partial(filename, 0, scene_data_size, (void **)&scene_data));
+  vector<uint8> scene_data;
+  B_ERR_BOOL(resource->load_partial(filename, 0, scene_data_size, &scene_data));
 
   const int buffer_data_size = header.total_size - header.binary_ofs;
-  char *buffer_data = new char[buffer_data_size];
-  B_ERR_BOOL(resource->load_partial(filename, header.binary_ofs, buffer_data_size, (void **)&buffer_data));
+  vector<uint8> buffer_data;
+  B_ERR_BOOL(resource->load_partial(filename, header.binary_ofs, buffer_data_size, &buffer_data));
 
   // apply the string fix-up
-  apply_fixup((int *)(scene_data + header.string_ofs), scene_data, scene_data);
+  apply_fixup((int *)(&scene_data[0] + header.string_ofs), &scene_data[0], &scene_data[0]);
 
   // apply the binary fixup
-  apply_fixup((int *)buffer_data, scene_data, buffer_data);
+  apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);
 
-  B_ERR_BOOL(load_materials(scene_data + header.material_ofs));
+  B_ERR_BOOL(load_materials(&scene_data[0] + header.material_ofs));
 
   Scene *s = *scene = new Scene;
-  B_ERR_BOOL(load_meshes(scene_data + header.mesh_ofs, s));
-  B_ERR_BOOL(load_cameras(scene_data + header.camera_ofs, s));
+  B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
+  B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
 
   return true;
 }

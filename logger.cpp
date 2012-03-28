@@ -6,45 +6,54 @@
 
 #pragma comment(lib, "dxerr.lib")
 
-bool check_bool(bool value, const char *exp, string *out)
-{
-	*out = exp;
-	return value;
+static const char *g_client_addr = "tcp://127.0.0.1:5555";
+
+bool check_bool(bool value, const char *exp, string *out) {
+  *out = exp;
+  return value;
 }
 
-bool check_hr(HRESULT hr, const char *exp, string *out)
-{
-	if (SUCCEEDED(hr))
-		return true;
+bool check_hr(HRESULT hr, const char *exp, string *out) {
+  if (SUCCEEDED(hr))
+    return true;
 
-	TCHAR *buf;
-	const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
-	FormatMessage(flags,  NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buf, 0, NULL);
-	*out = to_string("[%s] : %s", exp, buf);
-	LocalFree(buf); 
-	return false;
+  TCHAR *buf;
+  const DWORD flags = FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
+  FormatMessage(flags,  NULL, hr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&buf, 0, NULL);
+  *out = to_string("[%s] : %s", exp, buf);
+  LocalFree(buf); 
+  return false;
 }
 
-LogMgr* LogMgr::_instance = NULL;
+Logger* Logger::_instance = NULL;
 
-LogMgr::LogMgr() 
+Logger::Logger() 
   : _file(INVALID_HANDLE_VALUE)
   , _output_device(Debugger | File)
   , _break_on_error(false)
-	, _output_line_numbers(true)
+  , _output_line_numbers(true)
+  , _context(zmq_init(1))
+  , _socket(zmq_socket(_context, ZMQ_PUSH))
+  , _connected(false)
+  , _next_context_id(0)
 {
   init_severity_map();
 }
 
-LogMgr::~LogMgr() 
-{
+Logger::~Logger() {
   severity_map_.clear();
 
-	if (_file != INVALID_HANDLE_VALUE)
-		CloseHandle(_file);
+  if (_file != INVALID_HANDLE_VALUE)
+    CloseHandle(_file);
+
+  int zero = 0;
+  zmq_setsockopt(_socket, ZMQ_LINGER, &zero, sizeof (zero));
+  zmq_close(_socket);
+  zmq_term(_context);
 }
 
-void LogMgr::debug_output(const bool new_line, const bool one_shot, const char *file, const int line, const Severity severity, const char* const format, ...  )
+void Logger::debug_output(const bool new_line, const bool one_shot, const char *file, const int line, 
+                          const Severity severity, const char* const format, ...)
 {
   va_list arg;
   va_start(arg, format);
@@ -66,8 +75,8 @@ void LogMgr::debug_output(const bool new_line, const bool one_shot, const char *
   }
 
   std::string str = _output_line_numbers ? to_string("%s(%d): %s", file, line, buf) : buf;
-
-  if ((_output_device & LogMgr::Debugger) && severity_map_[LogMgr::Debugger][severity])
+/*
+  if ((_output_device & Logger::Debugger) && severity_map_[Logger::Debugger][severity])
     OutputDebugStringA(str.c_str());
 
   if (_output_device & File) {
@@ -80,58 +89,62 @@ void LogMgr::debug_output(const bool new_line, const bool one_shot, const char *
     }
   }
 
-  if (_file != INVALID_HANDLE_VALUE && (_output_device & LogMgr::File) && severity_map_[LogMgr::File][severity]) {
-		DWORD bytes_written;
-		WriteFile(_file, str.c_str(), str.size(), &bytes_written, NULL);
-		if (severity >= Error)
-			FlushFileBuffers(_file);
+  if (_file != INVALID_HANDLE_VALUE && (_output_device & Logger::File) && severity_map_[Logger::File][severity]) {
+    DWORD bytes_written;
+    WriteFile(_file, str.c_str(), str.size(), &bytes_written, NULL);
+    if (severity >= Error)
+      FlushFileBuffers(_file);
   }
+*/
+  if (!_connected)
+    _connected = zmq_connect(_socket, g_client_addr) == 0;
+
+  zmq_msg_t q;
+  int res = 0;
+  res = zmq_msg_init_size(&q, str.size() + 1);
+  strcpy((char *)zmq_msg_data(&q), str.c_str());
+  res = zmq_send(_socket, &q, 0);
+  res = zmq_msg_close(&q);
 
   va_end(arg);
 
-  if (_break_on_error && severity >= LogMgr::Error) 
+  if (_break_on_error && severity >= Logger::Error) 
     __asm int 3;
 }
 
-LogMgr& LogMgr::instance() 
-{
-  if (_instance == NULL) {
-    _instance = new LogMgr();
-    atexit(close);
-  }
+Logger& Logger::instance() {
+  if (!_instance)
+    _instance = new Logger();
   return *_instance;
 }
 
-void LogMgr::close()
-{
-  SAFE_DELETE(_instance);
+void Logger::close() {
+  delete exch_null(_instance);
 }
 
-LogMgr& LogMgr::enable_output(OuputDevice output) 
-{
+Logger& Logger::enable_output(OuputDevice output) {
   _output_device |= output;
   return *this;
 }
 
-LogMgr& LogMgr::disable_output(OuputDevice output) 
-{
+Logger& Logger::disable_output(OuputDevice output) {
   _output_device &= ~output;
   return *this;
 }
 
-LogMgr& LogMgr::open_output_file(const TCHAR *filename) 
-{
+Logger& Logger::open_output_file(const TCHAR *filename) {
   // close open file
-	if (_file != INVALID_HANDLE_VALUE)
-		CloseHandle(_file);
+  if (_file != INVALID_HANDLE_VALUE)
+    CloseHandle(_file);
 
-	SECURITY_ATTRIBUTES attr;
-	ZeroMemory(&attr, sizeof(attr));
-	attr.nLength = sizeof(attr);
-	attr.bInheritHandle = TRUE;
+  SECURITY_ATTRIBUTES attr;
+  ZeroMemory(&attr, sizeof(attr));
+  attr.nLength = sizeof(attr);
+  attr.bInheritHandle = TRUE;
 
-	if (INVALID_HANDLE_VALUE == (_file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, &attr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)))
-		return *this;
+  _file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, &attr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (_file == INVALID_HANDLE_VALUE)
+    return *this;
 
   // write header
   time_t rawTime;
@@ -142,21 +155,20 @@ LogMgr& LogMgr::open_output_file(const TCHAR *filename)
     return *this;
   }
 
-	char buf[80];
+  char buf[80];
   strftime(buf, sizeof(buf), "%H:%M:%S (%Y-%m-%d)", &timeInfo);
 
-	char header[512];
-	const int len = sprintf(header, "*****************************************************\n****\n**** Started at: %s\n****\n*****************************************************\n", buf);
+  char header[512];
+  const int len = sprintf(header, "*****************************************************\n****\n**** Started at: %s\n****\n*****************************************************\n", buf);
 
-	DWORD bytes_written = len;
-	WriteFile(_file, header, len, &bytes_written, NULL);
-	FlushFileBuffers(_file);
+  DWORD bytes_written = len;
+  WriteFile(_file, header, len, &bytes_written, NULL);
+  FlushFileBuffers(_file);
 
   return *this;
 }
 
-void LogMgr::init_severity_map() 
-{
+void Logger::init_severity_map() {
   severity_map_[Debugger][Verbose]  = false;
   severity_map_[Debugger][Info]     = true;
   severity_map_[Debugger][Warning]  = true;
@@ -170,26 +182,55 @@ void LogMgr::init_severity_map()
   severity_map_[File][Fatal]    = true;
 }
 
-LogMgr& LogMgr::enable_severity(const OuputDevice output, const Severity severity) 
-{
+Logger& Logger::enable_severity(const OuputDevice output, const Severity severity) {
   severity_map_[output][severity] = true;
   return *this;
 }
 
-LogMgr& LogMgr::disable_severity(const OuputDevice output, const Severity severity) 
-{
+Logger& Logger::disable_severity(const OuputDevice output, const Severity severity) {
   severity_map_[output][severity] = false;
   return *this;
 }
 
-LogMgr& LogMgr::break_on_error(const bool setting) 
-{
+Logger& Logger::break_on_error(const bool setting) {
   _break_on_error = setting;
   return *this;
 }
 
-LogMgr& LogMgr::print_file_and_line(const bool value)
-{
-	_output_line_numbers = value;		
-	return *this;
+Logger& Logger::print_file_and_line(const bool value) {
+  _output_line_numbers = value;
+  return *this;
+}
+
+int Logger::get_next_context_id() {
+  SCOPED_CS(_cs_context_id);
+  return ++_next_context_id;
+}
+
+void Logger::enter_context(int context_id, const char *msg) {
+}
+
+void Logger::leave_context(int context_id) {
+
+}
+
+ScopedContext::ScopedContext(int id, const char *fmt, ...) 
+  : _id(id) {
+
+  va_list arg;
+  va_start(arg, fmt);
+
+  const int len = _vscprintf(fmt, arg) + 1 + 1;
+
+  char* buf = (char*)_alloca(len);
+  vsprintf_s(buf, len, fmt, arg);
+  buf[len-2] = '\n';
+  buf[len-1] = 0;
+
+  LOGGER.enter_context(id, buf);
+  va_end(arg);
+}
+
+ScopedContext::~ScopedContext() {
+  LOGGER.leave_context(_id);
 }

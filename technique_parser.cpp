@@ -6,7 +6,7 @@
 #include "property.hpp"
 #include "material.hpp"
 #include "graphics_interface.hpp"
-#include <exception>
+#include "logger.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -600,7 +600,7 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 template<typename T> T id(T t) { return t; }
 
 template <typename T>
-void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string &)> fn = id<string>) {
+void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string &)> xform = id<string>) {
 	// a list is a list of tuples, where items within the tuple are whitespace delimited, and
 	// tuples are delimited by ';'
 	const char *item_start = scope->_start;
@@ -608,18 +608,18 @@ void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string
 	while (!scope->end()) {
 		char ch = scope->next_char();
 		if (ch == ';') {
-			cur.push_back(fn(string(item_start, scope->_start - item_start - 1)));
+			cur.push_back(xform(string(item_start, scope->_start - item_start - 1)));
 			items->push_back(cur);
 			cur.clear();
 			item_start = scope->skip_whitespace()._start;
 		} else if (isspace((uint8_t)ch)) {
-			cur.push_back(fn(string(item_start, scope->_start - item_start - 1)));
+			cur.push_back(xform(string(item_start, scope->_start - item_start - 1)));
 			item_start = scope->skip_whitespace()._start;
 		}
 	}
 
 	if (item_start < scope->_end) {
-		cur.push_back(fn(string(item_start, scope->_start - item_start)));
+		cur.push_back(xform(string(item_start, scope->_start - item_start)));
 		items->push_back(cur);
 	}
 }

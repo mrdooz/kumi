@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "utils.hpp"
 #include "async_file_loader.hpp"
 
 using std::pair;
@@ -105,6 +106,11 @@ AsyncFileLoader::AsyncFileLoader()
 {
 }
 
+AsyncFileLoader::~AsyncFileLoader() {
+  if (_thread != INVALID_HANDLE_VALUE)
+    CloseHandle(_thread);
+}
+
 AsyncFileLoader &AsyncFileLoader::instance()
 {
 	if (!_instance)
@@ -137,4 +143,10 @@ void AsyncFileLoader::remove_callback(const CbFileLoaded &cb)
 void AsyncFileLoader::cancel_load(const char *filename)
 {
 
+}
+
+void AsyncFileLoader::close() {
+  if (_instance) {
+    delete exch_null(_instance);
+  }
 }

@@ -21,13 +21,16 @@ Dispatcher &Dispatcher::instance() {
   return *_instance;
 }
 
+void Dispatcher::close() {
+  delete exch_null(_instance);
+}
+
 Dispatcher::Dispatcher() {
   ZeroMemory(_threads, sizeof(_threads));
 }
 
 void Dispatcher::invoke(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb) {
-  SCOPED_CONC_CS(_thread_cs);
-  //SCOPED_CS(_thread_cs);
+  SCOPED_CS(_thread_cs);
   Thread *thread = _threads[id];
   if (!thread)
     return;
@@ -36,7 +39,7 @@ void Dispatcher::invoke(const TrackedLocation &location, ThreadId id, const std:
 }
 
 void Dispatcher::invoke_and_wait(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb) {
-  SCOPED_CONC_CS(_thread_cs);
+  SCOPED_CS(_thread_cs);
   Thread *thread = _threads[id];
   if (!thread)
     return;
@@ -49,7 +52,7 @@ void Dispatcher::invoke_and_wait(const TrackedLocation &location, ThreadId id, c
 
 
 void Dispatcher::set_thread(ThreadId id, Thread *thread) {
-  SCOPED_CONC_CS(_thread_cs);
+  SCOPED_CS(_thread_cs);
   assert(!_threads[id]);
   _threads[id] = thread;
 }
@@ -66,6 +69,7 @@ Thread::Thread()
 }
 
 Thread::~Thread() {
+  CloseHandle(_cancel_event);
 }
 
 bool Thread::started() const { 
@@ -86,6 +90,7 @@ bool Thread::join() {
   if (WaitForSingleObject(_thread, INFINITE) != WAIT_OBJECT_0)
     return false;
 
+  CloseHandle(_thread);
   _thread = INVALID_HANDLE_VALUE;
   return true;
 }

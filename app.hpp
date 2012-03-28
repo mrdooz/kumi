@@ -33,15 +33,18 @@ struct RenderStates {
   ID3D11SamplerState *sampler_state;
 };
 
-class App : public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
-            public threading::GreedyThread
+class App : 
+#if USE_CEF 
+  public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
+#endif
+  public threading::GreedyThread
 {
 public:
 
   static App& instance();
 
   bool init(HINSTANCE hinstance);
-  bool close();
+  static bool close();
 
   void	tick();
 
@@ -59,9 +62,10 @@ private:
   void set_client_size();
   void find_app_root();
 
-  LRESULT wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-  static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+  static LRESULT CALLBACK wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+  //static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
+#if USE_CEF
   // CefClient methods
   virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() OVERRIDE { return this; }
   virtual CefRefPtr<CefLoadHandler> GetLoadHandler() OVERRIDE { return this; }
@@ -112,8 +116,9 @@ private:
     NOTIFY_DOWNLOAD_ERROR,
   };
   void SendNotification(NotificationType type);
-
+#endif
 protected:
+#if USE_CEF
   void SetLoading(bool isLoading);
   void SetNavState(bool canGoBack, bool canGoForward);
 
@@ -149,7 +154,7 @@ protected:
   IMPLEMENT_REFCOUNTING(App);
   // Include the default locking implementation.
   IMPLEMENT_LOCKING(App);
-
+#endif
   static App* _instance;
   EffectBase* _test_effect;
   HINSTANCE _hinstance;
@@ -162,9 +167,10 @@ protected:
   bool _draw_plane;
   string _app_root;
   int _ref_count;
-
+#if USE_CEF
   GraphicsObjectHandle _cef_texture;
   GraphicsObjectHandle _cef_staging;
+#endif
 };
 
 #define APP App::instance()

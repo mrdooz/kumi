@@ -176,7 +176,8 @@ public:
 private:
 
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
-  bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params);
+  bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, 
+                     std::set<std::string> *used_params);
 
   //TODO
   //RenderKey _key;

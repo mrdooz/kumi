@@ -8,6 +8,7 @@
 #include "../technique.hpp"
 #include "../material.hpp"
 #include "../renderer.hpp"
+#include "../logger.hpp"
 
 VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
@@ -15,6 +16,8 @@ VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::stri
 }
 
 bool VolumetricEffect::init() {
+
+  LOG_VERBOSE_LN(__FUNCTION__);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
@@ -80,6 +83,8 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
 }
 
 bool VolumetricEffect::render() {
+
+  LOG_CONTEXT(__FUNCTION__);
 
   static XMFLOAT4 clear_white(1, 1, 1, 1);
   static XMFLOAT4 clear_black(0, 0, 0, 1);

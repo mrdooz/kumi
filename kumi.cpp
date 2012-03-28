@@ -5,51 +5,35 @@
 #include "logger.hpp"
 #include "app.hpp"
 #include "path_utils.hpp"
-#include <TlHelp32.h>
+#include "log_server.hpp"
+#include "kumi.hpp"
 
 #pragma comment(lib, "Ws2_32.lib")
 
 static string g_module_name;
-static const char *g_log_server_addr = "tcp://*:5556";
-static const char *g_client_addr = "tcp://127.0.0.1:5556";
+static bool g_started_as_log_server;
 
-void file_changed(FileEvent event, const char *old_name, const char *new_name)
-{
+static bool start_second_process(const char *cmd_args) {
+  PROCESS_INFORMATION process_information;
+  ZeroMemory(&process_information, sizeof(process_information));
+  STARTUPINFOA startup_info;
+  ZeroMemory(&startup_info, sizeof(startup_info));
+  startup_info.cb = sizeof(startup_info);
+
+  char filename[MAX_PATH], cmdline[MAX_PATH];
+  GetModuleFileNameA(NULL, filename, MAX_PATH);
+  if (cmd_args[0] != '\0') 
+    sprintf(cmdline, "%s %s", filename, cmd_args);
+  else
+    strcpy(cmdline, filename);
+  BOOL res = CreateProcessA(filename, cmdline, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, 
+    &startup_info, &process_information);
+  CloseHandle(process_information.hProcess);
+  CloseHandle(process_information.hThread);
+  return !!res;
 }
 
-void file_changed2(const char *filename, const void *buf, size_t len)
-{
-}
-
-void file_loaded(const char *filename, const void *buf, size_t len)
-{
-  string str((const char *)buf, len);
-
-}
-
-bool bool_true()
-{
-  return true;
-}
-
-bool bool_false()
-{
-  return false;
-}
-
-HRESULT hr_ok()
-{
-  return S_OK;
-}
-
-HRESULT hr_meh()
-{
-  return E_INVALIDARG;
-}
-
-bool start_process(const char *cmd_args);
-
-int count_instances(const char *name) {
+static int count_instances(const char *name) {
   int cnt = 0;
   PROCESSENTRY32 entry;
   entry.dwSize = sizeof(PROCESSENTRY32);
@@ -64,116 +48,43 @@ int count_instances(const char *name) {
   return cnt;
 }
 
-bool start_process(const char *cmd_args) {
-  PROCESS_INFORMATION process_information;
-  ZeroMemory(&process_information, sizeof(process_information));
-  STARTUPINFOA startup_info;
-  ZeroMemory(&startup_info, sizeof(startup_info));
-  startup_info.cb = sizeof(startup_info);
+static int run_app(HINSTANCE instance) {
 
-  char filename[MAX_PATH], cmdline[MAX_PATH];
-  GetModuleFileNameA(NULL, filename, MAX_PATH);
-  if (strlen(cmd_args) > 0) 
-    sprintf(cmdline, "%s %s", filename, cmd_args);
-  else
-    strcpy(cmdline, filename);
-  return !!CreateProcessA(filename, cmdline, NULL, NULL, FALSE, NORMAL_PRIORITY_CLASS, NULL, NULL, 
-    &startup_info, &process_information);
-}
-
-
-int run_log_server() {
-
-  void *ctx = zmq_init(1);
-  void *s = zmq_socket(ctx, ZMQ_REP);
-  int res = zmq_bind(s, g_log_server_addr);
-  if (res < 0) {
-    const char *str = zmq_strerror(zmq_errno());
-    MessageBoxA(NULL, str, NULL, MB_ICONEXCLAMATION);
-    zmq_close(s);
-    zmq_term(ctx);
-    return zmq_errno();
-  }
-
-  start_process("");
-
-  while (true) {
-    zmq_msg_t r;
-    zmq_msg_init(&r);
-    zmq_recv(s, &r, 0);
-
-    MessageBoxA(NULL, (const char *)zmq_msg_data(&r), NULL, 0);
-    zmq_msg_close(&r);
-  }
-
-  zmq_close(s);
-  zmq_term(ctx);
-
-  return 0;
-}
-
-bool start_log_server() {
-
-  start_process("--log-server");
-
-  void *ctx = zmq_init(1);
-  void *s = zmq_socket(ctx, ZMQ_REQ);
-  int z_res;
-  if (zmq_connect(s, g_client_addr) < 0) {
-    MessageBoxA(NULL, zmq_strerror(zmq_errno()), NULL, MB_ICONEXCLAMATION);
-    zmq_close(s);
-    zmq_term(ctx);
-    return false;
-  }
-
-  zmq_msg_t q;
-  z_res = zmq_msg_init_size(&q, 7);
-  strcpy((char *)zmq_msg_data(&q), "magnus");
-  z_res = zmq_send(s, &q, 0);
-  zmq_msg_close(&q);
-
-  zmq_msg_t reply;
-  z_res = zmq_recv(s, &reply, 0);
-
-  zmq_close(s);
-  zmq_term(ctx);
-
-  return true;
-}
-
-int run_app(HINSTANCE instance) {
-
-  start_log_server();
-
+#if USE_CEF
   CefSettings settings;
   settings.multi_threaded_message_loop = false;
   CefInitialize(settings);
-
+#endif
   if (!APP.init(instance))
     return 1;
 
   int res = APP.run(NULL);
 
-  APP.close();
+  App::close();
 
   return res;
 }
 
-bool init() {
+static bool global_init() {
   char filename[MAX_PATH];
   GetModuleFileNameA(NULL, filename, MAX_PATH);
   g_module_name = filename;
-
-  WSADATA wsaData;
-  WSAStartup(0x0202, &wsaData );
   return true;
 }
 
+static bool global_close() {
+  HWND h = g_started_as_log_server ? FindWindow(g_app_window_class, g_app_window_class) : 
+    FindWindow(g_log_window_class, g_log_window_title);
+  PostMessage(h, WM_APP_CLOSE, 0, 0);
+  return true;
+}
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
-  if (!init())
+  if (!global_init())
     return 1;
+
+  int res = 0;
 
   // hopefully this should save me from killing myself :)
   Path path(g_module_name);
@@ -181,10 +92,15 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
   if (process_count > 2)
     return 1;
 
-
-  if (!strcmp(cmd_line, "--log-server")) {
-    return run_log_server();
+  g_started_as_log_server = !strcmp(cmd_line, "--log-server");
+  if (g_started_as_log_server) {
+    start_second_process("");
+    res = run_log_server(instance);
   } else {
-    return run_app(instance);
+    start_second_process("--log-server");
+    res = run_app(instance);
   }
+
+  global_close();
+  return res;
 }

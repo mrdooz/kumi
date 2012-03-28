@@ -1,6 +1,8 @@
 #ifndef _DX_UTILS_HPP_
 #define _DX_UTILS_HPP_
 
+#include "logger.hpp"
+
 struct CD3D11_INPUT_ELEMENT_DESC : public D3D11_INPUT_ELEMENT_DESC
 {
 	CD3D11_INPUT_ELEMENT_DESC(LPCSTR name, UINT index, DXGI_FORMAT fmt, UINT slot, 

@@ -11,16 +11,16 @@ struct SubMesh {
 };
 
 struct Mesh {
-	Mesh(const string &name) : name(name) { }
+	Mesh(const std::string &name) : name(name) { }
 	void submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
-	string name;
+	std::string name;
 	XMFLOAT4X4 obj_to_world;
 	std::vector<SubMesh *> submeshes;
 };
 
 struct Camera {
-	Camera(const string &name) : name(name) {}
-	string name;
+	Camera(const std::string &name) : name(name) {}
+	std::string name;
 	XMFLOAT3 pos, target, up;
 	float roll;
 	float aspect_ratio;

@@ -88,12 +88,12 @@ public:
 		}
 
 		enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
-		IdBuffer<ID3D11VertexShader *, IdCount, string> _vertex_shaders;
-		IdBuffer<ID3D11PixelShader *, IdCount, string> _pixel_shaders;
+		SearchableIdBuffer<ID3D11VertexShader *, string, IdCount> _vertex_shaders;
+		SearchableIdBuffer<ID3D11PixelShader *, string, IdCount> _pixel_shaders;
 		IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
 		IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
 		IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
-		IdBuffer<Technique *, IdCount, string> _techniques;
+		SearchableIdBuffer<Technique *, string, IdCount> _techniques;
 		IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
 
 		IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
@@ -101,15 +101,15 @@ public:
 		IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
 		IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
-		IdBuffer<TextureData *, IdCount, string> _textures;
-		IdBuffer<RenderTargetData *, IdCount, string> _render_targets;
+		SearchableIdBuffer<TextureData *, string, IdCount> _textures;
+		SearchableIdBuffer<RenderTargetData *, string, IdCount> _render_targets;
 	};
 
 	static bool create(ResourceInterface *ri);
 	static Graphics& instance();
+  static void close();
 
 	bool	init(const HWND hwnd, const int width, const int height);
-	bool	close();
 	void	clear(const XMFLOAT4& c);
 	void	clear(GraphicsObjectHandle h, const XMFLOAT4 &c);
 	void	present();

@@ -5,11 +5,15 @@
 #include <windows.h>
 #include <atlbase.h>
 #include <process.h>
+#include <TlHelp32.h>
+#include <CommCtrl.h>
 
 #include <stdio.h>
 #include <tchar.h>
 #include <stdint.h>
 #include <assert.h>
+
+#include <exception>
 
 typedef int8_t int8;
 typedef uint8_t uint8;
@@ -62,6 +66,7 @@ typedef uint64_t uint64;
 #include <type_traits>
 #include <stack>
 #include <hash_set>
+#include <set>
 
 #include <concurrent_queue.h>
 
@@ -72,7 +77,12 @@ typedef uint64_t uint64;
 #include <xnamath.h>
 
 // these files don't change that much, so we can include them here
-#include "logger.hpp"
+//#include "logger.hpp"
 
+#define USE_CEF 0
+#if USE_CEF
 #include <cef.h>
+#endif
 
+
+typedef std::basic_string<TCHAR> ustring;

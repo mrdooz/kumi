@@ -4,6 +4,7 @@
 #include "resource_manager.hpp"
 #include "file_watcher.hpp"
 #include "threading.hpp"
+#include "logger.hpp"
 
 using namespace std::tr1::placeholders;
 using namespace std;
@@ -63,19 +64,24 @@ bool ResourceManager::load_file(const char *filename, std::vector<uint8> *buf) {
 
   return ::load_file(full_path.c_str(), buf);
 }
-
+/*
 bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
   const string &full_path = resolve_filename(filename);
   if (full_path.empty()) return false;
 
   return ::load_file(full_path.c_str(), buf, len);
 }
+*/
+bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, std::vector<uint8> *buf) {
+  buf->resize(len);
+  return load_inplace(filename, ofs, len, buf->data());
+}
 
-bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, void **buf) {
+bool ResourceManager::load_inplace(const char *filename, size_t ofs, size_t len, void *buf) {
   const string &full_path = resolve_filename(filename);
 
   ScopedHandle h(CreateFileA(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 
-                             FILE_ATTRIBUTE_NORMAL, NULL));
+    FILE_ATTRIBUTE_NORMAL, NULL));
   if (h.handle() == INVALID_HANDLE_VALUE)
     return false;
 
@@ -83,27 +89,16 @@ bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len,
   if (ofs + len > size)
     return false;
 
-  // if no buffer is supplied, allocate a new one
-  const bool mem_supplied = *buf != NULL;
-  if (!mem_supplied)
-    *buf = new uint8_t[len];
-
   DWORD res;
   if (SetFilePointer(h, ofs, 0, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-    if (!mem_supplied)
-      delete [] exch_null(*buf);
     return false;
   }
 
-  if (!ReadFile(h, *buf, len, &res, NULL)) {
+  if (!ReadFile(h, buf, len, &res, NULL)) {
     DWORD err = GetLastError();
-    if (!mem_supplied)
-      delete [] exch_null(*buf);
     return false;
   }
-
   return true;
-
 }
 
 bool ResourceManager::file_exists(const char *filename) {

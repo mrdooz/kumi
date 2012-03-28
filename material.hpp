@@ -4,12 +4,12 @@
 
 struct MaterialProperty {
 
-  MaterialProperty(const string &name, int value) : name(name), type(PropertyType::kInt), _int(value) {}
-  MaterialProperty(const string &name, float value) : name(name), type(PropertyType::kFloat) { _float[0] = value; }
-  MaterialProperty(const string &name, const XMFLOAT4 &value) : name(name), type(PropertyType::kFloat4) 
+  MaterialProperty(const std::string &name, int value) : name(name), type(PropertyType::kInt), _int(value) {}
+  MaterialProperty(const std::string &name, float value) : name(name), type(PropertyType::kFloat) { _float[0] = value; }
+  MaterialProperty(const std::string &name, const XMFLOAT4 &value) : name(name), type(PropertyType::kFloat4) 
   { _float[0] = value.x; _float[1] = value.z; _float[2] = value.y; _float[3] = value.w; }
 
-  string name;
+  std::string name;
   PropertyType::Enum type;
   union {
     int _int;
@@ -18,8 +18,8 @@ struct MaterialProperty {
 };
 
 struct Material {
-  Material(const string &name) : name(name), id(~0) {}
-  string name;
+  Material(const std::string &name) : name(name), id(~0) {}
+  std::string name;
   std::vector<MaterialProperty> properties;
   uint16 id;  // set by the PropertyManager
 };

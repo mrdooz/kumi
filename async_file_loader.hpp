@@ -5,15 +5,17 @@ typedef std::function<void (const char *, const void *, size_t)> CbFileLoaded;
 class AsyncFileLoader
 {
 public:
-	AsyncFileLoader();
 
 	static AsyncFileLoader &instance();
+  static void close();
+
 	bool load_file(const char *filename, const CbFileLoaded &cb);
 	void cancel_load(const char *filename);
 	void remove_callback(const CbFileLoaded &cb);
-	void close();
 
 private:
+  AsyncFileLoader();
+  ~AsyncFileLoader();
 
 	bool lazy_create_thread();
 
