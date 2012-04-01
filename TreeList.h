@@ -20,6 +20,7 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <windowsx.h>
+#include <string>
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
@@ -76,23 +77,24 @@ typedef enum
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 
-struct tag_TreeListNodeData
+struct TreeListNodeData
 {
-    
-    char                        Data    [TREELIST_MAX_STRING +1];
-    BOOL                        Editable;
-    BOOL                        Numeric;
-    void                        *pExternalPtr;
-    BOOL                        Colored;
-    COLORREF                    BackgroundColor;
-    COLORREF                    TextColor;
-    COLORREF                    AltertedTextColor;
-    BOOL                        Altered;            // Private struct members -->
-    long                        CRC;                // Last element in struct!
-    
-    
+  TreeListNodeData() 
+    : Editable(FALSE), Numeric(FALSE), pExternalPtr(0), Colored(FALSE), BackgroundColor(0), TextColor(0)
+    , AltertedTextColor(0), Altered(FALSE), CRC(0)
+  {
+  }
+  std::string                 Data;
+  BOOL                        Editable;
+  BOOL                        Numeric;
+  void                        *pExternalPtr;
+  BOOL                        Colored;
+  COLORREF                    BackgroundColor;
+  COLORREF                    TextColor;
+  COLORREF                    AltertedTextColor;
+  BOOL                        Altered;            // Private struct members -->
+  long                        CRC;                // Last element in struct!
 };
-typedef struct tag_TreeListNodeData TreeListNodeData;
 
 
 ///////////////////////////////////////////////////////////////////////////////////////

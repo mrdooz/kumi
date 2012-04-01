@@ -102,7 +102,7 @@
     <ClCompile Include="..\log_server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\TreeList.c">
+    <ClCompile Include="..\TreeList.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

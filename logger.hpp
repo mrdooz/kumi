@@ -17,14 +17,15 @@ public:
 
   enum Severity 
   {
-    Verbose     = (1 << 0),
-    Info        = (1 << 1),
-    Warning     = (1 << 2),
-    Error       = (1 << 3),
-    Fatal       = (1 << 4),
+    Unknown,
+    Verbose,
+    Info,
+    Warning,
+    Error,
+    Fatal,
   };
 
-  void debug_output(const bool newLine, const bool one_shot, const char *file, const int line, const Severity severity, const char* const format, ...  );
+  void debug_output(bool newLine, bool one_shot, const char *file, int line, Severity severity, const char* const format, ...  );
 
   void enter_context(int context_id, const char *msg);
   void leave_context(int context_id);
@@ -33,10 +34,10 @@ public:
   Logger& enable_output(OuputDevice output);
   Logger& disable_output(OuputDevice output);
   Logger& open_output_file(const TCHAR *filename);
-  Logger& break_on_error(const bool setting);
+  Logger& break_on_error(bool setting);
 
-  Logger& enable_severity(const OuputDevice output, const Severity severity);
-  Logger& disable_severity(const OuputDevice output, const Severity severity);
+  Logger& enable_severity(OuputDevice output, Severity severity);
+  Logger& disable_severity(OuputDevice output, Severity severity);
 
   static Logger& instance();
   static void close();
@@ -50,6 +51,7 @@ private:
   ~Logger();
 
   void	init_severity_map();
+  void send_log_message(int scope, Severity severity, const char *msg); // < 0 = leave scope, > 0 = enter scope, 0 = no scope
 
   HANDLE _file;
   int   _output_device;

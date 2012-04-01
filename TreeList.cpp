@@ -17,6 +17,14 @@
 #pragma warning(disable : 4996) // CRT Secure - off
 
 #include "TreeList.h"
+#include "utils.hpp"
+using namespace std;
+
+template<class T>
+void reset(T *&ref, T *new_value) {
+  delete ref;
+  ref = new_value;
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////
 //
@@ -52,35 +60,33 @@ typedef HANDLE (CALLBACK* LPREMOVEPROP)(HWND,LPCTSTR);  // VC2010 issue
 
 // a single node (linked list) member
 
-static struct tag_TreeListNode
+struct TreeListNode
 {
-    int                         NodeDataCount;       // Count of items in pNodeData
-    HTREEITEM                   TreeItemHandle;
-    struct tag_TreeListNode     *pParennt;
-    struct tag_TreeListNode     *pSibling;
-    struct tag_TreeListNode     *pBrother;
-    TreeListNodeData            **pNodeData;         // Array of NodeData for each column
+    int                 NodeDataCount;       // Count of items in pNodeData
+    HTREEITEM           TreeItemHandle;
+    TreeListNode        *pParennt;
+    TreeListNode        *pSibling;
+    TreeListNode        *pBrother;
+    TreeListNodeData    **pNodeData;         // Array of NodeData for each column
     
 };
-typedef struct tag_TreeListNode TreeListNode;
 
 ///////////////////////////////////////////////////////////////
 // a column (header) struct
 
-typedef struct tag_TreeListColumnInfo
+struct TreeListColumnInfo
 {
     
     char                ColumnName[TREELIST_MAX_STRING+1];
     int                 Width;
     
 };
-typedef struct tag_TreeListColumnInfo TreeListColumnInfo;
 
 
 ///////////////////////////////////////////////////////////////
 // It's more convenient then RECT
 
-static struct tag_TreeListDimensions
+struct TreeListDimensions
 {
     
     int                         X;
@@ -88,13 +94,12 @@ static struct tag_TreeListDimensions
     int                         Width;
     int                         Hight;
 };
-typedef struct tag_TreeListDimensions TreeListDimensions;
 
 
 ///////////////////////////////////////////////////////////////
 // The is the session, the internal data for a control instance
 
-static struct tag_TreeListSession
+struct tag_TreeListSession
 {
     
     
@@ -161,7 +166,7 @@ typedef struct tag_TreeListSession TreeListSession;
 // a pointer to the dictionary will be attached to the parent window of the control.
 // This array will be updated with each instance and destroyed when the last control will be terminated.
 
-static struct tag_TreeListDict 
+struct tag_TreeListDict 
 {
     int                         ReferenceCount;
     HWND                        HwndParent      [TREELIST_MAX_INSTANCES];
@@ -169,7 +174,7 @@ static struct tag_TreeListDict
     TreeListSession             *pSessionPtr    [TREELIST_MAX_INSTANCES];
     
 };
-typedef struct tag_TreeListDict TreeListDict;
+typedef tag_TreeListDict TreeListDict;
 
 
 /////////////////////////////////////////////////////////////////
@@ -519,35 +524,33 @@ static void TreeList_Internal_DestroyEditBox(TreeListSession *pSession)
 
 static TreeListNode* TreeList_Internal_NodeCreateNew(TreeListSession *pSession)
 {
-    TreeListNode    *pTmpNode = 0;
-    int             iCol = 0;
-    
-    if(!pSession)
-        return 0; // No session
-    
-    
-    pTmpNode = (TreeListNode*)malloc(sizeof(TreeListNode));
-    if(pTmpNode)
+  TreeListNode    *pTmpNode = 0;
+  int             iCol = 0;
+
+  if(!pSession)
+    return 0; // No session
+
+
+  pTmpNode = (TreeListNode*)malloc(sizeof(TreeListNode));
+  if(pTmpNode)
+  {
+    memset(pTmpNode,0,sizeof(TreeListNode));
+    pSession->AllocatedTreeBytes += sizeof(TreeListNode);
+
+    pTmpNode->pNodeData = (TreeListNodeData**)malloc(sizeof(TreeListNodeData*) * (pSession->ColumnsCount +1));
+    if(!pTmpNode->pNodeData)
     {
-        memset(pTmpNode,0,sizeof(TreeListNode));
-        pSession->AllocatedTreeBytes += sizeof(TreeListNode);
-        
-        pTmpNode->pNodeData = (TreeListNodeData**)malloc(sizeof(TreeListNodeData*) * (pSession->ColumnsCount +1));
-        if(!pTmpNode->pNodeData)
-        {
-            free(pTmpNode);
-            pTmpNode = 0;
-            return pTmpNode;
-        }
-        
-        for(iCol = 0;iCol< pSession->ColumnsCount;iCol++)
-            pTmpNode->pNodeData[iCol] = 0;
-        
-        pSession->AllocatedTreeBytes += (sizeof(TreeListNodeData*) * pSession->ColumnsCount);
-        
+      SAFE_FREE(pTmpNode);
+      return pTmpNode;
     }
-    return pTmpNode;
-    
+
+    for(iCol = 0;iCol< pSession->ColumnsCount;iCol++)
+      pTmpNode->pNodeData[iCol] = 0;
+
+    pSession->AllocatedTreeBytes += (sizeof(TreeListNodeData*) * pSession->ColumnsCount);
+
+  }
+  return pTmpNode;
 }
 
 
@@ -601,13 +604,14 @@ static TreeListNode* TreeList_Internal_NodeColonize(TreeListSession *pSession, T
         return 0; // Null pointer
     
     // Allocate the new element
-    pNode->pNodeData[pNode->NodeDataCount] = (TreeListNodeData*)malloc(sizeof(TreeListNodeData)); // Allocate memory
+    pNode->pNodeData[pNode->NodeDataCount] = new TreeListNodeData(); //(TreeListNodeData*)malloc(sizeof(TreeListNodeData)); // Allocate memory
     if(!pNode->pNodeData[pNode->NodeDataCount])
         return 0; // No memory
     
     pSession->AllocatedTreeBytes += sizeof(TreeListNodeData);
     
-    memcpy(pNode->pNodeData[pNode->NodeDataCount],pNodeData,sizeof(TreeListNodeData)); // copy to the internal container
+    //memcpy(pNode->pNodeData[pNode->NodeDataCount],pNodeData,sizeof(TreeListNodeData)); // copy to the internal container
+    *pNode->pNodeData[pNode->NodeDataCount] = *pNodeData;
     pNode->pNodeData[pNode->NodeDataCount]->CRC = TreeList_Internal_CRCCreate(pNode->pNodeData[pNode->NodeDataCount],
         (sizeof(TreeListNodeData) - sizeof(pNode->pNodeData[pNode->NodeDataCount]->CRC))); // Set the crc sig
     pNode->NodeDataCount++;
@@ -708,45 +712,42 @@ static TreeListNode* TreeList_Internal_AddNode(TreeListSession *pSession,TreeLis
 
 static void TreeList_Internal_NodeFreeAllSubNodes(TreeListSession *pSession,TreeListNode *pNode)
 {
-    
-    
-    TreeListNode *pTmpNode     = 0;
-    int          Node;
-    
-    if(!pSession || !pNode)
-        return; // No session
-    
-    if(pNode->pSibling)
-    {
-        pTmpNode = pNode->pSibling;
-        TreeList_Internal_NodeFreeAllSubNodes(pSession,pTmpNode);
-    }
-    
-    if(pNode->pBrother)
-    {
-        pTmpNode = pNode->pBrother;
-        TreeList_Internal_NodeFreeAllSubNodes(pSession,pTmpNode);
-        
-    }
-    // Free the Nodes array
-    for(Node = 0;Node < pNode->NodeDataCount;Node++)
-    {
-        free(pNode->pNodeData[Node]);
-        pNode->pNodeData[Node] = 0;
-        pSession->AllocatedTreeBytes -= sizeof(TreeListNodeData);
-        
-    }
-    
-    if(pNode->pNodeData)
-    {
-        free(pNode->pNodeData);
-        pNode->pNodeData = 0;
-        pSession->AllocatedTreeBytes -= (sizeof(TreeListNodeData*) * pSession->ColumnsCount);
-    }
-    
-    free(pNode);
-    pNode = 0;
-    pSession->AllocatedTreeBytes -= sizeof(TreeListNode);
+  TreeListNode *pTmpNode     = 0;
+  int          Node;
+
+  if(!pSession || !pNode)
+    return; // No session
+
+  if(pNode->pSibling)
+  {
+    pTmpNode = pNode->pSibling;
+    TreeList_Internal_NodeFreeAllSubNodes(pSession,pTmpNode);
+  }
+
+  if(pNode->pBrother)
+  {
+    pTmpNode = pNode->pBrother;
+    TreeList_Internal_NodeFreeAllSubNodes(pSession,pTmpNode);
+
+  }
+  // Free the Nodes array
+  for(Node = 0;Node < pNode->NodeDataCount;Node++)
+  {
+    delete pNode->pNodeData[Node];
+    pNode->pNodeData[Node] = 0;
+    pSession->AllocatedTreeBytes -= sizeof(TreeListNodeData);
+
+  }
+
+  if(pNode->pNodeData)
+  {
+    SAFE_DELETE(pNode->pNodeData);
+    pSession->AllocatedTreeBytes -= (sizeof(TreeListNodeData*) * pSession->ColumnsCount);
+  }
+
+  free(pNode);
+  pNode = 0;
+  pSession->AllocatedTreeBytes -= sizeof(TreeListNode);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1001,37 +1002,35 @@ static void TreeList_Internal_RepositionControls(TreeListSession *pSession)
 
 static TreeListNode *TreeList_Internal_GetNodeFromTreeHandle(TreeListSession *pSession,HTREEITEM hTreeItem)
 {
-    
-    
-    TVITEM              TreeItem;
-    TreeListNode        *pNode      = 0;
-    int                 Node;
-    
-    if(!pSession)
-        return 0 ; // No session
-    
-    memset(&TreeItem,0,sizeof(TreeItem)); // Set all items to 0
-    
-    TreeItem.mask   = TVIF_HANDLE;
-    TreeItem.hItem  = hTreeItem;
-    
-    if(TreeView_GetItem( pSession->HwndTreeView, &TreeItem ) == FALSE)
-        return 0;
-    
-    pNode = (NODE_HANDLE)TreeItem.lParam;
-    
-    // Check the node(s) integrity
-    for(Node = 0;Node < pNode->NodeDataCount;Node++)
+  TVITEM              TreeItem;
+  TreeListNode        *pNode      = 0;
+  int                 Node;
+
+  if(!pSession)
+    return 0 ; // No session
+
+  memset(&TreeItem,0,sizeof(TreeItem)); // Set all items to 0
+
+  TreeItem.mask   = TVIF_HANDLE;
+  TreeItem.hItem  = hTreeItem;
+
+  if(TreeView_GetItem( pSession->HwndTreeView, &TreeItem ) == FALSE)
+    return 0;
+
+  pNode = (TreeListNode *)TreeItem.lParam;
+
+  // Check the node(s) integrity
+  for(Node = 0;Node < pNode->NodeDataCount;Node++)
+  {
+    if(pNode->pNodeData[Node])
     {
-        if(pNode->pNodeData[Node])
-        {
-            if(!TreeList_Internal_CRCCheck(pNode->pNodeData[Node],(sizeof(TreeListNodeData) - sizeof(pNode->pNodeData[Node]->CRC)),pNode->pNodeData[Node]->CRC))
-                return 0;
-        }
+      if(!TreeList_Internal_CRCCheck(pNode->pNodeData[Node],(sizeof(TreeListNodeData) - sizeof(pNode->pNodeData[Node]->CRC)),pNode->pNodeData[Node]->CRC))
+        return 0;
     }
-    
-    return pNode;
-    
+  }
+
+  return pNode;
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -1171,631 +1170,637 @@ static LRESULT CALLBACK TreeList_Internal_HandleTreeMessagesEx (HWND hWnd, UINT 
 
 static LRESULT TreeList_Internal_HandleTreeMessages (HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam)
 {
-    
-    
-    TreeListSession     *pSession           = 0;
-    TreeListDict        *pDict              = 0;
-    LPNMTVCUSTOMDRAW    lpNMTVCustomDraw    = 0;
-    HTREEITEM           hTreeItem           = 0;
-    HDITEM              HeaderItem;
-    LPNMHDR             lpNMHeader          = 0;
-    LPNMHEADER          lpNMHeaderChange    = 0;
-    TVHITTESTINFO       TreeTestInfo        = {0};
-    TVITEM              Treeitem            = {0};
-    WNDPROC             ProcParent          = (WNDPROC)GetProp(hWnd,"WNDPROC");
-    RECT                RectLabel           = {0,0,0,0};
-    RECT                RectText            = {0,0,0,0};
-    RECT                RectItem            = {0,0,0,0};
-    RECT                RectHeaderItem      = {0,0,0,0};
-    RECT                RectParent          = {0,0,0,0};
-    HBRUSH              brWnd               = 0;
-    HBRUSH              brTextBk            = 0;
-    COLORREF            clTextBk = 0,clWnd  = 0;
-    HDC                 hDC                 = 0;
-    HDC                 hDCMem              = 0;
-    HBITMAP             hBitMapMem          = 0;
-    HBITMAP             hOldBitMap          = 0;
-    LPNMHEADER          pNMHeader           = 0;
-    DWORD               dwMousePos          = 0;
-    DWORD               dwStyle             = 0;
-    BOOL                RetVal              = FALSE;
-    BOOL                SelectedLine        = FALSE;
-    int                 iCol                = 0;
-    int                 iOffSet             = 0;
-    int                 iColEnd,iColStart   = 0;
-    int                 iControlID          = 0;
-    TreeListSession     *pFirstSession      = 0;
-    TreeListNode        *pNode              = 0;
-    LPWINDOWPOS         lpPos               = 0;
-    
-    
-    pDict = (TreeListDict*)TreeList_Internal_DictGetPtr(hWnd,NULL);
-    if(!pDict)
-        return FALSE;
-    
-    switch (Msg)
+
+
+  TreeListSession     *pSession           = 0;
+  TreeListDict        *pDict              = 0;
+  LPNMTVCUSTOMDRAW    lpNMTVCustomDraw    = 0;
+  HTREEITEM           hTreeItem           = 0;
+  HDITEM              HeaderItem;
+  LPNMHDR             lpNMHeader          = 0;
+  LPNMHEADER          lpNMHeaderChange    = 0;
+  TVHITTESTINFO       TreeTestInfo        = {0};
+  TVITEM              Treeitem            = {0};
+  WNDPROC             ProcParent          = (WNDPROC)GetProp(hWnd,"WNDPROC");
+  RECT                RectLabel           = {0,0,0,0};
+  RECT                RectText            = {0,0,0,0};
+  RECT                RectItem            = {0,0,0,0};
+  RECT                RectHeaderItem      = {0,0,0,0};
+  RECT                RectParent          = {0,0,0,0};
+  HBRUSH              brWnd               = 0;
+  HBRUSH              brTextBk            = 0;
+  COLORREF            clTextBk = 0,clWnd  = 0;
+  HDC                 hDC                 = 0;
+  HDC                 hDCMem              = 0;
+  HBITMAP             hBitMapMem          = 0;
+  HBITMAP             hOldBitMap          = 0;
+  LPNMHEADER          pNMHeader           = 0;
+  DWORD               dwMousePos          = 0;
+  DWORD               dwStyle             = 0;
+  BOOL                RetVal              = FALSE;
+  BOOL                SelectedLine        = FALSE;
+  int                 iCol                = 0;
+  int                 iOffSet             = 0;
+  int                 iColEnd,iColStart   = 0;
+  int                 iControlID          = 0;
+  TreeListSession     *pFirstSession      = 0;
+  TreeListNode        *pNode              = 0;
+  LPWINDOWPOS         lpPos               = 0;
+
+
+  pDict = (TreeListDict*)TreeList_Internal_DictGetPtr(hWnd,NULL);
+  if(!pDict)
+    return FALSE;
+
+  switch (Msg)
+  {
+
+
+
+    ///////////////////////////////////////////
+
+  case WM_SIZE:
     {
-        
-        
-        
-        ///////////////////////////////////////////
-        
-    case WM_SIZE:
-        {
-            // Maximize
-            if(wParam == SIZE_MAXIMIZED)
-            {
-                PostMessage(hWnd,WM_EXITSIZEMOVE,0,0);
-                break;
-            }
-            // Restore down
-            for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
-            {
-                pSession = pDict->pSessionPtr[iControlID];
-                if(!pSession || pSession->ParentResizing == TRUE)
-                    break;
-                
-                PostMessage(hWnd,WM_EXITSIZEMOVE,0,0);
-                break;
-                
-            }
-            
-        }
+      // Maximize
+      if(wParam == SIZE_MAXIMIZED)
+      {
+        PostMessage(hWnd,WM_EXITSIZEMOVE,0,0);
         break;
-        ///////////////////////////////////////////
-        
-        
-    case WM_ENTERSIZEMOVE:
-        {
-            for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
-            {
-                pSession = pDict->pSessionPtr[iControlID];
-                if(pSession)
-                    pSession->ParentResizing    = TRUE;
-               
-            }
-            break;
-            
-        }
+      }
+      // Restore down
+      for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
+      {
+        pSession = pDict->pSessionPtr[iControlID];
+        if(!pSession || pSession->ParentResizing == TRUE)
+          break;
+
+        PostMessage(hWnd,WM_EXITSIZEMOVE,0,0);
         break;
-        ///////////////////////////////////////////
-        
-    case WM_EXITSIZEMOVE :
+
+      }
+
+    }
+    break;
+    ///////////////////////////////////////////
+
+
+  case WM_ENTERSIZEMOVE:
+    {
+      for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
+      {
+        pSession = pDict->pSessionPtr[iControlID];
+        if(pSession)
+          pSession->ParentResizing    = TRUE;
+
+      }
+      break;
+
+    }
+    break;
+    ///////////////////////////////////////////
+
+  case WM_EXITSIZEMOVE :
+    {
+
+
+      for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
+      {
+        pSession = pDict->pSessionPtr[iControlID];
+
+        if(!pSession)
+          break;
+
+        pSession->ParentResizing = FALSE;
+
+        if(!pFirstSession)
+          pFirstSession = pSession;
+
+        // Check if we have to reposition the controls
+        GetClientRect(pSession->HwndParent,&RectParent);
+        if(memcmp(&RectParent,&pSession->RectParent,sizeof(RECT)) != 0)
         {
-            
-            
-            for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
-            {
-                pSession = pDict->pSessionPtr[iControlID];
-                
-                if(!pSession)
-                    break;
-                
-                pSession->ParentResizing = FALSE;
-                
-                if(!pFirstSession)
-                    pFirstSession = pSession;
-                
-                // Check if we have to reposition the controls
-                GetClientRect(pSession->HwndParent,&RectParent);
-                if(memcmp(&RectParent,&pSession->RectParent,sizeof(RECT)) != 0)
-                {
-                    
-                    if((pSession->UseFullSize == TRUE) || (pSession->UseAnchors == TRUE))
-                    {
-                        pSession->ItemWasSelected   = FALSE;
-                        TreeList_Internal_RepositionControls(pSession);
-                    }
-                }
-            }
-            
-            if(pFirstSession)
-                InvalidateRect(pFirstSession->HwndParent,&pFirstSession->RectParent,TRUE);
+
+          if((pSession->UseFullSize == TRUE) || (pSession->UseAnchors == TRUE))
+          {
+            pSession->ItemWasSelected   = FALSE;
+            TreeList_Internal_RepositionControls(pSession);
+          }
         }
-        break;
-        
-        
-        ///////////////////////////////////////////
-        
-    case WM_PAINT:
-        {
-            
-            
-            for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
-            {
-                pSession = pDict->pSessionPtr[iControlID];
-                if(!pSession || pSession->ParentResizing)
-                    break;
-                
-                if(pSession->ColumnDoAutoAdjust == TRUE)
-                    TreeList_Internal_AutoSetLastColumn(pSession);
-            }
-            
-            // Double Buffering, might kill the flickering
+      }
+
+      if(pFirstSession)
+        InvalidateRect(pFirstSession->HwndParent,&pFirstSession->RectParent,TRUE);
+    }
+    break;
+
+
+    ///////////////////////////////////////////
+
+  case WM_PAINT:
+    {
+
+
+      for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
+      {
+        pSession = pDict->pSessionPtr[iControlID];
+        if(!pSession || pSession->ParentResizing)
+          break;
+
+        if(pSession->ColumnDoAutoAdjust == TRUE)
+          TreeList_Internal_AutoSetLastColumn(pSession);
+      }
+
+      // Double Buffering, might kill the flickering
 #ifdef TREELIST_DOUBLE_BUFFEING
-            
-            hDC = BeginPaint(hWnd, &pSession->PaintStruct);
-            if(hDC)
-            {
-                RetVal              = TRUE;
-                hDCMem = CreateCompatibleDC(NULL);
-                
-                // Select the bitmap within the DC:
-                hBitMapMem= CreateCompatibleBitmap(hDC, 800, 600);
-                hOldBitMap = SelectObject(hDCMem, hBitMapMem);
-                GetClientRect(pSession->HwndTreeView,&pSession->RectTree);
-                BitBlt(hDC, 0, 0, pSession->RectTree.right, pSession->RectTree.bottom, hDCMem, 0, 0, SRCCOPY);
-                SelectObject(hDCMem, hOldBitMap);
-                
-                DeleteObject(hBitMapMem);
-                DeleteDC(hDCMem);
-                EndPaint(hWnd, &pSession->PaintStruct);
-                
-            }
+
+      hDC = BeginPaint(hWnd, &pSession->PaintStruct);
+      if(hDC)
+      {
+        RetVal              = TRUE;
+        hDCMem = CreateCompatibleDC(NULL);
+
+        // Select the bitmap within the DC:
+        hBitMapMem= CreateCompatibleBitmap(hDC, 800, 600);
+        hOldBitMap = SelectObject(hDCMem, hBitMapMem);
+        GetClientRect(pSession->HwndTreeView,&pSession->RectTree);
+        BitBlt(hDC, 0, 0, pSession->RectTree.right, pSession->RectTree.bottom, hDCMem, 0, 0, SRCCOPY);
+        SelectObject(hDCMem, hOldBitMap);
+
+        DeleteObject(hBitMapMem);
+        DeleteDC(hDCMem);
+        EndPaint(hWnd, &pSession->PaintStruct);
+
+      }
 #endif
-            
-        }
-        break;
-        
-        
-        ///////////////////////////////////////////
-    case    WM_CTLCOLOREDIT:
-        {
-            
-            
-            for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
-            {
-                pSession = pDict->pSessionPtr[iControlID];
-                if(!pSession || pSession->ParentResizing)
-                    break;
-                if( ((HWND)lParam==pSession->HwndEditBox) && (pSession->EditBoxStyleNormal == FALSE))
-                {
-                    RetVal              = TRUE;
-                    SetTextColor((HDC)wParam,   RGB(255,255,255));
-                    SetBkColor((HDC)wParam, RGB(0,0,0));
-                }
-            }
-        }
-        break;
-        
-        ///////////////////////////////////////////
-        
-    case TREELIST_WM_EDIT_NODE:
-        {
-            
-            pSession = (TreeListSession*)lParam;
-            
-            if(!pSession || pSession->ParentResizing)
-                break;
-            
-            if(pSession->HwndEditBox)
-                break;
-            
-            
-            RetVal              = TRUE;
-            pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,pSession->EditedTreeItem);
-            if(pNode)
-            {
-                // This is place to edit a cell that needs editing
-                if(Header_GetItemRect(pSession->HwndHeader,pSession->EditedColumn,&RectHeaderItem) == FALSE)
-                {
-                    pSession->EditedColumn = 0;
-                    pSession->EditedTreeItem = 0;
-                    break;
-                }
-                if(TreeView_GetItemRect(pSession->HwndTreeView,pSession->EditedTreeItem,&RectText,TRUE) == FALSE)
-                {
-                    pSession->EditedColumn = 0;
-                    pSession->EditedTreeItem = 0;
-                    break;
-                }
-                pSession->SizeEdit.Width = RectHeaderItem.right - RectHeaderItem.left;
-                pSession->SizeEdit.Hight = RectText.bottom - RectText.top;
-                pSession->SizeEdit.X     = RectHeaderItem.left;
-                pSession->SizeEdit.Y     = RectText.top;
-                
-                // Check if we have vertical scrollbars
-                // Only if we are editing the last caolumn (4/26/20110)
-                iOffSet = 0;
-                if(pSession->EditedColumn == (pSession->ColumnsCount -1))
-                {
-                    dwStyle = GetWindowLong(pSession->HwndTreeView, GWL_STYLE);
-                    if((dwStyle & WS_VSCROLL) != 0)
-                        iOffSet = GetSystemMetrics(SM_CXVSCROLL);
-                }
-                // a Numeric only text box
-                if(pNode->pNodeData[pSession->EditedColumn]->Numeric == TRUE)
-                    dwStyle = WS_CHILD|WS_VISIBLE|ES_NUMBER;
-                else
-                    dwStyle = WS_CHILD|WS_VISIBLE;
-                
-                pSession->HwndEditBox = CreateWindowEx(0,
-                    "EDIT",
-                    pNode->pNodeData[pSession->EditedColumn]->Data,
-                    dwStyle,
-                    pSession->SizeEdit.X + pSession->SizeRequested.X,                                                       // Position: left
-                    pSession->SizeEdit.Y + ((RectHeaderItem.bottom - RectHeaderItem.top)) + pSession->SizeRequested.Y,    // Position: top
-                    pSession->SizeEdit.Width-1-iOffSet,    // Width
-                    pSession->SizeEdit.Hight-2,            // Height
-                    pSession->HwndParent,                  // Parent window handle
-                    0,
-                    pSession->InstanceParent, 0);
-                
-                if(pSession->HwndEditBox )
-                {
-                    
-                    TreeList_Internal_DictUpdate(FALSE,pSession,pSession->HwndParent,pSession->HwndEditBox);
-                    pSession->ProcEdit = (WNDPROC)SetWindowLong(pSession->HwndEditBox, GWL_WNDPROC, (LONG)TreeList_Internal_HandleEditBoxMessages); // Subclassing the control (it will help trapping the enter key press event on a dialog)
-                    SendMessage(pSession->HwndEditBox, WM_SETFONT, (WPARAM)pSession->FontHandleEdit, (LPARAM)TRUE);
-                    SetFocus(pSession->HwndEditBox);
-                    SendMessage(pSession->HwndEditBox,EM_SETSEL,strlen(pNode->pNodeData[pSession->EditedColumn]->Data),strlen(pNode->pNodeData[pSession->EditedColumn]->Data)); // Select all text
-                    
-                }
-                else
-                {
-                    pSession->EditedColumn = 0;
-                    pSession->EditedTreeItem = 0;
-                }
-                
-            }
-            
-        }
-        break;
-        ///////////////////////////////////////////
-    case TREELIST_WM_EDIT_ENTER:
-        {
-            
-            pSession = (TreeListSession*)lParam;
-            if(!pSession || pSession->ParentResizing)
-                break;
-            
-            if(pSession->WaitingForCaller == TRUE)// Do nothong while waiting for the caller
-                break;
-            
-            pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,pSession->EditedTreeItem);
-            if(!pNode)
-                break;
-            
-            RetVal              = TRUE;
-            memset(pSession->EditBoxBuffer,0,sizeof(pSession->EditBoxBuffer));
-            if(GetWindowText(pSession->HwndEditBox,pSession->EditBoxBuffer,TREELIST_MAX_STRING) > 0)// Get edit box text
-            {
-                if(strcmp(pSession->EditBoxBuffer,pNode->pNodeData[pSession->EditedColumn]->Data) != 0)
-                {
-                    // Call the user!
-                    if(pSession->pCBValidateEdit)
-                    {
-                        pSession->WaitingForCaller = TRUE;
-                        pSession->EditBoxOverrideBuffer[0] = 0;
-                        
-                        if(pSession->pCBValidateEdit((NODE_HANDLE)pSession,pNode->pNodeData[pSession->EditedColumn]->pExternalPtr,pSession->EditBoxBuffer, pSession->EditBoxOverrideBuffer) == TRUE)
-                        {
-                            
-                            if( pSession->EditBoxOverrideBuffer[0])
-                                strncpy(pNode->pNodeData[pSession->EditedColumn]->Data,pSession->EditBoxOverrideBuffer,TREELIST_MAX_STRING);
-                            else
-                                strncpy(pNode->pNodeData[pSession->EditedColumn]->Data,pSession->EditBoxBuffer,TREELIST_MAX_STRING);
-                            pNode->pNodeData[pSession->EditedColumn]->Altered = TRUE; // Set "changed" flag so we will be able to color it later
-                            // Update CRC
-                            pNode->pNodeData[pSession->EditedColumn]->CRC = TreeList_Internal_CRCCreate(pNode->pNodeData[pSession->EditedColumn],
-                                (sizeof(TreeListNodeData) - sizeof(pNode->pNodeData[pSession->EditedColumn]->CRC))); // Set the srs sig
-                        }
-                        pSession->WaitingForCaller = FALSE;
-                    }
-                }
-            }
-            
-            
-            TreeList_Internal_DestroyEditBox(pSession);// Kill the edit box
-            
-            // Select the edited line in the Tree
-            if(pNode && pSession->EditedColumn > 0)
-                TreeView_SelectItem(pSession->HwndTreeView,pNode->TreeItemHandle);
-            
-            SetFocus(pSession->HwndTreeView);
-            pSession->EditedColumn      = 0;
-            pSession->EditedTreeItem    = 0;
-            break;
-            
-        }
-        break;
-        ///////////////////////////////////////////
-    case WM_NOTIFY:
-        {
-            
-            
-            lpNMHeader = (LPNMHDR)lParam;
-            pSession = (TreeListSession*)TreeList_Internal_DictGetPtr(hWnd,lpNMHeader->hwndFrom);
-            if(!pSession || pSession->ParentResizing)
-                break;
-            
-            
-            switch(lpNMHeader->code)
-            {
-                
-                
-                ///////////////////////////////////////////
-            case NM_CUSTOMDRAW:
-                {
-                    
-                    RetVal              = TRUE;
-                    lpNMTVCustomDraw    = (LPNMTVCUSTOMDRAW) lParam;
-                    
-                    if(lpNMHeader->hwndFrom != pSession->HwndTreeView)
-                        break;
-                    
-                    switch (lpNMTVCustomDraw->nmcd.dwDrawStage)
-                    {
-                        
-                    case CDDS_PREPAINT:
-                        return CDRF_NOTIFYITEMDRAW;
-                        
-                    case CDDS_ITEMPREPAINT:
-                        return (CDRF_DODEFAULT | CDRF_NOTIFYPOSTPAINT);
-                        
-                    case CDDS_ITEMPOSTPAINT:
-                        {
-                            
-                            
-                            // Get a valid pinter to our internal data type
-                            hTreeItem = (HTREEITEM)lpNMTVCustomDraw->nmcd.dwItemSpec;
-                            pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,hTreeItem);
-                            if(!pNode || pNode->NodeDataCount == 0)
-                                return(CDRF_DODEFAULT);
-                            
-                            memcpy(&RectItem,&lpNMTVCustomDraw->nmcd.rc,sizeof(RECT));
-                            if (IsRectEmpty(&RectItem) == TRUE)
-                            {
-                                // Nothing to paint when we have an empty rect
-                                SetWindowLong(pSession->HwndParent, DWL_MSGRESULT, CDRF_DODEFAULT);
-                                break;
-                            }
-                            
-                            hDC = lpNMTVCustomDraw->nmcd.hdc;
-                            if(!hDC)
-                                return(CDRF_DODEFAULT); // No HDC
-                            
-                            SetBkMode(hDC, TRANSPARENT);
-                            
-                            if(TreeView_GetItemRect(pSession->HwndTreeView,hTreeItem,&RectLabel,TRUE) == FALSE)
-                                return(CDRF_DODEFAULT); // No RECT
-                            
-                            
-                            SetTextColor(hDC,RGB(0,0,0)); // Make sure we use black color
-                            clTextBk    = lpNMTVCustomDraw->clrTextBk;
-                            clWnd       = TreeView_GetBkColor(pSession->HwndTreeView);
-                            brTextBk    = CreateSolidBrush(clTextBk);
-                            brWnd       = CreateSolidBrush(clWnd);
-                            
-                            // Clear the original label rectangle
-                            RectLabel.right = pSession->RectTree.right;
-                            FillRect(hDC,&RectLabel,brWnd);
-                            
-                            pSession->ColumnsCount = Header_GetItemCount(pSession->HwndHeader);
-                            if(pSession->ColumnsCount == -1)
-                                return(CDRF_DODEFAULT); // No columns info, nothing to do
-                            
-                            
-                            // Draw the horizontal lines
-                            for (iCol =0; iCol <  pSession->ColumnsCount ; iCol++)
-                            {
-                                // Get current columns width from the header window
-                                memset(&HeaderItem,0,sizeof(HeaderItem));
-                                HeaderItem.mask = HDI_HEIGHT | HDI_WIDTH;
-                                if(Header_GetItem(pSession->HwndHeader,iCol,&HeaderItem) == TRUE)
-                                {
-                                    
-                                    pSession->pColumnsInfo[iCol]->Width = HeaderItem.cxy;
-                                    iOffSet +=  HeaderItem.cxy ;
-                                    RectItem.right = iOffSet - 1;
-                                    DrawEdge(hDC,&RectItem, BDR_SUNKENINNER,BF_RIGHT);
-                                }
-                            }
-                            
-                            // Draw the vertical lines
-                            DrawEdge(hDC,&RectItem, BDR_SUNKENINNER, BF_BOTTOM);
-                            
-                            // Draw Label, calculate the rect first
-                            DrawText(hDC,pNode->pNodeData[0]->Data,strlen(pNode->pNodeData[0]->Data),&RectText,DT_NOPREFIX | DT_CALCRECT);
-                            RectLabel.right = TREELIST_MIN( (RectLabel.left + RectText.right + 4), pSession->pColumnsInfo[0]->Width  - 4);
-                            
-                            if ((RectLabel.right - RectLabel.left) < 0)
-                                brTextBk = brWnd;
-                            
-                            if (clTextBk != clWnd)  // Draw label's background
-                            {
-                                
-                                if(pSession->ItemWasSelected == TRUE)
-                                {
-                                    SelectedLine = TRUE;
-                                    SetTextColor(hDC,RGB(255,255,255));
-                                    RectLabel.right = pSession->RectTree.right;
-                                    FillRect(hDC,&RectLabel, brTextBk);   
-                                } 
-                            }
-                            
-                            // Draw main label
-                            memcpy(&RectText,&RectLabel,sizeof(RECT));
-                            
-                            // The label right shoud be as the column right
-                            if(Header_GetItemRect(pSession->HwndHeader,0,&RectHeaderItem) == FALSE)
-                                return(CDRF_DODEFAULT);// Error getting the rect
-                            
-                            
-                            RectText.right = RectHeaderItem.right; // Set the right side
-                            TreeList_Internal_DeflateRectEx(&RectText,2, 1); // Defalate it
-                            DrawText(hDC,pNode->pNodeData[0]->Data,strlen(pNode->pNodeData[0]->Data), &RectText, DT_NOPREFIX | DT_END_ELLIPSIS); // Draw it
-                            iOffSet =pSession->pColumnsInfo[0]->Width;
-                            
-                            // Draw thwe other labels (the columns)
-                            for (iCol =1; iCol < pSession->ColumnsCount; iCol++)
-                            {
-                                
-                                if(pNode->pNodeData[iCol])
-                                {
-                                    memcpy(&RectText,&RectLabel,sizeof(RECT));
-                                    RectText.left = iOffSet;
-                                    RectText.right = iOffSet + pSession->pColumnsInfo[iCol]->Width;
-                                    
-                                    // Set cell bk color
-                                    if((SelectedLine == FALSE) && (pNode->pNodeData[iCol]->Colored == TRUE))
-                                    {
-                                        memcpy(&RectLabel,&RectText,sizeof(RECT));
-                                        if(brTextBk)
-                                            DeleteObject(brTextBk);
-                                        brTextBk    = CreateSolidBrush(pNode->pNodeData[iCol]->BackgroundColor);
-                                        RectLabel.top       += 1;
-                                        RectLabel.bottom    -= 1;
-                                        RectLabel.right     -= 2;
-                                        FillRect(hDC,&RectLabel,brTextBk);
-                                        
-                                    }
-                                    
-                                    
-                                    TreeList_Internal_DeflateRect(&RectText,TREELIST_FONT_TEXT_CELL_OFFSET, 1, 2, 1); // This is an "MFC" remake thing :)
-                                    
-                                    if(pNode->pNodeData[iCol])
-                                    {
-                                        
-                                        // Set specific text color (only when this is not the selected line)
-                                        if(SelectedLine == FALSE)
-                                        {
-                                            if(pNode->pNodeData[iCol]->Colored == TRUE)
-                                                SetTextColor(hDC,pNode->pNodeData[iCol]->TextColor);
-                                            
-                                            // Set special color for altered cells (if set by ty the caller)
-                                            if(pNode->pNodeData[iCol]->Altered == TRUE)
-                                                SetTextColor(hDC,pNode->pNodeData[iCol]->AltertedTextColor);
-                                            
-                                        }
-                                        
-                                        DrawText(hDC,pNode->pNodeData[iCol]->Data,strlen(pNode->pNodeData[iCol]->Data), &RectText, DT_NOPREFIX | DT_END_ELLIPSIS);
-                                    }
-                                    iOffSet += pSession->pColumnsInfo[iCol]->Width;
-                                }
-                            }
-                            
-                            SetTextColor(hDC,RGB(0,0,0));
-                            
-                            // Draw the rect (on the parent) around the tree
-                            if((pSession->CreateFlags & TREELIST_DRAW_EDGE) == TREELIST_DRAW_EDGE)
-                                DrawEdge(GetDC(pSession->HwndParent),&pSession->RectBorder, EDGE_ETCHED,BF_RECT);
-                            
-                            return(CDRF_DODEFAULT);
-                        }
-                        break;
-                    }
-                }
-                break;
-                
-                ///////////////////////////////////////////
-            case NM_RELEASEDCAPTURE:
-                {
-                    
-                    
-                    RetVal              = TRUE;
-                    TreeList_Internal_DestroyEditBox(pSession); // Kill the edit box, when resizing a column
-                    
-                    TreeList_Internal_UpdateColumns(pSession);
-                    pSession->ColumnDoAutoAdjust = TRUE;
-                    
-                    // Refresh
-                    InvalidateRect(pSession->HwndParent,&pSession->RectClientOnParent,TRUE);
-                    
-                    
-                    
-                }
-                break;
-                
-                ///////////////////////////////////////////
-            case NM_CLICK:
-                {
-                    
-                    if(lpNMHeader->hwndFrom != pSession->HwndTreeView)
-                        break;
-                    
-                    if(pSession->WaitingForCaller == TRUE)// Do nothong while waiting for the caller
-                        break;
-                    
-                    TreeList_Internal_DestroyEditBox(pSession);// Kill the edit box
-                    
-                    RetVal              = FALSE;  // Will make our control respond to click same as dblcick
-                    dwMousePos          = GetMessagePos();
-                    TreeTestInfo.pt.x   = GET_X_LPARAM(dwMousePos);
-                    TreeTestInfo.pt.y   = GET_Y_LPARAM(dwMousePos);
-                    MapWindowPoints(HWND_DESKTOP, lpNMHeader->hwndFrom, &TreeTestInfo.pt, 1);
-                    TreeView_HitTest(lpNMHeader->hwndFrom, &TreeTestInfo);
-                    
-                    if(TreeTestInfo.hItem)
-                    {
-                        pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,TreeTestInfo.hItem);
-                        if(!pNode)
-                            break;
-                        
-                        pSession->ItemWasSelected = TRUE;
-                        InvalidateRect(pSession->HwndTreeView,&pSession->RectTree,FALSE);   
-                        
-                            // Get the correct column where the mouse has clicked..
-                        iColStart = pSession->RectHeader.left;
-                        iColEnd   = 0;
-                        for(iCol = 0;iCol < pSession->ColumnsCount; iCol++)
-                        {
-                            iColEnd += pSession->pColumnsInfo[iCol]->Width;
-                            
-                            if((TreeTestInfo.pt.x >= iColStart) && (TreeTestInfo.pt.x < iColEnd))
-                            {
-                                if(pNode->NodeDataCount >= iCol) // Is there any data there?
-                                {
-                                    if(pNode->pNodeData[iCol] && pNode->pNodeData[iCol]->Editable == TRUE) // Is it editable?
-                                    {
-                                        
-                                        // Send edit message to the parent window
-                                        pSession->EditedColumn = iCol;
-                                        pSession->EditedTreeItem = TreeTestInfo.hItem;
-                                        PostMessage(pSession->HwndParent, TREELIST_WM_EDIT_NODE, 0, (LPARAM)pSession);
-                                        break;
-                                    }
-                                }
-                            }
-                            iColStart = iColEnd;
-                        }
-                        
-                        if(pSession->HwndEditBox)
-                            SendMessage(pSession->HwndParent, TREELIST_WM_EDIT_ENTER, 0, 0);
-                        else
-                        {
-                            if(iCol > 0)
-                                TreeView_SelectItem(lpNMHeader->hwndFrom,TreeTestInfo.hItem);
-                        }
-                    }
-                }
-                
-                break;
-            }
-        }
+
     }
-    
-    if(hDC) // Cleanup
+    break;
+
+
+    ///////////////////////////////////////////
+  case    WM_CTLCOLOREDIT:
     {
-        
-        if(brWnd)
-            DeleteObject(brWnd);
-        
-        if(brTextBk)
-            DeleteObject(brTextBk);
-        
+
+
+      for(iControlID = 0; iControlID < TREELIST_MAX_INSTANCES;iControlID++)
+      {
+        pSession = pDict->pSessionPtr[iControlID];
+        if(!pSession || pSession->ParentResizing)
+          break;
+        if( ((HWND)lParam==pSession->HwndEditBox) && (pSession->EditBoxStyleNormal == FALSE))
+        {
+          RetVal              = TRUE;
+          SetTextColor((HDC)wParam,   RGB(255,255,255));
+          SetBkColor((HDC)wParam, RGB(0,0,0));
+        }
+      }
     }
-    
-    if(RetVal == FALSE)
+    break;
+
+    ///////////////////////////////////////////
+
+  case TREELIST_WM_EDIT_NODE:
     {
-        if(ProcParent)
-            return CallWindowProc(ProcParent, hWnd, Msg, wParam, lParam);
+
+      pSession = (TreeListSession*)lParam;
+
+      if(!pSession || pSession->ParentResizing)
+        break;
+
+      if(pSession->HwndEditBox)
+        break;
+
+
+      RetVal              = TRUE;
+      pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,pSession->EditedTreeItem);
+      if(pNode)
+      {
+        // This is place to edit a cell that needs editing
+        if(Header_GetItemRect(pSession->HwndHeader,pSession->EditedColumn,&RectHeaderItem) == FALSE)
+        {
+          pSession->EditedColumn = 0;
+          pSession->EditedTreeItem = 0;
+          break;
+        }
+        if(TreeView_GetItemRect(pSession->HwndTreeView,pSession->EditedTreeItem,&RectText,TRUE) == FALSE)
+        {
+          pSession->EditedColumn = 0;
+          pSession->EditedTreeItem = 0;
+          break;
+        }
+        pSession->SizeEdit.Width = RectHeaderItem.right - RectHeaderItem.left;
+        pSession->SizeEdit.Hight = RectText.bottom - RectText.top;
+        pSession->SizeEdit.X     = RectHeaderItem.left;
+        pSession->SizeEdit.Y     = RectText.top;
+
+        // Check if we have vertical scrollbars
+        // Only if we are editing the last caolumn (4/26/20110)
+        iOffSet = 0;
+        if(pSession->EditedColumn == (pSession->ColumnsCount -1))
+        {
+          dwStyle = GetWindowLong(pSession->HwndTreeView, GWL_STYLE);
+          if((dwStyle & WS_VSCROLL) != 0)
+            iOffSet = GetSystemMetrics(SM_CXVSCROLL);
+        }
+        // a Numeric only text box
+        if(pNode->pNodeData[pSession->EditedColumn]->Numeric == TRUE)
+          dwStyle = WS_CHILD|WS_VISIBLE|ES_NUMBER;
         else
-            return FALSE;
+          dwStyle = WS_CHILD|WS_VISIBLE;
+
+        pSession->HwndEditBox = CreateWindowEx(0,
+          "EDIT",
+          pNode->pNodeData[pSession->EditedColumn]->Data.c_str(),
+          dwStyle,
+          pSession->SizeEdit.X + pSession->SizeRequested.X,                                                       // Position: left
+          pSession->SizeEdit.Y + ((RectHeaderItem.bottom - RectHeaderItem.top)) + pSession->SizeRequested.Y,    // Position: top
+          pSession->SizeEdit.Width-1-iOffSet,    // Width
+          pSession->SizeEdit.Hight-2,            // Height
+          pSession->HwndParent,                  // Parent window handle
+          0,
+          pSession->InstanceParent, 0);
+
+        if(pSession->HwndEditBox )
+        {
+
+          TreeList_Internal_DictUpdate(FALSE,pSession,pSession->HwndParent,pSession->HwndEditBox);
+          pSession->ProcEdit = (WNDPROC)SetWindowLong(pSession->HwndEditBox, GWL_WNDPROC, (LONG)TreeList_Internal_HandleEditBoxMessages); // Subclassing the control (it will help trapping the enter key press event on a dialog)
+          SendMessage(pSession->HwndEditBox, WM_SETFONT, (WPARAM)pSession->FontHandleEdit, (LPARAM)TRUE);
+          SetFocus(pSession->HwndEditBox);
+          size_t len = strlen(pNode->pNodeData[pSession->EditedColumn]->Data.c_str());
+          SendMessage(pSession->HwndEditBox,EM_SETSEL,len, len); // Select all text
+
+        }
+        else
+        {
+          pSession->EditedColumn = 0;
+          pSession->EditedTreeItem = 0;
+        }
+
+      }
+
     }
+    break;
+    ///////////////////////////////////////////
+  case TREELIST_WM_EDIT_ENTER:
+    {
+
+      pSession = (TreeListSession*)lParam;
+      if(!pSession || pSession->ParentResizing)
+        break;
+
+      if(pSession->WaitingForCaller == TRUE)// Do nothong while waiting for the caller
+        break;
+
+      pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,pSession->EditedTreeItem);
+      if(!pNode)
+        break;
+
+      RetVal              = TRUE;
+      memset(pSession->EditBoxBuffer,0,sizeof(pSession->EditBoxBuffer));
+      if(GetWindowText(pSession->HwndEditBox,pSession->EditBoxBuffer,TREELIST_MAX_STRING) > 0)// Get edit box text
+      {
+        if(strcmp(pSession->EditBoxBuffer,pNode->pNodeData[pSession->EditedColumn]->Data.c_str()) != 0)
+        {
+          // Call the user!
+          if(pSession->pCBValidateEdit)
+          {
+            pSession->WaitingForCaller = TRUE;
+            pSession->EditBoxOverrideBuffer[0] = 0;
+
+            if(pSession->pCBValidateEdit((NODE_HANDLE)pSession,pNode->pNodeData[pSession->EditedColumn]->pExternalPtr,pSession->EditBoxBuffer, pSession->EditBoxOverrideBuffer) == TRUE)
+            {
+
+              if( pSession->EditBoxOverrideBuffer[0])
+                //reset(pNode->pNodeData[pSession->EditedColumn]->Data, new string(pSession->EditBoxOverrideBuffer));
+                pNode->pNodeData[pSession->EditedColumn]->Data = pSession->EditBoxOverrideBuffer;
+              else
+                pNode->pNodeData[pSession->EditedColumn]->Data = pSession->EditBoxBuffer;
+              //reset(pNode->pNodeData[pSession->EditedColumn]->Data, new string(pSession->EditBoxBuffer));
+              pNode->pNodeData[pSession->EditedColumn]->Altered = TRUE; // Set "changed" flag so we will be able to color it later
+              // Update CRC
+              pNode->pNodeData[pSession->EditedColumn]->CRC = TreeList_Internal_CRCCreate(pNode->pNodeData[pSession->EditedColumn],
+                (sizeof(TreeListNodeData) - sizeof(pNode->pNodeData[pSession->EditedColumn]->CRC))); // Set the srs sig
+            }
+            pSession->WaitingForCaller = FALSE;
+          }
+        }
+      }
+
+
+      TreeList_Internal_DestroyEditBox(pSession);// Kill the edit box
+
+      // Select the edited line in the Tree
+      if(pNode && pSession->EditedColumn > 0)
+        TreeView_SelectItem(pSession->HwndTreeView,pNode->TreeItemHandle);
+
+      SetFocus(pSession->HwndTreeView);
+      pSession->EditedColumn      = 0;
+      pSession->EditedTreeItem    = 0;
+      break;
+
+    }
+    break;
+    ///////////////////////////////////////////
+  case WM_NOTIFY:
+    {
+
+
+      lpNMHeader = (LPNMHDR)lParam;
+      pSession = (TreeListSession*)TreeList_Internal_DictGetPtr(hWnd,lpNMHeader->hwndFrom);
+      if(!pSession || pSession->ParentResizing)
+        break;
+
+
+      switch(lpNMHeader->code)
+      {
+
+
+        ///////////////////////////////////////////
+      case NM_CUSTOMDRAW:
+        {
+
+          RetVal              = TRUE;
+          lpNMTVCustomDraw    = (LPNMTVCUSTOMDRAW) lParam;
+
+          if(lpNMHeader->hwndFrom != pSession->HwndTreeView)
+            break;
+
+          switch (lpNMTVCustomDraw->nmcd.dwDrawStage)
+          {
+
+          case CDDS_PREPAINT:
+            return CDRF_NOTIFYITEMDRAW;
+
+          case CDDS_ITEMPREPAINT:
+            return (CDRF_DODEFAULT | CDRF_NOTIFYPOSTPAINT);
+
+          case CDDS_ITEMPOSTPAINT:
+            {
+
+
+              // Get a valid pinter to our internal data type
+              hTreeItem = (HTREEITEM)lpNMTVCustomDraw->nmcd.dwItemSpec;
+              pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,hTreeItem);
+              if(!pNode || pNode->NodeDataCount == 0)
+                return(CDRF_DODEFAULT);
+
+              memcpy(&RectItem,&lpNMTVCustomDraw->nmcd.rc,sizeof(RECT));
+              if (IsRectEmpty(&RectItem) == TRUE)
+              {
+                // Nothing to paint when we have an empty rect
+                SetWindowLong(pSession->HwndParent, DWL_MSGRESULT, CDRF_DODEFAULT);
+                break;
+              }
+
+              hDC = lpNMTVCustomDraw->nmcd.hdc;
+              if(!hDC)
+                return(CDRF_DODEFAULT); // No HDC
+
+              SetBkMode(hDC, TRANSPARENT);
+
+              if(TreeView_GetItemRect(pSession->HwndTreeView,hTreeItem,&RectLabel,TRUE) == FALSE)
+                return(CDRF_DODEFAULT); // No RECT
+
+
+              SetTextColor(hDC,RGB(0,0,0)); // Make sure we use black color
+              clTextBk    = lpNMTVCustomDraw->clrTextBk;
+              clWnd       = TreeView_GetBkColor(pSession->HwndTreeView);
+              brTextBk    = CreateSolidBrush(clTextBk);
+              brWnd       = CreateSolidBrush(clWnd);
+
+              // Clear the original label rectangle
+              RectLabel.right = pSession->RectTree.right;
+              FillRect(hDC,&RectLabel,brWnd);
+
+              pSession->ColumnsCount = Header_GetItemCount(pSession->HwndHeader);
+              if(pSession->ColumnsCount == -1)
+                return(CDRF_DODEFAULT); // No columns info, nothing to do
+
+
+              // Draw the horizontal lines
+              for (iCol =0; iCol <  pSession->ColumnsCount ; iCol++)
+              {
+                // Get current columns width from the header window
+                memset(&HeaderItem,0,sizeof(HeaderItem));
+                HeaderItem.mask = HDI_HEIGHT | HDI_WIDTH;
+                if(Header_GetItem(pSession->HwndHeader,iCol,&HeaderItem) == TRUE)
+                {
+
+                  pSession->pColumnsInfo[iCol]->Width = HeaderItem.cxy;
+                  iOffSet +=  HeaderItem.cxy ;
+                  RectItem.right = iOffSet - 1;
+                  DrawEdge(hDC,&RectItem, BDR_SUNKENINNER,BF_RIGHT);
+                }
+              }
+
+              // Draw the vertical lines
+              DrawEdge(hDC,&RectItem, BDR_SUNKENINNER, BF_BOTTOM);
+
+              // Draw Label, calculate the rect first
+              const char *str = pNode->pNodeData[0]->Data.c_str();
+              DrawText(hDC,str, strlen(str),&RectText,DT_NOPREFIX | DT_CALCRECT);
+              RectLabel.right = TREELIST_MIN( (RectLabel.left + RectText.right + 4), pSession->pColumnsInfo[0]->Width  - 4);
+
+              if ((RectLabel.right - RectLabel.left) < 0)
+                brTextBk = brWnd;
+
+              if (clTextBk != clWnd)  // Draw label's background
+              {
+
+                if(pSession->ItemWasSelected == TRUE)
+                {
+                  SelectedLine = TRUE;
+                  SetTextColor(hDC,RGB(255,255,255));
+                  RectLabel.right = pSession->RectTree.right;
+                  FillRect(hDC,&RectLabel, brTextBk);   
+                } 
+              }
+
+              // Draw main label
+              memcpy(&RectText,&RectLabel,sizeof(RECT));
+
+              // The label right shoud be as the column right
+              if(Header_GetItemRect(pSession->HwndHeader,0,&RectHeaderItem) == FALSE)
+                return(CDRF_DODEFAULT);// Error getting the rect
+
+
+              RectText.right = RectHeaderItem.right; // Set the right side
+              TreeList_Internal_DeflateRectEx(&RectText,2, 1); // Defalate it
+              string *s = &pNode->pNodeData[0]->Data;
+              DrawText(hDC,s->c_str(),strlen(s->c_str()), &RectText, DT_NOPREFIX | DT_END_ELLIPSIS); // Draw it
+              iOffSet =pSession->pColumnsInfo[0]->Width;
+
+              // Draw thwe other labels (the columns)
+              for (iCol =1; iCol < pSession->ColumnsCount; iCol++)
+              {
+
+                if(pNode->pNodeData[iCol])
+                {
+                  memcpy(&RectText,&RectLabel,sizeof(RECT));
+                  RectText.left = iOffSet;
+                  RectText.right = iOffSet + pSession->pColumnsInfo[iCol]->Width;
+
+                  // Set cell bk color
+                  if((SelectedLine == FALSE) && (pNode->pNodeData[iCol]->Colored == TRUE))
+                  {
+                    memcpy(&RectLabel,&RectText,sizeof(RECT));
+                    if(brTextBk)
+                      DeleteObject(brTextBk);
+                    brTextBk    = CreateSolidBrush(pNode->pNodeData[iCol]->BackgroundColor);
+                    RectLabel.top       += 1;
+                    RectLabel.bottom    -= 1;
+                    RectLabel.right     -= 2;
+                    FillRect(hDC,&RectLabel,brTextBk);
+
+                  }
+
+
+                  TreeList_Internal_DeflateRect(&RectText,TREELIST_FONT_TEXT_CELL_OFFSET, 1, 2, 1); // This is an "MFC" remake thing :)
+
+                  if(pNode->pNodeData[iCol])
+                  {
+
+                    // Set specific text color (only when this is not the selected line)
+                    if(SelectedLine == FALSE)
+                    {
+                      if(pNode->pNodeData[iCol]->Colored == TRUE)
+                        SetTextColor(hDC,pNode->pNodeData[iCol]->TextColor);
+
+                      // Set special color for altered cells (if set by ty the caller)
+                      if(pNode->pNodeData[iCol]->Altered == TRUE)
+                        SetTextColor(hDC,pNode->pNodeData[iCol]->AltertedTextColor);
+
+                    }
+
+                    const char *str = pNode->pNodeData[iCol]->Data.c_str();
+                    DrawText(hDC,str,strlen(str), &RectText, DT_NOPREFIX | DT_END_ELLIPSIS);
+                  }
+                  iOffSet += pSession->pColumnsInfo[iCol]->Width;
+                }
+              }
+
+              SetTextColor(hDC,RGB(0,0,0));
+
+              // Draw the rect (on the parent) around the tree
+              if((pSession->CreateFlags & TREELIST_DRAW_EDGE) == TREELIST_DRAW_EDGE)
+                DrawEdge(GetDC(pSession->HwndParent),&pSession->RectBorder, EDGE_ETCHED,BF_RECT);
+
+              return(CDRF_DODEFAULT);
+            }
+            break;
+          }
+        }
+        break;
+
+        ///////////////////////////////////////////
+      case NM_RELEASEDCAPTURE:
+        {
+
+
+          RetVal              = TRUE;
+          TreeList_Internal_DestroyEditBox(pSession); // Kill the edit box, when resizing a column
+
+          TreeList_Internal_UpdateColumns(pSession);
+          pSession->ColumnDoAutoAdjust = TRUE;
+
+          // Refresh
+          InvalidateRect(pSession->HwndParent,&pSession->RectClientOnParent,TRUE);
+
+
+
+        }
+        break;
+
+        ///////////////////////////////////////////
+      case NM_CLICK:
+        {
+
+          if(lpNMHeader->hwndFrom != pSession->HwndTreeView)
+            break;
+
+          if(pSession->WaitingForCaller == TRUE)// Do nothong while waiting for the caller
+            break;
+
+          TreeList_Internal_DestroyEditBox(pSession);// Kill the edit box
+
+          RetVal              = FALSE;  // Will make our control respond to click same as dblcick
+          dwMousePos          = GetMessagePos();
+          TreeTestInfo.pt.x   = GET_X_LPARAM(dwMousePos);
+          TreeTestInfo.pt.y   = GET_Y_LPARAM(dwMousePos);
+          MapWindowPoints(HWND_DESKTOP, lpNMHeader->hwndFrom, &TreeTestInfo.pt, 1);
+          TreeView_HitTest(lpNMHeader->hwndFrom, &TreeTestInfo);
+
+          if(TreeTestInfo.hItem)
+          {
+            pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,TreeTestInfo.hItem);
+            if(!pNode)
+              break;
+
+            pSession->ItemWasSelected = TRUE;
+            InvalidateRect(pSession->HwndTreeView,&pSession->RectTree,FALSE);   
+
+            // Get the correct column where the mouse has clicked..
+            iColStart = pSession->RectHeader.left;
+            iColEnd   = 0;
+            for(iCol = 0;iCol < pSession->ColumnsCount; iCol++)
+            {
+              iColEnd += pSession->pColumnsInfo[iCol]->Width;
+
+              if((TreeTestInfo.pt.x >= iColStart) && (TreeTestInfo.pt.x < iColEnd))
+              {
+                if(pNode->NodeDataCount >= iCol) // Is there any data there?
+                {
+                  if(pNode->pNodeData[iCol] && pNode->pNodeData[iCol]->Editable == TRUE) // Is it editable?
+                  {
+
+                    // Send edit message to the parent window
+                    pSession->EditedColumn = iCol;
+                    pSession->EditedTreeItem = TreeTestInfo.hItem;
+                    PostMessage(pSession->HwndParent, TREELIST_WM_EDIT_NODE, 0, (LPARAM)pSession);
+                    break;
+                  }
+                }
+              }
+              iColStart = iColEnd;
+            }
+
+            if(pSession->HwndEditBox)
+              SendMessage(pSession->HwndParent, TREELIST_WM_EDIT_ENTER, 0, 0);
+            else
+            {
+              if(iCol > 0)
+                TreeView_SelectItem(lpNMHeader->hwndFrom,TreeTestInfo.hItem);
+            }
+          }
+        }
+
+        break;
+      }
+    }
+  }
+
+  if(hDC) // Cleanup
+  {
+
+    if(brWnd)
+      DeleteObject(brWnd);
+
+    if(brTextBk)
+      DeleteObject(brTextBk);
+
+  }
+
+  if(RetVal == FALSE)
+  {
+    if(ProcParent)
+      return CallWindowProc(ProcParent, hWnd, Msg, wParam, lParam);
     else
-        return RetVal;
-    
+      return FALSE;
+  }
+  else
+    return RetVal;
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////
@@ -2085,8 +2090,6 @@ int  TreeListDestroy         (TREELIST_HANDLE ListTreeHandle)
 
 TreeListError TreeListAddColumn(TREELIST_HANDLE ListTreeHandle,char *szColumnName,int Width)
 {
-    
-    
     TreeListSession *pSession = (TreeListSession*)ListTreeHandle;
     
     if(!pSession)
@@ -2177,7 +2180,7 @@ NODE_HANDLE TreeListAddNode(TREELIST_HANDLE ListTreeHandle,NODE_HANDLE ParentHan
     pNewNode = TreeList_Internal_AddNode(pSession,pParentNode);
     if(pNewNode)
     {
-        for(Node = 0;Node <= ColumnsCount;Node++)
+        for(Node = 0;Node < ColumnsCount;Node++)
         {
             if(!TreeList_Internal_NodeColonize(pSession,pNewNode,RowOfColumns + Node))
                 return 0; // Could not add the columns data
@@ -2185,8 +2188,8 @@ NODE_HANDLE TreeListAddNode(TREELIST_HANDLE ListTreeHandle,NODE_HANDLE ParentHan
         
         // Update UI Properties
         TreeItem.mask        = TVIF_TEXT | TVIF_PARAM;
-        TreeItem.pszText     = pNewNode->pNodeData[0]->Data;
-        TreeItem.cchTextMax  = strlen(pNewNode->pNodeData[0]->Data);
+        TreeItem.pszText     = (LPSTR)strdup(pNewNode->pNodeData[0]->Data.c_str());
+        TreeItem.cchTextMax  = strlen(pNewNode->pNodeData[0]->Data.c_str());
         TreeItem.lParam      = (LPARAM)pNewNode;
         
         // Updatge the base struct

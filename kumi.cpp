@@ -73,7 +73,7 @@ static bool global_init() {
 }
 
 static bool global_close() {
-  HWND h = g_started_as_log_server ? FindWindow(g_app_window_class, g_app_window_class) : 
+  HWND h = g_started_as_log_server ? FindWindow(g_app_window_class, g_app_window_title) :
     FindWindow(g_log_window_class, g_log_window_title);
   PostMessage(h, WM_APP_CLOSE, 0, 0);
   return true;

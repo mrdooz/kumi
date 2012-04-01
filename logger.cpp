@@ -3,6 +3,7 @@
 #include "utils.hpp"
 #include "path_utils.hpp"
 #include "string_utils.hpp"
+#include "log_server.hpp"
 
 #pragma comment(lib, "dxerr.lib")
 
@@ -52,8 +53,22 @@ Logger::~Logger() {
   zmq_term(_context);
 }
 
-void Logger::debug_output(const bool new_line, const bool one_shot, const char *file, const int line, 
-                          const Severity severity, const char* const format, ...)
+void Logger::send_log_message(int scope, Severity severity, const char *msg) {
+  if (!_connected)
+    _connected = zmq_connect(_socket, g_client_addr) == 0;
+
+  zmq_msg_t q;
+  int res = 0;
+  int len = msg ? (strlen(msg) + 1) : 0;
+  res = zmq_msg_init_size(&q, sizeof(LogMessageHeader) + len);
+  LogMessageHeader *hdr = (LogMessageHeader *)zmq_msg_data(&q);
+  if (len)
+    memcpy((void *)&hdr->data[0], msg, len);
+  res = zmq_send(_socket, &q, 0);
+  res = zmq_msg_close(&q);
+}
+
+void Logger::debug_output(bool new_line, bool one_shot, const char *file, int line, Severity severity, const char* const format, ...)
 {
   va_list arg;
   va_start(arg, format);
@@ -96,15 +111,7 @@ void Logger::debug_output(const bool new_line, const bool one_shot, const char *
       FlushFileBuffers(_file);
   }
 */
-  if (!_connected)
-    _connected = zmq_connect(_socket, g_client_addr) == 0;
-
-  zmq_msg_t q;
-  int res = 0;
-  res = zmq_msg_init_size(&q, str.size() + 1);
-  strcpy((char *)zmq_msg_data(&q), str.c_str());
-  res = zmq_send(_socket, &q, 0);
-  res = zmq_msg_close(&q);
+  send_log_message(0, severity, str.c_str());
 
   va_end(arg);
 
@@ -208,10 +215,11 @@ int Logger::get_next_context_id() {
 }
 
 void Logger::enter_context(int context_id, const char *msg) {
+  send_log_message(context_id, Unknown, msg);
 }
 
 void Logger::leave_context(int context_id) {
-
+  send_log_message(-context_id, Unknown, NULL);
 }
 
 ScopedContext::ScopedContext(int id, const char *fmt, ...) 

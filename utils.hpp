@@ -1,5 +1,8 @@
 #pragma once
 
+#include <functional>
+#include <unordered_map>
+
 class CriticalSection {
 public:
 	CriticalSection();

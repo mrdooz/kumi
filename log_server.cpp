@@ -1,9 +1,7 @@
 #include "stdafx.h"
 #include "log_server.hpp"
 #include "kumi.hpp"
-extern "C" {
 #include "TreeList.h"
-}
 
 using namespace std;
 
@@ -108,8 +106,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
       if (wparam == IDT_LOG_MSG_TIMER) {
         for (auto it = begin(g_msg_queue); it != end(g_msg_queue); ++it) {
           zmq_msg_t *p = (zmq_msg_t *)*it;
-          TreeListNodeData data = {0};
-          strncpy(data.Data, (const char *)zmq_msg_data(p), TREELIST_MAX_STRING);
+          TreeListNodeData data;
+          LogMessageHeader *hdr = (LogMessageHeader *)zmq_msg_data(p);
+          data.Data = hdr->data;
           TreeListAddNode(g_treelist_handle, NULL, &data, 1);
           zmq_msg_close(p);
           delete p;
