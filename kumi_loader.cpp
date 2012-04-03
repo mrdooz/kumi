@@ -145,8 +145,7 @@ bool KumiLoader::load_materials(const uint8 *buf) {
 }
 
 bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene **scene) {
-
-  LOG_INFO_LN("loading %s", resource->resolve_filename(filename).c_str());
+  LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
   MainHeader header;
   B_ERR_BOOL(resource->load_inplace(filename, 0, sizeof(header), (void *)&header));
 

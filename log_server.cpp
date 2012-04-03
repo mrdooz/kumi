@@ -18,6 +18,7 @@ bool g_timer_active;
 TREELIST_HANDLE g_treelist_handle;
 
 vector<zmq_msg_t *> g_msg_queue;
+deque<NODE_HANDLE> g_node_stack;
 
 static const int IDT_LOG_MSG_TIMER = 1;
 
@@ -108,8 +109,24 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
           zmq_msg_t *p = (zmq_msg_t *)*it;
           TreeListNodeData data;
           LogMessageHeader *hdr = (LogMessageHeader *)zmq_msg_data(p);
-          data.Data = hdr->data;
-          TreeListAddNode(g_treelist_handle, NULL, &data, 1);
+          NODE_HANDLE parent = g_node_stack.empty() ? NULL : g_node_stack.back();
+          // background colors, stolen from bootstrap
+          static COLORREF background_colors[] = {0x0, 0xcdaf49, 0x5bb75b, 0x32a7fa, 0x494fda};
+          if (hdr->severity != LogMessageHeader::Unknown) {
+            data.Colored = TRUE;
+            data.BackgroundColor = background_colors[hdr->severity];
+          }
+          if (hdr->type == LogMessageHeader::EnterScope) {
+            data.Data = hdr->data;
+            g_node_stack.push_back(
+              TreeListAddNode(g_treelist_handle, parent, &data, 1));
+          } else if (hdr->type == LogMessageHeader::LeaveScope) {
+            if (!g_node_stack.empty())
+              g_node_stack.pop_back();
+          } else {
+            data.Data = hdr->data;
+            TreeListAddNode(g_treelist_handle, parent, &data, 1);
+          }
           zmq_msg_close(p);
           delete p;
         }

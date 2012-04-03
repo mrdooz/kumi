@@ -22,7 +22,6 @@ public:
     Info,
     Warning,
     Error,
-    Fatal,
   };
 
   void debug_output(bool newLine, bool one_shot, const char *file, int line, Severity severity, const char* const format, ...  );
@@ -129,13 +128,17 @@ bool check_hr(HRESULT hr, const char *exp, string *out);
 
 class ScopedContext {
 public:
-  ScopedContext(int id, const char *fmt, ...);
+  ScopedContext(int id, bool is_spam, const char *fmt, ...);
   ~ScopedContext();
-
 private:
   int _id;
+  bool _is_spam;
 };
 
 #define LOG_CONTEXT(fmt, ...) \
 __declspec(thread) static int GEN_NAME(id, __LINE__) = __COUNTER__; \
-  MAKE_SCOPED(ScopedContext)(GEN_NAME(id, __LINE__), fmt, __VA_ARGS__);
+  MAKE_SCOPED(ScopedContext)(GEN_NAME(id, __LINE__), false, fmt, __VA_ARGS__);
+
+#define LOG_CONTEXT_SPAM(fmt, ...) \
+  __declspec(thread) static int GEN_NAME(id, __LINE__) = __COUNTER__; \
+  MAKE_SCOPED(ScopedContext)(GEN_NAME(id, __LINE__), true, fmt, __VA_ARGS__);

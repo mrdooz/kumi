@@ -8,15 +8,16 @@ struct LogMessageHeader {
   };
 
   enum Severity {
+    Unknown,
     Verbose,
     Info,
     Warning,
     Error,
-    Fatal,
   };
 
   uint16 type;
   uint16 severity;
+  uint32 id;
 #pragma warning(suppress: 4200)
   const char data[0];
 };

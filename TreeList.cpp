@@ -1,5 +1,3 @@
-
-
 ///////////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -1537,8 +1535,6 @@ static LRESULT TreeList_Internal_HandleTreeMessages (HWND hWnd, UINT Msg, WPARAM
 
           case CDDS_ITEMPOSTPAINT:
             {
-
-
               // Get a valid pinter to our internal data type
               hTreeItem = (HTREEITEM)lpNMTVCustomDraw->nmcd.dwItemSpec;
               pNode = TreeList_Internal_GetNodeFromTreeHandle(pSession,hTreeItem);
@@ -1562,21 +1558,27 @@ static LRESULT TreeList_Internal_HandleTreeMessages (HWND hWnd, UINT Msg, WPARAM
               if(TreeView_GetItemRect(pSession->HwndTreeView,hTreeItem,&RectLabel,TRUE) == FALSE)
                 return(CDRF_DODEFAULT); // No RECT
 
-
-              SetTextColor(hDC,RGB(0,0,0)); // Make sure we use black color
               clTextBk    = lpNMTVCustomDraw->clrTextBk;
               clWnd       = TreeView_GetBkColor(pSession->HwndTreeView);
-              brTextBk    = CreateSolidBrush(clTextBk);
+              //brTextBk    = CreateSolidBrush(clTextBk);
+              TreeListNodeData *data = pNode->pNodeData[0];
+              if (data->Colored) {
+                brTextBk    = CreateSolidBrush(data->Colored ? data->BackgroundColor : clTextBk);
+                SetTextColor(hDC,RGB(255, 255, 255));
+              } else {
+                brTextBk    = CreateSolidBrush(clTextBk);
+                SetTextColor(hDC,RGB(0,0,0)); // Make sure we use black color
+              }
               brWnd       = CreateSolidBrush(clWnd);
 
               // Clear the original label rectangle
               RectLabel.right = pSession->RectTree.right;
-              FillRect(hDC,&RectLabel,brWnd);
+              //FillRect(hDC,&RectLabel,brWnd);
+              FillRect(hDC,&RectLabel,brTextBk);
 
               pSession->ColumnsCount = Header_GetItemCount(pSession->HwndHeader);
               if(pSession->ColumnsCount == -1)
                 return(CDRF_DODEFAULT); // No columns info, nothing to do
-
 
               // Draw the horizontal lines
               for (iCol =0; iCol <  pSession->ColumnsCount ; iCol++)
@@ -1586,7 +1588,6 @@ static LRESULT TreeList_Internal_HandleTreeMessages (HWND hWnd, UINT Msg, WPARAM
                 HeaderItem.mask = HDI_HEIGHT | HDI_WIDTH;
                 if(Header_GetItem(pSession->HwndHeader,iCol,&HeaderItem) == TRUE)
                 {
-
                   pSession->pColumnsInfo[iCol]->Width = HeaderItem.cxy;
                   iOffSet +=  HeaderItem.cxy ;
                   RectItem.right = iOffSet - 1;

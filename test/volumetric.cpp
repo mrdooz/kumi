@@ -84,8 +84,6 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
 
 bool VolumetricEffect::render() {
 
-  LOG_CONTEXT(__FUNCTION__);
-
   static XMFLOAT4 clear_white(1, 1, 1, 1);
   static XMFLOAT4 clear_black(0, 0, 0, 1);
 

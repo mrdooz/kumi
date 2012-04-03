@@ -25,8 +25,6 @@ namespace
   }
 }
 
-
-
 Graphics* Graphics::_instance = NULL;
 
 Graphics& Graphics::instance() {
@@ -467,21 +465,23 @@ void Graphics::technique_file_changed(const char *filename, void *token) {
 }
 
 void Graphics::shader_file_changed(const char *filename, void *token) {
+  LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
+
   Technique *t = (Technique *)token;
   if (Shader *shader = t->vertex_shader()) {
     if (!t->init_shader(this, _ri, shader))
-      LOG_WARNING_LN("Error initializing shader: %s", filename);
+      LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
   }
 
   if (Shader *shader = t->pixel_shader()) {
     if (!t->init_shader(this, _ri, shader))
-      LOG_WARNING_LN("Error initializing shader: %s", filename);
+      LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
   }
 }
 
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
 
-  LOG_VERBOSE_LN("loading: %s", filename);
+  LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   bool res = true;
   vector<Material *> materials;
@@ -489,13 +489,13 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   vector<Technique *> loaded_techniques;
   vector<uint8> buf;
   B_ERR_BOOL(_ri->load_file(filename, &buf));
-  //LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
+  LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
 
   TechniqueParser parser;
   vector<Technique *> tmp;
   B_ERR_BOOL(parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
 
-  //LOG_VERBOSE_LN("parsed");
+  LOG_VERBOSE_LN("parsed");
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)

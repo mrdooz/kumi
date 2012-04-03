@@ -62,6 +62,11 @@ void Logger::send_log_message(int scope, Severity severity, const char *msg) {
   int len = msg ? (strlen(msg) + 1) : 0;
   res = zmq_msg_init_size(&q, sizeof(LogMessageHeader) + len);
   LogMessageHeader *hdr = (LogMessageHeader *)zmq_msg_data(&q);
+  hdr->severity = severity;
+  hdr->type = scope < 0 ? LogMessageHeader::LeaveScope : 
+              scope > 0 ? LogMessageHeader::EnterScope : 
+              LogMessageHeader::LogMessage;
+  hdr->id = abs(scope);
   if (len)
     memcpy((void *)&hdr->data[0], msg, len);
   res = zmq_send(_socket, &q, 0);
@@ -180,13 +185,11 @@ void Logger::init_severity_map() {
   severity_map_[Debugger][Info]     = true;
   severity_map_[Debugger][Warning]  = true;
   severity_map_[Debugger][Error]    = true;
-  severity_map_[Debugger][Fatal]    = true;
 
   severity_map_[File][Verbose]  = true;
   severity_map_[File][Info]     = true;
   severity_map_[File][Warning]  = true;
   severity_map_[File][Error]    = true;
-  severity_map_[File][Fatal]    = true;
 }
 
 Logger& Logger::enable_severity(const OuputDevice output, const Severity severity) {
@@ -222,9 +225,9 @@ void Logger::leave_context(int context_id) {
   send_log_message(-context_id, Unknown, NULL);
 }
 
-ScopedContext::ScopedContext(int id, const char *fmt, ...) 
-  : _id(id) {
-
+ScopedContext::ScopedContext(int id, bool is_spam, const char *fmt, ...) 
+  : _id(id)
+  , _is_spam(is_spam) {
   va_list arg;
   va_start(arg, fmt);
 
