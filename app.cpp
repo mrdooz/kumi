@@ -20,6 +20,10 @@
 #include "test/path_follow.hpp"
 #include "test/volumetric.hpp"
 #include "test/ps3_background.hpp"
+#include "kumi_gwen.hpp"
+#include "gwen/Skins/Simple.h"
+#include "gwen/Controls/Canvas.h"
+#include "gwen/Controls/Button.h"
 
 #if USE_CEF
 #include "v8_handler.hpp"
@@ -293,18 +297,29 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(create_window());
 
+  _gwen_renderer.reset(create_kumi_gwen_renderer());
+  _gwen_skin.reset(new Gwen::Skin::Simple(_gwen_renderer.get()));
+  _gwen_canvas.reset(new Gwen::Controls::Canvas(_gwen_skin.get()));
+  _gwen_canvas->SetSize(GRAPHICS.width(), GRAPHICS.height());
+
+  Gwen::Controls::Button *button = new Gwen::Controls::Button(_gwen_canvas.get());
+  button->SetBounds(10, 10, 200, 100);
+  button->SetText("hay gusy");
+
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\syncplicity");
+
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/gwen.tec", true));
 /*
   if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
     // log error
   }
 */
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
-  auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
-  DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
+  //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
+  //DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());
 
@@ -397,6 +412,8 @@ UINT App::run(void *userdata) {
 
       //GRAPHICS.find_technique("cef")->submit();
       RENDERER.render();
+
+      _gwen_canvas->RenderCanvas();
       GRAPHICS.present();
     }
   }
@@ -501,7 +518,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     //return 0;
 
   case WM_PAINT:
-    OutputDebugStringA("*\n");
     hdc = BeginPaint(hWnd, &ps);
     EndPaint(hWnd, &ps);
     return 0;

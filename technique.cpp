@@ -36,6 +36,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
+      ("COLOR", DXGI_FORMAT_R32G32B32_FLOAT)
       ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
     // ShaderInputs inputs;

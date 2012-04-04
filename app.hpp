@@ -33,6 +33,18 @@ struct RenderStates {
   ID3D11SamplerState *sampler_state;
 };
 
+namespace Gwen {
+  namespace Renderer {
+    class Base;
+  }
+  namespace Controls {
+    class Canvas;
+  }
+  namespace Skin {
+    class Base;
+  }
+}
+
 class App : 
 #if USE_CEF 
   public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
@@ -171,6 +183,10 @@ protected:
   GraphicsObjectHandle _cef_texture;
   GraphicsObjectHandle _cef_staging;
 #endif
+
+  std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
+  std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
+  std::unique_ptr<Gwen::Skin::Base> _gwen_skin;
 };
 
 #define APP App::instance()

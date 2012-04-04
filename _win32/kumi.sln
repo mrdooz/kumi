@@ -4,6 +4,7 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kumi", "kumi.vcxproj", "{9DFDA8BA-683C-485E-8109-155098B2D258}"
 	ProjectSection(ProjectDependencies) = postProject
 		{641C5F36-32EE-4323-B740-992B651CF9D6} = {641C5F36-32EE-4323-B740-992B651CF9D6}
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB} = {668AC2E1-1057-4FA0-ADA0-C8F974558FEB}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzmq", "..\..\zeromq-2.1.11\builds\msvc\libzmq\libzmq.vcxproj", "{641C5F36-32EE-4323-B740-992B651CF9D6}"

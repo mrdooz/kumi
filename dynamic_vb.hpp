@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include "dx_utils.hpp"
+#include "graphics.hpp"
 
 // Helper class for dynamic vertex buffers
 template<class Vtx>
@@ -22,7 +23,7 @@ public:
 
   bool create(int max_verts)
   {
-    return SUCCEEDED(create_dynamic_vertex_buffer(Graphics::instance().device(), max_verts, sizeof(Vtx), &_vb));
+    return SUCCEEDED(GRAPHICS.create_dynamic_vertex_buffer(max_verts, sizeof(Vtx), &_vb.p));
   }
 
   Vtx *map()

@@ -20,6 +20,22 @@ struct TechniqueRenderData {
 	uint16 material_id;
 };
 
+struct BufferRenderData {
+  BufferRenderData() : index_count(0), start_index(0), start_vertex(0), base_vertex(0), vertex_size(0), vertex_count(0) {}
+  GraphicsObjectHandle vs, ps;
+  GraphicsObjectHandle vb, ib;
+  GraphicsObjectHandle layout;
+  GraphicsObjectHandle rs, dss, bs;
+  DXGI_FORMAT index_format;
+  int index_count;
+  int start_index;
+  int start_vertex;
+  int base_vertex;
+  int vertex_size;
+  int vertex_count;
+  D3D_PRIMITIVE_TOPOLOGY topology;
+};
+
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
 	enum Cmd {
@@ -27,6 +43,7 @@ struct RenderKey {
 		kSetRenderTarget,
 		kRenderMesh,
 		kRenderTechnique,
+    kRenderBuffers,
 		kNumCommands
 	};
 	static_assert(kNumCommands < (1 << 16), "Too many commands");

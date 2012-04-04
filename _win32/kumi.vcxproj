@@ -39,12 +39,12 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(CEF)\include;$(ProjectDir)..\;$(ZMQ)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CEF)\include;$(ProjectDir)..\;$(ProjectDir)..\gwen\include;$(ZMQ)\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(CEF)\$(Configuration)\lib;$(OutDir);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(CEF)\include;$(ProjectDir)..\;$(ZMQ)\include;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;C:\Program Files (x86)\Microsoft DirectX SDK (February 2010)\Include;C:\Program Files (x86)\Microsoft DirectX SDK (August 2009)\Include;d:\projects;C:\Program Files (x86)\boost\boost_1_46_1;C:\Program Files (x86)\Visual Leak Detector\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(CEF)\include;$(ProjectDir)..\;$(ProjectDir)..\gwen\include;$(ZMQ)\include;C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Include;C:\Program Files (x86)\Microsoft DirectX SDK (February 2010)\Include;C:\Program Files (x86)\Microsoft DirectX SDK (August 2009)\Include;d:\projects;C:\Program Files (x86)\boost\boost_1_46_1;C:\Program Files (x86)\Visual Leak Detector\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(CEF)\$(Configuration)\lib;$(OutDir);C:\Program Files (x86)\Microsoft DirectX SDK (June 2010)\Lib\x86;C:\Program Files (x86)\Microsoft DirectX SDK (February 2010)\Lib\x86;C:\Program Files (x86)\Microsoft DirectX SDK (August 2009)\Lib\x86;C:\Program Files (x86)\boost\boost_1_46_1\stage\lib;C:\Program Files (x86)\Visual Leak Detector\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -54,7 +54,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/Zm250 %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -96,6 +96,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\kumi_gwen.cpp" />
     <ClCompile Include="..\kumi_loader.cpp" />
     <ClCompile Include="..\logger.cpp" />
     <ClCompile Include="..\log_server.cpp" />
@@ -141,6 +142,7 @@
     <ClInclude Include="..\graphics_submit.hpp" />
     <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\kumi.hpp" />
+    <ClInclude Include="..\kumi_gwen.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
     <ClInclude Include="..\log_server.hpp" />
@@ -165,6 +167,7 @@
     <ClInclude Include="..\TreeList.h" />
     <ClInclude Include="..\utils.hpp" />
     <ClInclude Include="..\v8_handler.hpp" />
+    <ClInclude Include="..\vertex_types.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

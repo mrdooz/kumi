@@ -8,6 +8,8 @@ public:
 	static Renderer &instance();
 
 	Renderer();
+  template <typename T>
+  T *alloc_command_data() { return (T *)alloc_command_data(sizeof(T)); }
 	void *alloc_command_data(size_t size);
 	void submit_command(const TrackedLocation &location, RenderKey key, void *data);
   void submit_technique(GraphicsObjectHandle technique);
