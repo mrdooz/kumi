@@ -327,7 +327,6 @@ void Graphics::present()
     _start_fps_time = now;
     _frame_count = 0;
   }
-
   _swap_chain->Present(0,0);
 }
 
@@ -489,13 +488,11 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   vector<Technique *> loaded_techniques;
   vector<uint8> buf;
   B_ERR_BOOL(_ri->load_file(filename, &buf));
-  LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
+  //LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
 
   TechniqueParser parser;
   vector<Technique *> tmp;
   B_ERR_BOOL(parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
-
-  LOG_VERBOSE_LN("parsed");
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
@@ -512,7 +509,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     tmp.erase(fails, end(tmp));
   }
 
-  LOG_VERBOSE_LN("adding watches..");
+  //LOG_VERBOSE_LN("adding watches..");
 
   auto &v = _techniques_by_file[filename];
   v.clear();
@@ -622,6 +619,8 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
   // copy the parameters into the technique's cbuffer staging area
   for (size_t i = 0; i < shader->cbuffer_params().size(); ++i) {
     const CBufferParam &p = shader->cbuffer_params()[i];
+    if (p.cbuffer == -1)
+      continue;
     const CBuffer &cb = cbuffers[p.cbuffer];
     switch (p.source) {
       case PropertySource::kMaterial:
@@ -634,10 +633,21 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
           break;
         }
       case PropertySource::kSystem: {
-          XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
-          memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
-          break;
+        switch (p.type) {
+          case PropertyType::kFloat4: {
+            XMFLOAT4 v = PROPERTY_MANAGER.get_system_property<XMFLOAT4>(p.name.c_str());
+            memcpy((void *)&cb.staging[p.start_offset], &v, p.size);
+            break;
+          }
+          case PropertyType::kFloat4x4: {
+            XMFLOAT4X4 v = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
+            memcpy((void *)&cb.staging[p.start_offset], &v, p.size);
+            break;
+          }
         }
+        break;
+      }
+
       case PropertySource::kUser:
         break;
     }

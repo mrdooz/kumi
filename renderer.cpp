@@ -85,6 +85,8 @@ void Renderer::render() {
 				ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
 				ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
+        GRAPHICS.set_cbuffer_params(technique, vertex_shader, -1, -1);
+        GRAPHICS.set_cbuffer_params(technique, pixel_shader, -1, -1);
 				GRAPHICS.set_samplers(technique, pixel_shader);
 				int resource_mask = 0;
 				GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
@@ -177,4 +179,17 @@ void Renderer::submit_command(const TrackedLocation &location, RenderKey key, vo
 	validate_command(key, data);
 #endif
 	_render_commands.push_back(RenderCmd(location, key, data));
+}
+
+uint16 Renderer::next_seq_nr() const { 
+  assert(_render_commands.size() < 65536); 
+  return (uint16)_render_commands.size(); 
+}
+
+void Renderer::submit_technique(GraphicsObjectHandle technique) {
+  RenderKey key;
+  key.cmd = RenderKey::kRenderTechnique;
+  TechniqueRenderData *data = (TechniqueRenderData *)RENDERER.alloc_command_data(sizeof(TechniqueRenderData));
+  data->technique = technique;
+  RENDERER.submit_command(FROM_HERE, key, data);
 }

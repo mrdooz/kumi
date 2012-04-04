@@ -82,6 +82,10 @@ bool DemoEngine::tick() {
   // tick the active effects
   for (size_t i = 0; i < _active_effects.size(); ++i) {
     EffectInstance *e = _active_effects[i];
+    float global_time = _current_time_ms / 1000.0f;
+    float local_time = (_current_time_ms - e->_start_time) / 1000.0f;
+    XMFLOAT4 tt(global_time, local_time, 0, 0);
+    PROPERTY_MANAGER.set_system_property("g_time", tt);
     e->_effect->update(_current_time_ms, _current_time_ms - e->_start_time, ticks_per_s, num_ticks, frac);
     e->_effect->render();
   }

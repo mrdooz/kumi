@@ -10,7 +10,8 @@ public:
 	Renderer();
 	void *alloc_command_data(size_t size);
 	void submit_command(const TrackedLocation &location, RenderKey key, void *data);
-	uint16 next_seq_nr() const { assert(_render_commands.size() < 65536); return (uint16)_render_commands.size(); }
+  void submit_technique(GraphicsObjectHandle technique);
+	uint16 next_seq_nr() const;
 	void render();
 
 private:

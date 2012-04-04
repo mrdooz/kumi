@@ -19,6 +19,7 @@
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
 #include "test/volumetric.hpp"
+#include "test/ps3_background.hpp"
 
 #if USE_CEF
 #include "v8_handler.hpp"
@@ -296,12 +297,13 @@ bool App::init(HINSTANCE hinstance)
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\syncplicity");
-
+/*
   if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
     // log error
   }
-
-  VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
+*/
+  //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
+  auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());
@@ -380,7 +382,7 @@ UINT App::run(void *userdata) {
   DEMO_ENGINE.start();
 
   while (WM_QUIT != msg.message) {
-    if( PeekMessage( &msg, NULL, 0, 0, PM_REMOVE ) ) {
+    if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) ) {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
@@ -390,38 +392,10 @@ UINT App::run(void *userdata) {
       CefDoMessageLoopWork();
 #endif
 
+      GRAPHICS.clear(XMFLOAT4(0,0,0,1));
       DEMO_ENGINE.tick();
 
-      GRAPHICS.clear(XMFLOAT4(0,0,0,1));
-
       //GRAPHICS.find_technique("cef")->submit();
-
-      /*
-      if (_test_effect) {
-
-      QueryPerformanceCounter(&cur);
-      float new_time = (float)cur.QuadPart / freq.QuadPart;
-      float delta_time = new_time - cur_time;
-      cur_time = new_time;
-      accumulator += delta_time;
-
-      // calc the number of ticks to step
-      int num_ticks = (int)(accumulator / dt);
-      const float a = delta_time > 0 ? (accumulator - num_ticks * dt) / delta_time : 0;
-
-      for (int i = 0; i < (int)_update_callbacks.size(); ++i)
-      _update_callbacks[i](running_time, dt, num_ticks, a);
-
-      running_time += num_ticks * dt;
-      accumulator -= num_ticks * dt;
-
-      {
-      //Prof_Zone(render);
-      //_test_effect->render();
-
-      }
-      }
-      */
       RENDERER.render();
       GRAPHICS.present();
     }
@@ -478,9 +452,6 @@ vv->Register();
 LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
 {
 
-  //Validators vv;
-  //make_funky(funky, vv);
-
   HDC hdc;
   PAINTSTRUCT ps;
   switch( message ) 
@@ -526,10 +497,11 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     DestroyWindow(hWnd);
     break;
 
-  case WM_ERASEBKGND:
-    return 0;
+  //case WM_ERASEBKGND:
+    //return 0;
 
   case WM_PAINT:
+    OutputDebugStringA("*\n");
     hdc = BeginPaint(hWnd, &ps);
     EndPaint(hWnd, &ps);
     return 0;

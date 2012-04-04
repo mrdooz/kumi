@@ -1,0 +1,49 @@
+technique ps3background {
+	
+	vertex_shader {
+		file effects/ps3background.fx;
+		params [
+			float4 g_time system;
+		];
+	};
+	
+	pixel_shader {
+		file effects/ps3background.fx;
+		params [
+			float4 g_time system;
+		];
+	};
+	
+	// 0,1
+	// 2,3
+	vertices {
+		format pos_tex;
+		data [ 
+			-1 +1 +1 +0 +0; 
+			+1 +1 +1 +1 +0;
+			-1 -1 +1 +0 +1;
+			+1 -1 +1 +1 +1;
+			];
+	};
+	
+	// 0, 1, 2
+	// 2, 1, 3
+	indices {
+		data [0 1 2 2 1 3];
+	};
+	
+	rasterizer_desc {
+		cull_mode = none;
+	};
+	
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+};
+

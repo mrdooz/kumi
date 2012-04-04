@@ -8,6 +8,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kumi", "kumi.vcxproj", "{9D
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzmq", "..\..\zeromq-2.1.11\builds\msvc\libzmq\libzmq.vcxproj", "{641C5F36-32EE-4323-B740-992B651CF9D6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Gwen", "..\gwen\_win32\Gwen.vcxproj", "{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -36,6 +38,15 @@ Global
 		{641C5F36-32EE-4323-B740-992B651CF9D6}.WithOpenPGM|Win32.ActiveCfg = WithOpenPGM|Win32
 		{641C5F36-32EE-4323-B740-992B651CF9D6}.WithOpenPGM|Win32.Build.0 = WithOpenPGM|Win32
 		{641C5F36-32EE-4323-B740-992B651CF9D6}.WithOpenPGM|x64.ActiveCfg = WithOpenPGM|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Debug|Win32.ActiveCfg = Debug|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Debug|Win32.Build.0 = Debug|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Debug|x64.ActiveCfg = Debug|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Release|Win32.ActiveCfg = Release|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Release|Win32.Build.0 = Release|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.Release|x64.ActiveCfg = Release|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|Win32.ActiveCfg = Release|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|Win32.Build.0 = Release|Win32
+		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

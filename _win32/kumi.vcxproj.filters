@@ -105,6 +105,9 @@
     <ClCompile Include="..\TreeList.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\test\ps3_background.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -220,6 +223,9 @@
     </ClInclude>
     <ClInclude Include="..\kumi.hpp">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\ps3_background.hpp">
+      <Filter>test</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -3,6 +3,7 @@
 #include "utils.hpp"
 #include "property.hpp"
 #include "graphics_object_handle.hpp"
+#include "graphics_submit.hpp"
 
 struct GraphicsInterface;
 struct ResourceInterface;
@@ -33,7 +34,7 @@ struct ParamBase {
 };
 
 struct CBufferParam : public ParamBase {
-  CBufferParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
+  CBufferParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source), cbuffer(-1) {}
 
   union DefaultValue {
     int _int;
@@ -168,8 +169,6 @@ public:
   DXGI_FORMAT index_format() const { return _index_format; }
   int index_count() const { return (int)_indices.size(); }
 
-  //TODO
-  //void submit();
   bool init(GraphicsInterface *graphics, ResourceInterface *res);
   bool reload_shaders();
   bool init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader);
@@ -178,10 +177,6 @@ private:
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
   bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, 
                      std::set<std::string> *used_params);
-
-  //TODO
-  //RenderKey _key;
-  //MeshRenderData _render_data;
 
   string _name;
   Shader *_vertex_shader;

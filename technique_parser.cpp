@@ -991,8 +991,11 @@ void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, T
 				const vector<int> &indices = indices_outer[0];
 
 				int max_value = INT_MIN;
-				for (auto it = begin(indices); it != end(indices); ++it)
-					technique->_indices.push_back(max_value = max(max_value, *it));
+				for (auto it = begin(indices); it != end(indices); ++it) {
+          const int v = *it;
+          max_value = max(max_value, v);
+          technique->_indices.push_back(v);
+        }
 
 				if (technique->_index_format == DXGI_FORMAT_UNKNOWN)
 					technique->_index_format = max_value < (1 << 16) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;

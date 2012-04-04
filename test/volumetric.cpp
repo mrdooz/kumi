@@ -37,7 +37,7 @@ bool VolumetricEffect::init() {
 
   _technique_diffuse = g.find_technique("diffuse");
 
-  _material_sky= m.find_material("sky::sky");
+  _material_sky = m.find_material("sky::sky");
   _technique_sky = g.find_technique("sky");
 
   _material_occlude = m.find_material("volumetric_occluder::black");

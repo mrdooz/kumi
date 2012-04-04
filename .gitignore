@@ -28,4 +28,5 @@ ipch/
 *.vso
 *.ps
 *.pso
+*.filters
 _win32/My Inspector XE Results - kumi/*

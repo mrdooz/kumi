@@ -115,8 +115,21 @@ public:
 	void	present();
 	void	resize(const int width, const int height);
 
-	const char *vs_profile() const { return _vs_profile.c_str(); }
-	const char *ps_profile() const { return _ps_profile.c_str(); }
+	virtual const char *vs_profile() const { return _vs_profile.c_str(); }
+	virtual const char *ps_profile() const { return _ps_profile.c_str(); }
+
+  virtual GraphicsObjectHandle create_constant_buffer(int size);
+  virtual GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
+  virtual GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
+  virtual GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
+
+  virtual GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
+  virtual GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
+
+  virtual GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
+  virtual GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
+  virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
+  virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
@@ -151,21 +164,9 @@ public:
   int height() const { return _height; }
 	void size(int *width, int *height) const { *width = _width; *height = _height; }
 
-	GraphicsObjectHandle create_constant_buffer(int size);
-	GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
-	GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
-	GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
-
-	GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
-	GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
-
 	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
 
-	GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
-	GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
-	GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
-	GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
 	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);

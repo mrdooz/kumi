@@ -247,12 +247,15 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
 }
 /*
 void Technique::submit() {
-_key.cmd = RenderKey::kRenderTechnique;
-_key.seq_nr = GRAPHICS.next_seq_nr();
-GRAPHICS.submit_command(FROM_HERE, _key, (void *)this);
+  _key.cmd = RenderKey::kRenderTechnique;
+  _key.seq_nr = GRAPHICS.next_seq_nr();
+  GRAPHICS.submit_command(FROM_HERE, _key, (void *)this);
 }
 */
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
-  auto it = find_if(_sampler_states.begin(), _sampler_states.end(), [&](const pair<string, GraphicsObjectHandle> &p) { return p.first == name; });
+  auto it = find_if(begin(_sampler_states), end(_sampler_states), 
+    [&](const pair<string, GraphicsObjectHandle> &p) { 
+      return p.first == name; 
+  });
   return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
 }
