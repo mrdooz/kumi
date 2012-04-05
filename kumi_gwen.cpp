@@ -27,6 +27,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     BufferRenderData *data = RENDERER.alloc_command_data<BufferRenderData>();
     data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
     data->vb = _vb_pos_col.vb();
+    data->vertex_size = _vb_pos_col.stride;
     data->vs = GRAPHICS.find_shader("gwen", "vs_color_main");
     data->ps = GRAPHICS.find_shader("gwen", "ps_color_main");
     data->layout = GRAPHICS.get_input_layout("gwen");
@@ -34,8 +35,12 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     RENDERER.submit_command(FROM_HERE, _render_key, data);
   };
 
+  static XMFLOAT4 to_directx(const Gwen::Color &col) {
+    return XMFLOAT4(float(col.r) / 255, float(col.g) / 255, float(col.b) / 255, float(col.a) / 255);
+  }
+
   virtual void SetDrawColor(Gwen::Color color) {
-    _draw_color = color;
+    _draw_color = to_directx(color);
   };
 
   virtual void DrawFilledRect(Gwen::Rect rect){
@@ -47,10 +52,19 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     // 2,3
     // 0, 1, 2
     // 2, 1, 3
-    PosCol v0(rect.x, rect.y, 0, _draw_color.r, _draw_color.g, _draw_color.b, _draw_color.a);
-    PosCol v1(rect.x + rect.w, rect.y, 0, _draw_color.r, _draw_color.g, _draw_color.b, _draw_color.a);
-    PosCol v2(rect.x, rect.y + rect.h, 0, _draw_color.r, _draw_color.g, _draw_color.b, _draw_color.a);
-    PosCol v3(rect.x + rect.w, rect.y + rect.h, 0, _draw_color.r, _draw_color.g, _draw_color.b, _draw_color.a);
+
+    Translate(rect);
+
+    float x0, y0, x1, y1, x2, y2, x3, y3;
+    screen_to_clip(rect.x, rect.y, GRAPHICS.width(), GRAPHICS.height(), &x0, &y0);
+    screen_to_clip(rect.x + rect.w, rect.y, GRAPHICS.width(), GRAPHICS.height(), &x1, &y1);
+    screen_to_clip(rect.x, rect.y + rect.h, GRAPHICS.width(), GRAPHICS.height(), &x2, &y2);
+    screen_to_clip(rect.x + rect.w, rect.y + rect.h, GRAPHICS.width(), GRAPHICS.height(), &x3, &y3);
+
+    PosCol v0(x0, y0, 0, _draw_color);
+    PosCol v1(x1, y1, 0, _draw_color);
+    PosCol v2(x2, y2, 0, _draw_color);
+    PosCol v3(x3, y3, 0, _draw_color);
 
     *_locked_pos_col++ = v0;
     *_locked_pos_col++ = v1;
@@ -62,7 +76,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   };
 
   virtual void StartClip() {
-
+    const Gwen::Rect& rect = ClipRegion();
   };
 
   virtual void EndClip() {
@@ -76,11 +90,19 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   virtual void FreeTexture( Gwen::Texture* pTexture ){
   };
 
-  virtual void DrawTexturedRect( Gwen::Texture* pTexture, Gwen::Rect pTargetRect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f ){};
+  virtual void DrawTexturedRect( Gwen::Texture* pTexture, Gwen::Rect pTargetRect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f )
+  {
+
+  };
+
   virtual void DrawMissingImage( Gwen::Rect pTargetRect ) {
 
   }
-  virtual Gwen::Color PixelColour( Gwen::Texture* pTexture, unsigned int x, unsigned int y, const Gwen::Color& col_default = Gwen::Color( 255, 255, 255, 255 ) ){ return col_default; }
+
+  virtual Gwen::Color PixelColour(Gwen::Texture* pTexture, unsigned int x, unsigned int y, const Gwen::Color& col_default = Gwen::Color( 255, 255, 255, 255 ) )
+  { 
+    return col_default; 
+  }
 
   virtual Gwen::Renderer::ICacheToTexture* GetCTT() { return NULL; }
 
@@ -112,7 +134,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   virtual void RenderText( Gwen::Font* pFont, Gwen::Point pos, const Gwen::String& text );
 */
 
-  Gwen::Color _draw_color;
+  XMFLOAT4 _draw_color;
   DynamicVb<PosCol> _vb_pos_col;
   PosCol *_locked_pos_col;
   RenderKey _render_key;

@@ -32,11 +32,11 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
 
   // input mappings are only relevant for vertex shaders
   if (shader->type() == Shader::kVertexShader) {
-    auto mapping = map_list_of
+    static auto mapping = map_list_of
       ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
-      ("COLOR", DXGI_FORMAT_R32G32B32_FLOAT)
+      ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
       ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
     // ShaderInputs inputs;
@@ -190,8 +190,7 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   const char *src = shader->source_filename().c_str();
   // compile the shader if the source is newer, or the object file doesn't exist
   if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
-    if (!compile_shader(graphics, shader))
-      return false;
+    LOG_ERR_BOOL(compile_shader(graphics, shader));
   } else {
     if (!res->file_exists(obj))
       return false;

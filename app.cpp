@@ -411,9 +411,9 @@ UINT App::run(void *userdata) {
       DEMO_ENGINE.tick();
 
       //GRAPHICS.find_technique("cef")->submit();
+      _gwen_canvas->RenderCanvas();
       RENDERER.render();
 
-      _gwen_canvas->RenderCanvas();
       GRAPHICS.present();
     }
   }

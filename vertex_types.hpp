@@ -32,7 +32,8 @@ struct PosTex
 struct PosCol
 {
   PosCol() {}
-	PosCol(float x, float y, float z, float r, float g, float b, float a) : pos(x, y, z), col(r, g, b, a) {}
+  PosCol(float x, float y, float z, float r, float g, float b, float a) : pos(x, y, z), col(r, g, b, a) {}
+  PosCol(float x, float y, float z, const XMFLOAT4& col) : pos(x, y, z), col(col) {}
   PosCol(const XMFLOAT3& pos, const XMFLOAT4& col) : pos(pos), col(col) {}
   PosCol(const XMFLOAT2& pos, float z, const XMFLOAT4& col) : pos(pos.x, pos.y, z), col(col) {}
   PosCol(const XMFLOAT3& pos) : pos(pos) {}

@@ -16,7 +16,7 @@ namespace Gwen
 
 				Simple( Gwen::Renderer::Base* renderer ) : Gwen::Skin::Base( renderer )
 				{
-
+          Init();
 				}
 
 				Gwen::Color m_colBorderColor;
@@ -38,30 +38,34 @@ namespace Gwen
 
 				Simple()
 				{
-					m_colBorderColor			= Gwen::Color( 80, 80, 80, 255 );
-					m_colBG						= Gwen::Color( 248, 248, 248, 255 );
-					m_colBGDark					= Gwen::Color( 235, 235, 235, 255 );
-
-					m_colControl				= Gwen::Color( 240, 240, 240, 255 );
-					m_colControlBright			= Gwen::Color( 255, 255, 255, 255 );
-					m_colControlDark			= Gwen::Color( 214, 214, 214, 255 );
-					m_colControlDarker			= Gwen::Color( 180, 180, 180, 255 );
-
-					m_colControlOutlineNormal	= Gwen::Color( 112, 112, 112, 255 );
-					m_colControlOutlineLight	= Gwen::Color( 144, 144, 144, 255 );
-					m_colControlOutlineLighter	= Gwen::Color( 210, 210, 210, 255 );
-
-					m_colHighlightBG			= Gwen::Color( 192, 221, 252, 255 );
-					m_colHighlightBorder		= Gwen::Color(  51, 153, 255, 255 );
-
-					m_colToolTipBackground		= Gwen::Color( 255, 255, 225, 255 );
-					m_colToolTipBorder			= Gwen::Color( 0, 0, 0, 255 );
-
-					m_colModal = Gwen::Color( 25, 25, 25, 150 );
-
-					m_DefaultFont.facename	= L"Microsoft Sans Serif";
-					m_DefaultFont.size		= 11;
+          Init();
 				}
+
+        void Init() {
+          m_colBorderColor			= Gwen::Color( 80, 80, 80, 255 );
+          m_colBG						= Gwen::Color( 248, 248, 248, 255 );
+          m_colBGDark					= Gwen::Color( 235, 235, 235, 255 );
+
+          m_colControl				= Gwen::Color( 240, 240, 240, 255 );
+          m_colControlBright			= Gwen::Color( 255, 255, 255, 255 );
+          m_colControlDark			= Gwen::Color( 214, 214, 214, 255 );
+          m_colControlDarker			= Gwen::Color( 180, 180, 180, 255 );
+
+          m_colControlOutlineNormal	= Gwen::Color( 112, 112, 112, 255 );
+          m_colControlOutlineLight	= Gwen::Color( 144, 144, 144, 255 );
+          m_colControlOutlineLighter	= Gwen::Color( 210, 210, 210, 255 );
+
+          m_colHighlightBG			= Gwen::Color( 192, 221, 252, 255 );
+          m_colHighlightBorder		= Gwen::Color(  51, 153, 255, 255 );
+
+          m_colToolTipBackground		= Gwen::Color( 255, 255, 225, 255 );
+          m_colToolTipBorder			= Gwen::Color( 0, 0, 0, 255 );
+
+          m_colModal = Gwen::Color( 25, 25, 25, 150 );
+
+          m_DefaultFont.facename	= L"Microsoft Sans Serif";
+          m_DefaultFont.size		= 11;
+        }
 
 				virtual void DrawGenericPanel( Controls::Base* control )
 				{
