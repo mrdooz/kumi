@@ -9,7 +9,7 @@ class GraphicsObjectHandle;
 template<class Traits, int N>
 class IdBufferBase {
 public:
-	typedef typename Traits::Type T;
+	typedef typename Traits::Value T;
   typedef typename Traits::Elem E;
 	typedef std::function<void(T)> Deleter;
 
@@ -64,35 +64,37 @@ protected:
 	stack<int> reclaimed_indices;
 };
 
-template<class T, class U>
+template<class Key, class Value>
 struct SearchableTraits {
 
-  typedef T Type;
-  typedef U Token;
-  typedef std::pair<T, U> Elem;
+  typedef std::pair<Key, Value> KeyValuePair;
+  typedef Value Value;
+  typedef Key Key;
+  typedef KeyValuePair Elem;
 
-  static T& get(Elem &t) {
-    return t.first;
+  static Key &get_key(KeyValuePair &kv) {
+    return kv.first;
   }
 
-  static U get_token(const Elem &e) {
-    return e.second;
+  static Value &get(KeyValuePair &kv) {
+    return kv.second;
   }
 };
 
 template<class T>
 struct SingleTraits {
   typedef T Type;
+  typedef T Value;
   typedef T Elem;
   static T& get(Elem& t) {
     return t;
   }
 };
 
-template<typename T, typename U, int N>
-struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<T, U>, N> {
+template<typename Key, typename Value, int N>
+struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N> {
 
-  typedef SearchableTraits<T, U> Traits;
+  typedef SearchableTraits<Key, Value> Traits;
 	typedef IdBufferBase<Traits, N> Parent;
 
 	SearchableIdBuffer(const typename Parent::Deleter &fn_deleter) 
@@ -105,13 +107,22 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<T, U>, N> {
     _buffer[idx] = e;
   }
 
-	int idx_from_token(const typename Traits::Token &t) {
+	int idx_from_token(const typename Traits::Key &key) {
 		for (int i = 0; i < Size; ++i) {
-			if (Traits::get_token(_buffer[i]) == t)
+			if (Traits::get_key(_buffer[i]) == key)
 				return i;
 		}
 		return -1;
 	}
+
+  template<typename R>
+  R find(const typename Traits::Key &key, R def) {
+    for (int i = 0; i < Size; ++i) {
+      if (Traits::get_key(_buffer[i]) == key)
+        return Traits::get(_buffer[i]);
+    }
+    return def;
+  }
 };
 
 template<typename T, int N>

@@ -55,19 +55,19 @@ Graphics::~Graphics()
 {
 }
 
-HRESULT Graphics::create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer) 
+HRESULT Graphics::create_static_vertex_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer) 
 {
-  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
 }
 
-HRESULT Graphics::create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer) {
-  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(index_count * elem_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
+HRESULT Graphics::create_static_index_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer) {
+  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
 }
 
-HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer)
+HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t buffer_size, ID3D11Buffer** vertex_buffer)
 {
   return create_buffer_inner(_device, 
-    CD3D11_BUFFER_DESC(vertex_count * vertex_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
+    CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
     NULL, vertex_buffer);
 }
 
@@ -90,7 +90,7 @@ GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool 
   if (idx != -1 || (idx = _res._render_targets.find_free_index()) != -1) {
     if (_res._render_targets[idx])
       _res._render_targets[idx]->reset();
-    _res._render_targets.set_pair(idx, make_pair(data, name));
+    _res._render_targets.set_pair(idx, make_pair(name, data));
     return GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
   }
   return GraphicsObjectHandle();
@@ -138,7 +138,7 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
   if (idx != -1 || (idx = _res._textures.find_free_index()) != -1) {
     if (_res._textures[idx])
       _res._textures[idx]->reset();
-    _res._textures.set_pair(idx, make_pair(data, name));
+    _res._textures.set_pair(idx, make_pair(name, data));
     return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
   }
   return GraphicsObjectHandle();
@@ -214,7 +214,7 @@ bool Graphics::create_back_buffers(int width, int height)
   B_ERR_HR(_device->CreateDepthStencilView(rt->depth_stencil, NULL, &rt->dsv.p));
   rt->dsv->GetDesc(&rt->dsv_desc);
 
-  _res._render_targets.set_pair(idx, make_pair(rt, "default_rt"));
+  _res._render_targets.set_pair(idx, make_pair("default_rt", rt));
   _default_rt_handle = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
@@ -337,8 +337,8 @@ void Graphics::resize(const int width, const int height)
   create_back_buffers(width, height);
 }
 
-GraphicsObjectHandle Graphics::create_constant_buffer(int size) {
-  CD3D11_BUFFER_DESC desc(size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DEFAULT);
+GraphicsObjectHandle Graphics::create_constant_buffer(int buffer_size) {
+  CD3D11_BUFFER_DESC desc(buffer_size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DEFAULT);
 
   const int idx = _res._constant_buffers.find_free_index();
   if (idx != -1 && SUCCEEDED(create_buffer_inner(_device, desc, NULL, &_res._constant_buffers[idx])))
@@ -346,16 +346,24 @@ GraphicsObjectHandle Graphics::create_constant_buffer(int size) {
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t data_size, const void* data) {
+GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t buffer_size, const void* data) {
   const int idx = _res._vertex_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(data_size, 1, data, &_res._vertex_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(buffer_size, data, &_res._vertex_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
 
+GraphicsObjectHandle Graphics::create_dynamic_vertex_buffer(uint32_t buffer_size) {
+  const int idx = _res._vertex_buffers.find_free_index();
+  if (idx != -1 && SUCCEEDED(create_dynamic_vertex_buffer(buffer_size, &_res._vertex_buffers[idx])))
+    return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
+  return GraphicsObjectHandle();
+}
+
+
 GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
   const int idx = _res._index_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, 1, data, &_res._index_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, data, &_res._index_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
@@ -374,7 +382,7 @@ GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int l
     ID3D11VertexShader *vs = nullptr;
     if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
       SAFE_RELEASE(_res._vertex_shaders[idx]);
-      _res._vertex_shaders[idx] = vs;
+      _res._vertex_shaders.set_pair(idx, make_pair(id, vs));
       return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
     }
   }
@@ -388,7 +396,7 @@ GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int le
     ID3D11PixelShader *ps = nullptr;
     if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
       SAFE_RELEASE(_res._pixel_shaders[idx]);
-      _res._pixel_shaders[idx] = ps;
+      _res._pixel_shaders.set_pair(idx, make_pair(id, ps));
       return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
     }
   }
@@ -529,7 +537,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     int idx = _res._techniques.idx_from_token(t->name());
     if (idx != -1 || (idx = _res._techniques.find_free_index()) != -1) {
       SAFE_DELETE(_res._techniques[idx]);
-      _res._techniques.set_pair(idx, make_pair(t, t->name()));
+      _res._techniques.set_pair(idx, make_pair(t->name(), t));
       v.push_back(t->name());
     } else {
       SAFE_DELETE(t);
@@ -546,6 +554,25 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
   int idx = _res._techniques.idx_from_token(name);
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_name) {
+  if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL)) {
+    if (technique->vertex_shader()->entry_point() == shader_name) {
+      int idx = _res._vertex_shaders.idx_from_token(shader_name);
+      return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx) : GraphicsObjectHandle();
+    } else if (technique->pixel_shader()->entry_point() == shader_name) {
+      int idx = _res._pixel_shaders.idx_from_token(shader_name);
+      return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx) : GraphicsObjectHandle();
+    }
+  }
+  return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::get_input_layout(const char *technique_name) {
+  if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL))
+    return technique->input_layout();
+  return GraphicsObjectHandle();
 }
 
 
@@ -666,11 +693,39 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-  return SUCCEEDED(_immediate_context->Map(_res._textures.get(h)->texture, sub, type, flags, res));
+  switch (h._type) {
+    case GraphicsObjectHandle::kTexture:
+      return SUCCEEDED(_immediate_context->Map(_res._textures.get(h)->texture, sub, type, flags, res));
+
+    case GraphicsObjectHandle::kVertexBuffer:
+      return SUCCEEDED(_immediate_context->Map(_res._vertex_buffers.get(h), sub, type, flags, res));
+
+    case GraphicsObjectHandle::kIndexBuffer:
+      return SUCCEEDED(_immediate_context->Map(_res._index_buffers.get(h), sub, type, flags, res));
+
+    default:
+      LOG_WARNING_LN("Invalid resource type passed to %s", __FUNCTION__);
+      return false;
+  }
 }
 
 void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
-  _immediate_context->Unmap(_res._textures.get(h)->texture, sub);
+  switch (h._type) {
+    case GraphicsObjectHandle::kTexture:
+      _immediate_context->Unmap(_res._textures.get(h)->texture, sub);
+      break;
+
+    case GraphicsObjectHandle::kVertexBuffer:
+      _immediate_context->Unmap(_res._vertex_buffers.get(h), sub);
+      break;
+
+    case GraphicsObjectHandle::kIndexBuffer:
+      _immediate_context->Unmap(_res._index_buffers.get(h), sub);
+      break;
+
+    default:
+      LOG_WARNING_LN("Invalid resource type passed to %s", __FUNCTION__);
+  }
 }
 
 void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {

@@ -7,9 +7,11 @@
 
 struct KumiGwenRenderer : public Gwen::Renderer::Base
 {
-  KumiGwenRenderer() 
-    : _locked_pos_col(nullptr) {
-      _vb_pos_col.create(64 * 1024);
+  KumiGwenRenderer()
+    : _locked_pos_col(nullptr)
+  {
+    _vb_pos_col.create(64 * 1024);
+    _render_key.cmd = RenderKey::kRenderBuffers;
   }
 
   virtual void Init() {
@@ -23,9 +25,13 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     int pos_col_count = _vb_pos_col.unmap(exch_null(_locked_pos_col));
 
     BufferRenderData *data = RENDERER.alloc_command_data<BufferRenderData>();
-    RenderKey key;
-    key.cmd = RenderKey::kRenderBuffers;
-    RENDERER.submit_command(FROM_HERE, key, data);
+    data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    data->vb = _vb_pos_col.vb();
+    data->vs = GRAPHICS.find_shader("gwen", "vs_color_main");
+    data->ps = GRAPHICS.find_shader("gwen", "ps_color_main");
+    data->layout = GRAPHICS.get_input_layout("gwen");
+    data->vertex_count = pos_col_count;
+    RENDERER.submit_command(FROM_HERE, _render_key, data);
   };
 
   virtual void SetDrawColor(Gwen::Color color) {
@@ -109,6 +115,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   Gwen::Color _draw_color;
   DynamicVb<PosCol> _vb_pos_col;
   PosCol *_locked_pos_col;
+  RenderKey _render_key;
 };
 
 

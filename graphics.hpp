@@ -87,13 +87,13 @@ public:
 		{
 		}
 
-		enum { IdCount = 1 << 1 << GraphicsObjectHandle::cIdBits };
-		SearchableIdBuffer<ID3D11VertexShader *, string, IdCount> _vertex_shaders;
-		SearchableIdBuffer<ID3D11PixelShader *, string, IdCount> _pixel_shaders;
+		enum { IdCount = 1 << GraphicsObjectHandle::cIdBits };
+		SearchableIdBuffer<string, ID3D11VertexShader *, IdCount> _vertex_shaders;
+		SearchableIdBuffer<string, ID3D11PixelShader *, IdCount> _pixel_shaders;
 		IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
 		IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
 		IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
-		SearchableIdBuffer<Technique *, string, IdCount> _techniques;
+		SearchableIdBuffer<string, Technique *, IdCount> _techniques;
 		IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
 
 		IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
@@ -101,8 +101,8 @@ public:
 		IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
 		IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
-		SearchableIdBuffer<TextureData *, string, IdCount> _textures;
-		SearchableIdBuffer<RenderTargetData *, string, IdCount> _render_targets;
+		SearchableIdBuffer<string, TextureData *, IdCount> _textures;
+		SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
 	};
 
 	static bool create(ResourceInterface *ri);
@@ -120,8 +120,9 @@ public:
 
   virtual GraphicsObjectHandle create_constant_buffer(int size);
   virtual GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
-  virtual GraphicsObjectHandle create_static_vertex_buffer(uint32_t data_size, const void* data);
-  virtual GraphicsObjectHandle create_static_index_buffer(uint32_t data_size, const void* data);
+  virtual GraphicsObjectHandle create_static_vertex_buffer(uint32_t buffer_size, const void* data);
+  virtual GraphicsObjectHandle create_static_index_buffer(uint32_t buffer_size, const void* data);
+  virtual GraphicsObjectHandle create_dynamic_vertex_buffer(uint32_t buffer_size);
 
   virtual GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
   virtual GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
@@ -166,11 +167,13 @@ public:
 
 	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
+  GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
+  GraphicsObjectHandle get_input_layout(const char *technique_name);
 
 
-	HRESULT create_dynamic_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, ID3D11Buffer** vertex_buffer);
-	HRESULT create_static_vertex_buffer(uint32_t vertex_count, uint32_t vertex_size, const void* data, ID3D11Buffer** vertex_buffer);
-	HRESULT create_static_index_buffer(uint32_t index_count, uint32_t elem_size, const void* data, ID3D11Buffer** index_buffer);
+	HRESULT create_dynamic_vertex_buffer(uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_vertex_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_index_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
 	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }

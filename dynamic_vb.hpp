@@ -17,20 +17,13 @@ public:
   {
   }
 
-  ~DynamicVb()
-  {
+  bool create(int max_verts) {
+    return (_vb = GRAPHICS.create_dynamic_vertex_buffer(max_verts * sizeof(Vtx))).is_valid();
   }
 
-  bool create(int max_verts)
-  {
-    return SUCCEEDED(GRAPHICS.create_dynamic_vertex_buffer(max_verts, sizeof(Vtx), &_vb.p));
-  }
-
-  Vtx *map()
-  {
-    ID3D11DeviceContext *c = Graphics::instance().context();
+  Vtx *map() {
     D3D11_MAPPED_SUBRESOURCE r;
-    if (FAILED(c->Map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &r)))
+    if (!GRAPHICS.map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &r))
       return NULL;
 
     _mapped = true;
@@ -42,8 +35,7 @@ public:
   {
     assert(_mapped);
     if (!_mapped) return -1;
-    ID3D11DeviceContext *c = Graphics::instance().context();
-    c->Unmap(_vb, 0);
+    GRAPHICS.unmap(_vb, 0);
     _mapped = false;
 
     // calc # verts inserted
@@ -52,12 +44,13 @@ public:
 
   ID3D11Buffer *get() { return _vb; }
   int num_verts() const { return _num_verts; }
+  GraphicsObjectHandle vb() const { return _vb; }
 
 private:
   Vtx *_org;
   bool _mapped;
   int _num_verts;
-  CComPtr<ID3D11Buffer> _vb;
+  GraphicsObjectHandle _vb;
 };
 
 

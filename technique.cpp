@@ -218,10 +218,10 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   GraphicsObjectHandle handle;
   switch (shader->type()) {
     case Shader::kVertexShader: 
-      handle = graphics->create_vertex_shader(buf.data(), len, shader->obj_filename()); 
+      handle = graphics->create_vertex_shader(buf.data(), len, shader->entry_point());
       break;
     case Shader::kPixelShader: 
-      handle = graphics->create_pixel_shader(buf.data(), len, shader->obj_filename()); 
+      handle = graphics->create_pixel_shader(buf.data(), len, shader->entry_point());
       break;
     case Shader::kGeometryShader: break;
   }
