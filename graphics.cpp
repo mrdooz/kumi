@@ -432,7 +432,7 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_font_family(const char *name) {
+GraphicsObjectHandle Graphics::create_font_family(const wstring &name) {
   int idx = _res._font_wrappers.idx_from_token(name);
   if (idx != -1)
     return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
@@ -441,7 +441,7 @@ GraphicsObjectHandle Graphics::create_font_family(const char *name) {
   idx = _res._font_wrappers.find_free_index();
   if (idx != -1) {
     IFW1FontWrapper *font = nullptr;
-    _fw1_factory->CreateFontWrapper(_device, utf8_to_wide(name).c_str(), &font);
+    _fw1_factory->CreateFontWrapper(_device, name.c_str(), &font);
     _res._font_wrappers.set_pair(idx, make_pair(name, font));
     return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
   }

@@ -120,7 +120,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     RenderKey key;
     key.cmd = RenderKey::kRenderText;
     TextRenderData *data = RENDERER.alloc_command_data<TextRenderData>();
-    data->font = GRAPHICS.create_font_family(wide_char_to_utf8(pFont->facename).c_str());
+    data->font = GRAPHICS.create_font_family(pFont->facename);
     int len = (text.size() + 1) * 2;
     data->str = (WCHAR *)RENDERER.alloc_command_data(len);
     memcpy((void *)data->str, text.c_str(), len);

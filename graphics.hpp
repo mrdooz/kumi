@@ -107,7 +107,7 @@ public:
 		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
 		SearchableIdBuffer<string, TextureData *, IdCount> _textures;
     SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
-    SearchableIdBuffer<string,  IFW1FontWrapper *, IdCount> _font_wrappers;
+    SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
 	};
 
 	static bool create(ResourceInterface *ri);
@@ -137,7 +137,7 @@ public:
   virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
   virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
-  virtual GraphicsObjectHandle create_font_family(const char *name);
+  virtual GraphicsObjectHandle create_font_family(const std::wstring &name);
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
