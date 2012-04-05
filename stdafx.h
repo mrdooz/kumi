@@ -84,5 +84,7 @@ typedef uint64_t uint64;
 #include <cef.h>
 #endif
 
+#include "FW1FontWrapper.h"
+
 
 typedef std::basic_string<TCHAR> ustring;

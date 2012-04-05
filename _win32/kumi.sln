@@ -3,6 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kumi", "kumi.vcxproj", "{9DFDA8BA-683C-485E-8109-155098B2D258}"
 	ProjectSection(ProjectDependencies) = postProject
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353} = {9F62DB07-EA42-4388-82AB-E6FAA371F353}
 		{641C5F36-32EE-4323-B740-992B651CF9D6} = {641C5F36-32EE-4323-B740-992B651CF9D6}
 		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB} = {668AC2E1-1057-4FA0-ADA0-C8F974558FEB}
 	EndProjectSection
@@ -10,6 +11,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libzmq", "..\..\zeromq-2.1.11\builds\msvc\libzmq\libzmq.vcxproj", "{641C5F36-32EE-4323-B740-992B651CF9D6}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Gwen", "..\gwen\_win32\Gwen.vcxproj", "{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FW1FontWrapper", "..\FW1FontWrapper\FW1FontWrapper.vcxproj", "{9F62DB07-EA42-4388-82AB-E6FAA371F353}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -48,6 +51,15 @@ Global
 		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|Win32.ActiveCfg = Release|Win32
 		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|Win32.Build.0 = Release|Win32
 		{668AC2E1-1057-4FA0-ADA0-C8F974558FEB}.WithOpenPGM|x64.ActiveCfg = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Debug|Win32.Build.0 = Debug|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Debug|x64.ActiveCfg = Debug|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Release|Win32.ActiveCfg = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Release|Win32.Build.0 = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.Release|x64.ActiveCfg = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.WithOpenPGM|Win32.ActiveCfg = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.WithOpenPGM|Win32.Build.0 = Release|Win32
+		{9F62DB07-EA42-4388-82AB-E6FAA371F353}.WithOpenPGM|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

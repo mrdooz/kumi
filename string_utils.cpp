@@ -32,6 +32,14 @@ bool wide_char_to_utf8(LPCOLESTR unicode, size_t len, string *str)
 	return true;
 }
 
+string wide_char_to_utf8(const wstring &str) {
+  int len = str.size();
+  char *buf = (char *)_alloca(len*2) + 1;
+  WideCharToMultiByte(CP_UTF8, 0, str.c_str(), len, buf, len * 2 + 1, NULL, NULL);
+  buf[len] = '\0';
+  return string(buf);
+}
+
 string trim(const string &str) 
 {
 	int leading = 0, trailing = 0;
@@ -44,15 +52,32 @@ string trim(const string &str)
 	return leading || trailing ? str.substr(leading, str.size() - (leading + trailing)) : str;
 }
 
+wstring utf8_to_wide(const char *str)
+{
+  const int len = strlen(str);
+  WCHAR *buf = (WCHAR *)_alloca((len+1)*2);
+
+  wstring res;
+  if (MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, (len+1) * 2)) {
+    res = wstring(buf);
+  } else {
+    int err = GetLastError();
+  }
+  return res;
+}
+
 #ifdef _UNICODE
 ustring ansi_to_host(const char *str)
 {
 	const int len = strlen(str);
-	WCHAR *buf = (WCHAR *)_alloca(len*2) + 1;
+	WCHAR *buf = (WCHAR *)_alloca((len+1)*2);
 
 	wstring res;
-	if (MultiByteToWideChar(CP_ACP, 0, str, -1, buf, len * 2 + 1))
-		res = wstring(buf);
+	if (MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, (len+1)*2)) {
+    res = wstring(buf);
+  } else {
+
+  }
 
 	return res;
 }

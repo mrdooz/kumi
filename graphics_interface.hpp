@@ -20,4 +20,6 @@ struct GraphicsInterface {
   virtual GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc) = 0;
   virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc) = 0;
   virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc) = 0;
+
+  virtual GraphicsObjectHandle create_font_family(const char *name) = 0;
 };

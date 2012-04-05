@@ -21,6 +21,9 @@ enum FileEvent;
 struct RenderTargetData;
 struct TextureData;
 
+struct IFW1Factory;
+struct IFW1FontWrapper;
+
 struct RenderTargetData {
 	RenderTargetData() {
 		reset();
@@ -83,7 +86,8 @@ public:
 			, _sampler_states(release_obj<ID3D11SamplerState *>)
 			, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
 			, _textures(delete_obj<TextureData *>)
-			, _render_targets(delete_obj<RenderTargetData *>)
+      , _render_targets(delete_obj<RenderTargetData *>)
+      , _font_wrappers(release_obj<IFW1FontWrapper *>)
 		{
 		}
 
@@ -102,7 +106,8 @@ public:
 		IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
 		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
 		SearchableIdBuffer<string, TextureData *, IdCount> _textures;
-		SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
+    SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
+    SearchableIdBuffer<string,  IFW1FontWrapper *, IdCount> _font_wrappers;
 	};
 
 	static bool create(ResourceInterface *ri);
@@ -131,6 +136,8 @@ public:
   virtual GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
   virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
   virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
+
+  virtual GraphicsObjectHandle create_font_family(const char *name);
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
@@ -169,7 +176,6 @@ public:
 	GraphicsObjectHandle find_technique(const char *name);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
-
 
 	HRESULT create_dynamic_vertex_buffer(uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
 	HRESULT create_static_vertex_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
@@ -229,6 +235,8 @@ private:
 
 	string _vs_profile;
 	string _ps_profile;
+
+  CComPtr<IFW1Factory> _fw1_factory;
 
 };
 

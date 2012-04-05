@@ -1,9 +1,11 @@
 #include "stdafx.h"
 #include "kumi_gwen.hpp"
 #include "gwen/Structures.h"
+#include "gwen/Font.h"
 #include "dynamic_vb.hpp"
 #include "vertex_types.hpp"
 #include "renderer.hpp"
+#include "string_utils.hpp"
 
 struct KumiGwenRenderer : public Gwen::Renderer::Base
 {
@@ -114,7 +116,20 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   };
 
   virtual void RenderText( Gwen::Font* pFont, Gwen::Point pos, const Gwen::UnicodeString& text ) {
+    Translate(pos.x, pos.y);
+    RenderKey key;
+    key.cmd = RenderKey::kRenderText;
+    TextRenderData *data = RENDERER.alloc_command_data<TextRenderData>();
+    data->font = GRAPHICS.create_font_family(wide_char_to_utf8(pFont->facename).c_str());
+    int len = (text.size() + 1) * 2;
+    data->str = (WCHAR *)RENDERER.alloc_command_data(len);
+    memcpy((void *)data->str, text.c_str(), len);
+    data->font_size = pFont->size;
+    data->x = pos.x;
+    data->y = pos.y;
+    data->flags = 0;
 
+    RENDERER.submit_command(FROM_HERE, key, data);
   }
 
   virtual Gwen::Point MeasureText(Gwen::Font* pFont, const Gwen::UnicodeString& text) {

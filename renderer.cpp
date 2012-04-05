@@ -3,6 +3,7 @@
 #include "graphics.hpp"
 #include "technique.hpp"
 #include "material_manager.hpp"
+#include "FW1FontWrapper.h"
 
 using namespace std;
 
@@ -154,7 +155,13 @@ void Renderer::render() {
           ctx->DrawIndexed(render_data->index_count, render_data->start_index, render_data->base_vertex);
         else
           ctx->Draw(render_data->vertex_count, render_data->start_vertex);
+        break;
+      }
 
+      case RenderKey::kRenderText: {
+        TextRenderData *render_data = (TextRenderData *)data;
+        IFW1FontWrapper *wrapper = res->_font_wrappers.get(render_data->font);
+        wrapper->DrawString(GRAPHICS.context(), render_data->str, render_data->font_size, render_data->x, render_data->y, 0xffffffff, 0);
         break;
       }
     }
@@ -162,6 +169,13 @@ void Renderer::render() {
 
   _render_commands.clear();
   _effect_data_ofs = 0;
+}
+
+void *Renderer::strdup(const char *str) {
+  int len = strlen(str);
+  void *mem = alloc_command_data(len + 1);
+  memcpy(mem, str, len);
+  return mem;
 }
 
 void *Renderer::alloc_command_data(size_t size) {

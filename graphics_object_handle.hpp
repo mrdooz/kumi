@@ -25,6 +25,7 @@ class GraphicsObjectHandle {
 		kVertexShader,
 		kPixelShader,
 		kShaderResourceView,
+    kFontFamily,
 	};	
 	GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
 	union {

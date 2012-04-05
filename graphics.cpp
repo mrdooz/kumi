@@ -6,6 +6,7 @@
 #include "resource_interface.hpp"
 #include "property_manager.hpp"
 #include "material_manager.hpp"
+#include "string_utils.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -430,6 +431,23 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
     return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
   return GraphicsObjectHandle();
 }
+
+GraphicsObjectHandle Graphics::create_font_family(const char *name) {
+  int idx = _res._font_wrappers.idx_from_token(name);
+  if (idx != -1)
+    return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
+  if (!_fw1_factory)
+    FW1CreateFactory(FW1_VERSION, &_fw1_factory.p);
+  idx = _res._font_wrappers.find_free_index();
+  if (idx != -1) {
+    IFW1FontWrapper *font = nullptr;
+    _fw1_factory->CreateFontWrapper(_device, utf8_to_wide(name).c_str(), &font);
+    _res._font_wrappers.set_pair(idx, make_pair(name, font));
+    return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
+  }
+  return GraphicsObjectHandle();
+}
+
 #if 0
 static bool technique_changed_callback(const char *filename) {
 	return true;
@@ -574,7 +592,6 @@ GraphicsObjectHandle Graphics::get_input_layout(const char *technique_name) {
     return technique->input_layout();
   return GraphicsObjectHandle();
 }
-
 
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
 

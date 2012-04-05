@@ -108,6 +108,9 @@
     <ClCompile Include="..\test\ps3_background.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\kumi_gwen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -226,6 +229,12 @@
     </ClInclude>
     <ClInclude Include="..\test\ps3_background.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\kumi_gwen.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\vertex_types.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

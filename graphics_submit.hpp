@@ -36,6 +36,15 @@ struct BufferRenderData {
   D3D_PRIMITIVE_TOPOLOGY topology;
 };
 
+struct TextRenderData {
+  GraphicsObjectHandle font;
+  const WCHAR *str;  // lives on the allocated stack. no need to free
+  float x, y;
+  float font_size;
+  XMFLOAT4 color;
+  uint32 flags;
+};
+
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
 	enum Cmd {
@@ -44,6 +53,7 @@ struct RenderKey {
 		kRenderMesh,
 		kRenderTechnique,
     kRenderBuffers,
+    kRenderText,
 		kNumCommands
 	};
 	static_assert(kNumCommands < (1 << 16), "Too many commands");
