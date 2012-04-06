@@ -34,6 +34,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     data->ps = GRAPHICS.find_shader("gwen", "ps_color_main");
     data->layout = GRAPHICS.get_input_layout("gwen");
     data->vertex_count = pos_col_count;
+    GRAPHICS.get_technique_states("gwen", &data->rs, &data->bs, &data->dss);
     RENDERER.submit_command(FROM_HERE, _render_key, data);
   };
 
@@ -120,7 +121,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     RenderKey key;
     key.cmd = RenderKey::kRenderText;
     TextRenderData *data = RENDERER.alloc_command_data<TextRenderData>();
-    data->font = GRAPHICS.create_font_family(pFont->facename);
+    data->font = get_font(pFont->facename);
     int len = (text.size() + 1) * 2;
     data->str = (WCHAR *)RENDERER.alloc_command_data(len);
     memcpy((void *)data->str, text.c_str(), len);
@@ -133,7 +134,19 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   }
 
   virtual Gwen::Point MeasureText(Gwen::Font* pFont, const Gwen::UnicodeString& text) {
-    return Gwen::Point();
+    DWRITE_TEXT_METRICS metrics;
+    GRAPHICS.get_text_metric(get_font(pFont->facename), text, pFont->size, 0, 0, 0, &metrics);
+    return Gwen::Point(metrics.width, metrics.height);
+  }
+
+  GraphicsObjectHandle get_font(const std::wstring &font_name) {
+    auto it = _fonts.find(font_name);
+    if (it == _fonts.end()) {
+      GraphicsObjectHandle font = GRAPHICS.get_or_create_font_family(font_name);
+      _fonts[font_name] = font;
+      return font;
+    }
+    return it->second;
   }
 
   //
@@ -149,6 +162,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   virtual void RenderText( Gwen::Font* pFont, Gwen::Point pos, const Gwen::String& text );
 */
 
+  std::map<wstring, GraphicsObjectHandle> _fonts;
   XMFLOAT4 _draw_color;
   DynamicVb<PosCol> _vb_pos_col;
   PosCol *_locked_pos_col;

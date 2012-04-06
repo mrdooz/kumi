@@ -137,7 +137,8 @@ public:
   virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
   virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
-  virtual GraphicsObjectHandle create_font_family(const std::wstring &name);
+  virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
+  bool get_text_metric(GraphicsObjectHandle font, const std::wstring &str, float size, float x, float y, uint32 flags, DWRITE_TEXT_METRICS *metrics);
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
@@ -174,6 +175,7 @@ public:
 
 	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
+  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
 

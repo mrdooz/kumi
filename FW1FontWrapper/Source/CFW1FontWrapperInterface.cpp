@@ -194,14 +194,15 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
 	FLOAT X,
 	FLOAT Y,
 	UINT32 Color,
-	UINT Flags
+	UINT Flags,
+  DWRITE_TEXT_METRICS *pMetrics
 ) {
 	FW1_RECTF rect;
 	
 	rect.Left = rect.Right = X;
 	rect.Top = rect.Bottom = Y;
 	
-	DrawString(pContext, pszString, NULL, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP);
+	DrawString(pContext, pszString, NULL, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP, pMetrics);
 }
 
 
@@ -214,14 +215,15 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
 	FLOAT X,
 	FLOAT Y,
 	UINT32 Color,
-	UINT Flags
+	UINT Flags,
+  DWRITE_TEXT_METRICS *pMetrics
 ) {
 	FW1_RECTF rect;
 	
 	rect.Left = rect.Right = X;
 	rect.Top = rect.Bottom = Y;
 	
-	DrawString(pContext, pszString, pszFontFamily, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP);
+	DrawString(pContext, pszString, pszFontFamily, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP, pMetrics);
 }
 
 
@@ -235,7 +237,8 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
 	UINT32 Color,
 	const FW1_RECTF *pClipRect,
 	const FLOAT *pTransformMatrix,
-	UINT Flags
+	UINT Flags,
+  DWRITE_TEXT_METRICS *pMetrics
 ) {
 	if(m_defaultTextInited) {
 		UINT32 stringLength = 0;
@@ -284,6 +287,9 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
 					pTransformMatrix,
 					Flags
 				);
+
+        if (pMetrics)
+          pTextLayout->GetMetrics(pMetrics);
 				
 				pTextLayout->Release();
 			}

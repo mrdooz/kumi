@@ -161,7 +161,7 @@ void Renderer::render() {
       case RenderKey::kRenderText: {
         TextRenderData *render_data = (TextRenderData *)data;
         IFW1FontWrapper *wrapper = res->_font_wrappers.get(render_data->font);
-        wrapper->DrawString(GRAPHICS.context(), render_data->str, render_data->font_size, render_data->x, render_data->y, 0xffffffff, 0);
+        wrapper->DrawString(GRAPHICS.context(), render_data->str, render_data->font_size, render_data->x, render_data->y, 0xffffffff, 0, NULL);
         break;
       }
     }

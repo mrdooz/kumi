@@ -432,7 +432,7 @@ GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &de
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_font_family(const wstring &name) {
+GraphicsObjectHandle Graphics::get_or_create_font_family(const wstring &name) {
   int idx = _res._font_wrappers.idx_from_token(name);
   if (idx != -1)
     return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
@@ -446,6 +446,14 @@ GraphicsObjectHandle Graphics::create_font_family(const wstring &name) {
     return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
   }
   return GraphicsObjectHandle();
+}
+
+bool Graphics::get_text_metric(GraphicsObjectHandle font, const std::wstring &str, float size, float x, float y, uint32 flags, DWRITE_TEXT_METRICS *metrics) {
+  if (IFW1FontWrapper *wrapper = _res._font_wrappers.get(font)) {
+    wrapper->DrawString(GRAPHICS.context(), str.c_str(), size, x, y, 0xffffff, flags | FW1_ANALYZEONLY, metrics);
+    return true;
+  }
+  return false;
 }
 
 #if 0
@@ -572,6 +580,14 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
   int idx = _res._techniques.idx_from_token(name);
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
+}
+
+void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss) {
+  if (Technique *technique = _res._techniques.find(name, (Technique *)NULL)) {
+    *rs = technique->rasterizer_state();
+    *bs = technique->blend_state();
+    *dss = technique->depth_stencil_state();
+  }
 }
 
 GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_name) {

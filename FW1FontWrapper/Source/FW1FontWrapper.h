@@ -870,7 +870,8 @@ MIDL_INTERFACE("83347A5C-B0B1-460e-A35C-427E8B85F9F4") IFW1FontWrapper : public 
 		__in FLOAT X,
 		__in FLOAT Y,
 		__in UINT32 Color,
-		__in UINT Flags
+    __in UINT Flags,
+    __out_opt DWRITE_TEXT_METRICS *pMetrics
 	) = 0;
 	
 	/// <summary>Draw a string.</summary>
@@ -892,7 +893,8 @@ MIDL_INTERFACE("83347A5C-B0B1-460e-A35C-427E8B85F9F4") IFW1FontWrapper : public 
 		__in FLOAT X,
 		__in FLOAT Y,
 		__in UINT32 Color,
-		__in UINT Flags
+    __in UINT Flags,
+    __out_opt DWRITE_TEXT_METRICS *pMetrics
 	) = 0;
 	
 	/// <summary>Draw a string.</summary>
@@ -916,7 +918,8 @@ MIDL_INTERFACE("83347A5C-B0B1-460e-A35C-427E8B85F9F4") IFW1FontWrapper : public 
 		__in UINT32 Color,
 		__in const FW1_RECTF *pClipRect,
 		__in const FLOAT *pTransformMatrix,
-		__in UINT Flags
+		__in UINT Flags,
+    __out_opt DWRITE_TEXT_METRICS *pMetrics
 	) = 0;
 	
 	/// <summary>Draw geometry.</summary>

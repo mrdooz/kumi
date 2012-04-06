@@ -51,7 +51,8 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 			FLOAT X,
 			FLOAT Y,
 			UINT32 Color,
-			UINT Flags
+			UINT Flags,
+      DWRITE_TEXT_METRICS *pMetrics
 		);
 		virtual void STDMETHODCALLTYPE DrawString(
 			ID3D11DeviceContext *pContext,
@@ -61,7 +62,8 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 			FLOAT X,
 			FLOAT Y,
 			UINT32 Color,
-			UINT Flags
+			UINT Flags,
+      DWRITE_TEXT_METRICS *pMetrics
 		);
 		virtual void STDMETHODCALLTYPE DrawString(
 			ID3D11DeviceContext *pContext,
@@ -72,7 +74,8 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 			UINT32 Color,
 			const FW1_RECTF *pClipRect,
 			const FLOAT *pTransformMatrix,
-			UINT Flags
+			UINT Flags,
+      DWRITE_TEXT_METRICS *pMetrics
 		);
 		
 		virtual void STDMETHODCALLTYPE DrawGeometry(
