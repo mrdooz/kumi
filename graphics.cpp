@@ -145,9 +145,67 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_INFO *image_info, std::function<void (ID3D11Resource *)> cb)
-{
+bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, uint8 **bits) {
 
+  HRESULT hr;
+  D3DX11GetImageInfoFromFile(filename, NULL, info, &hr);
+  if (FAILED(hr))
+    return false;
+
+  D3DX11_IMAGE_LOAD_INFO loadinfo;
+  ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
+  loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
+  loadinfo.Usage = D3D11_USAGE_STAGING;
+  loadinfo.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  CComPtr<ID3D11Resource> resource;
+  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, &loadinfo, NULL, &resource.p, &hr);
+  if (FAILED(hr))
+    return false;
+
+  D3D11_MAPPED_SUBRESOURCE sub;
+  if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub)))
+    return false;
+
+  uint8 *src = (uint8 *)sub.pData;
+  uint8 *dst = new uint8[sub.RowPitch * info->Height];
+
+  int row_size = 4 * info->Width;
+  for (uint32 i = 0; i < info->Height; ++i) {
+    memcpy(&dst[i*sub.RowPitch], &src[i*sub.RowPitch], row_size);
+  }
+
+  GRAPHICS.context()->Unmap(resource, 0);
+  *pitch = sub.RowPitch;
+  *bits = dst;
+  return true;
+}
+
+GraphicsObjectHandle Graphics::load_texture(const char *filename) {
+  D3DX11_IMAGE_INFO info;
+  HRESULT hr;
+  D3DX11GetImageInfoFromFile(filename, NULL, &info, &hr);
+  if (FAILED(hr)) {
+    return GraphicsObjectHandle();
+  }
+
+  /*
+  D3DX11_IMAGE_LOAD_INFO loadinfo;
+  ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
+  loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
+  loadinfo.Usage = D3D11_USAGE_STAGING;
+  loadinfo.Format = image_info.Format;
+  CComPtr<ID3D11Resource> resource;
+*/
+  int idx = _res._textures.find_free_index();
+  if (idx == -1)
+    return GraphicsObjectHandle();
+
+  CComPtr<ID3D11Resource> resource;
+  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, NULL, NULL, &resource.p, &hr);
+  if (FAILED(hr)) {
+    return GraphicsObjectHandle();
+  }
+  return GraphicsObjectHandle();
 }
 
 bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out)

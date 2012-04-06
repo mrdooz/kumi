@@ -155,7 +155,9 @@ public:
 
 	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
-  GraphicsObjectHandle load_texture(const char *filename, D3DX11_IMAGE_INFO *image_info, std::function<void (ID3D11Resource *)> cb);
+  typedef std::function<void (ID3D11Resource *, const D3DX11_IMAGE_INFO &info)> fnOnLoaded;
+  GraphicsObjectHandle load_texture(const char *filename);
+  bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, uint8 **bits);
 
 	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
 	void unmap(GraphicsObjectHandle h, UINT sub);

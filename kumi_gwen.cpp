@@ -145,14 +145,29 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
 
   virtual void LoadTexture(Gwen::Texture* pTexture) {
 
-    D3DX11_IMAGE_INFO image_info;
-    HRESULT hr;
-    D3DX11GetImageInfoFromFile(pTexture->name.c_str(), NULL, &image_info, &hr);
-    if (FAILED(hr)) {
-      pTexture->failed = true;
-      return;
-    }
+    D3DX11_IMAGE_INFO info;
+    GRAPHICS.load_texture(pTexture->name.c_str(), &info, [=](ID3D11Resource *resource, const D3DX11_IMAGE_INFO &info) {
+      D3D11_MAPPED_SUBRESOURCE sub;
+      if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub))) {
+        pTexture->failed = true;
+        return;
+      }
 
+      MappedTexture &texture = _mapped_textures[pTexture->name.c_str()];
+      texture.image_info = info;
+      uint32 pitch = texture.pitch = sub.RowPitch;
+      uint8 *src = (uint8 *)sub.pData;
+      uint8 *dst = texture.data = new uint8[pitch * info.Height];
+
+      int row_size = 4 * info.Width;
+      for (uint32 i = 0; i < info.Height; ++i) {
+        memcpy(&dst[i*pitch], &src[i*pitch], row_size);
+      }
+
+      pTexture->failed = false;
+      GRAPHICS.context()->Unmap(resource, 0);
+    });
+/*
     D3DX11_IMAGE_LOAD_INFO loadinfo;
     ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
     loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -164,34 +179,14 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
       pTexture->failed = true;
       return;
     }
-
-    D3D11_MAPPED_SUBRESOURCE sub;
-    if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub))) {
-      pTexture->failed = true;
-      return;
-    }
-
-    MappedTexture &texture = _mapped_textures[pTexture->name.c_str()];
-    texture.image_info = image_info;
-    uint32 pitch = texture.pitch = sub.RowPitch;
-    uint8 *src = (uint8 *)sub.pData;
-    uint8 *dst = texture.data = new uint8[pitch * image_info.Height];
-    
-    int row_size = 4 * image_info.Width;
-    for (uint32 i = 0; i < image_info.Height; ++i) {
-      memcpy(&dst[i*pitch], &src[i*pitch], row_size);
-    }
-
-    pTexture->failed = false;
-
-    GRAPHICS.context()->Unmap(resource, 0);
+*/
   };
 
   virtual void FreeTexture( Gwen::Texture* pTexture ){
   };
 
   virtual void DrawTexturedRect(Gwen::Texture* pTexture, Gwen::Rect rect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f) {
-
+/*
     Translate(rect);
 
     float x0, y0, x1, y1, x2, y2, x3, y3;
@@ -214,8 +209,8 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     *_locked_pos_tex++ = v2;
     *_locked_pos_tex++ = v1;
     *_locked_pos_tex++ = v3;
-
-    DrawFilledRect(pTargetRect);
+*/
+    DrawFilledRect(rect);
   };
 
   virtual void DrawMissingImage( Gwen::Rect pTargetRect ) {
