@@ -11,6 +11,8 @@
 #include <string>
 
 #include "Gwen/BaseRender.h"
+#include "Gwen/TextObject.h"
+#include "Gwen/Gwen.h"
 
 namespace Gwen
 {

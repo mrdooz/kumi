@@ -41,7 +41,10 @@ namespace Gwen {
     class Canvas;
   }
   namespace Skin {
-    class Base;
+    class TexturedBase;
+  }
+  namespace Input {
+    class Windows;
   }
 }
 
@@ -186,7 +189,8 @@ protected:
 
   std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
   std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
-  std::unique_ptr<Gwen::Skin::Base> _gwen_skin;
+  std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
+  std::unique_ptr<Gwen::Input::Windows> _gwen_input;
 };
 
 #define APP App::instance()

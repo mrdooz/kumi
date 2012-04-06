@@ -2,10 +2,24 @@
 #include "kumi_gwen.hpp"
 #include "gwen/Structures.h"
 #include "gwen/Font.h"
+#include "gwen/Texture.h"
 #include "dynamic_vb.hpp"
 #include "vertex_types.hpp"
 #include "renderer.hpp"
 #include "string_utils.hpp"
+#include <D3DX11tex.h>
+
+#pragma comment(lib, "D3DX11.lib")
+
+struct MappedTexture {
+  MappedTexture() : data(nullptr) {}
+  ~MappedTexture() {
+    SAFE_ADELETE(data);
+  }
+  D3DX11_IMAGE_INFO image_info;
+  uint32 pitch;
+  uint8 *data;
+};
 
 struct KumiGwenRenderer : public Gwen::Renderer::Base
 {
@@ -40,6 +54,10 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
 
   static XMFLOAT4 to_directx(const Gwen::Color &col) {
     return XMFLOAT4(float(col.r) / 255, float(col.g) / 255, float(col.b) / 255, float(col.a) / 255);
+  }
+
+  static uint32 to_abgr(const XMFLOAT4 &col) {
+    return ((uint32(255 * col.w)) << 24) | ((uint32(255 * col.z)) << 16) | ((uint32(255 * col.y)) << 8) | (uint32(255 * col.x));
   }
 
   virtual void SetDrawColor(Gwen::Color color) {
@@ -88,29 +106,73 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
 
   virtual void LoadTexture( Gwen::Texture* pTexture ) {
 
+    D3DX11_IMAGE_INFO image_info;
+    HRESULT hr;
+    D3DX11GetImageInfoFromFile(pTexture->name.c_str(), NULL, &image_info, &hr);
+    if (FAILED(hr)) {
+      pTexture->failed = true;
+      return;
+    }
+
+    D3DX11_IMAGE_LOAD_INFO loadinfo;
+    ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
+    loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
+    loadinfo.Usage = D3D11_USAGE_STAGING;
+    loadinfo.Format = image_info.Format;
+    CComPtr<ID3D11Resource> resource;
+    D3DX11CreateTextureFromFile(GRAPHICS.device(), pTexture->name.c_str(), &loadinfo, NULL, &resource.p, &hr);
+    if (FAILED(hr)) {
+      pTexture->failed = true;
+      return;
+    }
+
+    D3D11_MAPPED_SUBRESOURCE sub;
+    if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub))) {
+      pTexture->failed = true;
+      return;
+    }
+
+    MappedTexture &texture = _mapped_textures[pTexture->name.c_str()];
+    texture.image_info = image_info;
+    uint32 pitch = texture.pitch = sub.RowPitch;
+    uint8 *src = (uint8 *)sub.pData;
+    uint8 *dst = texture.data = new uint8[pitch * image_info.Height];
+    
+    int row_size = 4 * image_info.Width;
+    for (uint32 i = 0; i < image_info.Height; ++i) {
+      memcpy(&dst[i*pitch], &src[i*pitch], row_size);
+    }
+
+    pTexture->failed = false;
+
+    GRAPHICS.context()->Unmap(resource, 0);
   };
 
   virtual void FreeTexture( Gwen::Texture* pTexture ){
   };
 
-  virtual void DrawTexturedRect( Gwen::Texture* pTexture, Gwen::Rect pTargetRect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f )
-  {
-
+  virtual void DrawTexturedRect( Gwen::Texture* pTexture, Gwen::Rect pTargetRect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f ) {
+    DrawFilledRect(pTargetRect);
   };
 
   virtual void DrawMissingImage( Gwen::Rect pTargetRect ) {
 
   }
 
-  virtual Gwen::Color PixelColour(Gwen::Texture* pTexture, unsigned int x, unsigned int y, const Gwen::Color& col_default = Gwen::Color( 255, 255, 255, 255 ) )
-  { 
-    return col_default; 
+  virtual Gwen::Color PixelColour(Gwen::Texture* pTexture, unsigned int x, unsigned int y, const Gwen::Color& col_default = Gwen::Color( 255, 255, 255, 255 ) ) { 
+    auto it = _mapped_textures.find(pTexture->name);
+    if (it == _mapped_textures.end()) {
+      LOG_WARNING_LN("Texture not loaded: %s", pTexture->name.c_str());
+      return col_default; 
+    }
+    const MappedTexture &texture = it->second;
+    uint8 *pixel = &texture.data[y*texture.pitch+x*4];
+    return Gwen::Color(pixel[0], pixel[1], pixel[2], pixel[3]);
   }
 
   virtual Gwen::Renderer::ICacheToTexture* GetCTT() { return NULL; }
 
   virtual void LoadFont( Gwen::Font* pFont ){
-
   };
 
   virtual void FreeFont( Gwen::Font* pFont ){
@@ -128,6 +190,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     data->font_size = pFont->size;
     data->x = pos.x;
     data->y = pos.y;
+    data->color = to_abgr(_draw_color);
     data->flags = 0;
 
     RENDERER.submit_command(FROM_HERE, key, data);
@@ -158,10 +221,9 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   }
   virtual void DrawPixel( int x, int y );
   virtual void DrawShavedCornerRect( Gwen::Rect rect, bool bSlight = false );
-  virtual Gwen::Point MeasureText( Gwen::Font* pFont, const Gwen::String& text );
-  virtual void RenderText( Gwen::Font* pFont, Gwen::Point pos, const Gwen::String& text );
 */
 
+  std::map<string, MappedTexture> _mapped_textures;
   std::map<wstring, GraphicsObjectHandle> _fonts;
   XMFLOAT4 _draw_color;
   DynamicVb<PosCol> _vb_pos_col;

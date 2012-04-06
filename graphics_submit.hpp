@@ -41,7 +41,7 @@ struct TextRenderData {
   const WCHAR *str;  // lives on the allocated stack. no need to free
   float x, y;
   float font_size;
-  XMFLOAT4 color;
+  uint32 color; // AABBGGRR
   uint32 flags;
 };
 
