@@ -28,20 +28,18 @@ class CFW1TextGeometry : public CFW1Object<IFW1TextGeometry> {
 		HRESULT initTextGeometry(IFW1Factory *pFW1Factory);
 	
 	// Internal functions
-	protected:
-		CFW1TextGeometry(const CFW1TextGeometry&);
-		CFW1TextGeometry& operator=(const CFW1TextGeometry&);
-		
+	private:
 		virtual ~CFW1TextGeometry();
 	
 	// Internal data
-	protected:
+	private:
 		std::vector<FW1_GLYPHVERTEX>	m_vertices;
 		std::vector<FW1_GLYPHVERTEX>	m_sortedVertices;
 		
 		UINT							m_maxSheetIndex;
 		std::vector<UINT>				m_vertexCounts;
 		std::vector<UINT>				m_vertexStartIndices;
+		bool							m_sorted;
 };
 
 

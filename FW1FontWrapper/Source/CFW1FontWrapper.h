@@ -51,8 +51,7 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 			FLOAT X,
 			FLOAT Y,
 			UINT32 Color,
-			UINT Flags,
-      DWRITE_TEXT_METRICS *pMetrics
+			UINT Flags
 		);
 		virtual void STDMETHODCALLTYPE DrawString(
 			ID3D11DeviceContext *pContext,
@@ -62,20 +61,47 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 			FLOAT X,
 			FLOAT Y,
 			UINT32 Color,
-			UINT Flags,
-      DWRITE_TEXT_METRICS *pMetrics
+			UINT Flags
 		);
 		virtual void STDMETHODCALLTYPE DrawString(
 			ID3D11DeviceContext *pContext,
 			const WCHAR *pszString,
 			const WCHAR *pszFontFamily,
 			FLOAT FontSize,
-			const FW1_RECTF *pFormatRect,
+			const FW1_RECTF *pLayoutRect,
 			UINT32 Color,
 			const FW1_RECTF *pClipRect,
 			const FLOAT *pTransformMatrix,
+			UINT Flags
+		);
+		
+		virtual FW1_RECTF STDMETHODCALLTYPE MeasureString(
+			const WCHAR *pszString,
+			const WCHAR *pszFontFamily,
+			FLOAT FontSize,
+			const FW1_RECTF *pLayoutRect,
+			UINT Flags
+		);
+		
+		virtual void STDMETHODCALLTYPE AnalyzeString(
+			ID3D11DeviceContext *pContext,
+			const WCHAR *pszString,
+			const WCHAR *pszFontFamily,
+			FLOAT FontSize,
+			const FW1_RECTF *pLayoutRect,
+			UINT32 Color,
 			UINT Flags,
-      DWRITE_TEXT_METRICS *pMetrics
+			IFW1TextGeometry *pTextGeometry
+		);
+		
+		virtual void STDMETHODCALLTYPE AnalyzeTextLayout(
+			ID3D11DeviceContext *pContext,
+			IDWriteTextLayout *pTextLayout,
+			FLOAT OriginX,
+			FLOAT OriginY,
+			UINT32 Color,
+			UINT Flags,
+			IFW1TextGeometry *pTextGeometry
 		);
 		
 		virtual void STDMETHODCALLTYPE DrawGeometry(
@@ -104,14 +130,19 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 		);
 	
 	// Internal functions
-	protected:
-		CFW1FontWrapper(const CFW1FontWrapper&);
-		CFW1FontWrapper& operator=(const CFW1FontWrapper&);
-		
+	private:
 		virtual ~CFW1FontWrapper();
+		
+		IDWriteTextLayout* createTextLayout(
+			const WCHAR *pszString,
+			const WCHAR *pszFontFamily,
+			FLOAT fontSize,
+			const FW1_RECTF *pLayoutRect,
+			UINT flags
+		);
 	
 	// Internal data
-	protected:
+	private:
 		std::wstring					m_lastError;
 		
 		ID3D11Device					*m_pDevice;
@@ -126,6 +157,8 @@ class CFW1FontWrapper : public CFW1Object<IFW1FontWrapper> {
 		
 		CRITICAL_SECTION				m_textRenderersCriticalSection;
 		std::stack<IFW1TextRenderer*>	m_textRenderers;
+		CRITICAL_SECTION				m_textGeometriesCriticalSection;
+		std::stack<IFW1TextGeometry*>	m_textGeometries;
 		
 		bool							m_defaultTextInited;
 		IDWriteTextFormat				*m_pDefaultTextFormat;

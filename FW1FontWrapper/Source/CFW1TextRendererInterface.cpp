@@ -85,7 +85,6 @@ HRESULT CFW1TextRenderer::DrawGlyphRun(
 	const DWRITE_GLYPH_RUN_DESCRIPTION *glyphRunDescription,
 	IUnknown *clientDrawingEffect
 ) {
-	clientDrawingContext;
 	glyphRunDescription;
 	measuringMode;
 	
@@ -123,9 +122,10 @@ HRESULT CFW1TextRenderer::DrawGlyphRun(
 	else {
 		// Glyph vertex
 		FW1_GLYPHVERTEX glyphVertex;
-		glyphVertex.PositionX = baselineOriginX;
-		glyphVertex.PositionY = baselineOriginY;
+		glyphVertex.PositionY = floor(baselineOriginY + 0.5f);
 		glyphVertex.GlyphColor = m_currentColor;
+		
+		float positionX = floor(baselineOriginX + 0.5f);
 		
 		// Optional drawing effect
 		if(clientDrawingEffect != NULL) {
@@ -138,21 +138,25 @@ HRESULT CFW1TextRenderer::DrawGlyphRun(
 		}
 		
 		// Add a vertex for each glyph in the run
-		for(UINT i=0; i < glyphRun->glyphCount; ++i) {
-			glyphVertex.GlyphIndex = m_pGlyphProvider->GetAtlasIdFromGlyphIndex(
-				glyphMap,
-				glyphRun->glyphIndices[i],
-				glyphRun->fontFace,
-				flags
-			);
-			
-			if((glyphRun->bidiLevel & 0x1) != 0)
-				glyphVertex.PositionX -= glyphRun->glyphAdvances[i];
-			
-			m_pTextGeometry->AddGlyphVertex(&glyphVertex);
-			
-			if((glyphRun->bidiLevel & 0x1) == 0)
-				glyphVertex.PositionX += glyphRun->glyphAdvances[i];
+		IFW1TextGeometry *pTextGeometry = static_cast<IFW1TextGeometry*>(clientDrawingContext);
+		if(pTextGeometry != NULL) {
+			for(UINT i=0; i < glyphRun->glyphCount; ++i) {
+				glyphVertex.GlyphIndex = m_pGlyphProvider->GetAtlasIdFromGlyphIndex(
+					glyphMap,
+					glyphRun->glyphIndices[i],
+					glyphRun->fontFace,
+					flags
+				);
+				
+				if((glyphRun->bidiLevel & 0x1) != 0)
+					positionX -= glyphRun->glyphAdvances[i];
+				
+				glyphVertex.PositionX = floor(positionX + 0.5f);
+				pTextGeometry->AddGlyphVertex(&glyphVertex);
+				
+				if((glyphRun->bidiLevel & 0x1) == 0)
+					positionX += glyphRun->glyphAdvances[i];
+			}
 		}
 	}
 	
@@ -218,13 +222,6 @@ HRESULT CFW1TextRenderer::DrawInlineObject(
 }
 
 
-// Get text geometry for a previously drawn text layout
-void STDMETHODCALLTYPE CFW1TextRenderer::GetTextGeometry(IFW1TextGeometry **ppTextGeometry) {
-	m_pTextGeometry->AddRef();
-	*ppTextGeometry = m_pTextGeometry;
-}
-
-
 // Get glyph provider
 HRESULT STDMETHODCALLTYPE CFW1TextRenderer::GetGlyphProvider(IFW1GlyphProvider **ppGlyphProvider) {
 	if(ppGlyphProvider == NULL)
@@ -243,7 +240,8 @@ HRESULT STDMETHODCALLTYPE CFW1TextRenderer::DrawTextLayout(
 	FLOAT OriginX,
 	FLOAT OriginY,
 	UINT32 Color,
-	UINT Flags
+	UINT Flags,
+	IFW1TextGeometry *pTextGeometry
 ) {
 	m_currentFlags = Flags;
 	m_currentColor = Color;
@@ -252,9 +250,7 @@ HRESULT STDMETHODCALLTYPE CFW1TextRenderer::DrawTextLayout(
 	m_pCachedGlyphMapFontFace = NULL;
 	m_cachedGlyphMapFontSize = 0.0f;
 	
-	m_pTextGeometry->Clear();
-	
-	return pTextLayout->Draw(NULL, m_pDWriteTextRendererProxy, OriginX, OriginY);
+	return pTextLayout->Draw(pTextGeometry, m_pDWriteTextRendererProxy, OriginX, OriginY);
 }
 
 

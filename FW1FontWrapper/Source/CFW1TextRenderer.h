@@ -16,7 +16,6 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 		virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject);
 		
 		// IFW1DWriteTextRenderer
-		virtual void STDMETHODCALLTYPE GetTextGeometry(IFW1TextGeometry **ppTextGeometry);
 		virtual HRESULT STDMETHODCALLTYPE GetGlyphProvider(IFW1GlyphProvider **ppGlyphProvider);
 		
 		virtual HRESULT STDMETHODCALLTYPE DrawTextLayout(
@@ -24,7 +23,8 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 			FLOAT OriginX,
 			FLOAT OriginY,
 			UINT32 Color,
-			UINT Flags
+			UINT Flags,
+			IFW1TextGeometry *pTextGeometry
 		);
 	
 	// Public functions
@@ -33,15 +33,11 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 		
 		HRESULT initTextRenderer(
 			IFW1Factory *pFW1Factory,
-			IFW1GlyphProvider *pGlyphProvider,
-			IFW1TextGeometry *pTextGeometry
+			IFW1GlyphProvider *pGlyphProvider
 		);
 	
 	// Internal functions
-	protected:
-		CFW1TextRenderer(const CFW1TextRenderer&);
-		CFW1TextRenderer& operator=(const CFW1TextRenderer&);
-		
+	private:
 		virtual ~CFW1TextRenderer();
 		
 		// IDWritePixelSnapping interface (called via proxy)
@@ -84,9 +80,8 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 		);
 	
 	// Internal data
-	protected:
+	private:
 		IFW1GlyphProvider			*m_pGlyphProvider;
-		IFW1TextGeometry			*m_pTextGeometry;
 		
 		UINT						m_currentFlags;
 		UINT32						m_currentColor;
@@ -97,7 +92,7 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 	
 	
 	// Proxy for IDWriteTextRenderer interface
-	protected:
+	private:
 		class CDWriteTextRendererProxy : public IDWriteTextRenderer {
 			public:
 				virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) {
@@ -136,11 +131,11 @@ class CFW1TextRenderer : public CFW1Object<IFW1TextRenderer> {
 			public:
 				CDWriteTextRendererProxy(CFW1TextRenderer *realObject) : m_realObject(realObject) {}
 			
-			protected:
+			private:
 				CDWriteTextRendererProxy(const CDWriteTextRendererProxy&);
 				CDWriteTextRendererProxy& operator=(const CDWriteTextRendererProxy&);
 			
-			protected:
+			private:
 				CFW1TextRenderer	*m_realObject;
 		} *m_pDWriteTextRendererProxy;
 };

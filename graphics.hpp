@@ -138,7 +138,7 @@ public:
   virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
 
   virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
-  bool get_text_metric(GraphicsObjectHandle font, const std::wstring &str, float size, float x, float y, uint32 flags, DWRITE_TEXT_METRICS *metrics);
+  bool measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect);
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }

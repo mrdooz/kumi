@@ -448,9 +448,11 @@ GraphicsObjectHandle Graphics::get_or_create_font_family(const wstring &name) {
   return GraphicsObjectHandle();
 }
 
-bool Graphics::get_text_metric(GraphicsObjectHandle font, const std::wstring &str, float size, float x, float y, uint32 flags, DWRITE_TEXT_METRICS *metrics) {
+bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect) {
   if (IFW1FontWrapper *wrapper = _res._font_wrappers.get(font)) {
-    wrapper->DrawString(GRAPHICS.context(), str.c_str(), size, x, y, 0xffffff, flags | FW1_ANALYZEONLY, metrics);
+    FW1_RECTF layout_rect;
+    layout_rect.Left = layout_rect.Right = layout_rect.Top = layout_rect.Bottom = 0;
+    *rect = wrapper->MeasureString(text.c_str(), family.c_str(), size, &layout_rect, flags | FW1_NOWORDWRAP);
     return true;
   }
   return false;

@@ -50,7 +50,6 @@ class CFW1Factory : public IFW1Factory {
 		);
 		virtual HRESULT STDMETHODCALLTYPE CreateTextRenderer(
 			IFW1GlyphProvider *pGlyphProvider,
-			IFW1TextGeometry *pTextGeometry,
 			IFW1TextRenderer **ppTextRenderer
 		);
 		virtual HRESULT STDMETHODCALLTYPE CreateTextGeometry(
@@ -87,7 +86,7 @@ class CFW1Factory : public IFW1Factory {
 			UINT GlyphSheetHeight,
 			BOOL HardwareCoordBuffer,
 			BOOL AllowOversizedGlyph,
-			UINT MaxGlyphCountPerSheet,
+			UINT MaxGlyphCount,
 			UINT MipLevels,
 			IFW1GlyphSheet **ppGlyphSheet
 		);
@@ -103,10 +102,7 @@ class CFW1Factory : public IFW1Factory {
 		HRESULT initFactory();
 	
 	// Internal functions
-	protected:
-		CFW1Factory(const CFW1Factory&);
-		CFW1Factory& operator=(const CFW1Factory&);
-		
+	private:
 		virtual ~CFW1Factory();
 		
 		HRESULT createDWriteFactory(IDWriteFactory **ppDWriteFactory);
@@ -114,11 +110,15 @@ class CFW1Factory : public IFW1Factory {
 		void setErrorString(const wchar_t *str);
 	
 	// Internal data
-	protected:
+	private:
 		ULONG						m_cRefCount;
 		
 		std::wstring				m_lastError;
 		CRITICAL_SECTION			m_errorStringCriticalSection;
+	
+	private:
+		CFW1Factory(const CFW1Factory&);
+		CFW1Factory& operator=(const CFW1Factory&);
 };
 
 

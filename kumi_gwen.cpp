@@ -134,9 +134,9 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   }
 
   virtual Gwen::Point MeasureText(Gwen::Font* pFont, const Gwen::UnicodeString& text) {
-    DWRITE_TEXT_METRICS metrics;
-    GRAPHICS.get_text_metric(get_font(pFont->facename), text, pFont->size, 0, 0, 0, &metrics);
-    return Gwen::Point(metrics.width, metrics.height);
+    FW1_RECTF rect;
+    GRAPHICS.measure_text(get_font(pFont->facename), pFont->facename, text, pFont->size, 0, &rect);
+    return Gwen::Point(rect.Right - rect.Left, rect.Bottom - rect.Top);
   }
 
   GraphicsObjectHandle get_font(const std::wstring &font_name) {

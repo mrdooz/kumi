@@ -26,6 +26,7 @@ CFW1FontWrapper::CFW1FontWrapper() :
 	m_pDefaultTextFormat(NULL)
 {
 	InitializeCriticalSection(&m_textRenderersCriticalSection);
+	InitializeCriticalSection(&m_textGeometriesCriticalSection);
 }
 
 
@@ -47,9 +48,15 @@ CFW1FontWrapper::~CFW1FontWrapper() {
 		m_textRenderers.pop();
 	}
 	
+	while(!m_textGeometries.empty()) {
+		m_textGeometries.top()->Release();
+		m_textGeometries.pop();
+	}
+	
 	SAFE_RELEASE(m_pDefaultTextFormat);
 	
 	DeleteCriticalSection(&m_textRenderersCriticalSection);
+	DeleteCriticalSection(&m_textGeometriesCriticalSection);
 }
 
 
@@ -120,6 +127,57 @@ HRESULT CFW1FontWrapper::initFontWrapper(
 	}
 	
 	return hResult;
+}
+
+
+// Create text layout from string
+IDWriteTextLayout* CFW1FontWrapper::createTextLayout(
+	const WCHAR *pszString,
+	const WCHAR *pszFontFamily,
+	FLOAT fontSize,
+	const FW1_RECTF *pLayoutRect,
+	UINT flags
+) {
+	if(m_defaultTextInited) {
+		UINT32 stringLength = 0;
+		while(pszString[stringLength] != 0)
+			++stringLength;
+		
+		// Create DWrite text layout for the string
+		IDWriteTextLayout *pTextLayout;
+		HRESULT hResult = m_pDWriteFactory->CreateTextLayout(
+			pszString,
+			stringLength,
+			m_pDefaultTextFormat,
+			pLayoutRect->Right - pLayoutRect->Left,
+			pLayoutRect->Bottom - pLayoutRect->Top,
+			&pTextLayout
+		);
+		if(SUCCEEDED(hResult)) {
+			// Layout settings
+			DWRITE_TEXT_RANGE allText = {0, stringLength};
+			pTextLayout->SetFontSize(fontSize, allText);
+			
+			if(pszFontFamily != NULL)
+				pTextLayout->SetFontFamilyName(pszFontFamily, allText);
+			
+			if((flags & FW1_NOWORDWRAP) != 0)
+				pTextLayout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
+			
+			if(flags & FW1_RIGHT)
+				pTextLayout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
+			else if(flags & FW1_CENTER)
+				pTextLayout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+			if(flags & FW1_BOTTOM)
+				pTextLayout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
+			else if(flags & FW1_VCENTER)
+				pTextLayout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+			
+			return pTextLayout;
+		}
+	}
+	
+	return NULL;
 }
 
 

@@ -133,6 +133,183 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawTextLayout(
 	const FLOAT *pTransformMatrix,
 	UINT Flags
 ) {
+	IFW1TextGeometry *pTextGeometry = NULL;
+	
+	// If needed, get a text geometry to store vertices in
+	if((Flags & FW1_ANALYZEONLY) == 0 && (Flags & FW1_CACHEONLY) == 0) {
+		EnterCriticalSection(&m_textGeometriesCriticalSection);
+		if(!m_textGeometries.empty()) {
+			pTextGeometry = m_textGeometries.top();
+			m_textGeometries.pop();
+		}
+		LeaveCriticalSection(&m_textGeometriesCriticalSection);
+		
+		if(pTextGeometry == NULL) {
+			IFW1TextGeometry *pNewTextGeometry;
+			HRESULT hResult = m_pFW1Factory->CreateTextGeometry(&pNewTextGeometry);
+			if(FAILED(hResult)) {
+			}
+			else {
+				pTextGeometry = pNewTextGeometry;
+			}
+		}
+		
+		if(pTextGeometry != NULL)
+			pTextGeometry->Clear();
+	}
+	
+	// Draw
+	AnalyzeTextLayout(pContext, pTextLayout, OriginX, OriginY, Color, Flags, pTextGeometry);
+	if((Flags & FW1_ANALYZEONLY) == 0 && (Flags & FW1_CACHEONLY) == 0) {
+		DrawGeometry(pContext, pTextGeometry, pClipRect, pTransformMatrix, Flags);
+	}
+	
+	if(pTextGeometry != NULL) {
+		// Keep the text geometry for future use
+		EnterCriticalSection(&m_textGeometriesCriticalSection);
+		m_textGeometries.push(pTextGeometry);
+		LeaveCriticalSection(&m_textGeometriesCriticalSection);
+	}
+}
+
+
+// Draw text
+void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
+	ID3D11DeviceContext *pContext,
+	const WCHAR *pszString,
+	FLOAT FontSize,
+	FLOAT X,
+	FLOAT Y,
+	UINT32 Color,
+	UINT Flags
+) {
+	FW1_RECTF rect;
+	
+	rect.Left = rect.Right = X;
+	rect.Top = rect.Bottom = Y;
+	
+	DrawString(pContext, pszString, NULL, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP);
+}
+
+
+// Draw text
+void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
+	ID3D11DeviceContext *pContext,
+	const WCHAR *pszString,
+	const WCHAR *pszFontFamily,
+	FLOAT FontSize,
+	FLOAT X,
+	FLOAT Y,
+	UINT32 Color,
+	UINT Flags
+) {
+	FW1_RECTF rect;
+	
+	rect.Left = rect.Right = X;
+	rect.Top = rect.Bottom = Y;
+	
+	DrawString(pContext, pszString, pszFontFamily, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP);
+}
+
+
+// Draw text
+void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
+	ID3D11DeviceContext *pContext,
+	const WCHAR *pszString,
+	const WCHAR *pszFontFamily,
+	FLOAT FontSize,
+	const FW1_RECTF *pLayoutRect,
+	UINT32 Color,
+	const FW1_RECTF *pClipRect,
+	const FLOAT *pTransformMatrix,
+	UINT Flags
+) {
+	IDWriteTextLayout *pTextLayout = createTextLayout(pszString, pszFontFamily, FontSize, pLayoutRect, Flags);
+	if(pTextLayout != NULL) {
+		// Draw
+		DrawTextLayout(
+			pContext,
+			pTextLayout,
+			pLayoutRect->Left,
+			pLayoutRect->Top,
+			Color,
+			pClipRect,
+			pTransformMatrix,
+			Flags
+		);
+		
+		pTextLayout->Release();
+	}
+}
+
+
+// Measure text
+FW1_RECTF STDMETHODCALLTYPE CFW1FontWrapper::MeasureString(
+	const WCHAR *pszString,
+	const WCHAR *pszFontFamily,
+	FLOAT FontSize,
+	const FW1_RECTF *pLayoutRect,
+	UINT Flags
+) {
+	FW1_RECTF stringRect = {pLayoutRect->Left, pLayoutRect->Top, pLayoutRect->Left, pLayoutRect->Top};
+	
+	IDWriteTextLayout *pTextLayout = createTextLayout(pszString, pszFontFamily, FontSize, pLayoutRect, Flags);
+	if(pTextLayout != NULL) {
+		// Get measurements
+		DWRITE_OVERHANG_METRICS overhangMetrics;
+		HRESULT hResult = pTextLayout->GetOverhangMetrics(&overhangMetrics);
+		if(SUCCEEDED(hResult)) {
+			stringRect.Left = floor(pLayoutRect->Left - overhangMetrics.left);
+			stringRect.Top = floor(pLayoutRect->Top - overhangMetrics.top);
+			stringRect.Right = ceil(pLayoutRect->Left + overhangMetrics.right);
+			stringRect.Bottom = ceil(pLayoutRect->Top + overhangMetrics.bottom);
+		}
+		
+		pTextLayout->Release();
+	}
+	
+	return stringRect;
+}
+
+
+// Create geometry from a string
+void STDMETHODCALLTYPE CFW1FontWrapper::AnalyzeString(
+	ID3D11DeviceContext *pContext,
+	const WCHAR *pszString,
+	const WCHAR *pszFontFamily,
+	FLOAT FontSize,
+	const FW1_RECTF *pLayoutRect,
+	UINT32 Color,
+	UINT Flags,
+	IFW1TextGeometry *pTextGeometry
+) {
+	IDWriteTextLayout *pTextLayout = createTextLayout(pszString, pszFontFamily, FontSize, pLayoutRect, Flags);
+	if(pTextLayout != NULL) {
+		AnalyzeTextLayout(
+			pContext,
+			pTextLayout,
+			pLayoutRect->Left,
+			pLayoutRect->Top,
+			Color,
+			Flags,
+			pTextGeometry
+		);
+		
+		pTextLayout->Release();
+	}
+}
+
+
+// Create geometry from a text layout
+void STDMETHODCALLTYPE CFW1FontWrapper::AnalyzeTextLayout(
+	ID3D11DeviceContext *pContext,
+	IDWriteTextLayout *pTextLayout,
+	FLOAT OriginX,
+	FLOAT OriginY,
+	UINT32 Color,
+	UINT Flags,
+	IFW1TextGeometry *pTextGeometry
+) {
 	// Get a text renderer
 	IFW1TextRenderer *pTextRenderer = NULL;
 	
@@ -144,156 +321,29 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawTextLayout(
 	LeaveCriticalSection(&m_textRenderersCriticalSection);
 	
 	if(pTextRenderer == NULL) {
-		IFW1TextGeometry *pTextGeometry;
-		HRESULT hResult = m_pFW1Factory->CreateTextGeometry(&pTextGeometry);
+		IFW1TextRenderer *pNewTextRenderer;
+		HRESULT hResult = m_pFW1Factory->CreateTextRenderer(m_pGlyphProvider, &pNewTextRenderer);
 		if(FAILED(hResult)) {
 		}
 		else {
-			IFW1TextRenderer *pNewTextRenderer;
-			hResult = m_pFW1Factory->CreateTextRenderer(m_pGlyphProvider, pTextGeometry, &pNewTextRenderer);
-			if(FAILED(hResult)) {
-			}
-			else {
-				pTextRenderer = pNewTextRenderer;
-			}
-			
-			pTextGeometry->Release();
+			pTextRenderer = pNewTextRenderer;
 		}
 	}
 	
-	// Draw
+	// Create geometry
 	if(pTextRenderer != NULL) {
-		HRESULT hResult = pTextRenderer->DrawTextLayout(pTextLayout, OriginX, OriginY, Color, Flags);
-		if(SUCCEEDED(hResult) && (Flags & FW1_ANALYZEONLY) == 0) {
-			// Flush the glyph atlas in case any new glyphs were added
-			if((Flags & FW1_NOFLUSH) == 0)
-				m_pGlyphAtlas->Flush(pContext);
-			
-			// Draw the vertices
-			if((Flags & FW1_CACHEONLY) == 0) {
-				IFW1TextGeometry *pTextGeometry;
-				pTextRenderer->GetTextGeometry(&pTextGeometry);
-				DrawGeometry(pContext, pTextGeometry, pClipRect, pTransformMatrix, Flags);
-				pTextGeometry->Release();
-			}
+		HRESULT hResult = pTextRenderer->DrawTextLayout(pTextLayout, OriginX, OriginY, Color, Flags, pTextGeometry);
+		if(FAILED(hResult)) {
 		}
+		
+		// Flush the glyph atlas in case any new glyphs were added
+		if((Flags & FW1_NOFLUSH) == 0)
+			m_pGlyphAtlas->Flush(pContext);
 		
 		// Keep the text renderer for future use
 		EnterCriticalSection(&m_textRenderersCriticalSection);
 		m_textRenderers.push(pTextRenderer);
 		LeaveCriticalSection(&m_textRenderersCriticalSection);
-	}
-}
-
-
-// Draw text
-void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
-	ID3D11DeviceContext *pContext,
-	const WCHAR *pszString,
-	FLOAT FontSize,
-	FLOAT X,
-	FLOAT Y,
-	UINT32 Color,
-	UINT Flags,
-  DWRITE_TEXT_METRICS *pMetrics
-) {
-	FW1_RECTF rect;
-	
-	rect.Left = rect.Right = X;
-	rect.Top = rect.Bottom = Y;
-	
-	DrawString(pContext, pszString, NULL, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP, pMetrics);
-}
-
-
-// Draw text
-void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
-	ID3D11DeviceContext *pContext,
-	const WCHAR *pszString,
-	const WCHAR *pszFontFamily,
-	FLOAT FontSize,
-	FLOAT X,
-	FLOAT Y,
-	UINT32 Color,
-	UINT Flags,
-  DWRITE_TEXT_METRICS *pMetrics
-) {
-	FW1_RECTF rect;
-	
-	rect.Left = rect.Right = X;
-	rect.Top = rect.Bottom = Y;
-	
-	DrawString(pContext, pszString, pszFontFamily, FontSize, &rect, Color, NULL, NULL, Flags | FW1_NOWORDWRAP, pMetrics);
-}
-
-
-// Draw text
-void STDMETHODCALLTYPE CFW1FontWrapper::DrawString(
-	ID3D11DeviceContext *pContext,
-	const WCHAR *pszString,
-	const WCHAR *pszFontFamily,
-	FLOAT FontSize,
-	const FW1_RECTF *pFormatRect,
-	UINT32 Color,
-	const FW1_RECTF *pClipRect,
-	const FLOAT *pTransformMatrix,
-	UINT Flags,
-  DWRITE_TEXT_METRICS *pMetrics
-) {
-	if(m_defaultTextInited) {
-		UINT32 stringLength = 0;
-		while(pszString[stringLength] != 0)
-			++stringLength;
-		
-		if(stringLength > 0) {
-			// Create DWrite text layout for the string
-			IDWriteTextLayout *pTextLayout;
-			HRESULT hResult = m_pDWriteFactory->CreateTextLayout(
-				pszString,
-				stringLength,
-				m_pDefaultTextFormat,
-				pFormatRect->Right - pFormatRect->Left,
-				pFormatRect->Bottom - pFormatRect->Top,
-				&pTextLayout
-			);
-			if(SUCCEEDED(hResult)) {
-				// Layout settings
-				DWRITE_TEXT_RANGE allText = {0, stringLength};
-				pTextLayout->SetFontSize(FontSize, allText);
-				
-				if(pszFontFamily != NULL)
-					pTextLayout->SetFontFamilyName(pszFontFamily, allText);
-				
-				if((Flags & FW1_NOWORDWRAP) != 0)
-					pTextLayout->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP);
-				
-				if(Flags & FW1_RIGHT)
-					pTextLayout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_TRAILING);
-				else if(Flags & FW1_CENTER)
-					pTextLayout->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-				if(Flags & FW1_BOTTOM)
-					pTextLayout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR);
-				else if(Flags & FW1_VCENTER)
-					pTextLayout->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-				
-				// Draw
-				DrawTextLayout(
-					pContext,
-					pTextLayout,
-					pFormatRect->Left,
-					pFormatRect->Top,
-					Color,
-					pClipRect,
-					pTransformMatrix,
-					Flags
-				);
-
-        if (pMetrics)
-          pTextLayout->GetMetrics(pMetrics);
-				
-				pTextLayout->Release();
-			}
-		}
 	}
 }
 
@@ -307,7 +357,7 @@ void STDMETHODCALLTYPE CFW1FontWrapper::DrawGeometry(
 	UINT Flags
 ) {
 	FW1_VERTEXDATA vertexData = pGeometry->GetGlyphVerticesTemp();
-	if(vertexData.TotalVertexCount > 0) {
+	if(vertexData.TotalVertexCount > 0 || (Flags & FW1_RESTORESTATE) == 0) {
 		if(m_featureLevel < D3D_FEATURE_LEVEL_10_0 || m_pGlyphRenderStates->HasGeometryShader() == FALSE)
 			Flags |= FW1_NOGEOMETRYSHADER;
 		
