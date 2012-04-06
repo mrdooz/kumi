@@ -25,7 +25,8 @@ struct BufferRenderData {
   GraphicsObjectHandle vs, ps;
   GraphicsObjectHandle vb, ib;
   GraphicsObjectHandle layout;
-  GraphicsObjectHandle rs, dss, bs;
+  GraphicsObjectHandle texture;
+  GraphicsObjectHandle rs, dss, bs, ss;
   DXGI_FORMAT index_format;
   int index_count;
   int start_index;

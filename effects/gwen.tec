@@ -1,4 +1,4 @@
-technique gwen {
+technique gwen_color {
 	
 	vertex_shader {
 		file effects/gwen.fx;
@@ -6,8 +6,48 @@ technique gwen {
 	};
 	
 	pixel_shader {
-		entry_point ps_color_main;
 		file effects/gwen.fx;
+		entry_point ps_color_main;
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = true;
+			src_blend = src_alpha;
+			dest_blend = inv_src_alpha;
+			blend_op = add;
+			src_blend_alpha = one;
+			dest_blend_alpha = zero;
+			blend_op_alpha = add;
+		};
+	};
+	
+	rasterizer_desc {
+	};
+	
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+};
+
+technique gwen_texture {
+	
+	vertex_shader {
+		file effects/gwen.fx;
+		entry_point vs_texture_main;
+	};
+	
+	pixel_shader {
+		params [
+			texture2d diffuse_texture system;
+			sampler diffuse_sampler technique;
+		];
+
+		file effects/gwen.fx;
+		entry_point ps_texture_main;
+	};
+	
+	sampler_desc diffuse_sampler {
 	};
 	
 	blend_desc {

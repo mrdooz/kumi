@@ -145,6 +145,11 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
   return GraphicsObjectHandle();
 }
 
+GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_INFO *image_info, std::function<void (ID3D11Resource *)> cb)
+{
+
+}
+
 bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
 {
   out->reset();
@@ -584,11 +589,12 @@ GraphicsObjectHandle Graphics::find_technique(const char *name) {
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss) {
+void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss, GraphicsObjectHandle *ss) {
   if (Technique *technique = _res._techniques.find(name, (Technique *)NULL)) {
-    *rs = technique->rasterizer_state();
-    *bs = technique->blend_state();
-    *dss = technique->depth_stencil_state();
+    if (rs) *rs = technique->rasterizer_state();
+    if (bs) *bs = technique->blend_state();
+    if (dss) *dss = technique->depth_stencil_state();
+    if (ss) *ss = technique->sampler_state("");
   }
 }
 

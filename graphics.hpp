@@ -6,6 +6,8 @@
 #include "graphics_object_handle.hpp"
 #include "graphics_interface.hpp"
 #include "technique.hpp"
+#include <D3DX11tex.h>
+#include <functional>
 
 struct Io;
 class Shader;
@@ -153,6 +155,7 @@ public:
 
 	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
+  GraphicsObjectHandle load_texture(const char *filename, D3DX11_IMAGE_INFO *image_info, std::function<void (ID3D11Resource *)> cb);
 
 	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
 	void unmap(GraphicsObjectHandle h, UINT sub);
@@ -175,7 +178,7 @@ public:
 
 	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
-  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
+  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss, GraphicsObjectHandle *ss);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
 

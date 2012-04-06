@@ -46,6 +46,8 @@ public:
   int num_verts() const { return _num_verts; }
   GraphicsObjectHandle vb() const { return _vb; }
 
+  bool is_mapped() const { return _mapped; }
+
 private:
   Vtx *_org;
   bool _mapped;
