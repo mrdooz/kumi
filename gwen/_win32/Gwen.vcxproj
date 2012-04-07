@@ -59,6 +59,11 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <DisableSpecificWarnings>4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -134,6 +139,30 @@
     <ClCompile Include="..\src\Skin.cpp" />
     <ClCompile Include="..\src\ToolTip.cpp" />
     <ClCompile Include="..\src\Utility.cpp" />
+    <ClCompile Include="..\UnitTest\testButton.cpp" />
+    <ClCompile Include="..\UnitTest\testCheckbox.cpp" />
+    <ClCompile Include="..\UnitTest\testCollapsibleList.cpp" />
+    <ClCompile Include="..\UnitTest\testColorPicker.cpp" />
+    <ClCompile Include="..\UnitTest\testComboBox.cpp" />
+    <ClCompile Include="..\UnitTest\testCrossSplitter.cpp" />
+    <ClCompile Include="..\UnitTest\testGroupBox.cpp" />
+    <ClCompile Include="..\UnitTest\testImagePanel.cpp" />
+    <ClCompile Include="..\UnitTest\testLabel.cpp" />
+    <ClCompile Include="..\UnitTest\testLabelMultiline.cpp" />
+    <ClCompile Include="..\UnitTest\testListBox.cpp" />
+    <ClCompile Include="..\UnitTest\testMenuStrip.cpp" />
+    <ClCompile Include="..\UnitTest\testNumeric.cpp" />
+    <ClCompile Include="..\UnitTest\testProgressBar.cpp" />
+    <ClCompile Include="..\UnitTest\testProperties.cpp" />
+    <ClCompile Include="..\UnitTest\testRadioButton.cpp" />
+    <ClCompile Include="..\UnitTest\testScrollControl.cpp" />
+    <ClCompile Include="..\UnitTest\testSlider.cpp" />
+    <ClCompile Include="..\UnitTest\testStatusBar.cpp" />
+    <ClCompile Include="..\UnitTest\testTabControl.cpp" />
+    <ClCompile Include="..\UnitTest\testTextBox.cpp" />
+    <ClCompile Include="..\UnitTest\testTreeControl.cpp" />
+    <ClCompile Include="..\UnitTest\UnitTest.cpp" />
+    <ClCompile Include="..\UnitTest\testWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\Gwen\Align.h" />
@@ -175,6 +204,9 @@
     <ClInclude Include="..\include\Gwen\Util\ControlFactory.h" />
     <ClInclude Include="..\include\Gwen\Util\ImportExport.h" />
     <ClInclude Include="..\include\Gwen\WindowProvider.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\UnitTest\ReadMe.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

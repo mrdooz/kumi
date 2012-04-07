@@ -14,6 +14,7 @@ class GraphicsObjectHandle {
 		kIndexBuffer,
 		kConstantBuffer,
 		kTexture,
+    kResource,
 		kRenderTarget,
 		kShader,
 		kInputLayout,

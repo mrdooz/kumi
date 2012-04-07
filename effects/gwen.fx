@@ -28,8 +28,8 @@ float4 ps_color_main(ps_color_input input) : SV_Target
 // Texture mapped vs/ps
 //
 
-Texture2D diffuse_texture;
-sampler diffuse_sampler;
+Texture2D diffuse_texture : register(t0);
+sampler diffuse_sampler : register(s0);
 
 struct vs_texture_input {
 	float4 pos : SV_POSITION;

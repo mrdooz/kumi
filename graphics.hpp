@@ -69,6 +69,20 @@ struct TextureData {
 	CComPtr<ID3D11ShaderResourceView> srv;
 };
 
+struct ResourceData {
+  ~ResourceData() {
+    reset();
+  }
+
+  void reset() {
+    resource.Release();
+    srv.Release();
+  }
+  operator bool() { return resource || srv; }
+  D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+  CComPtr<ID3D11Resource> resource;
+  CComPtr<ID3D11ShaderResourceView> srv;
+};
 
 class Graphics : public GraphicsInterface {
 public:
@@ -89,6 +103,7 @@ public:
 			, _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
 			, _textures(delete_obj<TextureData *>)
       , _render_targets(delete_obj<RenderTargetData *>)
+      , _resources(delete_obj<ResourceData *>)
       , _font_wrappers(release_obj<IFW1FontWrapper *>)
 		{
 		}
@@ -109,6 +124,7 @@ public:
 		IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
 		SearchableIdBuffer<string, TextureData *, IdCount> _textures;
     SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
+    SearchableIdBuffer<string, ResourceData *, IdCount> _resources;
     SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
 	};
 
@@ -155,9 +171,9 @@ public:
 
 	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
 	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
-  typedef std::function<void (ID3D11Resource *, const D3DX11_IMAGE_INFO &info)> fnOnLoaded;
-  GraphicsObjectHandle load_texture(const char *filename);
-  bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, uint8 **bits);
+  GraphicsObjectHandle load_texture(const char *filename, D3DX11_IMAGE_INFO *info);
+  GraphicsObjectHandle get_texture(const char *filename);
+  bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
 
 	bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
 	void unmap(GraphicsObjectHandle h, UINT sub);
@@ -180,7 +196,8 @@ public:
 
 	bool load_techniques(const char *filename, bool add_materials);
 	GraphicsObjectHandle find_technique(const char *name);
-  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss, GraphicsObjectHandle *ss);
+  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
+  GraphicsObjectHandle get_sampler_state(const char *technique, const char *sampler_state);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
 
@@ -222,7 +239,9 @@ private:
 
 	GraphicsObjectHandle _default_rt_handle;
 
+#ifdef _DEBUG
 	CComPtr<ID3D11Debug> _d3d_debug;
+#endif
 
 	CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
 	CComPtr<ID3D11DepthStencilState> _default_depth_stencil_state;

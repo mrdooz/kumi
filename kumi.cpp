@@ -97,7 +97,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
     start_second_process("");
     res = run_log_server(instance);
   } else {
-    start_second_process("--log-server");
+    //start_second_process("--log-server");
     res = run_app(instance);
   }
 

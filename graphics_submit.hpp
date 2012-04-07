@@ -21,12 +21,16 @@ struct TechniqueRenderData {
 };
 
 struct BufferRenderData {
+  static const int MAX_SAMPLERS = 8;
+  static const int MAX_TEXTURES = 8;
   BufferRenderData() : index_count(0), start_index(0), start_vertex(0), base_vertex(0), vertex_size(0), vertex_count(0) {}
   GraphicsObjectHandle vs, ps;
   GraphicsObjectHandle vb, ib;
   GraphicsObjectHandle layout;
-  GraphicsObjectHandle texture;
   GraphicsObjectHandle rs, dss, bs, ss;
+  // samplers and textures are loaded into consecutive registers
+  GraphicsObjectHandle samplers[MAX_SAMPLERS];
+  GraphicsObjectHandle textures[MAX_TEXTURES];
   DXGI_FORMAT index_format;
   int index_count;
   int start_index;

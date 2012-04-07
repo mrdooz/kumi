@@ -14,13 +14,10 @@
 using namespace std;
 
 struct MappedTexture {
-  MappedTexture() : data(nullptr) {}
-  ~MappedTexture() {
-    SAFE_ADELETE(data);
-  }
   D3DX11_IMAGE_INFO image_info;
   uint32 pitch;
-  uint8 *data;
+  vector<uint8> data;
+private:
 };
 
 static XMFLOAT4 to_directx(const Gwen::Color &col) {
@@ -48,26 +45,29 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   virtual void Begin() {
     _locked_pos_col = _vb_pos_col.map();
     _locked_pos_tex = _vb_pos_tex.map();
+    _cur_texture = GraphicsObjectHandle();
+    _cur_start_vtx = 0;
+    _textured_calls.clear();
   };
 
   virtual void End() {
 
     // draw the colored stuff
     {
-      int pos_col_count = _vb_pos_col.unmap(exch_null(_locked_pos_col));
-
-      BufferRenderData *data = RENDERER.alloc_command_data<BufferRenderData>();
-      data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-      data->vb = _vb_pos_col.vb();
-      data->vertex_size = _vb_pos_col.stride;
-      data->vs = GRAPHICS.find_shader("gwen_color", "vs_color_main");
-      data->ps = GRAPHICS.find_shader("gwen_color", "ps_color_main");
-      data->layout = GRAPHICS.get_input_layout("gwen_color");
-      data->vertex_count = pos_col_count;
-      GRAPHICS.get_technique_states("gwen_color", &data->rs, &data->bs, &data->dss, NULL);
-      RenderKey render_key;
-      render_key.cmd = RenderKey::kRenderBuffers;
-      RENDERER.submit_command(FROM_HERE, render_key, data);
+      if (int pos_col_count = _vb_pos_col.unmap(exch_null(_locked_pos_col))) {
+        BufferRenderData *data = RENDERER.alloc_command_data<BufferRenderData>();
+        data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+        data->vb = _vb_pos_col.vb();
+        data->vertex_size = _vb_pos_col.stride;
+        data->vs = GRAPHICS.find_shader("gwen_color", "vs_color_main");
+        data->ps = GRAPHICS.find_shader("gwen_color", "ps_color_main");
+        data->layout = GRAPHICS.get_input_layout("gwen_color");
+        data->vertex_count = pos_col_count;
+        GRAPHICS.get_technique_states("gwen_color", &data->rs, &data->bs, &data->dss);
+        RenderKey render_key;
+        render_key.cmd = RenderKey::kRenderBuffers;
+        RENDERER.submit_command(FROM_HERE, render_key, data);
+      }
     }
 
     // draw the textured stuff
@@ -80,18 +80,19 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
       for (auto it = begin(_textured_calls); it != end(_textured_calls); ++it) {
         const TexturedRender &r = *it;
         int cnt = r.vertex_count;
-        GraphicsObjectHandle texture = r.texture;
 
         BufferRenderData *data = RENDERER.alloc_command_data<BufferRenderData>();
         data->start_vertex = r.start_vertex;
         data->vertex_count = cnt;
         data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-        data->vb = _vb_pos_col.vb();
-        data->vertex_size = _vb_pos_col.stride;
-        data->vs = GRAPHICS.find_shader("gwen_color", "vs_color_main");
-        data->ps = GRAPHICS.find_shader("gwen_color", "ps_color_main");
-        data->layout = GRAPHICS.get_input_layout("gwen_color");
-        GRAPHICS.get_technique_states("gwen_color", &data->rs, &data->bs, &data->dss, NULL);
+        data->vb = _vb_pos_tex.vb();
+        data->vertex_size = _vb_pos_tex.stride;
+        data->vs = GRAPHICS.find_shader("gwen_texture", "vs_texture_main");
+        data->ps = GRAPHICS.find_shader("gwen_texture", "ps_texture_main");
+        data->layout = GRAPHICS.get_input_layout("gwen_texture");
+        GRAPHICS.get_technique_states("gwen_texture", &data->rs, &data->bs, &data->dss);
+        data->samplers[0] = GRAPHICS.get_sampler_state("gwen_texture", "diffuse_sampler");
+        data->textures[0] = r.texture;
         RenderKey render_key;
         render_key.cmd = RenderKey::kRenderBuffers;
         RENDERER.submit_command(FROM_HERE, render_key, data);
@@ -146,47 +147,17 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
   virtual void LoadTexture(Gwen::Texture* pTexture) {
 
     D3DX11_IMAGE_INFO info;
-    GRAPHICS.load_texture(pTexture->name.c_str(), &info, [=](ID3D11Resource *resource, const D3DX11_IMAGE_INFO &info) {
-      D3D11_MAPPED_SUBRESOURCE sub;
-      if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub))) {
-        pTexture->failed = true;
-        return;
-      }
-
-      MappedTexture &texture = _mapped_textures[pTexture->name.c_str()];
-      texture.image_info = info;
-      uint32 pitch = texture.pitch = sub.RowPitch;
-      uint8 *src = (uint8 *)sub.pData;
-      uint8 *dst = texture.data = new uint8[pitch * info.Height];
-
-      int row_size = 4 * info.Width;
-      for (uint32 i = 0; i < info.Height; ++i) {
-        memcpy(&dst[i*pitch], &src[i*pitch], row_size);
-      }
-
-      pTexture->failed = false;
-      GRAPHICS.context()->Unmap(resource, 0);
-    });
-/*
-    D3DX11_IMAGE_LOAD_INFO loadinfo;
-    ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
-    loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
-    loadinfo.Usage = D3D11_USAGE_STAGING;
-    loadinfo.Format = image_info.Format;
-    CComPtr<ID3D11Resource> resource;
-    D3DX11CreateTextureFromFile(GRAPHICS.device(), pTexture->name.c_str(), &loadinfo, NULL, &resource.p, &hr);
-    if (FAILED(hr)) {
-      pTexture->failed = true;
-      return;
-    }
-*/
+    GraphicsObjectHandle h = GRAPHICS.load_texture(pTexture->name.c_str(), &info);
+    pTexture->width = info.Width;
+    pTexture->height = info.Height;
+    pTexture->failed = !h.is_valid();
   };
 
   virtual void FreeTexture( Gwen::Texture* pTexture ){
   };
 
   virtual void DrawTexturedRect(Gwen::Texture* pTexture, Gwen::Rect rect, float u1=0.0f, float v1=0.0f, float u2=1.0f, float v2=1.0f) {
-/*
+
     Translate(rect);
 
     float x0, y0, x1, y1, x2, y2, x3, y3;
@@ -195,22 +166,39 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     screen_to_clip(rect.x, rect.y + rect.h, GRAPHICS.width(), GRAPHICS.height(), &x2, &y2);
     screen_to_clip(rect.x + rect.w, rect.y + rect.h, GRAPHICS.width(), GRAPHICS.height(), &x3, &y3);
 
+    GraphicsObjectHandle texture = GRAPHICS.get_texture(pTexture->name.c_str());
+    if (texture != _cur_texture) {
+      int cnt = 0;
+      if (_cur_texture.is_valid()) {
+
+        // add the previous texture
+        _textured_calls.push_back(TexturedRender());
+        TexturedRender &r = _textured_calls.back();
+        r.start_vertex = _cur_start_vtx;
+        cnt = _vb_pos_tex.unmap(exch_null(_locked_pos_tex));
+        _locked_pos_tex = _vb_pos_tex.map();
+        r.vertex_count = cnt;
+        r.texture = _cur_texture;
+
+      }
+      _cur_start_vtx += cnt;
+      _cur_texture = texture;
+    }
+
     // 0,1
     // 2,3
-    PosTex v0(x0, y0, 0, u1, v1);
-    PosTex v1(x1, y1, 0, u2, v1);
-    PosTex v2(x2, y2, 0, u1, v2);
-    PosTex v3(x3, y3, 0, u2, v2);
+    PosTex vv0(x0, y0, 0, u1, v1);
+    PosTex vv1(x1, y1, 0, u2, v1);
+    PosTex vv2(x2, y2, 0, u1, v2);
+    PosTex vv3(x3, y3, 0, u2, v2);
 
-    *_locked_pos_tex++ = v0;
-    *_locked_pos_tex++ = v1;
-    *_locked_pos_tex++ = v2;
+    *_locked_pos_tex++ = vv0;
+    *_locked_pos_tex++ = vv1;
+    *_locked_pos_tex++ = vv2;
 
-    *_locked_pos_tex++ = v2;
-    *_locked_pos_tex++ = v1;
-    *_locked_pos_tex++ = v3;
-*/
-    DrawFilledRect(rect);
+    *_locked_pos_tex++ = vv2;
+    *_locked_pos_tex++ = vv1;
+    *_locked_pos_tex++ = vv3;
   };
 
   virtual void DrawMissingImage( Gwen::Rect pTargetRect ) {
@@ -219,12 +207,18 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
 
   virtual Gwen::Color PixelColour(Gwen::Texture* pTexture, unsigned int x, unsigned int y, const Gwen::Color& col_default = Gwen::Color( 255, 255, 255, 255 ) ) { 
     auto it = _mapped_textures.find(pTexture->name);
+    MappedTexture *texture = nullptr;
     if (it == _mapped_textures.end()) {
-      LOG_WARNING_LN("Texture not loaded: %s", pTexture->name.c_str());
-      return col_default; 
+      // read the texture if it hasn't been read
+      texture = &_mapped_textures[pTexture->name];
+      if (!GRAPHICS.read_texture(pTexture->name.c_str(), &texture->image_info, &texture->pitch, &texture->data)) {
+        _mapped_textures.erase(pTexture->name);
+        return col_default;
+      }
+    } else {
+      texture = &it->second;
     }
-    const MappedTexture &texture = it->second;
-    uint8 *pixel = &texture.data[y*texture.pitch+x*4];
+    uint8 *pixel = &texture->data[y*texture->pitch+x*4];
     return Gwen::Color(pixel[0], pixel[1], pixel[2], pixel[3]);
   }
 

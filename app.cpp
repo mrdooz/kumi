@@ -25,6 +25,7 @@
 #include "gwen/Controls/Canvas.h"
 #include "gwen/Controls/Button.h"
 #include "gwen/Input/Windows.h"
+#include "gwen/UnitTest/UnitTest.h"
 
 #if USE_CEF
 #include "v8_handler.hpp"
@@ -269,6 +270,10 @@ App::App()
 
 App::~App()
 {
+  _gwen_input.reset();
+  _gwen_canvas.reset();
+  _gwen_skin.reset();
+  _gwen_renderer.reset();
 }
 
 App& App::instance()
@@ -306,12 +311,15 @@ bool App::init(HINSTANCE hinstance)
   _gwen_input.reset(new Gwen::Input::Windows());
   _gwen_input->Initialize(_gwen_canvas.get());
 
+  UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
+  pUnit->SetPos( 10, 10 );
+/*
   Gwen::Controls::Button *button = new Gwen::Controls::Button(_gwen_canvas.get());
   button->SetBounds(10, 10, 200, 100);
   button->SetText("hay gusy");
   button->SetFont(L"Arial", 20, false);
   button->SetTextColor(Gwen::Color(0,0,0,255));
-
+*/
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");

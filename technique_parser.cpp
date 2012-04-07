@@ -558,7 +558,7 @@ Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
 
 void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 
-	static auto valid_sources = map_list_of
+	auto valid_sources = map_list_of
 		("material", PropertySource::kMaterial)
 		("system", PropertySource::kSystem)
 		("user", PropertySource::kUser)
@@ -626,7 +626,7 @@ void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string
 
 void TechniqueParser::parse_material(Scope *scope, Material *material) {
 
-	static auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
+	auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
 
 	Symbol type;
 	while (scope->consume_in(tmp, &type)) {
@@ -652,7 +652,7 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
 
 void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
-	static auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams);
+	auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams);
 	const string &ext = shader->type() == Shader::kVertexShader ? ".vso" : ".pso";
 	string entry_point = shader->type() == Shader::kVertexShader ? "vs_main" : "ps_main";
 	Symbol symbol;
@@ -692,7 +692,7 @@ void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 
 void TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc) {
 
-	static auto tmp = list_of(kSymDepthEnable);
+	auto tmp = list_of(kSymDepthEnable);
 	Symbol symbol;
 
 	while (scope->consume_in(tmp, &symbol)) {
@@ -708,11 +708,11 @@ void TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL
 
 void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
 
-	static auto valid = list_of
+	auto valid = list_of
 		(kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)
 		(kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
 
-	static auto valid_filters = map_list_of
+	auto valid_filters = map_list_of
 		("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
 		("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
 		("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
@@ -730,14 +730,14 @@ void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 		("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
 		("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC);
 
-	static auto valid_address = map_list_of
+	auto valid_address = map_list_of
 		("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
 		("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
 		("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
 		("border", D3D11_TEXTURE_ADDRESS_BORDER)
 		("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE);
 
-	static auto valid_cmp_func = map_list_of
+	auto valid_cmp_func = map_list_of
 		("never", D3D11_COMPARISON_NEVER)
 		("less", D3D11_COMPARISON_LESS)
 		("equal", D3D11_COMPARISON_EQUAL)
@@ -794,11 +794,11 @@ void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 
 void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
 
-	static auto valid = list_of
+	auto valid = list_of
 		(kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)
 		(kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
 
-	static auto valid_blend = map_list_of
+	auto valid_blend = map_list_of
 		("zero", D3D11_BLEND_ZERO)
 		("one", D3D11_BLEND_ONE)
 		("src_color", D3D11_BLEND_SRC_COLOR)
@@ -817,7 +817,7 @@ void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 		("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
 		("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA);
 
-	static auto valid_blend_op = map_list_of
+	auto valid_blend_op = map_list_of
 		("add", D3D11_BLEND_OP_ADD)
 		("subtract", D3D11_BLEND_OP_SUBTRACT)
 		("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
@@ -857,7 +857,7 @@ void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
 
 void TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
 
-	static auto valid = list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget);
+	auto valid = list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget);
 
 	Symbol symbol;
 	while (!scope->end() && scope->consume_in(valid, &symbol)) {
@@ -880,7 +880,7 @@ void TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
 
 void TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
 
-	static auto valid = list_of
+	auto valid = list_of
 		(kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)
 		(kSymSlopeScaledDepthBias)(kSymDepthClipEnable)
 		(kSymScissorEnable)(kSymMultisampleEnable)(kSymAntialiasedLineEnable);
@@ -932,8 +932,8 @@ void TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
 
 void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
-	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
-	static auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
+	auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+	auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
 
 	Symbol symbol;
 	while (scope->consume_in(valid_tags, &symbol)) {
@@ -964,8 +964,8 @@ void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, 
 
 void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
-	static auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
-	static auto index_fmts = map_list_of("index16", DXGI_FORMAT_R16_UINT)("index32", DXGI_FORMAT_R32_UINT);
+	auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+	auto index_fmts = map_list_of("index16", DXGI_FORMAT_R16_UINT)("index32", DXGI_FORMAT_R32_UINT);
 
 	technique->_index_format = DXGI_FORMAT_UNKNOWN;
 	Symbol symbol;
@@ -1018,7 +1018,7 @@ void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, T
 
 void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
 
-	static auto valid = list_of
+	auto valid = list_of
 		(kSymVertexShader)(kSymPixelShader)
 		(kSymMaterial)
 		(kSymVertices)(kSymIndices)

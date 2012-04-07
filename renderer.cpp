@@ -151,6 +151,22 @@ void Renderer::render() {
         if (render_data->dss.is_valid()) ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(render_data->dss), ~0);
         if (render_data->bs.is_valid()) ctx->OMSetBlendState(res->_blend_states.get(render_data->bs), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
+        ID3D11SamplerState *samplers[8];
+        int num_samplers = 0;
+        for (int i = 0; render_data->samplers[i].is_valid(); ++i, ++num_samplers)
+          samplers[i] = res->_sampler_states.get(render_data->samplers[i]);
+
+        if (num_samplers)
+          ctx->PSSetSamplers(0, num_samplers, samplers);
+
+        int num_textures = 0;
+        ID3D11ShaderResourceView *textures[8];
+        for (int i = 0; render_data->textures[i].is_valid(); ++i, ++num_textures)
+          textures[i] = res->_resources.get(render_data->textures[i])->srv;
+
+        if (num_textures)
+          ctx->PSSetShaderResources(0, num_textures, textures);
+
         if (indexed)
           ctx->DrawIndexed(render_data->index_count, render_data->start_index, render_data->base_vertex);
         else

@@ -32,7 +32,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
 
   // input mappings are only relevant for vertex shaders
   if (shader->type() == Shader::kVertexShader) {
-    static auto mapping = map_list_of
+    auto mapping = map_list_of
       ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
       ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)

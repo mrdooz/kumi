@@ -148,7 +148,7 @@ string ResourceManager::resolve_filename(const char *filename) {
 #else
   for (size_t i = 0; i < _paths.size(); ++i) {
     string cand(_paths[i] + filename);
-    if (file_exists(cand.c_str())) {
+    if (::file_exists(cand.c_str())) {
       res = cand.c_str();
       break;
     }

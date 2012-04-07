@@ -145,7 +145,7 @@ GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, 
   return GraphicsObjectHandle();
 }
 
-bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, uint8 **bits) {
+bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits) {
 
   HRESULT hr;
   D3DX11GetImageInfoFromFile(filename, NULL, info, &hr);
@@ -167,7 +167,8 @@ bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint3
     return false;
 
   uint8 *src = (uint8 *)sub.pData;
-  uint8 *dst = new uint8[sub.RowPitch * info->Height];
+  bits->resize(sub.RowPitch * info->Height);
+  uint8 *dst = &(*bits)[0];
 
   int row_size = 4 * info->Width;
   for (uint32 i = 0; i < info->Height; ++i) {
@@ -176,34 +177,42 @@ bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint3
 
   GRAPHICS.context()->Unmap(resource, 0);
   *pitch = sub.RowPitch;
-  *bits = dst;
   return true;
 }
 
-GraphicsObjectHandle Graphics::load_texture(const char *filename) {
-  D3DX11_IMAGE_INFO info;
+GraphicsObjectHandle Graphics::get_texture(const char *filename) {
+  int idx = _res._resources.idx_from_token(filename);
+  if (idx == -1)
+    return GraphicsObjectHandle();
+  return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
+}
+
+GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_INFO *info) {
+
+  if (info) {
+    HRESULT hr;
+    D3DX11GetImageInfoFromFile(filename, NULL, info, &hr);
+    if (FAILED(hr))
+      return GraphicsObjectHandle();
+  }
+
+  ResourceData *data = new ResourceData();
   HRESULT hr;
-  D3DX11GetImageInfoFromFile(filename, NULL, &info, &hr);
+  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, NULL, NULL, &data->resource, &hr);
   if (FAILED(hr)) {
     return GraphicsObjectHandle();
   }
 
-  /*
-  D3DX11_IMAGE_LOAD_INFO loadinfo;
-  ZeroMemory(&loadinfo, sizeof(D3DX11_IMAGE_LOAD_INFO));
-  loadinfo.CpuAccessFlags = D3D11_CPU_ACCESS_READ;
-  loadinfo.Usage = D3D11_USAGE_STAGING;
-  loadinfo.Format = image_info.Format;
-  CComPtr<ID3D11Resource> resource;
-*/
-  int idx = _res._textures.find_free_index();
-  if (idx == -1)
+  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, DXGI_FORMAT_R8G8B8A8_UNORM);
+  if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->srv)))
     return GraphicsObjectHandle();
 
-  CComPtr<ID3D11Resource> resource;
-  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, NULL, NULL, &resource.p, &hr);
-  if (FAILED(hr)) {
-    return GraphicsObjectHandle();
+  int idx = _res._resources.idx_from_token(filename);
+  if (idx != -1 || (idx = _res._resources.find_free_index()) != -1) {
+    if (_res._resources[idx])
+      _res._resources[idx]->reset();
+    _res._resources.set_pair(idx, make_pair(filename, data));
+    return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
   }
   return GraphicsObjectHandle();
 }
@@ -345,7 +354,9 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
+#ifdef _DEBUG
   B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&(_d3d_debug.p)));
+#endif
 
   B_ERR_BOOL(create_back_buffers(width, height));
 
@@ -647,13 +658,19 @@ GraphicsObjectHandle Graphics::find_technique(const char *name) {
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss, GraphicsObjectHandle *ss) {
+void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss) {
   if (Technique *technique = _res._techniques.find(name, (Technique *)NULL)) {
     if (rs) *rs = technique->rasterizer_state();
     if (bs) *bs = technique->blend_state();
     if (dss) *dss = technique->depth_stencil_state();
-    if (ss) *ss = technique->sampler_state("");
   }
+}
+
+GraphicsObjectHandle Graphics::get_sampler_state(const char *name, const char *sampler_state) {
+  if (Technique *technique = _res._techniques.find(name, (Technique *)NULL)) {
+    return technique->sampler_state(sampler_state);
+  }
+  return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_name) {
