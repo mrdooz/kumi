@@ -7,6 +7,7 @@
 #include "property_manager.hpp"
 #include "material_manager.hpp"
 #include "string_utils.hpp"
+#include "tracked_location.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -17,12 +18,19 @@ using namespace std::tr1::placeholders;
 
 namespace
 {
-  HRESULT create_buffer_inner(ID3D11Device* device, const D3D11_BUFFER_DESC& desc, const void* data, ID3D11Buffer** buffer)
+  template <class T>
+  void set_private_data(const TrackedLocation &loc, T *t) {
+    t->SetPrivateData(WKPDID_D3DDebugObjectName, loc.function.size(), loc.function.c_str());
+  }
+
+  HRESULT create_buffer_inner(const TrackedLocation &loc, ID3D11Device* device, const D3D11_BUFFER_DESC& desc, const void* data, ID3D11Buffer** buffer)
   {
     D3D11_SUBRESOURCE_DATA init_data;
     ZeroMemory(&init_data, sizeof(init_data));
     init_data.pSysMem = data;
-    return device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
+    HRESULT hr = device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
+    set_private_data(loc, *buffer);
+    return hr;
   }
 }
 
@@ -56,18 +64,18 @@ Graphics::~Graphics()
 {
 }
 
-HRESULT Graphics::create_static_vertex_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer) 
+HRESULT Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer) 
 {
-  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+  return create_buffer_inner(loc, _device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
 }
 
-HRESULT Graphics::create_static_index_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer) {
-  return create_buffer_inner(_device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
+HRESULT Graphics::create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer) {
+  return create_buffer_inner(loc, _device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
 }
 
-HRESULT Graphics::create_dynamic_vertex_buffer(uint32_t buffer_size, ID3D11Buffer** vertex_buffer)
+HRESULT Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer)
 {
-  return create_buffer_inner(_device, 
+  return create_buffer_inner(loc, _device, 
     CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
     NULL, vertex_buffer);
 }
@@ -80,9 +88,9 @@ void Graphics::set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t 
   context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool shader_resource, const char *name) {
+GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name) {
   RenderTargetData *data = new RenderTargetData;
-  if (!create_render_target(width, height, shader_resource, data)) {
+  if (!create_render_target(loc, width, height, shader_resource, data)) {
     delete exch_null(data);
     return GraphicsObjectHandle();
   }
@@ -97,7 +105,7 @@ GraphicsObjectHandle Graphics::create_render_target(int width, int height, bool 
   return GraphicsObjectHandle();
 }
 
-bool Graphics::create_render_target(int width, int height, bool shader_resource, RenderTargetData *out)
+bool Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, RenderTargetData *out)
 {
   out->reset();
 
@@ -106,31 +114,36 @@ bool Graphics::create_render_target(int width, int height, bool shader_resource,
   out->texture_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_R32G32B32A32_FLOAT, width, height, 1, 1, 
     D3D11_BIND_RENDER_TARGET | shader_resource * D3D11_BIND_SHADER_RESOURCE);
   B_WRN_HR(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
+  set_private_data(loc, out->texture.p);
 
   // create the render target view
   out->rtv_desc = CD3D11_RENDER_TARGET_VIEW_DESC(D3D11_RTV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
   B_WRN_HR(_device->CreateRenderTargetView(out->texture, &out->rtv_desc, &out->rtv.p));
+  set_private_data(loc, out->rtv.p);
 
   // create the depth stencil texture
   out->depth_buffer_desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL);
   B_WRN_HR(_device->CreateTexture2D(&out->depth_buffer_desc, NULL, &out->depth_stencil.p));
+  set_private_data(loc, out->depth_stencil.p);
 
   // create depth stencil view
   out->dsv_desc = CD3D11_DEPTH_STENCIL_VIEW_DESC(D3D11_DSV_DIMENSION_TEXTURE2D, DXGI_FORMAT_D24_UNORM_S8_UINT);
   B_WRN_HR(_device->CreateDepthStencilView(out->depth_stencil, &out->dsv_desc, &out->dsv.p));
+  set_private_data(loc, out->dsv.p);
 
   if (shader_resource) {
     // create the shader resource view
     out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
     B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+    set_private_data(loc, out->srv.p);
   }
 
   return true;
 }
 
-GraphicsObjectHandle Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name) {
+GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name) {
   TextureData *data = new TextureData;
-  if (!create_texture(desc, data)) {
+  if (!create_texture(loc, desc, data)) {
     delete exch_null(data);
     return GraphicsObjectHandle();
   }
@@ -217,7 +230,7 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_I
   return GraphicsObjectHandle();
 }
 
-bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
+bool Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
 {
   out->reset();
 
@@ -225,19 +238,21 @@ bool Graphics::create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out
   ZeroMemory(&out->texture_desc, sizeof(out->texture_desc));
   out->texture_desc = desc;
   B_WRN_HR(_device->CreateTexture2D(&out->texture_desc, NULL, &out->texture.p));
+  set_private_data(loc, out->texture.p);
 
   // create the shader resource view if the texture has a shader resource bind flag
   if (desc.BindFlags & D3D11_BIND_SHADER_RESOURCE) {
     out->srv_desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
     B_WRN_HR(_device->CreateShaderResourceView(out->texture, &out->srv_desc, &out->srv.p));
+    set_private_data(loc, out->srv.p);
   }
 
   return true;
 }
 
-bool Graphics::create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out)
+bool Graphics::create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out)
 {
-  if (!create_texture(CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
+  if (!create_texture(loc, CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
     return false;
 
   D3D11_MAPPED_SUBRESOURCE resource;
@@ -266,6 +281,7 @@ bool Graphics::create_back_buffers(int width, int height)
     rt = _res._render_targets.get(idx);
     rt->reset();
     // release any existing buffers
+    //_immediate_context->ClearState();
     _swap_chain->ResizeBuffers(1, width, height, _buffer_format, 0);
   } else {
     rt = new RenderTargetData;
@@ -277,14 +293,17 @@ bool Graphics::create_back_buffers(int width, int height)
   rt->texture->GetDesc(&rt->texture_desc);
 
   B_ERR_HR(_device->CreateRenderTargetView(rt->texture, NULL, &rt->rtv));
+  set_private_data(FROM_HERE, rt->rtv.p);
   rt->rtv->GetDesc(&rt->rtv_desc);
 
   // depth buffer
   B_ERR_HR(_device->CreateTexture2D(
     &CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), 
     NULL, &rt->depth_stencil.p));
+  set_private_data(FROM_HERE, rt->depth_stencil.p);
 
   B_ERR_HR(_device->CreateDepthStencilView(rt->depth_stencil, NULL, &rt->dsv.p));
+  set_private_data(FROM_HERE, rt->dsv.p);
   rt->dsv->GetDesc(&rt->dsv_desc);
 
   _res._render_targets.set_pair(idx, make_pair("default_rt", rt));
@@ -352,6 +371,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
     adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain.p, &_device.p,
     &_feature_level, &_immediate_context.p));
 
+  set_private_data(FROM_HERE, _immediate_context.p);
+
   B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
 
 #ifdef _DEBUG
@@ -363,6 +384,11 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   B_ERR_HR(_device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()), &_default_depth_stencil_state.p));
   B_ERR_HR(_device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()), &_default_rasterizer_state.p));
   B_ERR_HR(_device->CreateBlendState(&CD3D11_BLEND_DESC(CD3D11_DEFAULT()), &_default_blend_state.p));
+
+  set_private_data(FROM_HERE, _default_depth_stencil_state.p);
+  set_private_data(FROM_HERE, _default_rasterizer_state.p);
+  set_private_data(FROM_HERE, _default_blend_state.p);
+
   for (int i = 0; i < 4; ++i)
     _default_blend_factors[i] = 1.0f;
   return true;
@@ -412,50 +438,53 @@ void Graphics::resize(const int width, const int height)
   create_back_buffers(width, height);
 }
 
-GraphicsObjectHandle Graphics::create_constant_buffer(int buffer_size) {
-  CD3D11_BUFFER_DESC desc(buffer_size, D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DEFAULT);
+GraphicsObjectHandle Graphics::create_constant_buffer(const TrackedLocation &loc, int buffer_size, bool dynamic) {
+  CD3D11_BUFFER_DESC desc(buffer_size, D3D11_BIND_CONSTANT_BUFFER, 
+    dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, 
+    dynamic ? D3D11_CPU_ACCESS_WRITE : 0);
 
   const int idx = _res._constant_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_buffer_inner(_device, desc, NULL, &_res._constant_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_buffer_inner(loc, _device, desc, NULL, &_res._constant_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_static_vertex_buffer(uint32_t buffer_size, const void* data) {
+GraphicsObjectHandle Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data) {
   const int idx = _res._vertex_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(buffer_size, data, &_res._vertex_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(loc, buffer_size, data, &_res._vertex_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_dynamic_vertex_buffer(uint32_t buffer_size) {
+GraphicsObjectHandle Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size) {
   const int idx = _res._vertex_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_dynamic_vertex_buffer(buffer_size, &_res._vertex_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_dynamic_vertex_buffer(loc, buffer_size, &_res._vertex_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
 
 
-GraphicsObjectHandle Graphics::create_static_index_buffer(uint32_t data_size, const void* data) {
+GraphicsObjectHandle Graphics::create_static_index_buffer(const TrackedLocation &loc, uint32_t data_size, const void* data) {
   const int idx = _res._index_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_index_buffer(data_size, data, &_res._index_buffers[idx])))
+  if (idx != -1 && SUCCEEDED(create_static_index_buffer(loc, data_size, data, &_res._index_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
+GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
   const int idx = _res._input_layouts.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_res._input_layouts[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int len, const string &id) {
+GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id) {
 
   int idx = _res._vertex_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _res._vertex_shaders.find_free_index()) != -1) {
     ID3D11VertexShader *vs = nullptr;
     if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
+      set_private_data(loc, vs);
       SAFE_RELEASE(_res._vertex_shaders[idx]);
       _res._vertex_shaders.set_pair(idx, make_pair(id, vs));
       return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
@@ -464,12 +493,13 @@ GraphicsObjectHandle Graphics::create_vertex_shader(void *shader_bytecode, int l
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int len, const string &id) {
+GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id) {
 
   int idx = _res._pixel_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _res._pixel_shaders.find_free_index()) != -1) {
     ID3D11PixelShader *ps = nullptr;
     if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
+      set_private_data(loc, ps);
       SAFE_RELEASE(_res._pixel_shaders[idx]);
       _res._pixel_shaders.set_pair(idx, make_pair(id, ps));
       return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
@@ -478,28 +508,29 @@ GraphicsObjectHandle Graphics::create_pixel_shader(void *shader_bytecode, int le
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc) {
+GraphicsObjectHandle Graphics::create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc) {
   const int idx = _res._rasterizer_states.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_res._rasterizer_states[idx])))
+  if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_res._rasterizer_states[idx]))) {
     return GraphicsObjectHandle(GraphicsObjectHandle::kRasterizerState, 0, idx);
+  }
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_blend_state(const D3D11_BLEND_DESC &desc) {
+GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc) {
   const int idx = _res._blend_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_res._blend_states[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kBlendState, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc) {
+GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc) {
   const int idx = _res._depth_stencil_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_res._depth_stencil_states[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kDepthStencilState, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_sampler_state(const D3D11_SAMPLER_DESC &desc) {
+GraphicsObjectHandle Graphics::create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc) {
   const int idx = _res._sampler_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_res._sampler_states[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
@@ -753,6 +784,8 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 
 }
 
+int g_set_cbuffer_count = 0;
+
 void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id) {
 
   ID3D11DeviceContext *ctx = _immediate_context;
@@ -800,12 +833,17 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
   for (auto i = begin(cbuffers); i != end(cbuffers); ++i) {
     const CBuffer &cb = *i;
     ID3D11Buffer *buffer = _res._constant_buffers.get(cb.handle);
-    ctx->UpdateSubresource(buffer, 0, NULL, &cb.staging[0], 0, 0);
+    D3D11_MAPPED_SUBRESOURCE sub;
+    ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+    float *p = (float *)&cb.staging[0];
+    memcpy(sub.pData, &cb.staging[0], cb.staging.size());
+    ctx->Unmap(buffer, 0);
     if (shader->type() == Shader::kVertexShader)
       ctx->VSSetConstantBuffers(0, 1, &buffer);
     else
       ctx->PSSetConstantBuffers(0, 1, &buffer);
   }
+  g_set_cbuffer_count++;
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {

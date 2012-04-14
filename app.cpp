@@ -26,6 +26,7 @@
 #include "gwen/Controls/Button.h"
 #include "gwen/Input/Windows.h"
 #include "gwen/UnitTest/UnitTest.h"
+#include "gwen/Controls/StatusBar.h"
 
 #if USE_CEF
 #include "v8_handler.hpp"
@@ -243,7 +244,8 @@ void App::SetNavState(bool canGoBack, bool canGoForward)
   EnableWindow(_back_hwnd, canGoBack);
   EnableWindow(_forward_hwnd, canGoForward);
 }
-#endif
+#endif // #if USE_CEF
+
 App::App()
   : _hinstance(NULL)
   , _width(-1)
@@ -270,6 +272,7 @@ App::App()
 
 App::~App()
 {
+  _gwen_status_bar.reset();
   _gwen_input.reset();
   _gwen_canvas.reset();
   _gwen_skin.reset();
@@ -311,15 +314,10 @@ bool App::init(HINSTANCE hinstance)
   _gwen_input.reset(new Gwen::Input::Windows());
   _gwen_input->Initialize(_gwen_canvas.get());
 
-  UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
-  pUnit->SetPos( 10, 10 );
-/*
-  Gwen::Controls::Button *button = new Gwen::Controls::Button(_gwen_canvas.get());
-  button->SetBounds(10, 10, 200, 100);
-  button->SetText("hay gusy");
-  button->SetFont(L"Arial", 20, false);
-  button->SetTextColor(Gwen::Color(0,0,0,255));
-*/
+  _gwen_status_bar.reset(new Gwen::Controls::StatusBar(_gwen_canvas.get()));
+
+  //UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
+  //pUnit->SetPos( 10, 10 );
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
@@ -332,8 +330,8 @@ bool App::init(HINSTANCE hinstance)
   }
 */
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
-  //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
-  //DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
+  auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
+  DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());
 
@@ -395,6 +393,8 @@ bool App::create_window()
 void App::on_idle() {
 }
 
+int g_render_count = 0;
+
 UINT App::run(void *userdata) {
   MSG msg = {0};
 
@@ -422,13 +422,18 @@ UINT App::run(void *userdata) {
       CefDoMessageLoopWork();
 #endif
 
-
       GRAPHICS.clear(XMFLOAT4(0,0,0,1));
       DEMO_ENGINE.tick();
+
+      XMFLOAT4 tt;
+      PROPERTY_MANAGER.get_system_property("g_time", &tt);
+
+      _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
 
       //GRAPHICS.find_technique("cef")->submit();
       _gwen_canvas->RenderCanvas();
       RENDERER.render();
+      g_render_count++;
 
       GRAPHICS.present();
     }
@@ -532,12 +537,12 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 
   //case WM_ERASEBKGND:
     //return 0;
-
+/*
   case WM_PAINT:
     hdc = BeginPaint(hWnd, &ps);
     EndPaint(hWnd, &ps);
     return 0;
-
+*/
   case WM_CREATE:
     {
       _instance->_hwnd = hWnd;

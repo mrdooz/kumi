@@ -17,7 +17,7 @@ DemoEngine::DemoEngine()
   , _inited(false)
   , _frequency(0)
   , _last_time(0)
-  , _current_time_ms(0)
+  , _current_time(0)
   , _cur_effect(0)
 {
 }
@@ -56,17 +56,22 @@ bool DemoEngine::tick() {
 
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
-  const int64 elapsed_ms = 1000 * (now - _last_time) / _frequency;
-  _current_time_ms += elapsed_ms;
+  int64 delta = (now - _last_time);
+  _current_time += delta;
+  //const int64 elapsed_ms = 1000 * (now - _last_time) / _frequency;
+  //_current_time_ms += elapsed_ms;
+  uint32 current_time_ms = uint32((1000 * _current_time) / _frequency);
+  double elapsed_ms = 1000.0 * delta / _frequency;
+
 
   // check for any effects that have ended
-  while (!_active_effects.empty() && _active_effects.front()->_end_time <= _current_time_ms) {
+  while (!_active_effects.empty() && _active_effects.front()->_end_time <= current_time_ms) {
     _active_effects.front()->_running = false;
     _active_effects.pop_front();
   }
 
   // check if any effect start now
-  while (!_inactive_effects.empty() && _inactive_effects.front()->_start_time <= _current_time_ms) {
+  while (!_inactive_effects.empty() && _inactive_effects.front()->_start_time <= current_time_ms) {
     EffectInstance *e = _inactive_effects.front();
     _inactive_effects.pop_front();
     e->_running = true;
@@ -82,11 +87,11 @@ bool DemoEngine::tick() {
   // tick the active effects
   for (size_t i = 0; i < _active_effects.size(); ++i) {
     EffectInstance *e = _active_effects[i];
-    float global_time = _current_time_ms / 1000.0f;
-    float local_time = (_current_time_ms - e->_start_time) / 1000.0f;
+    float global_time = current_time_ms / 1000.0f;
+    float local_time = (current_time_ms - e->_start_time) / 1000.0f;
     XMFLOAT4 tt(global_time, local_time, 0, 0);
     PROPERTY_MANAGER.set_system_property("g_time", tt);
-    e->_effect->update(_current_time_ms, _current_time_ms - e->_start_time, ticks_per_s, num_ticks, frac);
+    e->_effect->update(current_time_ms, current_time_ms - e->_start_time, ticks_per_s, num_ticks, frac);
     e->_effect->render();
   }
 

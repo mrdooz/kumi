@@ -5,6 +5,7 @@
 #include "dx_utils.hpp"
 #include "graphics.hpp"
 #include "resource_interface.hpp"
+#include "tracked_location.hpp"
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -75,11 +76,11 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
       const int *vb = read_and_step<const int*>(&buf);
       const int vb_size = *vb;
       submesh->data.vertex_count = vb_size / submesh->data.vertex_size;
-      submesh->data.vb = GRAPHICS.create_static_vertex_buffer(vb_size, (const void *)(vb + 1));
+      submesh->data.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
       const int *ib = read_and_step<const int*>(&buf);
       const int ib_size = *ib;
       submesh->data.index_count = ib_size / index_format_to_size(submesh->data.index_format);
-      submesh->data.ib = GRAPHICS.create_static_index_buffer(ib_size, (const void *)(ib + 1));
+      submesh->data.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
       submesh->data.mesh_id = (PropertyManager::Id)mesh;
     }
   }

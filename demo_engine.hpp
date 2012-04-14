@@ -51,7 +51,8 @@ private:
 	int _cur_effect;
 	int64 _frequency;
 	int64 _last_time;
-	int64 _current_time_ms;
+  int64 _current_time;
+	//int64 _current_time_ms;
 	
 	bool _paused;
 	bool _inited;

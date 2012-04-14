@@ -169,6 +169,7 @@
     <ClInclude Include="..\test\ps3_background.hpp" />
     <ClInclude Include="..\test\volumetric.hpp" />
     <ClInclude Include="..\threading.hpp" />
+    <ClInclude Include="..\tracked_location.hpp" />
     <ClInclude Include="..\TreeList.h" />
     <ClInclude Include="..\utils.hpp" />
     <ClInclude Include="..\v8_handler.hpp" />

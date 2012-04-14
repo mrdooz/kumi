@@ -22,6 +22,7 @@ ps_input vs_main(vs_input input)
 
 float4 ps_main(ps_input input) : SV_Target
 {
+	//return sin(10*g_time[1]);
 	float r = 0, g = 0, b = 0;
 	for (int i = 0; i < 10; i++) {
 		float x = input.tex.x * g_time[0];

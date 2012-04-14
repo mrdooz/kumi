@@ -141,19 +141,19 @@ public:
 	virtual const char *vs_profile() const { return _vs_profile.c_str(); }
 	virtual const char *ps_profile() const { return _ps_profile.c_str(); }
 
-  virtual GraphicsObjectHandle create_constant_buffer(int size);
-  virtual GraphicsObjectHandle create_input_layout(const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
-  virtual GraphicsObjectHandle create_static_vertex_buffer(uint32_t buffer_size, const void* data);
-  virtual GraphicsObjectHandle create_static_index_buffer(uint32_t buffer_size, const void* data);
-  virtual GraphicsObjectHandle create_dynamic_vertex_buffer(uint32_t buffer_size);
+  virtual GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
+  virtual GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
+  virtual GraphicsObjectHandle create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
+  virtual GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
+  virtual GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);
 
-  virtual GraphicsObjectHandle create_vertex_shader(void *shader_bytecode, int len, const string &id);
-  virtual GraphicsObjectHandle create_pixel_shader(void *shader_bytecode, int len, const string &id);
+  virtual GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
+  virtual GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
 
-  virtual GraphicsObjectHandle create_rasterizer_state(const D3D11_RASTERIZER_DESC &desc);
-  virtual GraphicsObjectHandle create_blend_state(const D3D11_BLEND_DESC &desc);
-  virtual GraphicsObjectHandle create_depth_stencil_state(const D3D11_DEPTH_STENCIL_DESC &desc);
-  virtual GraphicsObjectHandle create_sampler_state(const D3D11_SAMPLER_DESC &desc);
+  virtual GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
+  virtual GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
+  virtual GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
+  virtual GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc);
 
   virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
   bool measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect);
@@ -169,8 +169,8 @@ public:
 
 	BackedResources *get_backed_resources() { return &_res; }
 
-	GraphicsObjectHandle create_render_target(int width, int height, bool shader_resource, const char *name);
-	GraphicsObjectHandle create_texture(const D3D11_TEXTURE2D_DESC &desc, const char *name);
+	GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name);
+	GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
   GraphicsObjectHandle load_texture(const char *filename, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
   bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
@@ -180,7 +180,7 @@ public:
 	void copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src);
 
 	// Create a texture, and fill it with data
-	bool create_texture(int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
+	bool create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
 
   ID3D11RasterizerState *default_rasterizer_state() const { return _default_rasterizer_state; }
   ID3D11DepthStencilState *default_depth_stencil_state() const { return _default_depth_stencil_state; }
@@ -201,9 +201,9 @@ public:
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
 
-	HRESULT create_dynamic_vertex_buffer(uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
-	HRESULT create_static_vertex_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
-	HRESULT create_static_index_buffer(uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
+	HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
+	HRESULT create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
 	void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
@@ -219,8 +219,8 @@ private:
 	Graphics(ResourceInterface *ri);
 	~Graphics();
 
-	bool create_render_target(int width, int height, bool shader_resource, RenderTargetData *out);
-	bool create_texture(const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
+	bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, RenderTargetData *out);
+	bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
   bool create_back_buffers(int width, int height);
 

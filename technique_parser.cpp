@@ -7,6 +7,7 @@
 #include "material.hpp"
 #include "graphics_interface.hpp"
 #include "logger.hpp"
+#include "tracked_location.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -959,7 +960,7 @@ void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, 
 		}
 	}
 	THROW_ON_FALSE(technique->_vertex_size != -1);
-	technique->_vb = graphics->create_static_vertex_buffer(technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
+	technique->_vb = graphics->create_static_vertex_buffer(FROM_HERE, technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
 }
 
 void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
@@ -1010,9 +1011,9 @@ void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, T
 		// create a local copy of the indices
 		vector<uint16> v;
 		copy(technique->_indices.begin(), technique->_indices.end(), back_inserter(v));
-		technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * v.size(), &v[0]);
+		technique->_ib = graphics->create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * v.size(), &v[0]);
 	} else {
-		technique->_ib = graphics->create_static_index_buffer(index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+		technique->_ib = graphics->create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
 	}
 }
 

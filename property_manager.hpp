@@ -16,6 +16,12 @@ public:
 		return b(name);
 	}
 
+  template<typename T>
+  void get_system_property(const char *name, T *out) {
+    BagGetter<T> b(_system_properties);
+    *out = b(name);
+  }
+
 	template<typename T> void set_material_property(Id material_id, const char *name, const T &value) {
 		BagGetter<T> b(_material_properties[material_id]);
 		b(name) = value;

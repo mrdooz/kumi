@@ -3,6 +3,7 @@
 #include "dx_utils.hpp"
 #include "graphics_interface.hpp"
 #include "resource_interface.hpp"
+#include "tracked_location.hpp"
 
 using namespace boost::assign;
 using namespace std;
@@ -54,7 +55,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
     }
 
-    _input_layout = graphics->create_input_layout(&inputs[0], inputs.size(), buf, len);
+    _input_layout = graphics->create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
     if (!_input_layout.is_valid())
       return false;
   }
@@ -79,7 +80,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
     }
     if (!found) {
       cb_idx = _constant_buffers.size();
-      _constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, graphics->create_constant_buffer(cb_desc.Size)));
+      _constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, graphics->create_constant_buffer(FROM_HERE, cb_desc.Size, true)));
     }
 
     // extract all the used variable's cbuffer, starting offset and size
@@ -217,10 +218,10 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   GraphicsObjectHandle handle;
   switch (shader->type()) {
     case Shader::kVertexShader: 
-      handle = graphics->create_vertex_shader(buf.data(), len, shader->entry_point());
+      handle = graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->entry_point());
       break;
     case Shader::kPixelShader: 
-      handle = graphics->create_pixel_shader(buf.data(), len, shader->entry_point());
+      handle = graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->entry_point());
       break;
     case Shader::kGeometryShader: break;
   }
@@ -237,11 +238,11 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
   if (_pixel_shader)
     B_ERR_BOOL(init_shader(graphics, res, _pixel_shader));
 
-  _rasterizer_state = graphics->create_rasterizer_state(_rasterizer_desc);
-  _blend_state = graphics->create_blend_state(_blend_desc);
-  _depth_stencil_state = graphics->create_depth_stencil_state(_depth_stencil_desc);
+  _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
+  _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);
+  _depth_stencil_state = graphics->create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
   for (size_t i = 0; i < _sampler_descs.size(); ++i)
-    _sampler_states.push_back(make_pair(_sampler_descs[i].first, graphics->create_sampler_state(_sampler_descs[i].second)));
+    _sampler_states.push_back(make_pair(_sampler_descs[i].first, graphics->create_sampler_state(FROM_HERE, _sampler_descs[i].second)));
 
   return true;
 }

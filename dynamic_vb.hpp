@@ -2,6 +2,7 @@
 #include <cassert>
 #include "dx_utils.hpp"
 #include "graphics.hpp"
+#include "tracked_location.hpp"
 
 // Helper class for dynamic vertex buffers
 template<class Vtx>
@@ -18,7 +19,7 @@ public:
   }
 
   bool create(int max_verts) {
-    return (_vb = GRAPHICS.create_dynamic_vertex_buffer(max_verts * sizeof(Vtx))).is_valid();
+    return (_vb = GRAPHICS.create_dynamic_vertex_buffer(FROM_HERE, max_verts * sizeof(Vtx))).is_valid();
   }
 
   Vtx *map() {

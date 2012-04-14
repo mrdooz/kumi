@@ -39,6 +39,7 @@ namespace Gwen {
   }
   namespace Controls {
     class Canvas;
+    class StatusBar;
   }
   namespace Skin {
     class TexturedBase;
@@ -187,10 +188,11 @@ protected:
   GraphicsObjectHandle _cef_staging;
 #endif
 
-  std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
-  std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
-  std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
+  std::unique_ptr<Gwen::Controls::StatusBar> _gwen_status_bar;
   std::unique_ptr<Gwen::Input::Windows> _gwen_input;
+  std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
+  std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
+  std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
 };
 
 #define APP App::instance()
