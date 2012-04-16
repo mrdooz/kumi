@@ -1,5 +1,6 @@
 cbuffer globals {
 	float4 g_time;	// [total_elapsed, effect_elapsed, 0, 0]
+	float4 g_screen_size;
 }
 
 struct vs_input {
@@ -22,15 +23,20 @@ ps_input vs_main(vs_input input)
 
 float4 ps_main(ps_input input) : SV_Target
 {
-	//return sin(10*g_time[1]);
+	// determine correct y at current x
+	float nx = input.pos.x / g_screen_size.x;
+	float ny = input.pos.y / g_screen_size.y;
 	float r = 0, g = 0, b = 0;
-	for (int i = 0; i < 10; i++) {
-		float x = input.tex.x * g_time[0];
-		float y = input.tex.y + sin(x/100*g_time[1]*x/100);
-		r += (0.5 + 0.7*(x-0.5)*sin(20*(y-0.5))) / 10;
-		g += (0.2 + 0.7*(r-0.5)*sin(2*(y-0.5))) / 1;
-		b += (0.1 + 0.7*(x-0.2)*sin(5*(y-0.5))) / 10;
+	
+	float freq[10] = { 2, 3, 4, 5, 10, 7, 6, 4, 2, 1 };
+	float amp[10] = { 2, 3, 4, 0.5, 1, 0.7, 6, 4, 2, 1 };
+	
+	for (int i = 0; i < 10; ++i) {
+		float y = 0.5 + clamp(amp[i]*0.5*sin(freq[i]*3.1415 * nx + ((i+1)*(i+g_time[0].x))/5), 0, 1);
+		float dd = clamp(pow(abs(ny-y), g_time.x/5), 0.1, 100);
+		float d = 0.08/dd; //clamp(1.0 - abs(ny-y), 0, 1);
+		b += d / 10;
 	}
-	return float4(r, g, b, 0);
+	return float4(pow(b,2.1),pow(b,6),b,b);
 }
 

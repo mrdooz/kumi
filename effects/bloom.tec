@@ -1,14 +1,21 @@
-technique ps3background {
+technique bloom {
 	
 	vertex_shader {
-		file effects/ps3background.fx;
+		file effects/bloom.fx;
+		entry_point vs_main;
 		params [
 			float4 g_time system;
 		];
 	};
 	
 	pixel_shader {
-		file effects/ps3background.fx;
+		file effects/bloom.fx;
+		entry_point ps_main;
+		params [
+			texture2d bloom_rt system;
+			sampler diffuse_sampler technique;
+		];
+
 		params [
 			float4 g_time system;
 			float4 g_screen_size system;
@@ -31,6 +38,9 @@ technique ps3background {
 	// 2, 1, 3
 	indices {
 		data [0 1 2 2 1 3];
+	};
+	
+	sampler_desc diffuse_sampler default {
 	};
 	
 	rasterizer_desc {

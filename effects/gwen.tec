@@ -48,6 +48,9 @@ technique gwen_texture {
 	};
 	
 	sampler_desc diffuse_sampler {
+		filter = min_mag_linear_mip_point;
+		address_u = clamp;
+		address_v = clamp;
 	};
 	
 	blend_desc {

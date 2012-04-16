@@ -95,7 +95,7 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
   }
 
   std::string str = _output_line_numbers ? to_string("%s(%d): %s", file, line, buf) : buf;
-/*
+
   if ((_output_device & Logger::Debugger) && severity_map_[Logger::Debugger][severity])
     OutputDebugStringA(str.c_str());
 
@@ -115,7 +115,7 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
     if (severity >= Error)
       FlushFileBuffers(_file);
   }
-*/
+
   send_log_message(0, severity, str.c_str());
 
   va_end(arg);

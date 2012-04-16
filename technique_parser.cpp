@@ -105,7 +105,7 @@ enum Symbol {
 	kSymTexture2d,
 	kSymSampler,
 	kSymInt,
-	kSymParamDefault,
+	kSymDefault,
 
 	kSymRasterizerDesc,
 		kSymFillMode,
@@ -189,7 +189,7 @@ struct {
 	{ kSymInt, "int" },
 	{ kSymTexture2d, "texture2d" },
 	{ kSymSampler, "sampler" },
-	{ kSymParamDefault, "default" },
+	{ kSymDefault, "default" },
 
 	// descs
 	{ kSymRasterizerDesc, "rasterizer_desc" },
@@ -590,7 +590,7 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 	EXPECT(scope, kSymSemicolon);
 
 	// check for default value
-	if (cbuffer_param && scope->consume_if(kSymParamDefault)) {
+	if (cbuffer_param && scope->consume_if(kSymDefault)) {
 		string value = scope->string_until(';');
 		EXPECT(scope, kSymSemicolon);
 		parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
@@ -1063,6 +1063,9 @@ void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope,
 
 			case kSymSamplerDesc: {
 				string name = scope->next_identifier();
+        if (scope->consume_if(kSymDefault)) {
+          technique->_default_sampler_state = name;
+        }
 				scope->munch(kSymBlockOpen);
 
 				D3D11_SAMPLER_DESC desc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
@@ -1109,11 +1112,11 @@ bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, cons
 			switch (scope.next_symbol()) {
 
 				case kSymTechnique: {
-					Rollback2<Technique> t(new Technique);
+          unique_ptr<Technique> t(new Technique);
 					scope.next_identifier(&t.get()->_name).munch(kSymBlockOpen);
 					parse_technique(graphics, &scope, t.get());
 					scope.munch(kSymBlockClose).munch(kSymSemicolon);
-					techniques->push_back(t.commit());
+					techniques->push_back(t.release());
 					break;
 				}
 

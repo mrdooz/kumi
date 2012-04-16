@@ -17,7 +17,7 @@ void Mesh::submit(const TrackedLocation &location, uint16 seq_nr, int material_i
 	for (size_t i = 0; i < submeshes.size(); ++i) {
 		SubMesh *s = submeshes[i];
 		s->key.seq_nr = seq_nr;
-		MeshRenderData *p = (MeshRenderData *)RENDERER.alloc_command_data(sizeof(MeshRenderData));
+		MeshRenderData *p = RENDERER.alloc_command_data<MeshRenderData>();
 		memcpy(p, (void *)&s->data, sizeof(MeshRenderData));
 		if (material_id != -1)
 			p->material_id = (uint16)material_id;

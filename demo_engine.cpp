@@ -58,8 +58,6 @@ bool DemoEngine::tick() {
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
   int64 delta = (now - _last_time);
   _current_time += delta;
-  //const int64 elapsed_ms = 1000 * (now - _last_time) / _frequency;
-  //_current_time_ms += elapsed_ms;
   uint32 current_time_ms = uint32((1000 * _current_time) / _frequency);
   double elapsed_ms = 1000.0 * delta / _frequency;
 
@@ -107,4 +105,8 @@ bool DemoEngine::close() {
 void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
   assert(!_inited);
   _effects.push_back(new EffectInstance(effect, start_time, end_time));
+}
+
+void DemoEngine::reset_current_effect() {
+
 }

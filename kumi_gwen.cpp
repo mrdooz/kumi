@@ -59,8 +59,8 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
         data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         data->vb = _vb_pos_col.vb();
         data->vertex_size = _vb_pos_col.stride;
-        data->vs = GRAPHICS.find_shader("gwen_color", "vs_color_main");
-        data->ps = GRAPHICS.find_shader("gwen_color", "ps_color_main");
+        data->vs = GRAPHICS.find_shader("gwen_color", "gwen::vs_color_main");
+        data->ps = GRAPHICS.find_shader("gwen_color", "gwen::ps_color_main");
         data->layout = GRAPHICS.get_input_layout("gwen_color");
         data->vertex_count = pos_col_count;
         GRAPHICS.get_technique_states("gwen_color", &data->rs, &data->bs, &data->dss);
@@ -87,8 +87,8 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
         data->topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
         data->vb = _vb_pos_tex.vb();
         data->vertex_size = _vb_pos_tex.stride;
-        data->vs = GRAPHICS.find_shader("gwen_texture", "vs_texture_main");
-        data->ps = GRAPHICS.find_shader("gwen_texture", "ps_texture_main");
+        data->vs = GRAPHICS.find_shader("gwen_texture", "gwen::vs_texture_main");
+        data->ps = GRAPHICS.find_shader("gwen_texture", "gwen::ps_texture_main");
         data->layout = GRAPHICS.get_input_layout("gwen_texture");
         GRAPHICS.get_technique_states("gwen_texture", &data->rs, &data->bs, &data->dss);
         data->samplers[0] = GRAPHICS.get_sampler_state("gwen_texture", "diffuse_sampler");
@@ -236,8 +236,8 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     key.cmd = RenderKey::kRenderText;
     TextRenderData *data = RENDERER.alloc_command_data<TextRenderData>();
     data->font = get_font(pFont->facename);
-    int len = (text.size() + 1) * 2;
-    data->str = (WCHAR *)RENDERER.alloc_command_data(len);
+    int len = (text.size() + 1) * sizeof(WCHAR);
+    data->str = (WCHAR *)RENDERER.raw_alloc(len);
     memcpy((void *)data->str, text.c_str(), len);
     data->font_size = pFont->size;
     data->x = pos.x;

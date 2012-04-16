@@ -370,7 +370,6 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   B_ERR_HR(D3D11CreateDeviceAndSwapChain(
     adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain.p, &_device.p,
     &_feature_level, &_immediate_context.p));
-
   set_private_data(FROM_HERE, _immediate_context.p);
 
   B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
@@ -435,6 +434,7 @@ void Graphics::resize(const int width, const int height)
 {
   if (!_swap_chain || width == 0 || height == 0)
     return;
+  PROPERTY_MANAGER.set_system_property("g_screen_size", XMFLOAT4((float)width, (float)height, 0, 0));
   create_back_buffers(width, height);
 }
 
@@ -563,43 +563,6 @@ bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &famil
   return false;
 }
 
-#if 0
-static bool technique_changed_callback(const char *filename) {
-	return true;
-}
-
-static bool create_techniques_from_file(ResourceInterface *ri, const char *filename, vector<Technique *> *techniques, vector<Material *> *materials) {
-  void *buf;
-  size_t len;
-  if (!ri->load_file(filename, &buf, &len))
-    return false;
-
-  // TODO
-  if (!ri->supports_file_watch()) {
-    //load_inner(filename);
-  } else {
-		ri->add_file_watch(filename, true, technique_changed_callback);
-  }
-
-
-  techniques->clear();
-  TechniqueParser parser;
-  vector<Technique *> tmp;
-  bool res = parser.parse(&GRAPHICS, (const char *)buf, (const char *)buf + len, &tmp, materials);
-  if (res) {
-    for (size_t i = 0; i < tmp.size(); ++i) {
-      if (tmp[i]->init(&GRAPHICS, ri)) {
-        techniques->push_back(tmp[i]);
-      } else {
-        delete exch_null(tmp[i]);
-        res = false;
-        break;
-      }
-    }
-  }
-  return res;
-}
-#endif
 void Graphics::technique_file_changed(const char *filename, void *token) {
 
 }
@@ -644,7 +607,8 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   // delete all the techniques that fail to initialize
   if (fails != end(tmp)) {
     for (auto i = fails; i != end(tmp); ++i) {
-      LOG_WARNING_LN("init failed for technique: %s", (*i)->name().c_str());
+      Technique *t = *i;
+      LOG_WARNING_LN("init failed for technique: %s. Error msg: %s", t->name().c_str(), t->error_msg().c_str());
       delete exch_null(*i);
     }
     tmp.erase(fails, end(tmp));
@@ -704,13 +668,13 @@ GraphicsObjectHandle Graphics::get_sampler_state(const char *name, const char *s
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_name) {
+GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_id) {
   if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL)) {
-    if (technique->vertex_shader()->entry_point() == shader_name) {
-      int idx = _res._vertex_shaders.idx_from_token(shader_name);
+    if (technique->vertex_shader()->id() == shader_id) {
+      int idx = _res._vertex_shaders.idx_from_token(shader_id);
       return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx) : GraphicsObjectHandle();
-    } else if (technique->pixel_shader()->entry_point() == shader_name) {
-      int idx = _res._pixel_shaders.idx_from_token(shader_name);
+    } else if (technique->pixel_shader()->id() == shader_id) {
+      int idx = _res._pixel_shaders.idx_from_token(shader_id);
       return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx) : GraphicsObjectHandle();
     }
   }
@@ -784,8 +748,6 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 
 }
 
-int g_set_cbuffer_count = 0;
-
 void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id) {
 
   ID3D11DeviceContext *ctx = _immediate_context;
@@ -843,7 +805,6 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
     else
       ctx->PSSetConstantBuffers(0, 1, &buffer);
   }
-  g_set_cbuffer_count++;
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {

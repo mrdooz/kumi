@@ -27,6 +27,8 @@ public:
 	bool tick();
 	bool close();
 
+  void reset_current_effect();
+
 private:
 
 	struct EffectInstance {

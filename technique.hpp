@@ -107,6 +107,8 @@ public:
   GraphicsObjectHandle handle() const { return _handle; }
   void validate() { _valid = true; } // tihi
 
+  std::string id() const;
+
 private:
 
   bool _valid;
@@ -172,8 +174,14 @@ public:
   bool init(GraphicsInterface *graphics, ResourceInterface *res);
   bool reload_shaders();
   bool init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader);
+
+  bool is_valid() const { return _valid; }
+  const std::string &error_msg() const { return _error_msg; }
+
+  const std::string &get_default_sampler_state() const { return _default_sampler_state; }
 private:
 
+  void add_error_msg(const char *fmt, ...);
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
   bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, 
                      std::set<std::string> *used_params);
@@ -193,6 +201,7 @@ private:
   GraphicsObjectHandle _vb;
   GraphicsObjectHandle _ib;
 
+  string _default_sampler_state;
   GraphicsObjectHandle _rasterizer_state;
   std::vector<std::pair<std::string, GraphicsObjectHandle> > _sampler_states;
   GraphicsObjectHandle _blend_state;
@@ -204,4 +213,7 @@ private:
   CD3D11_DEPTH_STENCIL_DESC _depth_stencil_desc;
 
   vector<Material *> _materials;
+
+  std::string _error_msg;
+  bool _valid;
 };

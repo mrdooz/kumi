@@ -4,9 +4,15 @@
 #include "graphics_interface.hpp"
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
+#include "path_utils.hpp"
 
 using namespace boost::assign;
 using namespace std;
+
+string Shader::id() const {
+  Path p(_source_filename);
+  return p.get_filename_without_ext() + "::" + _entry_point;
+}
 
 Technique::Technique()
   : _vertex_shader(nullptr)
@@ -16,12 +22,31 @@ Technique::Technique()
   , _depth_stencil_desc(CD3D11_DEFAULT())
   , _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
+  , _valid(false)
 {
 }
 
 Technique::~Technique() {
   SAFE_DELETE(_vertex_shader);
   SAFE_DELETE(_pixel_shader);
+}
+
+void Technique::add_error_msg(const char *fmt, ...) {
+  va_list arg;
+  va_start(arg, fmt);
+
+  const int len = _vscprintf(fmt, arg) + 1;
+
+  char* buf = (char*)_alloca(len);
+  vsprintf_s(buf, len, fmt, arg);
+  va_end(arg);
+
+  if (_error_msg.empty())
+    _error_msg = buf;
+  else
+    _error_msg += "\n" + string(buf);
+
+  _valid = false;
 }
 
 bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params)
@@ -48,7 +73,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
 
       DXGI_FORMAT fmt;
       if (!lookup<string, DXGI_FORMAT>(input.SemanticName, mapping, &fmt)) {
-        LOG_ERROR("Invalid input semantic found: %s", input.SemanticName);
+        add_error_msg("Invalid input semantic found: %s", input.SemanticName);
         return false;
       }
 
@@ -56,8 +81,10 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
     }
 
     _input_layout = graphics->create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
-    if (!_input_layout.is_valid())
+    if (!_input_layout.is_valid()) {
+      add_error_msg("Invalid input layout");
       return false;
+    }
   }
 
   // constant buffers are stored per technique as they are shared between the
@@ -92,7 +119,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
         used_params->insert(var_desc.Name);
         CBufferParam *param = shader->find_cbuffer_param(var_desc.Name);
         if (!param) {
-          LOG_ERROR_LN("Shader parameter %s not found", var_desc.Name);
+          add_error_msg("Shader parameter %s not found", var_desc.Name);
           return false;
         }
         param->cbuffer = cb_idx;
@@ -107,7 +134,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
     D3D11_SHADER_INPUT_BIND_DESC input_desc;
     reflector->GetResourceBindingDesc(i, &input_desc);
     if (input_desc.BindCount > 1) {
-      LOG_ERROR("Only bind counts of 1 are supported");
+      add_error_msg("Only bind counts of 1 are supported");
       return false;
     }
 
@@ -116,7 +143,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       case D3D10_SIT_TEXTURE: {
         ResourceViewParam *param = shader->find_resource_view_param(input_desc.Name);
         if (!param) {
-          LOG_ERROR("Resource view %s not found", input_desc.Name);
+          add_error_msg("Resource view %s not found", input_desc.Name);
           return false;
         }
         param->bind_point = input_desc.BindPoint;
@@ -126,7 +153,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       case D3D10_SIT_SAMPLER: {
         SamplerParam *param = shader->find_sampler_param(input_desc.Name);
         if (!param) {
-          LOG_ERROR("Sampler %s not found", input_desc.Name);
+          add_error_msg("Sampler %s not found", input_desc.Name);
           return false;
         }
         param->bind_point = input_desc.BindPoint;
@@ -143,6 +170,23 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
   STARTUPINFOA startup_info;
   ZeroMemory(&startup_info, sizeof(startup_info));
   startup_info.cb = sizeof(STARTUPINFO);
+
+  // create a pipe, and use it for stdout/stderr
+  HANDLE stdout_read, stdout_write;
+  SECURITY_ATTRIBUTES sattr;
+  ZeroMemory(&sattr, sizeof(sattr));
+  sattr.nLength = sizeof(SECURITY_ATTRIBUTES); 
+  sattr.bInheritHandle = TRUE; 
+  sattr.lpSecurityDescriptor = NULL;
+
+  if (!CreatePipe(&stdout_read, &stdout_write, &sattr, 0)) {
+    DWORD err = GetLastError();
+    return false;
+  }
+
+  startup_info.dwFlags = STARTF_USESTDHANDLES;
+  startup_info.hStdError = startup_info.hStdOutput = stdout_write;
+
   // redirect the child's output handles to the log manager's
   // TODO
   /*
@@ -172,9 +216,29 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
     CloseHandle(process_info.hProcess);
     CloseHandle(process_info.hThread);
   } else {
-    LOG_ERROR("Unable to launch fxc.exe");
+    add_error_msg("Unable to launch fxc.exe");
   }
 
+  if (exit_code) {
+    // read the pipe
+    string err_msg;
+    char buf[4096+1];
+    while (true) {
+      DWORD bytes_read;
+      BOOL res = ReadFile(stdout_read, buf, sizeof(buf)-1, &bytes_read, NULL);
+      if (!res || bytes_read == 0)
+        break;
+      buf[bytes_read] = 0;
+      err_msg += buf;
+      if (bytes_read < sizeof(buf)-1)
+        break;
+    }
+    add_error_msg(err_msg.c_str());
+    LOG_WARNING_LN(err_msg.c_str());
+
+    CloseHandle(stdout_read);
+    CloseHandle(stdout_write);
+  }
   return exit_code == 0;
 }
 
@@ -191,7 +255,8 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   const char *src = shader->source_filename().c_str();
   // compile the shader if the source is newer, or the object file doesn't exist
   if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
-    LOG_ERR_BOOL(compile_shader(graphics, shader));
+    if (!compile_shader(graphics, shader))
+      return false;
   } else {
     if (!res->file_exists(obj))
       return false;
@@ -218,10 +283,10 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   GraphicsObjectHandle handle;
   switch (shader->type()) {
     case Shader::kVertexShader: 
-      handle = graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->entry_point());
+      handle = graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->id());
       break;
     case Shader::kPixelShader: 
-      handle = graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->entry_point());
+      handle = graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->id());
       break;
     case Shader::kGeometryShader: break;
   }
@@ -232,11 +297,11 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
 
 bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
 
-  if (_vertex_shader)
-    B_ERR_BOOL(init_shader(graphics, res, _vertex_shader));
+  if (_vertex_shader && !init_shader(graphics, res, _vertex_shader))
+    return false;
 
-  if (_pixel_shader)
-    B_ERR_BOOL(init_shader(graphics, res, _pixel_shader));
+  if (_pixel_shader && !init_shader(graphics, res, _pixel_shader))
+    return false;
 
   _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
   _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);

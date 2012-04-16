@@ -2,6 +2,9 @@
 #include "graphics_object_handle.hpp"
 #include "property_manager.hpp"
 
+static const int MAX_SAMPLERS = 8;
+static const int MAX_TEXTURES = 8;
+
 struct MeshRenderData {
 	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
 	GraphicsObjectHandle vb, ib;
@@ -18,11 +21,11 @@ struct MeshRenderData {
 struct TechniqueRenderData {
 	GraphicsObjectHandle technique;
 	uint16 material_id;
+  GraphicsObjectHandle textures[MAX_TEXTURES];
+  GraphicsObjectHandle render_targets[MAX_TEXTURES];
 };
 
 struct BufferRenderData {
-  static const int MAX_SAMPLERS = 8;
-  static const int MAX_TEXTURES = 8;
   BufferRenderData() : index_count(0), start_index(0), start_vertex(0), base_vertex(0), vertex_size(0), vertex_count(0) {}
   GraphicsObjectHandle vs, ps;
   GraphicsObjectHandle vb, ib;
@@ -59,6 +62,7 @@ struct RenderKey {
 		kRenderTechnique,
     kRenderBuffers,
     kRenderText,
+    kSetScissorRect,
 		kNumCommands
 	};
 	static_assert(kNumCommands < (1 << 16), "Too many commands");

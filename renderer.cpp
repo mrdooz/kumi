@@ -18,9 +18,20 @@ Renderer::Renderer()
 {
 }
 
+bool Renderer::create() {
+  assert(!_instance);
+  _instance = new Renderer();
+  return true;
+}
+
+bool Renderer::close() {
+  assert(_instance);
+  delete exch_null(_instance);
+  return true;
+}
+
 Renderer &Renderer::instance() {
-  if (!_instance)
-    _instance = new Renderer();
+  assert(_instance);
   return *_instance;
 }
 
@@ -32,9 +43,11 @@ void Renderer::render() {
 
   ctx->RSSetViewports(1, &GRAPHICS.viewport());
 
+  // i need to think about how i want to do this sorting, how to group stuff etc, so at the moment i'm just
+  // leaving it off..
   // sort by keys
-  sort(begin(_render_commands), end(_render_commands), 
-    [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
+  //sort(begin(_render_commands), end(_render_commands), 
+//    [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
 
   // delete commands are sorted before render commands, so we can just save the
   // deleted items when we find them
@@ -86,7 +99,8 @@ void Renderer::render() {
 
         ctx->RSSetState(res->_rasterizer_states.get(technique->rasterizer_state()));
         ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
-        ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+        ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), 
+          GRAPHICS.default_sample_mask());
 
         GRAPHICS.set_cbuffer_params(technique, vertex_shader, -1, -1);
         GRAPHICS.set_cbuffer_params(technique, pixel_shader, -1, -1);
@@ -94,6 +108,29 @@ void Renderer::render() {
         int resource_mask = 0;
         GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
 
+        const std::string &sampler_name = technique->get_default_sampler_state();
+        if (!sampler_name.empty()) {
+          GraphicsObjectHandle sampler = GRAPHICS.get_sampler_state(technique->name().c_str(), sampler_name.c_str());
+          ID3D11SamplerState *samplers = res->_sampler_states.get(sampler);
+          ctx->PSSetSamplers(0, 1, &samplers);
+        }
+/*
+        int num_textures = 0;
+        ID3D11ShaderResourceView *textures[8];
+        for (int i = 0; d->textures[i].is_valid(); ++i, ++num_textures)
+          textures[i] = res->_resources.get(d->textures[i])->srv;
+
+        if (num_textures)
+          ctx->PSSetShaderResources(0, num_textures, textures);
+
+        int num_rendertargets = 0;
+        ID3D11ShaderResourceView *render_targets[8];
+        for (int i = 0; d->render_targets[i].is_valid(); ++i, ++num_rendertargets)
+          render_targets[i] = res->_render_targets.get(d->render_targets[i])->srv;
+
+        if (num_rendertargets)
+          ctx->PSSetShaderResources(0, num_rendertargets, render_targets);
+*/
         ctx->DrawIndexed(technique->index_count(), 0, 0);
         GRAPHICS.unbind_resource_views(resource_mask);
 
@@ -189,12 +226,12 @@ void Renderer::render() {
 
 void *Renderer::strdup(const char *str) {
   int len = strlen(str);
-  void *mem = alloc_command_data(len + 1);
+  void *mem = malloc(len + 1);
   memcpy(mem, str, len);
   return mem;
 }
 
-void *Renderer::alloc_command_data(size_t size) {
+void *Renderer::raw_alloc(size_t size) {
   if (size + _effect_data_ofs >= cEffectDataSize)
     return nullptr;
 
@@ -209,24 +246,24 @@ void Renderer::validate_command(RenderKey key, const void *data) {
 
   switch (key.cmd) {
 
-  case RenderKey::kSetRenderTarget:
-    break;
+    case RenderKey::kSetRenderTarget:
+      break;
 
-  case RenderKey::kRenderMesh: {
-    MeshRenderData *render_data = (MeshRenderData *)data;
-    const uint16 material_id = render_data->material_id;
-    const Material *material = MATERIAL_MANAGER.get_material(material_id);
-    Technique *technique = res->_techniques.get(render_data->technique);
-    assert(technique);
-    Shader *vertex_shader = technique->vertex_shader();
-    assert(vertex_shader);
-    Shader *pixel_shader = technique->pixel_shader();
-    assert(pixel_shader);
-    break;
-                               }
+    case RenderKey::kRenderMesh: {
+      MeshRenderData *render_data = (MeshRenderData *)data;
+      const uint16 material_id = render_data->material_id;
+      const Material *material = MATERIAL_MANAGER.get_material(material_id);
+      Technique *technique = res->_techniques.get(render_data->technique);
+      assert(technique);
+      Shader *vertex_shader = technique->vertex_shader();
+      assert(vertex_shader);
+      Shader *pixel_shader = technique->pixel_shader();
+      assert(pixel_shader);
+      break;
+    }
 
-  case RenderKey::kRenderTechnique:
-    break;
+    case RenderKey::kRenderTechnique:
+      break;
   }
 }
 
@@ -245,7 +282,7 @@ uint16 Renderer::next_seq_nr() const {
 void Renderer::submit_technique(GraphicsObjectHandle technique) {
   RenderKey key;
   key.cmd = RenderKey::kRenderTechnique;
-  TechniqueRenderData *data = (TechniqueRenderData *)RENDERER.alloc_command_data(sizeof(TechniqueRenderData));
+  TechniqueRenderData *data = RENDERER.alloc_command_data<TechniqueRenderData>();
   data->technique = technique;
   RENDERER.submit_command(FROM_HERE, key, data);
 }

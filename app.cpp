@@ -303,6 +303,7 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(ResourceManager::create());
   B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
+  B_ERR_BOOL(Renderer::create());
 
   B_ERR_BOOL(create_window());
 
@@ -331,7 +332,7 @@ bool App::init(HINSTANCE hinstance)
 */
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
-  DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
+  DEMO_ENGINE.add_effect(effect, 0, 1000 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());
 
@@ -340,6 +341,7 @@ bool App::init(HINSTANCE hinstance)
 
 bool App::close() {
   FileWatcher::close();
+  Renderer::close();
   Graphics::close();
   Logger::close();
   Dispatcher::close();
@@ -393,8 +395,6 @@ bool App::create_window()
 void App::on_idle() {
 }
 
-int g_render_count = 0;
-
 UINT App::run(void *userdata) {
   MSG msg = {0};
 
@@ -427,14 +427,11 @@ UINT App::run(void *userdata) {
 
       XMFLOAT4 tt;
       PROPERTY_MANAGER.get_system_property("g_time", &tt);
-
       _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
 
       //GRAPHICS.find_technique("cef")->submit();
       _gwen_canvas->RenderCanvas();
       RENDERER.render();
-      g_render_count++;
-
       GRAPHICS.present();
     }
   }
@@ -490,8 +487,8 @@ vv->Register();
 LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
 {
 
-  HDC hdc;
-  PAINTSTRUCT ps;
+  //HDC hdc;
+  //PAINTSTRUCT ps;
   switch( message ) 
   {
 
@@ -621,8 +618,16 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     break;
     */
 
-  case WM_KEYDOWN:
   case WM_KEYUP:
+    switch (wParam) {
+      case VK_F5:
+        DEMO_ENGINE.reset_current_effect();
+        break;
+    }
+    break;
+
+  case WM_KEYDOWN:
+  //case WM_KEYUP:
   case WM_SYSKEYDOWN:
   case WM_SYSKEYUP:
   case WM_CHAR:
