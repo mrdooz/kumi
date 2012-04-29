@@ -32,10 +32,26 @@ Dispatcher::Dispatcher() {
 void Dispatcher::invoke(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb) {
   SCOPED_CS(_thread_cs);
   Thread *thread = _threads[id];
+  assert(thread);
   if (!thread)
     return;
 
   thread->add_deferred(DeferredCall(location, cb));
+}
+
+void Dispatcher::invoke_in(const TrackedLocation &location, ThreadId id, DWORD delta_ms, const std::function<void()> &cb) {
+  SCOPED_CS(_thread_cs);
+  Thread *thread = _threads[id];
+  assert(thread);
+  if (!thread)
+    return;
+
+  DWORD now = timeGetTime();
+  DWORD t = now + delta_ms;
+  if (t == ~0)
+    t++;
+
+  thread->add_deferred(DeferredCall(location, t, cb));
 }
 
 void Dispatcher::invoke_and_wait(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb) {
@@ -62,10 +78,14 @@ void Dispatcher::set_thread(ThreadId id, Thread *thread) {
 // Thread
 //
 //////////////////////////////////////////////////////////////////////////
-Thread::Thread() 
+Thread::Thread(ThreadId thread_id) 
   : _thread(INVALID_HANDLE_VALUE) 
   , _cancel_event(CreateEvent(NULL, FALSE, FALSE, NULL))
+  , _thread_id(thread_id)
+  , _thread_start(timeGetTime())
+  , _ping_pong_idx(0)
 {
+  DISPATCHER.set_thread(thread_id, this);
 }
 
 Thread::~Thread() {
@@ -96,10 +116,31 @@ bool Thread::join() {
 }
 
 void Thread::add_deferred(const DeferredCall &call) {
-  _deferred.push(call);
+  if (call.invoke_at != ~0)
+    _deferred_ping_pong[0].push(call);
+  else 
+    _deferred.push(call);
 }
 
 void Thread::process_deferred() {
+  DWORD now = timeGetTime();
+
+  // process time-dependent callbacks
+  auto &q = _deferred_ping_pong[_ping_pong_idx];
+  auto &q2 = _deferred_ping_pong[_ping_pong_idx ^ 1];
+  while (!q.empty()) {
+    DeferredCall cur;
+    if (q.try_pop(cur)) {
+      if ( (int)(cur.invoke_at - now) > 0) {
+        cur.callback();
+      } else {
+        q2.push(cur);
+      }
+    }
+  }
+
+  _ping_pong_idx ^= 1;
+
   while (!_deferred.empty()) {
     DeferredCall cur;
     if (_deferred.try_pop(cur)) {
@@ -140,8 +181,8 @@ UINT GreedyThread::run(void *data) {
 // SleepyThread
 //
 //////////////////////////////////////////////////////////////////////////
-SleepyThread::SleepyThread() 
-  : Thread()
+SleepyThread::SleepyThread(ThreadId thread_id) 
+  : Thread(thread_id)
   , _deferred_event(CreateEvent(NULL, FALSE, FALSE, NULL))
   , _sleep_interval(INFINITE)
 {

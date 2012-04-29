@@ -20,6 +20,7 @@
 #include "test/path_follow.hpp"
 #include "test/volumetric.hpp"
 #include "test/ps3_background.hpp"
+#include "test/scene_player.hpp"
 #include "kumi_gwen.hpp"
 #include "gwen/Skins/TexturedBase.h"
 #include "gwen/Controls/Canvas.h"
@@ -247,7 +248,8 @@ void App::SetNavState(bool canGoBack, bool canGoForward)
 #endif // #if USE_CEF
 
 App::App()
-  : _hinstance(NULL)
+  : GreedyThread(threading::kMainThread)
+  , _hinstance(NULL)
   , _width(-1)
   , _height(-1)
   , _hwnd(NULL)
@@ -267,7 +269,6 @@ App::App()
 #endif
 {
   find_app_root();
-  DISPATCHER.set_thread(threading::kMainThread, this);
 }
 
 App::~App()
@@ -319,6 +320,7 @@ bool App::init(HINSTANCE hinstance)
 
   //UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
   //pUnit->SetPos( 10, 10 );
+  RESOURCE_MANAGER.add_path("D:\\SkyDrive");
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
@@ -331,7 +333,8 @@ bool App::init(HINSTANCE hinstance)
   }
 */
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
-  auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
+  //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
+  auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
   DEMO_ENGINE.add_effect(effect, 0, 1000 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());

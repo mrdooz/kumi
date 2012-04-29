@@ -234,6 +234,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
     Translate(pos.x, pos.y);
     RenderKey key;
     key.cmd = RenderKey::kRenderText;
+    key.depth = 1;
     TextRenderData *data = RENDERER.alloc_command_data<TextRenderData>();
     data->font = get_font(pFont->facename);
     int len = (text.size() + 1) * sizeof(WCHAR);

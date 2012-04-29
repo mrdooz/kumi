@@ -126,17 +126,25 @@ bool KumiLoader::load_materials(const uint8 *buf) {
     for (int j = 0; j < props; ++j) {
       const char *name = read_and_step<const char *>(&buf);
       PropertyType::Enum type = read_and_step<PropertyType::Enum>(&buf);
-      switch (type) {
-      case PropertyType::kInt:
-        material->properties.push_back(MaterialProperty(name, read_and_step<int>(&buf)));
-        break;
-      case PropertyType::kFloat:
-        material->properties.push_back(MaterialProperty(name, read_and_step<float>(&buf)));
-        break;
 
-      case PropertyType::kFloat4:
-        material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT4>(&buf)));
-        break;
+      switch (type) {
+
+        case PropertyType::kInt:
+          material->properties.push_back(MaterialProperty(name, read_and_step<int>(&buf)));
+          break;
+
+        case PropertyType::kFloat:
+          material->properties.push_back(MaterialProperty(name, read_and_step<float>(&buf)));
+          break;
+
+        case PropertyType::kFloat3:
+          material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT3>(&buf)));
+          break;
+
+        case PropertyType::kFloat4:
+          material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT4>(&buf)));
+          break;
+
       }
     }
     _material_ids[material->name] = MATERIAL_MANAGER.add_material(material, true);

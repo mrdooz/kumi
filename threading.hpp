@@ -18,12 +18,15 @@ namespace threading {
 
     DeferredCall() : handle(INVALID_HANDLE_VALUE) {}
     DeferredCall(const TrackedLocation &location, HANDLE handle, const Fn &callback) 
-      : location(location), handle(handle), callback(callback) {}
+      : location(location), handle(handle), invoke_at(~0), callback(callback) {}
     DeferredCall(const TrackedLocation &location, const Fn &callback) 
-      : location(location), handle(INVALID_HANDLE_VALUE), callback(callback) {}
+      : location(location), handle(INVALID_HANDLE_VALUE), invoke_at(~0), callback(callback) {}
+    DeferredCall(const TrackedLocation &location, DWORD invoke_at, const Fn &callback) 
+      : location(location), handle(INVALID_HANDLE_VALUE), invoke_at(invoke_at), callback(callback) {}
 
     TrackedLocation location;
     HANDLE handle;
+    DWORD invoke_at;
     Fn callback;
   };
 
@@ -41,20 +44,24 @@ namespace threading {
 
     ThreadId thread_id() const;
   protected:
-    Thread();
+    Thread(ThreadId thread_id);
     virtual ~Thread();
     virtual void add_deferred(const DeferredCall &call);
     void process_deferred();
 
+    DWORD _thread_start;
     HANDLE _thread;
     ThreadId _thread_id;
     HANDLE _cancel_event;
     Concurrency::concurrent_queue<DeferredCall> _deferred;
+    int _ping_pong_idx;
+    Concurrency::concurrent_queue<DeferredCall> _deferred_ping_pong[2];
   };
 
   // These guys just process messages and then call the on_idle as fast as they can
   class GreedyThread : public Thread {
   public:
+    GreedyThread(ThreadId thread_id) : Thread(thread_id) {}
     virtual bool start();
   private:
     static UINT __stdcall run(void *data);
@@ -65,7 +72,7 @@ namespace threading {
   public:
     virtual bool start();
   protected:
-    SleepyThread();
+    SleepyThread(ThreadId thread_id);
     ~SleepyThread();
     static UINT __stdcall run(void *data);
     virtual void add_deferred(const DeferredCall &call);
@@ -83,6 +90,7 @@ namespace threading {
 
     // queue the function on the specified thread's queue
     void invoke(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb);
+    void invoke_in(const TrackedLocation &location, ThreadId id, DWORD delta_ms, const std::function<void()> &cb);
     void invoke_and_wait(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb);
 
   private:

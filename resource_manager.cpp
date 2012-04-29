@@ -23,15 +23,17 @@ static bool file_exists(const char *filename)
   return !!(status.st_mode & _S_IFREG);
 }
 
-static string normalize_path(const char *path) {
+static string normalize_path(const char *path, bool add_trailing_slash) {
   string res(path);
   for (size_t i = 0; i < res.size(); ++i) {
     if (res[i] == '\\')
       res[i] = '/';
   }
 
-  if (!res.empty() && res.back() != '/')
-    res.push_back('/');
+  if (add_trailing_slash) {
+    if (!res.empty() && res.back() != '/')
+      res.push_back('/');
+  }
 
   return res;
 }
@@ -55,7 +57,7 @@ bool ResourceManager::create() {
 }
 
 void ResourceManager::add_path(const char *path) {
-  _paths.push_back(normalize_path(path));
+  _paths.push_back(normalize_path(path, true));
 }
 
 bool ResourceManager::load_file(const char *filename, std::vector<uint8> *buf) {
@@ -128,6 +130,10 @@ void ResourceManager::copy_on_load(bool enable, const char *dest) {
 
 string ResourceManager::resolve_filename(const char *filename) {
 
+  if (::file_exists(filename)) {
+    return normalize_path(filename, false);
+  }
+
   auto it = _resolved_paths.find(filename);
   if (it != _resolved_paths.end())
     return it->second;
@@ -154,10 +160,11 @@ string ResourceManager::resolve_filename(const char *filename) {
     }
   }
 #endif
-  if (!res.empty())
+  if (!res.empty()) {
+    res = normalize_path(res.c_str(), false);
     _resolved_paths[filename] = res;
+  }
   return res;
-
 }
 
 void ResourceManager::add_file_watch(const char *filename, bool initial_callback, void *token, const cbFileChanged &cb) {
@@ -177,8 +184,14 @@ void ResourceManager::remove_file_watch(const cbFileChanged &cb) {
   }
 }
 
+void laters() {
+
+}
+
 void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, 
                                    const string &new_name) {
+
+  DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, 2500, laters);
 
   if ((uint32)event & (FileWatcher::kFileEventCreate | FileWatcher::kFileEventModify)) {
     auto i = _watched_files.find(old_name);

@@ -23,6 +23,9 @@ ps_input vs_main(vs_input input)
 
 float4 ps_main(ps_input input) : SV_Target
 {
+	float t = g_time[0].x;
+	t = 5;
+
 	// determine correct y at current x
 	float nx = input.pos.x / g_screen_size.x;
 	float ny = input.pos.y / g_screen_size.y;
@@ -32,8 +35,8 @@ float4 ps_main(ps_input input) : SV_Target
 	float amp[10] = { 2, 3, 4, 0.5, 1, 0.7, 6, 4, 2, 1 };
 	
 	for (int i = 0; i < 10; ++i) {
-		float y = 0.5 + clamp(amp[i]*0.5*sin(freq[i]*3.1415 * nx + ((i+1)*(i+g_time[0].x))/5), 0, 1);
-		float dd = clamp(pow(abs(ny-y), g_time.x/5), 0.1, 100);
+		float y = 0.5 + clamp(amp[i]*0.5*sin(freq[i]*3.1415 * nx + ((i+1)*(i+t))/5), 0, 1);
+		float dd = clamp(pow(abs(ny-y), t/5), 0.1, 100);
 		float d = 0.08/dd; //clamp(1.0 - abs(ny-y), 0, 1);
 		b += d / 10;
 	}

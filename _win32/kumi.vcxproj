@@ -121,6 +121,7 @@
     <ClCompile Include="..\technique.cpp" />
     <ClCompile Include="..\technique_parser.cpp" />
     <ClCompile Include="..\test\demo.cpp" />
+    <ClCompile Include="..\test\scene_player.cpp" />
     <ClCompile Include="..\test\path_follow.cpp" />
     <ClCompile Include="..\test\ps3_background.cpp" />
     <ClCompile Include="..\test\volumetric.cpp" />
@@ -167,6 +168,7 @@
     <ClInclude Include="..\test\demo.hpp" />
     <ClInclude Include="..\test\path_follow.hpp" />
     <ClInclude Include="..\test\ps3_background.hpp" />
+    <ClInclude Include="..\test\scene_player.hpp" />
     <ClInclude Include="..\test\volumetric.hpp" />
     <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\tracked_location.hpp" />

@@ -43,11 +43,9 @@ void Renderer::render() {
 
   ctx->RSSetViewports(1, &GRAPHICS.viewport());
 
-  // i need to think about how i want to do this sorting, how to group stuff etc, so at the moment i'm just
-  // leaving it off..
-  // sort by keys
-  //sort(begin(_render_commands), end(_render_commands), 
-//    [&](const RenderCmd &a, const RenderCmd &b) { return a.key.data < b.key.data; });
+  // sort by keys (just using the depth)
+  stable_sort(begin(_render_commands), end(_render_commands), 
+    [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
 
   // delete commands are sorted before render commands, so we can just save the
   // deleted items when we find them
@@ -114,23 +112,7 @@ void Renderer::render() {
           ID3D11SamplerState *samplers = res->_sampler_states.get(sampler);
           ctx->PSSetSamplers(0, 1, &samplers);
         }
-/*
-        int num_textures = 0;
-        ID3D11ShaderResourceView *textures[8];
-        for (int i = 0; d->textures[i].is_valid(); ++i, ++num_textures)
-          textures[i] = res->_resources.get(d->textures[i])->srv;
 
-        if (num_textures)
-          ctx->PSSetShaderResources(0, num_textures, textures);
-
-        int num_rendertargets = 0;
-        ID3D11ShaderResourceView *render_targets[8];
-        for (int i = 0; d->render_targets[i].is_valid(); ++i, ++num_rendertargets)
-          render_targets[i] = res->_render_targets.get(d->render_targets[i])->srv;
-
-        if (num_rendertargets)
-          ctx->PSSetShaderResources(0, num_rendertargets, render_targets);
-*/
         ctx->DrawIndexed(technique->index_count(), 0, 0);
         GRAPHICS.unbind_resource_views(resource_mask);
 

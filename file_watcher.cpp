@@ -161,8 +161,10 @@ bool DirWatch::start_watch()
                                  NULL, &_overlapped, WatcherThread::on_completion);
 }
 
-WatcherThread::WatcherThread() : _last_tick(-1) {
-  DISPATCHER.set_thread(kFileMonitorThread, this);
+WatcherThread::WatcherThread() 
+  : SleepyThread(kFileMonitorThread)
+  , _last_tick(-1) 
+{
 }
 
 WatcherThread::~WatcherThread() {
