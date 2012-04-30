@@ -184,24 +184,24 @@ void ResourceManager::remove_file_watch(const cbFileChanged &cb) {
   }
 }
 
-void laters() {
-
-}
-
-void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, 
-                                   const string &new_name) {
-
-  DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, 2500, laters);
-
-  if ((uint32)event & (FileWatcher::kFileEventCreate | FileWatcher::kFileEventModify)) {
-    auto i = _watched_files.find(old_name);
-    if (i == _watched_files.end())
-      return;
-    // call all the callbacks registered for the changed file
-    auto &v = i->second;
-    for (auto j = begin(v); j != end(v); ++j) {
-      const pair<cbFileChanged, void*> &x = *j;
-      x.first(old_name.c_str(), x.second);
+void ResourceManager::deferred_file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, const string &new_name) {
+  if (0 == --_file_change_ref_count[old_name]) {
+    if ((uint32)event & (FileWatcher::kFileEventCreate | FileWatcher::kFileEventModify)) {
+      auto i = _watched_files.find(old_name);
+      if (i == end(_watched_files))
+        return;
+      // call all the callbacks registered for the changed file
+      auto &v = i->second;
+      for (auto j = begin(v); j != end(v); ++j) {
+        const pair<cbFileChanged, void*> &x = *j;
+        x.first(old_name.c_str(), x.second);
+      }
     }
   }
+}
+
+void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, const string &new_name) {
+  _file_change_ref_count[old_name]++;
+  DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, 2500, 
+    bind(&ResourceManager::deferred_file_changed, this, token, event, old_name, new_name));
 }

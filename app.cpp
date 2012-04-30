@@ -321,6 +321,7 @@ bool App::init(HINSTANCE hinstance)
   //UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
   //pUnit->SetPos( 10, 10 );
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
+  RESOURCE_MANAGER.add_path("c:\\users\\dooz\\SkyDrive");
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");

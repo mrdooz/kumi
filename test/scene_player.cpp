@@ -13,16 +13,15 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
 }
 
 void ScenePlayer::file_changed(const char *filename, void *token) {
+  LOG_VERBOSE_LN(__FUNCTION__);
+  KumiLoader loader;
+  loader.load(filename, &RESOURCE_MANAGER, &_scene);
 
 }
 
 bool ScenePlayer::init() {
 
-  LOG_VERBOSE_LN(__FUNCTION__);
-  KumiLoader loader;
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
-  loader.load(resolved_name.c_str(), &RESOURCE_MANAGER, &_scene);
-
   RESOURCE_MANAGER.add_file_watch(resolved_name.c_str(), true, NULL, bind(&ScenePlayer::file_changed, this, _1, _2));
 
 /*

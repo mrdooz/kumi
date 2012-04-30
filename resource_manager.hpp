@@ -34,6 +34,7 @@ public:
 
 private:
   void file_changed(void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
+  void deferred_file_changed(void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
 
   static ResourceManager *_instance;
   bool _copy_on_load;
@@ -42,6 +43,8 @@ private:
   std::map<std::string, std::string> _resolved_paths;
 
   std::map<std::string, vector<std::pair<cbFileChanged, void*>>> _watched_files;
+
+  std::map<std::string, int> _file_change_ref_count;
 };
 
 #define RESOURCE_MANAGER ResourceManager::instance()
