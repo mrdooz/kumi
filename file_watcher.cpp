@@ -201,7 +201,7 @@ void WatcherThread::on_idle() {
       i = _events.erase(i);
 
     } else {
-      _sleep_interval = min(_sleep_interval, i->second.delta);
+      _sleep_interval = std::min<DWORD>(_sleep_interval, i->second.delta);
       ++i;
     }
   }

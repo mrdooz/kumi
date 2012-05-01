@@ -114,6 +114,9 @@
     <ClCompile Include="..\test\scene_player.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\websocket_server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -242,11 +245,11 @@
     <ClInclude Include="..\tracked_location.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\test\scene_player">
-      <Filter>test</Filter>
-    </ClInclude>
     <ClInclude Include="..\test\scene_player.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\websocket_server.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

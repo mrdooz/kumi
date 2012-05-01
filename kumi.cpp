@@ -7,6 +7,7 @@
 #include "path_utils.hpp"
 #include "log_server.hpp"
 #include "kumi.hpp"
+#include "websocket_server.hpp"
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -81,6 +82,9 @@ static bool global_close() {
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
+  WebSocketThread ws_thread;
+  ws_thread.start();
+
   if (!global_init())
     return 1;
 
@@ -100,6 +104,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
     //start_second_process("--log-server");
     res = run_app(instance);
   }
+
+  ws_thread.stop();
 
   global_close();
   return res;

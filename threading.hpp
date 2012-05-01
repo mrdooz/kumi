@@ -9,6 +9,7 @@ namespace threading {
     kMainThread,
     kIoThread,
     kFileMonitorThread,
+    kWebSocketThread,
 
     kThreadCount,
   };
@@ -78,6 +79,16 @@ namespace threading {
     virtual void add_deferred(const DeferredCall &call);
     HANDLE _deferred_event;
     DWORD _sleep_interval;
+  };
+
+  class BlockingThread : public Thread {
+  public:
+    virtual bool start();
+  protected:
+    BlockingThread(ThreadId thread_id, void *user_data);
+    static UINT __stdcall run(void *data);
+    virtual UINT blocking_run(void *data) = 0;
+    void *_user_data;
   };
 
   class Dispatcher {

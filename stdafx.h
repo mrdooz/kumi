@@ -27,7 +27,7 @@ typedef uint64_t uint64;
 #include <direct.h>
 #include <io.h>
 #include <sys/stat.h>
-
+/*
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/include/phoenix_core.hpp>
 #include <boost/spirit/include/phoenix_operator.hpp>
@@ -55,6 +55,9 @@ typedef uint64_t uint64;
 #include <boost/type_traits/remove_reference.hpp>
 #include <boost/type_traits/is_member_function_pointer.hpp>
 
+*/
+
+#include <boost/scoped_ptr.hpp>
 #include <boost/assign/list_of.hpp>
 
 #include <vector>
@@ -67,6 +70,8 @@ typedef uint64_t uint64;
 #include <stack>
 #include <hash_set>
 #include <set>
+#include <time.h>
+#include <functional>
 
 #include <concurrent_queue.h>
 
@@ -84,7 +89,8 @@ typedef uint64_t uint64;
 #include <cef.h>
 #endif
 
-#include "FW1FontWrapper.h"
+#include <concurrent_queue.h>
 
+#include "FW1FontWrapper.h"
 
 typedef std::basic_string<TCHAR> ustring;

@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include "threading.hpp"
-#include <concurrent_queue.h>
 
 using std::pair;
 using std::make_pair;
@@ -217,6 +216,30 @@ UINT SleepyThread::run(void *data) {
 void SleepyThread::add_deferred(const DeferredCall &call) {
   _deferred.push(call);
   SetEvent(_deferred_event);
+}
+
+//////////////////////////////////////////////////////////////////////////
+//
+// BlockingThread
+//
+//////////////////////////////////////////////////////////////////////////
+BlockingThread::BlockingThread(ThreadId thread_id, void *user_data)
+  : Thread(thread_id)
+  , _user_data(user_data)
+{
+}
+
+bool BlockingThread::start() {
+  if (_thread != INVALID_HANDLE_VALUE)
+    return false;
+
+  _thread = (HANDLE)_beginthreadex(NULL, 0, &BlockingThread::run, this, 0, NULL);
+  return _thread != INVALID_HANDLE_VALUE;
+}
+
+UINT BlockingThread::run(void *data) {
+  BlockingThread *self = (BlockingThread *)data;
+  return self->blocking_run(NULL);
 }
 
 }
