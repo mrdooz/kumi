@@ -11,6 +11,8 @@
 #ifndef _TREELIST_CONTROL_H
 #define _TREELIST_CONTROL_H
 
+#if WITH_ZMQ_LOGSERVER
+
 #ifdef _WIN32_WINNT
 #undef _WIN32_WINNT
 #endif
@@ -163,6 +165,6 @@ TreeListError   TreeListAddColumn       (TREELIST_HANDLE ListTreeHandle,char *sz
 
 NODE_HANDLE     TreeListAddNode         (TREELIST_HANDLE ListTreeHandle,NODE_HANDLE ParentHandle,TreeListNodeData *RowOfColumns,int ColumnsCount);
 
-
+#endif
 
 #endif // _TREELIST_CONTROL_H

@@ -21,6 +21,8 @@
 #include "test/volumetric.hpp"
 #include "test/ps3_background.hpp"
 #include "test/scene_player.hpp"
+
+#if WITH_GWEN
 #include "kumi_gwen.hpp"
 #include "gwen/Skins/TexturedBase.h"
 #include "gwen/Controls/Canvas.h"
@@ -28,8 +30,9 @@
 #include "gwen/Input/Windows.h"
 #include "gwen/UnitTest/UnitTest.h"
 #include "gwen/Controls/StatusBar.h"
+#endif
 
-#if USE_CEF
+#if WITH_CEF
 #include "v8_handler.hpp"
 #endif
 
@@ -48,7 +51,7 @@ const TCHAR *g_app_window_title = _T("kumi - magnus österlind");
 #define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
 #endif
 
-#if USE_CEF
+#if WITH_CEF
 #pragma comment(lib, "libcef.lib")
 #pragma comment(lib, "libcef_dll_wrapper.lib")
 
@@ -245,7 +248,7 @@ void App::SetNavState(bool canGoBack, bool canGoForward)
   EnableWindow(_back_hwnd, canGoBack);
   EnableWindow(_forward_hwnd, canGoForward);
 }
-#endif // #if USE_CEF
+#endif // #if WITH_CEF
 
 App::App()
   : GreedyThread(threading::kMainThread)
@@ -258,7 +261,7 @@ App::App()
   , _cur_camera(1)
   , _draw_plane(false)
   , _ref_count(1)
-#if USE_CEF
+#if WITH_CEF
   , _main_hwnd(NULL)
   , _browser_hwnd(NULL)
   , _edit_hwnd(NULL)
@@ -273,11 +276,13 @@ App::App()
 
 App::~App()
 {
+#if WITH_GWEN
   _gwen_status_bar.reset();
   _gwen_input.reset();
   _gwen_canvas.reset();
   _gwen_skin.reset();
   _gwen_renderer.reset();
+#endif
 }
 
 App& App::instance()
@@ -297,7 +302,7 @@ bool App::init(HINSTANCE hinstance)
   _width = GetSystemMetrics(SM_CXSCREEN) / 2;
   _height = GetSystemMetrics(SM_CYSCREEN) / 2;
 
-#if USE_CEF
+#if WITH_CEF
   CefSettings settings;
   settings.multi_threaded_message_loop = false;
 #endif
@@ -308,6 +313,7 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(create_window());
 
+#if WITH_GWEN
   _gwen_renderer.reset(create_kumi_gwen_renderer());
   _gwen_skin.reset(new Gwen::Skin::TexturedBase(_gwen_renderer.get()));
   _gwen_skin->Init("gfx/DefaultSkin.png");
@@ -315,11 +321,9 @@ bool App::init(HINSTANCE hinstance)
   _gwen_canvas->SetSize(GRAPHICS.width(), GRAPHICS.height());
   _gwen_input.reset(new Gwen::Input::Windows());
   _gwen_input->Initialize(_gwen_canvas.get());
-
   _gwen_status_bar.reset(new Gwen::Controls::StatusBar(_gwen_canvas.get()));
+#endif
 
-  //UnitTest* pUnit = new UnitTest(_gwen_canvas.get());
-  //pUnit->SetPos( 10, 10 );
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
   RESOURCE_MANAGER.add_path("c:\\users\\dooz\\SkyDrive");
   RESOURCE_MANAGER.add_path("C:\\syncplicity");
@@ -416,25 +420,27 @@ UINT App::run(void *userdata) {
 
   while (WM_QUIT != msg.message) {
     if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) ) {
+#if WITH_GWEN
       _gwen_input->ProcessMessage(msg);
+#endif
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
       process_deferred();
 
-#if USE_CEF
+#if WITH_CEF
       CefDoMessageLoopWork();
 #endif
 
       GRAPHICS.clear(XMFLOAT4(0,0,0,1));
       DEMO_ENGINE.tick();
 
+#if WITH_GWEN
       XMFLOAT4 tt;
       PROPERTY_MANAGER.get_system_property("g_time", &tt);
       _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
-
-      //GRAPHICS.find_technique("cef")->submit();
       _gwen_canvas->RenderCanvas();
+#endif
       RENDERER.render();
       GRAPHICS.present();
     }
@@ -500,7 +506,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_KILLFOCUS:
     {
       SetFocus(_instance->_hwnd);
-#if USE_CEF
+#if WITH_CEF
       if (GetBrowser())
         GetBrowser()->SetFocus(message == WM_SETFOCUS);
 #endif
@@ -509,7 +515,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 
   case WM_SIZE:
     GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
-#if USE_CEF
+#if WITH_CEF
     _cef_texture = GRAPHICS.create_texture(
       CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, 
       D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
@@ -548,7 +554,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     {
       _instance->_hwnd = hWnd;
       B_ERR_BOOL(GRAPHICS.init(hWnd, _instance->_width, _instance->_height));
-#if USE_CEF
+#if WITH_CEF
       CefWindowInfo info;
       info.m_bIsTransparent = TRUE;
       CefBrowserSettings settings;
@@ -571,7 +577,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_LBUTTONUP:
   case WM_MBUTTONUP:
   case WM_RBUTTONUP:
-#if USE_CEF
+#if WITH_CEF
     if (GetBrowser()) {
       if (GetCapture() == hWnd)
         ReleaseCapture();
@@ -584,7 +590,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_LBUTTONDOWN:
   case WM_MBUTTONDOWN:
   case WM_RBUTTONDOWN:
-#if USE_CEF
+#if WITH_CEF
     if (GetBrowser()) {
       SetCapture(hWnd);
       SetFocus(hWnd);
@@ -595,7 +601,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     break;
 
   case WM_MOUSEMOVE:
-#if USE_CEF
+#if WITH_CEF
     if (GetBrowser())
       GetBrowser()->SendMouseMoveEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), false);
 #endif
@@ -637,7 +643,7 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_CHAR:
   case WM_SYSCHAR:
   case WM_IME_CHAR:
-#if USE_CEF
+#if WITH_CEF
     if (GetBrowser()) {
       const CefBrowser::KeyType type = 
         (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) ? KT_KEYDOWN :

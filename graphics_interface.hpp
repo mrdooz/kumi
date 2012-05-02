@@ -23,5 +23,7 @@ struct GraphicsInterface {
   virtual GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc) = 0;
   virtual GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc) = 0;
 
+#if WITH_GWEN
   virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name) = 0;
+#endif
 };

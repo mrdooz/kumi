@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#if WITH_ZMQ_LOGSERVER
 #include "log_server.hpp"
 #include "kumi.hpp"
 #include "TreeList.h"
@@ -207,3 +208,4 @@ int run_log_server(HINSTANCE instance) {
   CloseHandle(thread_id);
   return 0;
 }
+#endif

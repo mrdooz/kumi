@@ -1,5 +1,5 @@
 #pragma once
-
+#if WITH_ZMQ_LOGSERVER
 struct LogMessageHeader {
   enum Type {
     EnterScope,
@@ -29,3 +29,4 @@ private:
 };
 
 int run_log_server(HINSTANCE instance);
+#endif

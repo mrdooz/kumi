@@ -23,8 +23,10 @@ enum FileEvent;
 struct RenderTargetData;
 struct TextureData;
 
+#if WITH_GWEN
 struct IFW1Factory;
 struct IFW1FontWrapper;
+#endif
 
 struct RenderTargetData {
 	RenderTargetData() {
@@ -104,7 +106,9 @@ public:
 			, _textures(delete_obj<TextureData *>)
       , _render_targets(delete_obj<RenderTargetData *>)
       , _resources(delete_obj<ResourceData *>)
+#if WITH_GWEN
       , _font_wrappers(release_obj<IFW1FontWrapper *>)
+#endif
 		{
 		}
 
@@ -125,7 +129,9 @@ public:
 		SearchableIdBuffer<string, TextureData *, IdCount> _textures;
     SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
     SearchableIdBuffer<string, ResourceData *, IdCount> _resources;
+#if WITH_GWEN
     SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
+#endif
 	};
 
 	static bool create(ResourceInterface *ri);
@@ -155,8 +161,10 @@ public:
   virtual GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
   virtual GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc);
 
+#if WITH_GWEN
   virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
   bool measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect);
+#endif
 
 	ID3D11Device* device() { return _device; }
   ID3D11DeviceContext* context() { return _immediate_context; }
@@ -262,7 +270,9 @@ private:
 	string _vs_profile;
 	string _ps_profile;
 
+#if WITH_GWEN
   CComPtr<IFW1Factory> _fw1_factory;
+#endif
 
 };
 

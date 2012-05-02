@@ -15,6 +15,7 @@ using namespace std::tr1::placeholders;
 #pragma comment(lib, "DXGI.lib")
 #pragma comment(lib, "DXGUID.lib")
 #pragma comment(lib, "D3D11.lib")
+#pragma comment(lib, "D3DX11.lib")
 
 namespace
 {
@@ -537,6 +538,7 @@ GraphicsObjectHandle Graphics::create_sampler_state(const TrackedLocation &loc, 
   return GraphicsObjectHandle();
 }
 
+#if WITH_GWEN
 GraphicsObjectHandle Graphics::get_or_create_font_family(const wstring &name) {
   int idx = _res._font_wrappers.idx_from_token(name);
   if (idx != -1)
@@ -562,6 +564,7 @@ bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &famil
   }
   return false;
 }
+#endif
 
 void Graphics::technique_file_changed(const char *filename, void *token) {
 

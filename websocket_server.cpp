@@ -1,11 +1,25 @@
 #include "stdafx.h"
+#if WITH_WEBSOCKETS
 #include "websocket_server.hpp"
 #include "websocketpp/websocketpp.hpp"
+#include "graphics.hpp"
+#include "string_utils.hpp"
+
+using namespace std;
+
+static string create_json(const char *key, float value) {
+  return to_string("{\"%s\" : %f }", key, value);
+}
 
 class echo_server_handler : public websocketpp::server::handler {
 public:
   void on_message(connection_ptr con, message_ptr msg) {
-    con->send(msg->get_payload(),msg->get_opcode());
+    const string &str = msg->get_payload();
+    if (str == "SYSTEM.FPS") {
+      con->send(create_json("system.fps", GRAPHICS.fps()), websocketpp::frame::opcode::TEXT);
+    } else {
+      con->send(msg->get_payload(),msg->get_opcode());
+    }
   }
 };
 
@@ -53,3 +67,5 @@ void WebSocketThread::stop() {
   if (_impl && _impl->_server)
     _impl->_server->stop();
 }
+
+#endif

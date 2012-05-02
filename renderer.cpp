@@ -194,9 +194,13 @@ void Renderer::render() {
       }
 
       case RenderKey::kRenderText: {
+#if WITH_GWEN
         TextRenderData *rd = (TextRenderData *)data;
         IFW1FontWrapper *wrapper = res->_font_wrappers.get(rd->font);
         wrapper->DrawString(GRAPHICS.context(), rd->str, rd->font_size, rd->x, rd->y, rd->color, 0);
+#else
+        assert(!"Compile with WITH_GWEN to get font rendering to work");
+#endif
         break;
       }
     }

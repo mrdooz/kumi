@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#if WITH_GWEN
 #include "kumi_gwen.hpp"
 #include "gwen/Structures.h"
 #include "gwen/Font.h"
@@ -8,8 +9,6 @@
 #include "renderer.hpp"
 #include "string_utils.hpp"
 #include <D3DX11tex.h>
-
-#pragma comment(lib, "D3DX11.lib")
 
 using namespace std;
 
@@ -303,3 +302,5 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
 Gwen::Renderer::Base* create_kumi_gwen_renderer() {
   return new KumiGwenRenderer();
 }
+
+#endif

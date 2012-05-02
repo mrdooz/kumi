@@ -33,6 +33,7 @@ struct RenderStates {
   ID3D11SamplerState *sampler_state;
 };
 
+#if WITH_GWEN
 namespace Gwen {
   namespace Renderer {
     class Base;
@@ -48,9 +49,10 @@ namespace Gwen {
     class Windows;
   }
 }
+#endif
 
 class App : 
-#if USE_CEF 
+#if WITH_CEF 
   public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
 #endif
   public threading::GreedyThread
@@ -81,7 +83,7 @@ private:
   static LRESULT CALLBACK wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
   //static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-#if USE_CEF
+#if WITH_CEF
   // CefClient methods
   virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() OVERRIDE { return this; }
   virtual CefRefPtr<CefLoadHandler> GetLoadHandler() OVERRIDE { return this; }
@@ -134,7 +136,7 @@ private:
   void SendNotification(NotificationType type);
 #endif
 protected:
-#if USE_CEF
+#if WITH_CEF
   void SetLoading(bool isLoading);
   void SetNavState(bool canGoBack, bool canGoForward);
 
@@ -183,16 +185,18 @@ protected:
   bool _draw_plane;
   string _app_root;
   int _ref_count;
-#if USE_CEF
+#if WITH_CEF
   GraphicsObjectHandle _cef_texture;
   GraphicsObjectHandle _cef_staging;
 #endif
 
+#if WITH_GWEN
   std::unique_ptr<Gwen::Controls::StatusBar> _gwen_status_bar;
   std::unique_ptr<Gwen::Input::Windows> _gwen_input;
   std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
   std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
   std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
+#endif
 };
 
 #define APP App::instance()

@@ -51,7 +51,7 @@ static int count_instances(const char *name) {
 
 static int run_app(HINSTANCE instance) {
 
-#if USE_CEF
+#if WITH_CEF
   CefSettings settings;
   settings.multi_threaded_message_loop = false;
   CefInitialize(settings);
@@ -74,22 +74,28 @@ static bool global_init() {
 }
 
 static bool global_close() {
+#if WITH_ZMQ_LOGSERVER
   HWND h = g_started_as_log_server ? FindWindow(g_app_window_class, g_app_window_title) :
     FindWindow(g_log_window_class, g_log_window_title);
   PostMessage(h, WM_APP_CLOSE, 0, 0);
+#endif
   return true;
 }
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
-  WebSocketThread ws_thread;
-  ws_thread.start();
 
   if (!global_init())
     return 1;
 
+#if WITH_WEBSOCKETS
+  WebSocketThread ws_thread;
+  ws_thread.start();
+#endif
+
   int res = 0;
 
+#if WITH_ZMQ_LOGSERVER
   // hopefully this should save me from killing myself :)
   Path path(g_module_name);
   int process_count = count_instances(path.get_filename().c_str());
@@ -101,11 +107,16 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
     start_second_process("");
     res = run_log_server(instance);
   } else {
-    //start_second_process("--log-server");
+    start_second_process("--log-server");
     res = run_app(instance);
   }
+#else
+  res = run_app(instance);
+#endif
 
+#if WITH_WEBSOCKETS
   ws_thread.stop();
+#endif
 
   global_close();
   return res;

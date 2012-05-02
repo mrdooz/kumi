@@ -1,7 +1,7 @@
 #pragma once
+#if WITH_WEBSOCKETS
 
 #include "threading.hpp"
-
 class WebSocketThread : public threading::BlockingThread {
 
 public:
@@ -14,3 +14,5 @@ protected:
   struct Impl;
   Impl *_impl;
 };
+
+#endif

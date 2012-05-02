@@ -1,5 +1,6 @@
 Debug/
 Release/
+Distribution/
 _win32/_ReSharper.kumi/*
 data/
 ipch/
