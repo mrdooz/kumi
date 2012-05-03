@@ -33,6 +33,9 @@ struct BlockHeader {
 };
 #pragma pack(pop)
 
+static XMFLOAT4 expand_float3(const XMFLOAT3 &v, float w) {
+  return XMFLOAT4(v.x, v.y, v.z, w);
+}
 
 static void apply_fixup(int *data, const void *ptr_base, const void *data_base) {
   // the data is stored as a int count followed by #count int offsets
@@ -88,6 +91,21 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
   return true;
 }
 
+bool KumiLoader::load_lights(const uint8 *buf, Scene *scene) {
+  BlockHeader *header = (BlockHeader *)buf;
+  buf += sizeof(BlockHeader);
+
+  const int count = read_and_step<int>(&buf);
+  for (int i = 0; i < count; ++i) {
+    Light *light = new Light(read_and_step<const char *>(&buf));
+    scene->lights.push_back(light);
+    light->pos = expand_float3(read_and_step<XMFLOAT3>(&buf), 0);
+    light->color = expand_float3(read_and_step<XMFLOAT3>(&buf), 1);
+    light->intensity = read_and_step<float>(&buf);
+  }
+  return true;
+}
+
 bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
@@ -105,7 +123,6 @@ bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
     camera->near_plane = read_and_step<float>(&buf);
     camera->far_plane = read_and_step<float>(&buf);
   }
-
   return true;
 }
 
@@ -178,6 +195,7 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
   Scene *s = *scene = new Scene;
   B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
   B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
+  B_ERR_BOOL(load_lights(&scene_data[0] + header.light_ofs, s));
 
   return true;
 }

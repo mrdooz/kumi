@@ -28,6 +28,14 @@ struct Camera {
 	float near_plane, far_plane;
 };
 
+struct Light {
+  Light(const std::string &name) : name(name) {}
+  std::string name;
+  XMFLOAT4 pos;
+  XMFLOAT4 color;
+  float intensity;
+};
+
 struct Scene {
 
 	~Scene();
@@ -37,4 +45,5 @@ struct Scene {
 
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;
+  std::vector<Light *> lights;
 };

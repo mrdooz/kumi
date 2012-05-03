@@ -75,6 +75,11 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
     XMStoreFloat4x4(&lookat_tmp, lookat);
     XMStoreFloat4x4(&proj_tmp, proj);
 
+    if (!_scene->lights.empty()) {
+      PROPERTY_MANAGER.set_system_property("LightPos", _scene->lights[0]->pos);
+      PROPERTY_MANAGER.set_system_property("LightColor", _scene->lights[0]->color);
+    }
+
     PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
     PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
   }
