@@ -37,10 +37,6 @@ namespace
 
 Graphics* Graphics::_instance = NULL;
 
-Graphics& Graphics::instance() {
-  assert(_instance);
-  return *_instance;
-}
 
 bool Graphics::create(ResourceInterface *ri) {
   assert(!_instance);
@@ -401,8 +397,10 @@ void Graphics::set_default_render_target()
   _immediate_context->RSSetViewports(1, &_viewport);
 }
 
-void Graphics::close() {
+bool Graphics::close() {
+  assert(_instance);
   delete exch_null(_instance);
+  return true;
 }
 
 void Graphics::clear(GraphicsObjectHandle h, const XMFLOAT4 &c) {
@@ -763,16 +761,20 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
     if (p.cbuffer == -1)
       continue;
     const CBuffer &cb = cbuffers[p.cbuffer];
+
     switch (p.source) {
+
       case PropertySource::kMaterial:
         memcpy((void *)&cb.staging[p.start_offset], 
                &PROPERTY_MANAGER.get_material_property<XMFLOAT4>(material_id, p.name.c_str()), p.size);
         break;
+
       case PropertySource::kMesh: {
           XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_mesh_property<XMFLOAT4X4>(mesh_id, p.name.c_str());
           memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
           break;
         }
+
       case PropertySource::kSystem: {
         switch (p.type) {
           case PropertyType::kFloat4: {
@@ -780,6 +782,7 @@ void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 m
             memcpy((void *)&cb.staging[p.start_offset], &v, p.size);
             break;
           }
+
           case PropertyType::kFloat4x4: {
             XMFLOAT4X4 v = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
             memcpy((void *)&cb.staging[p.start_offset], &v, p.size);

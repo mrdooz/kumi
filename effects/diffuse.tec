@@ -12,7 +12,7 @@ technique diffuse {
 	pixel_shader {
 		file effects/diffuse.fx;
 		params [
-			float4 DiffuseColor material;
+			float4 Diffuse material;
 		];
 	};
 	

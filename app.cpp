@@ -310,6 +310,7 @@ bool App::init(HINSTANCE hinstance)
   B_ERR_BOOL(ResourceManager::create());
   B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
   B_ERR_BOOL(Renderer::create());
+  B_ERR_BOOL(MaterialManager::create());
 
   B_ERR_BOOL(create_window());
 
@@ -326,10 +327,8 @@ bool App::init(HINSTANCE hinstance)
 
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
   RESOURCE_MANAGER.add_path("c:\\users\\dooz\\SkyDrive");
-  RESOURCE_MANAGER.add_path("C:\\syncplicity");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
-  RESOURCE_MANAGER.add_path("D:\\syncplicity");
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/gwen.tec", true));
 /*
@@ -339,7 +338,8 @@ bool App::init(HINSTANCE hinstance)
 */
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
-  auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
+  //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
+  auto effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   DEMO_ENGINE.add_effect(effect, 0, 1000 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());
@@ -349,8 +349,10 @@ bool App::init(HINSTANCE hinstance)
 
 bool App::close() {
   FileWatcher::close();
-  Renderer::close();
-  Graphics::close();
+  B_ERR_BOOL(Renderer::close());
+  B_ERR_BOOL(Graphics::close());
+  B_ERR_BOOL(MaterialManager::close());
+  B_ERR_BOOL(ResourceManager::close());
   Logger::close();
   Dispatcher::close();
   delete exch_null(_instance);

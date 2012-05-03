@@ -135,8 +135,12 @@ public:
 	};
 
 	static bool create(ResourceInterface *ri);
-	static Graphics& instance();
-  static void close();
+	inline static Graphics& instance() {
+      assert(_instance);
+      return *_instance;
+  }
+
+  static bool close();
 
 	bool	init(const HWND hwnd, const int width, const int height);
 	void	clear(const XMFLOAT4& c);

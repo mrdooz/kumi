@@ -15,6 +15,7 @@ public:
   ResourceManager();
 
   static bool create();
+  static bool close();
   static ResourceManager &instance();
 
   bool file_exists(const char *filename);

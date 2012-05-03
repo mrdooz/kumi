@@ -56,6 +56,12 @@ bool ResourceManager::create() {
   return true;
 }
 
+bool ResourceManager::close() {
+  assert(_instance);
+  SAFE_DELETE(_instance);
+  return true;
+}
+
 void ResourceManager::add_path(const char *path) {
   _paths.push_back(normalize_path(path, true));
 }

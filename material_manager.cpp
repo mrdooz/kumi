@@ -8,15 +8,26 @@ using namespace std;
 
 MaterialManager* MaterialManager::_instance = nullptr;
 
-MaterialManager &MaterialManager::instance() {
-  if (!_instance)
+bool MaterialManager::create() {
+    assert(!_instance);
     _instance = new MaterialManager;
+    return true;
+}
+
+bool MaterialManager::close() {
+  assert(_instance);
+  SAFE_DELETE(_instance);
+  return true;
+}
+
+MaterialManager &MaterialManager::instance() {
+  assert(_instance);
   return *_instance;
 }
 
 
-MaterialManager::MaterialManager() : _next_material_id(0) {
-
+MaterialManager::MaterialManager() 
+  : _next_material_id(0) {
 }
 
 const Material *MaterialManager::get_material(uint16 id) {
@@ -68,6 +79,8 @@ uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
       break;
     }
   }
+
+  _id_to_materials[key] = material;
 
   return key;
 }

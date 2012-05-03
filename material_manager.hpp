@@ -4,6 +4,8 @@
 class MaterialManager {
 public:
 	static MaterialManager &instance();
+  static bool create();
+  static bool close();
 
 	uint16 find_material(const std::string &name);
 	uint16 add_material(Material *material, bool delete_existing);

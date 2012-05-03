@@ -138,6 +138,7 @@ bool KumiLoader::load_materials(const uint8 *buf) {
           break;
 
         case PropertyType::kFloat3:
+          // note, this is converted to XMFLOAT4 internally
           material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT3>(&buf)));
           break;
 
