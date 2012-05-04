@@ -7,12 +7,16 @@
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
 
+#define FILE_VERSION 2
+
 #pragma pack(push, 1)
 struct MainHeader {
+  int version;
   int material_ofs;
   int mesh_ofs;
   int light_ofs;
   int camera_ofs;
+  int animation_ofs;
   int string_ofs;
   int binary_ofs;
   int total_size;
@@ -24,6 +28,7 @@ namespace BlockId {
     kMeshes,
     kCameras,
     kLights,
+    kAnimation,
   };
 }
 
@@ -53,6 +58,18 @@ const T& read_and_step(const U **buf) {
   const T &tmp = *(const T *)*buf;
   *buf += sizeof(T);
   return tmp;
+}
+
+template <class U>
+void read_and_step_raw(const U **buf, void *dst, int len) {
+  memcpy(dst, (const void *)*buf, len);
+  *buf += len;
+}
+
+template <class T, class U>
+void read_and_step(const U **buf, T *val) {
+  *val = *(const T *)*buf;
+  *buf += sizeof(T);
 }
 
 bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
@@ -126,6 +143,22 @@ bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
   return true;
 }
 
+bool KumiLoader::load_animation(const uint8 *buf, Scene *scene) {
+
+  BlockHeader *header = (BlockHeader *)buf;
+  buf += sizeof(BlockHeader);
+
+  const int count = read_and_step<int>(&buf);
+  for (int i = 0; i < count; ++i) {
+    const char *node_name = read_and_step<const char *>(&buf);
+    vector<KeyFrame> &keys = scene->animation[node_name];
+    const int num_frames = read_and_step<int>(&buf);
+    keys.resize(num_frames);
+    read_and_step_raw(&buf, &keys[0], num_frames * sizeof(KeyFrame));
+  }
+  return true;
+}
+
 
 bool KumiLoader::load_materials(const uint8 *buf) {
 
@@ -175,6 +208,10 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
   LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
   MainHeader header;
   B_ERR_BOOL(resource->load_inplace(filename, 0, sizeof(header), (void *)&header));
+  if (header.version != FILE_VERSION) {
+    LOG_ERROR_LN("Incompatible kumi file version: %d vs %d", header.version, FILE_VERSION);
+    return false;
+  }
 
   const int scene_data_size = header.binary_ofs;
   vector<uint8> scene_data;
@@ -196,6 +233,7 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
   B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
   B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
   B_ERR_BOOL(load_lights(&scene_data[0] + header.light_ofs, s));
+  B_ERR_BOOL(load_animation(&scene_data[0] + header.animation_ofs, s));
 
   return true;
 }

@@ -36,6 +36,13 @@ struct Light {
   float intensity;
 };
 
+#pragma pack(push, 1)
+struct KeyFrame {
+  double time;
+  XMFLOAT4X4 mtx;
+};
+#pragma pack(pop)
+
 struct Scene {
 
 	~Scene();
@@ -46,4 +53,5 @@ struct Scene {
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;
   std::vector<Light *> lights;
+  std::map<std::string, std::vector<KeyFrame>> animation;
 };
