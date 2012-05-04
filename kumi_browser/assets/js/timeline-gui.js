@@ -11,96 +11,98 @@
 // IN THE SOFTWARE.
 
 Timeline.prototype.initGUI = function() {
-  var self = this;
+    var self = this;
 
-  this.trackLabelWidth = 108;
-  this.trackLabelHeight = 20;
-  this.tracksScrollWidth = 16;
-  this.tracksScrollHeight = 0;
-  this.tracksScrollThumbPos = 0;
-  this.tracksScrollThumbHeight = 0;
-  this.tracksScrollY = 0;
-  this.timeScrollWidth = 0;
-  this.timeScrollHeight = 16;
-  this.timeScrollThumbPos = 0;
-  this.timeScrollThumbWidth = 0;
-  this.timeScrollX = 0;
-  this.headerHeight = 30;
-  this.canvasHeight = 200;
-  this.draggingTime = false;
-  this.draggingTracksScrollThumb = false;
-  this.draggingTimeScrollThumb = false;
-  this.draggingKeys = false;
-  this.draggingTimeScale = false;
-  this.selectedKeys = [];
-  this.timeScale = 1;
+    this.trackLabelWidth = 108;
+    this.trackLabelHeight = 20;
+    this.tracksScrollWidth = 16;
+    this.tracksScrollHeight = 0;
+    this.tracksScrollThumbPos = 0;
+    this.tracksScrollThumbHeight = 0;
+    this.tracksScrollY = 0;
+    this.timeScrollWidth = 0;
+    this.timeScrollHeight = 16;
+    this.timeScrollThumbPos = 0;
+    this.timeScrollThumbWidth = 0;
+    this.timeScrollX = 0;
+    this.headerHeight = 30;
+    this.canvasHeight = 200;
+    this.draggingTime = false;
+    this.draggingTracksScrollThumb = false;
+    this.draggingTimeScrollThumb = false;
+    this.draggingKeys = false;
+    this.draggingTimeScale = false;
+    this.selectedKeys = [];
+    this.timeScale = 1;
 
-  this.trackNameCounter = 0;
-  this.initTracks();
-  this.load();
+    this.trackNameCounter = 0;
+    this.initTracks();
+    this.load();
 
-  this.container = document.createElement("div");
-    this.container.style.width = "100%";
+    var editor = $('#editor');
+    this.container = document.createElement("div");
+    //this.container.style.width = "100%";
     this.container.style.height = this.canvasHeight + "px";
-    this.container.style.background = "#EEEEEE";	
-    this.container.style.position = "fixed";		
-    this.container.style.left = "0px";      	
-    this.container.style.bottom = "0px";      	
-    document.body.appendChild(this.container);
-
-  this.splitter = document.createElement("div");
-  this.splitter.style.width = "100%";
-  this.splitter.style.height = "4px";
-  this.splitter.style.cursor = "ns-resize";
-  this.splitter.style.position = "fixed";	
-  this.splitter.style.left = "0px";	
+    this.container.style.background = "#EEEEEE";
+    //this.container.style.position = "fixed";
+    //this.container.style.left = "0px";      
+    //this.container.style.bottom = "0px";      
+    
+    editor.append(this.container);
+    //editor.appendChild(this.container);
+    //document.body.appendChild(this.container);
+/*
+    this.splitter = document.createElement("div");
+    this.splitter.style.width = "100%";
+    this.splitter.style.height = "4px";
+    this.splitter.style.cursor = "ns-resize";
+    this.splitter.style.position = "fixed";
+    this.splitter.style.left = "0px";
     this.splitter.style.bottom = (this.canvasHeight - 2) + "px";
     this.splitter.addEventListener("mousedown", function() {
-      function mouseMove(e) {
-        var h = (window.innerHeight - e.clientY);
-        self.splitter.style.bottom = (h - 2) + "px";
-        self.container.style.height = h + "px";
-        self.canvasHeight = h;     	
-        self.tracksScrollY = 0;
-        self.tracksScrollThumbPos = 0;
-      self.save();
-      }
-      function mouseUp(e) {
-        document.body.removeEventListener("mousemove", mouseMove, false);
-        document.body.removeEventListener("mouseup", mouseUp, false);
-      }
-      document.body.addEventListener("mousemove", mouseMove, false);
-      document.body.addEventListener("mouseup", mouseUp, false);
-    }, false)
-  document.body.appendChild(this.splitter);
-
-    this.canvas = document.createElement("canvas");		
+        function mouseMove(e) {
+            var h = (window.innerHeight - e.clientY);
+            self.splitter.style.bottom = (h - 2) + "px";
+            self.container.style.height = h + "px";
+            self.canvasHeight = h;
+            self.tracksScrollY = 0;
+            self.tracksScrollThumbPos = 0;
+            self.save();
+        }
+        function mouseUp(e) {
+            document.body.removeEventListener("mousemove", mouseMove, false);
+            document.body.removeEventListener("mouseup", mouseUp, false);
+        }
+        document.body.addEventListener("mousemove", mouseMove, false);
+        document.body.addEventListener("mouseup", mouseUp, false);
+    }, false);
+    document.body.appendChild(this.splitter);
+*/
+    this.canvas = document.createElement("canvas");
     this.c = this.canvas.getContext("2d");
     this.canvas.width = 0;
     this.container.appendChild(this.canvas);
 
+    this.buildInputDialog();
 
-  this.buildInputDialog();
-
-  var self = this;
-  this.canvas.addEventListener('click', function(event) {
-     self.onMouseClick(event);
-  }, false);
-  this.canvas.addEventListener('mousedown', function(event) {
-    self.onMouseDown(event);
-  }, false);
-  document.body.addEventListener('mousemove', function(event) {
-    self.onDocumentMouseMove(event);
-  }, false);
-  this.canvas.addEventListener('mousemove', function(event) {
-    self.onCanvasMouseMove(event);
-  }, false);
-  document.body.addEventListener('mouseup', function(event) {
-    self.onMouseUp(event);
-  }, false);
-  this.canvas.addEventListener('dblclick', function(event) {
-    self.onMouseDoubleClick(event);
-  }, false);
+    this.canvas.addEventListener('click', function(event) {
+        self.onMouseClick(event);
+    }, false);
+    this.canvas.addEventListener('mousedown', function(event) {
+        self.onMouseDown(event);
+    }, false);
+    document.body.addEventListener('mousemove', function(event) {
+        self.onDocumentMouseMove(event);
+    }, false);
+    this.canvas.addEventListener('mousemove', function(event) {
+        self.onCanvasMouseMove(event);
+    }, false);
+    document.body.addEventListener('mouseup', function(event) {
+        self.onMouseUp(event);
+    }, false);
+    this.canvas.addEventListener('dblclick', function(event) {
+        self.onMouseDoubleClick(event);
+    }, false);
 }
 
 Timeline.prototype.onMouseDown = function(event) {
@@ -579,8 +581,8 @@ Timeline.prototype.drawRombus = function(x, y, w, h, color, drawLeft, drawRight,
   if (drawRight) {
     this.c.beginPath();
       this.c.moveTo(x, y - h/2);
-    this.c.lineTo(x + w/2, y);  	
-      this.c.lineTo(x, y + h/2);  	
+    this.c.lineTo(x + w/2, y);
+      this.c.lineTo(x, y + h/2);
       this.c.fill();
   }
 }
