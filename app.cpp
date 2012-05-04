@@ -339,7 +339,7 @@ bool App::init(HINSTANCE hinstance)
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
-  auto effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
+  auto effect = new ScenePlayer(GraphicsObjectHandle(), "simple effect");
   DEMO_ENGINE.add_effect(effect, 0, 1000 * 1000);
 
   B_ERR_BOOL(DEMO_ENGINE.init());

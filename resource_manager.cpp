@@ -173,9 +173,12 @@ string ResourceManager::resolve_filename(const char *filename) {
   return res;
 }
 
-void ResourceManager::add_file_watch(const char *filename, bool initial_callback, void *token, const cbFileChanged &cb) {
-  if (initial_callback)
-    cb(filename, token);
+void ResourceManager::add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result) {
+  if (initial_callback) {
+    bool res = cb(filename, token);
+    if (initial_result)
+      *initial_result = res;
+  }
 
   FILE_WATCHER.add_file_watch(filename, token, threading::kMainThread, 
     bind(&ResourceManager::file_changed, this, _1, _2, _3, _4));

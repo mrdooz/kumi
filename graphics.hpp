@@ -236,8 +236,8 @@ private:
 
   bool create_back_buffers(int width, int height);
 
-  void technique_file_changed(const char *filename, void *token);
-  void shader_file_changed(const char *filename, void *token);
+  bool technique_file_changed(const char *filename, void *token);
+  bool shader_file_changed(const char *filename, void *token);
 
 	static Graphics* _instance;
 

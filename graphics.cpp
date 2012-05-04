@@ -564,23 +564,28 @@ bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &famil
 }
 #endif
 
-void Graphics::technique_file_changed(const char *filename, void *token) {
-
+bool Graphics::technique_file_changed(const char *filename, void *token) {
+  return true;
 }
 
-void Graphics::shader_file_changed(const char *filename, void *token) {
+bool Graphics::shader_file_changed(const char *filename, void *token) {
   LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   Technique *t = (Technique *)token;
   if (Shader *shader = t->vertex_shader()) {
-    if (!t->init_shader(this, _ri, shader))
+    if (!t->init_shader(this, _ri, shader)) {
       LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
+      return false;
+    }
   }
 
   if (Shader *shader = t->pixel_shader()) {
-    if (!t->init_shader(this, _ri, shader))
+    if (!t->init_shader(this, _ri, shader)) {
       LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
+      return false;
+    }
   }
+  return true;
 }
 
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
@@ -624,11 +629,12 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     Technique *t = *i;
 
     if (_ri->supports_file_watch()) {
+      auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
       if (Shader *vs = t->vertex_shader()) {
-        _ri->add_file_watch(vs->source_filename().c_str(), false, t, bind(&Graphics::shader_file_changed, this, _1, _2));
+        _ri->add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr);
       }
       if (Shader *ps = t->pixel_shader()) {
-        _ri->add_file_watch(ps->source_filename().c_str(), false, t, bind(&Graphics::shader_file_changed, this, _1, _2));
+        _ri->add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr);
       }
     }
 
@@ -643,7 +649,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   }
 
   if (_ri->supports_file_watch()) {
-    _ri->add_file_watch(filename, false, NULL, bind(&Graphics::technique_file_changed, this, _1, _2));
+    _ri->add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), false, nullptr);
   }
 
   return res;

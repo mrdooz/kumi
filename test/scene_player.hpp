@@ -14,7 +14,7 @@ public:
   virtual bool render() override;
   virtual bool close() override;
 private:
-  void file_changed(const char *filename, void *token);
+  bool file_changed(const char *filename, void *token);
 
   Scene *_scene;
 };
