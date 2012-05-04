@@ -50,6 +50,10 @@ struct Scene {
 	void submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 	void submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
+  Mesh *find_mesh_by_name(const std::string &name);
+
+  std::map<std::string, Mesh *> _meshes_by_name;
+
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;
   std::vector<Light *> lights;

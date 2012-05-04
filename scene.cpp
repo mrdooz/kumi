@@ -54,3 +54,17 @@ void Scene::submit_mesh(const TrackedLocation &location, const char *name, uint1
 		}
 	}
 }
+
+Mesh *Scene::find_mesh_by_name(const std::string &name) {
+  auto it = _meshes_by_name.find(name);
+  if (it != _meshes_by_name.end())
+    return it->second;
+
+  for (int i = 0; i < (int)meshes.size(); ++i) {
+    if (meshes[i]->name == name) {
+      _meshes_by_name[name] = meshes[i];
+      return meshes[i];
+    }
+  }
+  return nullptr;
+}

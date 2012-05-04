@@ -49,12 +49,33 @@ static XMFLOAT4X4 mtx_at_time(const vector<KeyFrame> &frames, double time) {
   return frames.back().mtx;
 }
 
+XMFLOAT4X4 transpose(const XMFLOAT4X4 &mtx) {
+  return XMFLOAT4X4(
+    mtx._11, mtx._21, mtx._31, mtx._41,
+    mtx._12, mtx._22, mtx._32, mtx._42,
+    mtx._13, mtx._23, mtx._33, mtx._43,
+    mtx._14, mtx._24, mtx._34, mtx._44);
+}
+
 bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, 
                               float ticks_fraction) {
-  if (_scene && !_scene->cameras.empty()) {
+
+  if (!_scene)
+    return true;
+
+  double time = global_time / 1000.0;
+
+  for (auto it = begin(_scene->animation); it != end(_scene->animation); ++it) {
+    if (Mesh *mesh = _scene->find_mesh_by_name(it->first)) {
+      XMFLOAT4X4 mtx = transpose(mtx_at_time(it->second, time));
+      PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)mesh, "world", mtx);
+    }
+  }
+
+  if (!_scene->cameras.empty()) {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation[camera->name], global_time / 1000.0);
+    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation[camera->name], time);
 
     XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
 //      XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),

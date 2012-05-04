@@ -1,6 +1,7 @@
 var wsUri = "ws://127.0.0.1:9002";
 var output;
 var smoothie = new SmoothieChart();
+var websocket;
 var fps_series = new TimeSeries();
 
 function openWebSocket()
@@ -31,8 +32,6 @@ function onMessage(e)
     if (fps) {
         fps_series.append(new Date().getTime(), fps);
     }
-    //writeToScreen('<span style="color: blue;">RESPONSE: ' + fps + '</span>');
-    //websocket.close();
 }
 
 function onError(evt)
@@ -56,7 +55,7 @@ function writeToScreen(message)
 
 var kbInit = function() {
     output = document.getElementById("output");
-    smoothie.streamTo(document.getElementById("mycanvas"));
+    smoothie.streamTo(document.getElementById("fps-canvas"));
     smoothie.addTimeSeries(fps_series);
     openWebSocket();
     setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
