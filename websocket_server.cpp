@@ -5,19 +5,25 @@
 #include "graphics.hpp"
 #include "string_utils.hpp"
 #include "json_writer.hpp"
+#include "demo_engine.hpp"
+#include "logger.hpp"
 
 using namespace std;
+using namespace websocketpp;
 
-class echo_server_handler : public websocketpp::server::handler {
+class echo_server_handler : public server::handler {
 public:
   void on_message(connection_ptr con, message_ptr msg) {
     const string &str = msg->get_payload();
     if (str == "SYSTEM.FPS") {
       auto obj = JsonValue::create_object();
       obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
-      con->send(obj->print(4), websocketpp::frame::opcode::TEXT);
+      con->send(obj->print(4), frame::opcode::TEXT);
+    } else if (str == "DEMO.INFO") {
+      con->send(DEMO_ENGINE.get_info(), frame::opcode::TEXT);
+      //con->send(msg->get_payload(),msg->get_opcode());
     } else {
-      con->send(msg->get_payload(),msg->get_opcode());
+      LOG_WARNING_LN("Unknown websocket message: %s", str);
     }
   }
 };

@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "demo_engine.hpp"
 #include "logger.hpp"
+#include "json_writer.hpp"
 
 using std::sort;
 
@@ -18,6 +19,7 @@ DemoEngine::DemoEngine()
   , _last_time(0)
   , _current_time(0)
   , _cur_effect(0)
+  , _duration_ms(3 * 60 * 1000)
 {
 }
 
@@ -33,8 +35,19 @@ bool DemoEngine::start() {
   return true;
 }
 
-void DemoEngine::pause(bool pause) {
+void DemoEngine::set_paused(bool pause) {
   _paused = pause;
+}
+
+bool DemoEngine::paused() const {
+  return _paused;
+}
+
+void DemoEngine::set_pos(uint32 ms) {
+}
+
+uint32 DemoEngine::duration() const {
+  return _duration_ms;
 }
 
 bool DemoEngine::init() {
@@ -115,4 +128,23 @@ void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) 
 
 void DemoEngine::reset_current_effect() {
 
+}
+
+std::string DemoEngine::get_info() {
+  auto root = JsonValue::create_object();
+  auto demo = JsonValue::create_object();
+  root->add_key_value("demo", demo);
+  demo->add_key_value("duration", JsonValue::create_int(_duration_ms));
+  auto effects = JsonValue::create_array();
+  for (auto it = begin(_effects); it != end(_effects); ++it) {
+    auto effect = JsonValue::create_object();
+    auto cur = *it;
+    effect->add_key_value("name", JsonValue::create_string(cur->_effect->name()));
+    effect->add_key_value("start_time", JsonValue::create_int(cur->_start_time));
+    effect->add_key_value("end_time", JsonValue::create_int(cur->_end_time));
+    effects->add_value(effect);
+  }
+  demo->add_key_value("effects", effects);
+
+  return root->print(2);
 }

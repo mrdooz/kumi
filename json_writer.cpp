@@ -22,6 +22,10 @@ JsonValue::JsonValuePtr JsonValue::create_string(const char *str) {
   return js;
 }
 
+JsonValue::JsonValuePtr JsonValue::create_string(const std::string &str) {
+  return create_string(str.c_str());
+}
+
 JsonValue::JsonValuePtr JsonValue::create_number(double value) {
   auto js = JsonValuePtr(new JsonValue(JS_NUMBER));
   js->_number = value;
@@ -58,14 +62,12 @@ bool JsonValue::add_key_value(const string &key, JsonValuePtr value) {
 
 string JsonValue::print(int indent_size) {
   string res;
-  string indent_string;
-  indent_string.reserve(512);
-  print_inner(indent_size, &indent_string, &res);
+  print_inner(1, &res);
 
   return res;
 }
 
-void JsonValue::print_inner(int indent_size, string *indent_string, string *res) {
+void JsonValue::print_inner(int indent_level, string *res) {
 
   switch (_type) {
   case JS_STRING: 
@@ -109,32 +111,33 @@ JsonObject::JsonObject()
 
 }
 
-void JsonObject::print_inner(int indent_size, string *indent_string, string *res) {
-  indent_string->append(string(indent_size, ' '));
+void JsonObject::print_inner(int indent_level, string *res) {
 
   res->append("{\n");
+
+  string indent_string(indent_level, '\t');
 
   auto it = begin(_key_value);
   if (it != end(_key_value)) {
     stringstream str;
-    str << *indent_string << "\"" << it->first << "\": ";
+    str << indent_string << "\"" << it->first << "\": ";
     res->append(str.str());
-    it->second->print_inner(indent_size, indent_string, res);
+    it->second->print_inner(indent_level + 1, res);
     ++it;
   }
 
   for (; it != end(_key_value); ++it) {
     stringstream str;
-    str << ",\n" << *indent_string << "\"" << it->first << "\": ";
+    str << ",\n" << indent_string << "\"" << it->first << "\": ";
     res->append(str.str());
 
-    it->second->print_inner(indent_size, indent_string, res);
+    it->second->print_inner(indent_level + 1, res);
   }
 
-  indent_string->erase(indent_string->size() - indent_size);
+  indent_string = string(indent_level - 1, '\t');
 
   stringstream str;
-  str << "\n" << *indent_string << "}";
+  str << "\n" << indent_string << "}";
   res->append(str.str());
 }
 
@@ -151,29 +154,29 @@ JsonArray::JsonArray()
 {
 }
 
-void JsonArray::print_inner(int indent_size, string *indent_string, string *res) {
-  indent_string->append(string(indent_size, ' '));
+void JsonArray::print_inner(int indent_level, string *res) {
+  string indent_string(indent_level, '\t');
 
   res->append("[\n");
 
   auto it = begin(_value);
   if (it != end(_value)) {
-    res->append(*indent_string);
-    (*it)->print_inner(indent_size, indent_string, res);
+    res->append(indent_string);
+    (*it)->print_inner(indent_level + 1, res);
     ++it;
   }
 
   for (; it != end(_value); ++it) {
     stringstream str;
-    str << ",\n" << *indent_string;
+    str << ",\n" << indent_string;
     res->append(str.str());
-    (*it)->print_inner(indent_size, indent_string, res);
+    (*it)->print_inner(indent_level + 1, res);
   }
 
-  indent_string->erase(indent_string->size() - indent_size);
+  indent_string = string(indent_level - 1, '\t');
 
   stringstream str;
-  str << "\n" << *indent_string << "]";
+  str << "\n" << indent_string << "]";
   res->append(str.str());
 }
 

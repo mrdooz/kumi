@@ -9,6 +9,7 @@ public:
   virtual ~JsonValue();
 
   static JsonValuePtr create_string(const char *str);
+  static JsonValuePtr create_string(const std::string &str);
   static JsonValuePtr create_number(double value);
   static JsonValuePtr create_int(int value);
   static JsonValuePtr create_bool(bool value);
@@ -33,7 +34,7 @@ protected:
 
   JsonValue(JsonType type);
 
-  virtual void print_inner(int indent_size, std::string *indent_string, std::string *res);
+  virtual void print_inner(int indent_level, std::string *res);
 
   JsonType _type;
   union {
@@ -52,7 +53,7 @@ public:
 protected:
   JsonObject();
 
-  virtual void print_inner(int indent_size, std::string *indent_string, std::string *res);
+  virtual void print_inner(int indent_level, std::string *res);
   std::map<std::string, JsonValuePtr> _key_value;
 };
 
@@ -64,7 +65,7 @@ public:
 private:
   JsonArray();
 
-  virtual void print_inner(int indent_size, std::string *indent_string, std::string *res);
+  virtual void print_inner(int indent_level, std::string *res);
   std::vector<JsonValuePtr> _value;
 };
 

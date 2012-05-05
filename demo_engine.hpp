@@ -11,6 +11,7 @@ public:
 	virtual bool update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, float ticks_fraction) { return true; }
 	virtual bool render() { return true; }
 	virtual bool close() { return true; }
+  const std::string name() const { return _name; }
 protected:
 	std::string _name;
 	GraphicsObjectHandle _context;
@@ -23,10 +24,17 @@ public:
   static bool close();
 
 	void add_effect(Effect *effect, uint32 start_time, uint32 end_time);
+  bool init();
+
 	bool start();
-	void pause(bool pause);
-	bool init();
+	void set_paused(bool pause);
+  bool paused() const;
+
+  void set_pos(uint32 ms);
+  uint32 duration() const;
 	bool tick();
+
+  std::string get_info();
 
   void reset_current_effect();
 
@@ -55,6 +63,7 @@ private:
 	int64 _frequency;
 	int64 _last_time;
   int64 _current_time;
+  uint32 _duration_ms;
 	//int64 _current_time_ms;
 	
 	bool _paused;

@@ -96,13 +96,14 @@ SmoothieChart.prototype.removeTimeSeries = function(timeSeries) {
 	this.seriesSet.splice(this.seriesSet.indexOf(timeSeries), 1);
 };
 
-SmoothieChart.prototype.streamTo = function(canvas, delay) {
+SmoothieChart.prototype.streamTo = function(canvas, delay, start_now) {
   var self = this;
   this.render_on_tick = function() {
     self.render(canvas, new Date().getTime() - (delay || 0));
   };
 
-  this.start();
+  if (start_now)
+    this.start();
 };
 
 SmoothieChart.prototype.start = function() {
