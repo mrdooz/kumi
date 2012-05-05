@@ -22,21 +22,12 @@
 
     <script type="text/javascript" src="assets/js/jquery-1.7.2.min.js"></script>
     <script type="text/javascript" src="assets/js/smoothie.js"></script>
-    <script type="text/javascript" src="assets/js/timeline.js"></script>     
-    <script type="text/javascript" src="assets/js/timeline-gui.js"></script>     
-    <script type="text/javascript">     
-      var rect = {x: 0, y: 0}     
-      anim("rect", rect).to({x:0}, 0).to({x:50}, 1);
-    </script> 
     <script type="text/javascript" src="kumi_browser.js"></script>
-    
-    <script language="javascript" type="text/javascript">
+    <script type="text/javascript">
       $(document).ready(function() {
           kbInit();
-          var c = $('#fps-canvas');
       });
     </script>
-
 
     <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
     <!--[if lt IE 9]>
@@ -57,44 +48,21 @@
       </div>
     </div>
 
-    <div class="container-fluid">
-      <div class="row-fluid">
-        <div class="span9">
-          <div class="span12">
+    <div class="container">
+      <div class="row">
+          <div class="span1">
             <img id="connection-status" style="padding:10px;" src="assets/gfx/disconnected.png"/>          
-            <div id="output"></div>
+          </div>
+          <div class="span11">
             <canvas id="fps-canvas" width="800" height="100"></canvas>
           </div>
-          <div class="row-fluid">
-            <div class="span4">
-              <h2>Heading</h2>
-              <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. </p>
-              <p><a class="btn" href="#">View details &raquo;</a></p>
-            </div><!--/span-->
-            <div class="span4">
-              <h2>Heading</h2>
-              <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. </p>
-              <p><a class="btn" href="#">View details &raquo;</a></p>
-            </div><!--/span-->
-            <div class="span4">
-              <h2>Heading</h2>
-              <p>Donec id elit non mi porta gravida at eget metus. Fusce dapibus, tellus ac cursus commodo, tortor mauris condimentum nibh, ut fermentum massa justo sit amet risus. Etiam porta sem malesuada magna mollis euismod. Donec sed odio dui. </p>
-              <p><a class="btn" href="#">View details &raquo;</a></p>
-            </div><!--/span-->
-          </div><!--/row-->
-          
-          <div class="span12">
-            <div id="editor"></div>
-          </div>
-
-        </div><!--/span-->
-      </div><!--/row-->
-
-      <hr>
-
-      <footer>
-        <p>&copy; Company 2012</p>
-      </footer>
+      </div>
+      <div class="row">
+        <div class="span12">
+        <canvas id="timeline">
+        </canvas>
+        </div>
+      </div>
 
     </div><!--/.fluid-container-->
 
