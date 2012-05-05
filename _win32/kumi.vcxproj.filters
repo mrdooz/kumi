@@ -117,6 +117,9 @@
     <ClCompile Include="..\websocket_server.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\json_writer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -249,6 +252,9 @@
       <Filter>test</Filter>
     </ClInclude>
     <ClInclude Include="..\websocket_server.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\json_writer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

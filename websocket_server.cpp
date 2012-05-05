@@ -4,19 +4,18 @@
 #include "websocketpp/websocketpp.hpp"
 #include "graphics.hpp"
 #include "string_utils.hpp"
+#include "json_writer.hpp"
 
 using namespace std;
-
-static string create_json(const char *key, float value) {
-  return to_string("{\"%s\" : %f }", key, value);
-}
 
 class echo_server_handler : public websocketpp::server::handler {
 public:
   void on_message(connection_ptr con, message_ptr msg) {
     const string &str = msg->get_payload();
     if (str == "SYSTEM.FPS") {
-      con->send(create_json("system.fps", GRAPHICS.fps()), websocketpp::frame::opcode::TEXT);
+      auto obj = JsonValue::create_object();
+      obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
+      con->send(obj->print(4), websocketpp::frame::opcode::TEXT);
     } else {
       con->send(msg->get_payload(),msg->get_opcode());
     }

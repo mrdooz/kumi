@@ -3,6 +3,7 @@ var output;
 var smoothie = new SmoothieChart();
 var websocket;
 var fps_series = new TimeSeries();
+var fps_interval_id;
 
 function openWebSocket()
 {
@@ -16,13 +17,16 @@ function openWebSocket()
 
 function onOpen(evt)
 {
-    writeToScreen("CONNECTED");
-    //doSend("SYSTEM.FPS");
+    // icons from http://findicons.com/pack/2103/discovery
+    $('#connection-status').attr('src', 'assets/gfx/connected.png');
+    //websocket.send('DEMOENGINE.INFO');
+    fps_interval_id = setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
 }
 
-function onClose(evt)
+function onClose(e)
 {
-    writeToScreen("DISCONNECTED");
+    clearInterval(fps_interval_id);
+    $('#connection-status').attr('src', 'assets/gfx/disconnected.png');
 }
 
 function onMessage(e)
@@ -34,23 +38,9 @@ function onMessage(e)
     }
 }
 
-function onError(evt)
+function onError(e)
 {
-    writeToScreen('<span style="color: red;">ERROR:</span> ' + evt.data);
-}
-
-function doSend(message)
-{
-    writeToScreen("SENT: " + message); 
-    websocket.send(message);
-}
-
-function writeToScreen(message)
-{
-    var pre = document.createElement("p");
-    pre.style.wordWrap = "break-word";
-    pre.innerHTML = message;
-    output.appendChild(pre);
+    console.error(e);
 }
 
 var kbInit = function() {
@@ -58,5 +48,4 @@ var kbInit = function() {
     smoothie.streamTo(document.getElementById("fps-canvas"));
     smoothie.addTimeSeries(fps_series);
     openWebSocket();
-    setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
 };

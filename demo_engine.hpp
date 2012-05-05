@@ -19,13 +19,14 @@ protected:
 class DemoEngine {
 public:
 	static DemoEngine &instance();
+  static bool create();
+  static bool close();
 
 	void add_effect(Effect *effect, uint32 start_time, uint32 end_time);
 	bool start();
 	void pause(bool pause);
 	bool init();
 	bool tick();
-	bool close();
 
   void reset_current_effect();
 

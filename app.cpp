@@ -311,6 +311,7 @@ bool App::init(HINSTANCE hinstance)
   B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
   B_ERR_BOOL(Renderer::create());
   B_ERR_BOOL(MaterialManager::create());
+  B_ERR_BOOL(DemoEngine::create());
 
   B_ERR_BOOL(create_window());
 
@@ -349,6 +350,7 @@ bool App::init(HINSTANCE hinstance)
 
 bool App::close() {
   FileWatcher::close();
+  B_ERR_BOOL(DemoEngine::close());
   B_ERR_BOOL(Renderer::close());
   B_ERR_BOOL(Graphics::close());
   B_ERR_BOOL(MaterialManager::close());

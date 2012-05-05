@@ -7,8 +7,7 @@ using std::sort;
 DemoEngine *DemoEngine::_instance = NULL;
 
 DemoEngine& DemoEngine::instance() {
-  if (!_instance)
-    _instance = new DemoEngine;
+  assert(_instance);
   return *_instance;
 }
 
@@ -20,6 +19,12 @@ DemoEngine::DemoEngine()
   , _current_time(0)
   , _cur_effect(0)
 {
+}
+
+bool DemoEngine::create() {
+  assert(!_instance);
+  _instance = new DemoEngine;
+  return true;
 }
 
 bool DemoEngine::start() {
@@ -99,6 +104,7 @@ bool DemoEngine::tick() {
 }
 
 bool DemoEngine::close() {
+  delete exch_null(_instance);
   return true;
 }
 
