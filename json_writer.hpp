@@ -1,8 +1,7 @@
 #pragma once
 
 class JsonValue {
-  friend class JsonObject;
-  friend class JsonArray;
+  friend class JsonWriter;
 public:
   typedef std::shared_ptr<JsonValue> JsonValuePtr;
 
@@ -19,8 +18,6 @@ public:
   virtual bool add_value(JsonValuePtr value);
   virtual bool add_key_value(const std::string &key, JsonValuePtr value);
 
-  std::string print(int indent_size);
-
 protected:
   enum JsonType {
     JS_NULL = 0,
@@ -34,8 +31,6 @@ protected:
 
   JsonValue(JsonType type);
 
-  virtual void print_inner(int indent_level, std::string *res);
-
   JsonType _type;
   union {
     const char *_string;
@@ -47,25 +42,32 @@ protected:
 
 class JsonObject : public JsonValue {
   friend class JsonValue;
+  friend class JsonWriter;
 public:
   virtual bool add_key_value(const std::string &key, JsonValuePtr value);
 
 protected:
   JsonObject();
-
-  virtual void print_inner(int indent_level, std::string *res);
   std::map<std::string, JsonValuePtr> _key_value;
 };
 
 class JsonArray : public JsonValue {
   friend class JsonValue;
+  friend class JsonWriter;
 public:
   virtual bool add_value(JsonValuePtr value);
 
 private:
   JsonArray();
-
-  virtual void print_inner(int indent_level, std::string *res);
   std::vector<JsonValuePtr> _value;
 };
 
+class JsonWriter {
+public:
+  std::string print(JsonValue::JsonValuePtr root);
+private:
+  void print_dispatch(const JsonValue *obj, int indent_level, std::string *res);
+  void print_inner(const JsonValue *obj, int indent_level, std::string *res);
+  void print_inner(const JsonArray *obj, int indent_level, std::string *res);
+  void print_inner(const JsonObject *obj, int indent_level, std::string *res);
+};

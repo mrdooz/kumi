@@ -60,46 +60,6 @@ bool JsonValue::add_key_value(const string &key, JsonValuePtr value) {
   return false;
 }
 
-string JsonValue::print(int indent_size) {
-  string res;
-  print_inner(1, &res);
-
-  return res;
-}
-
-void JsonValue::print_inner(int indent_level, string *res) {
-
-  switch (_type) {
-  case JS_STRING: 
-    res->append("\"");
-    res->append(_string);
-    res->append("\"");
-    break;
-
-  case JS_NUMBER: {
-    static char buf[2048];
-    sprintf(buf, "%f", _number);
-    res->append(buf);
-    break;
-                  }
-
-  case JS_INT:
-    static char buf2[32];
-    sprintf(buf2, "%d", _int);
-    res->append(buf2);
-    break;
-
-  case JS_BOOL:
-    res->append(_bool ? "true" : "false");
-    break;
-
-  default:
-    assert(!"invalid type in print_inner");
-    break;
-  }
-}
-
-
 bool JsonObject::add_key_value(const string &key, JsonValuePtr value) {
   _key_value[key] = value;
   return true;
@@ -108,40 +68,7 @@ bool JsonObject::add_key_value(const string &key, JsonValuePtr value) {
 JsonObject::JsonObject() 
   : JsonValue(JS_OBJECT) 
 {
-
 }
-
-void JsonObject::print_inner(int indent_level, string *res) {
-
-  res->append("{\n");
-
-  string indent_string(indent_level, '\t');
-
-  auto it = begin(_key_value);
-  if (it != end(_key_value)) {
-    stringstream str;
-    str << indent_string << "\"" << it->first << "\": ";
-    res->append(str.str());
-    it->second->print_inner(indent_level + 1, res);
-    ++it;
-  }
-
-  for (; it != end(_key_value); ++it) {
-    stringstream str;
-    str << ",\n" << indent_string << "\"" << it->first << "\": ";
-    res->append(str.str());
-
-    it->second->print_inner(indent_level + 1, res);
-  }
-
-  indent_string = string(indent_level - 1, '\t');
-
-  stringstream str;
-  str << "\n" << indent_string << "}";
-  res->append(str.str());
-}
-
-
 
 bool JsonArray::add_value(JsonValuePtr value) {
   _value.push_back(value);
@@ -154,23 +81,91 @@ JsonArray::JsonArray()
 {
 }
 
-void JsonArray::print_inner(int indent_level, string *res) {
+string JsonWriter::print(JsonValue::JsonValuePtr root) {
+  string res;
+  print_dispatch(root.get(), 1, &res);
+  return res;
+}
+
+void JsonWriter::print_inner(const JsonValue *obj, int indent_level, std::string *res) {
+
+  switch (obj->_type) {
+  case JsonValue::JS_STRING: 
+    res->append("\"");
+    res->append(obj->_string);
+    res->append("\"");
+    break;
+
+  case JsonValue::JS_NUMBER: {
+    static char buf[2048];
+    sprintf(buf, "%f", obj->_number);
+    res->append(buf);
+    break;
+                  }
+
+  case JsonValue::JS_INT:
+    static char buf2[32];
+    sprintf(buf2, "%d", obj->_int);
+    res->append(buf2);
+    break;
+
+  case JsonValue::JS_BOOL:
+    res->append(obj->_bool ? "true" : "false");
+    break;
+
+  default:
+    assert(!"invalid type in print_inner");
+    break;
+  }
+}
+
+void JsonWriter::print_inner(const JsonObject *obj, int indent_level, std::string *res) {
+
+  res->append("{\n");
+
+  string indent_string(indent_level, '\t');
+
+  auto it = begin(obj->_key_value);
+  if (it != end(obj->_key_value)) {
+    stringstream str;
+    str << indent_string << "\"" << it->first << "\": ";
+    res->append(str.str());
+    print_dispatch(it->second.get(), indent_level + 1, res);
+    ++it;
+  }
+
+  for (; it != end(obj->_key_value); ++it) {
+    stringstream str;
+    str << ",\n" << indent_string << "\"" << it->first << "\": ";
+    res->append(str.str());
+
+    print_dispatch(it->second.get(), indent_level + 1, res);
+  }
+
+  indent_string = string(indent_level - 1, '\t');
+
+  stringstream str;
+  str << "\n" << indent_string << "}";
+  res->append(str.str());
+}
+
+void JsonWriter::print_inner(const JsonArray *obj, int indent_level, std::string *res) {
   string indent_string(indent_level, '\t');
 
   res->append("[\n");
 
-  auto it = begin(_value);
-  if (it != end(_value)) {
+  auto it = begin(obj->_value);
+  if (it != end(obj->_value)) {
     res->append(indent_string);
-    (*it)->print_inner(indent_level + 1, res);
+    print_dispatch(it->get(), indent_level + 1, res);
     ++it;
   }
 
-  for (; it != end(_value); ++it) {
+  for (; it != end(obj->_value); ++it) {
     stringstream str;
     str << ",\n" << indent_string;
     res->append(str.str());
-    (*it)->print_inner(indent_level + 1, res);
+    print_dispatch(it->get(), indent_level + 1, res);
   }
 
   indent_string = string(indent_level - 1, '\t');
@@ -180,3 +175,14 @@ void JsonArray::print_inner(int indent_level, string *res) {
   res->append(str.str());
 }
 
+void JsonWriter::print_dispatch(const JsonValue *obj, int indent_level, std::string *res) {
+  // meh, this is kinda cheesy..
+  switch (obj->_type) {
+    case JsonValue::JS_ARRAY:
+      return print_inner(static_cast<const JsonArray *>(obj), indent_level, res);
+    case JsonValue::JS_OBJECT:
+      return print_inner(static_cast<const JsonObject *>(obj), indent_level, res);
+    default:
+      return print_inner(obj, indent_level, res);
+  }
+}

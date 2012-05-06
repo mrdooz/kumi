@@ -146,5 +146,6 @@ std::string DemoEngine::get_info() {
   }
   demo->add_key_value("effects", effects);
 
-  return root->print(2);
+  JsonWriter w;
+  return w.print(root);
 }

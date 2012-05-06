@@ -89,6 +89,13 @@ function onBtnPlay(playing) {
 function onBtnNext() {
 }
 
+function getTimeInfo() {
+    var o = {};
+    o.state = is_playing ? true : false;
+    o.cur_time = cur_time;
+    return JSON.stringify(o);
+}
+
 function timelineInit() {
     var canvas = $('#timeline-canvas');
     var pos = canvas.position();
@@ -115,12 +122,14 @@ function timelineInit() {
 
     canvas.mouseup(function(event) {
         button_state[event.which] = 0;
+        var ofs = canvas.offset();
         
         if (event.which == 1) {
             var x = event.pageX - pos.left;
             var y = event.pageY - pos.top;
             if (ptInRect(x, y, 15, horiz_margin, 15+25, canvas.width() - horiz_margin)) {
-                cur_time = pixelToTime(x);
+                cur_time = pixelToTime(x - horiz_margin);
+                websocket.send(getTimeInfo());
             }
         }
     });
