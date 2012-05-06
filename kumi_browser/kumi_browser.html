@@ -19,15 +19,35 @@
         padding: 9px 0;
       }
     </style>
-
+    
     <script type="text/javascript" src="assets/js/jquery-1.7.2.min.js"></script>
     <script type="text/javascript" src="assets/js/smoothie.js"></script>
     <script type="text/javascript" src="kumi_browser.js"></script>
+    
     <script type="text/javascript">
       $(document).ready(function() {
-          kbInit();
+      
+        var fps = $('#fps-canvas');
+        fps.get(0).width = fps.parent().width();
+        fps.get(0).height = 100;
+        
+        var editor = $('#timeline-canvas');
+        editor.get(0).width = editor.parent().width();
+        
+        var playing = false;
+        $('#btn-prev').click(onBtnPrev);
+        $('#btn-play').click(function() {
+          playing = !playing;
+          // from http://www.iconarchive.com/show/I-like-buttons-icons-by-mazenl77.html
+          $('#btn-play').attr('src', playing ? 'assets/gfx/ez_pause.png' : 'assets/gfx/ez_play.png');
+          onBtnPlay(playing);
+        });
+        $('#btn-next').click(onBtnNext);
+
+        kbInit();
       });
     </script>
+
 
     <!-- Le HTML5 shim, for IE6-8 support of HTML5 elements -->
     <!--[if lt IE 9]>
@@ -39,33 +59,34 @@
   </head>
 
   <body>
-
     <div class="navbar navbar-fixed-top">
       <div class="navbar-inner">
         <div class="container-fluid">
             <a class="brand">kumi.browser</a>
+            <img id="connection-status" style="padding:5px 0px; float:right;" src="assets/gfx/disconnected.png"/>
         </div>
       </div>
     </div>
 
     <div class="container">
-      <div class="row">
-          <div class="span1">
-            <img id="connection-status" style="padding:10px;" src="assets/gfx/disconnected.png"/>          
-          </div>
-          <div class="span11">
-            <canvas id="fps-canvas" width="800" height="100"></canvas>
-          </div>
-      </div>
-      <div class="row">
+      <div class="row-fluid">
         <div class="span12">
-        <canvas id="timeline">
-        </canvas>
+          <canvas id="fps-canvas"></canvas>
+        </div>
+      </div><!-- row -->
+      <div class="row-fluid">
+        <div class="span3">
+          <img id="btn-prev" style="width:35%; height:35%; margin-right:-25px;margin-top:-10px" src="assets/gfx/ez_prev.png"/>
+          <img id="btn-play" style="width:35%; height:35%; margin-right:-25px;margin-top:-10px" src="assets/gfx/ez_play.png"/>
+          <img id="btn-next" style="width:35%; height:35%; margin-right:-25px;margin-top:-10px" src="assets/gfx/ez_next.png"/>
+        </div>
+        <div class="span9">
+          <canvas id="timeline-canvas"></canvas>
         </div>
       </div>
-
+      
     </div><!--/.fluid-container-->
-
+    
     <!-- Le javascript
     ================================================== -->
     <!-- Placed at the end of the document so the pages load faster -->
