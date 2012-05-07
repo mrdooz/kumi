@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "demo_engine.hpp"
 #include "logger.hpp"
-#include "json_writer.hpp"
+#include "json_utils.hpp"
 
 using std::sort;
 
@@ -30,7 +30,6 @@ bool DemoEngine::create() {
 }
 
 bool DemoEngine::start() {
-  _paused = false;
   QueryPerformanceCounter((LARGE_INTEGER *)&_last_time);
   return true;
 }
@@ -44,6 +43,7 @@ bool DemoEngine::paused() const {
 }
 
 void DemoEngine::set_pos(uint32 ms) {
+  _current_time = ms * _frequency / 1000;
 }
 
 uint32 DemoEngine::duration() const {
@@ -67,18 +67,12 @@ bool DemoEngine::init() {
 }
 
 bool DemoEngine::tick() {
-  if (_paused) {
-    QueryPerformanceCounter((LARGE_INTEGER *)&_last_time);
-    return true;
-  }
-
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
-  int64 delta = (now - _last_time);
+  int64 delta = _paused ? 0 : (now - _last_time);
   _current_time += delta;
   uint32 current_time_ms = uint32((1000 * _current_time) / _frequency);
   double elapsed_ms = 1000.0 * delta / _frequency;
-
 
   // check for any effects that have ended
   while (!_active_effects.empty() && _active_effects.front()->_end_time <= current_time_ms) {
@@ -146,6 +140,5 @@ std::string DemoEngine::get_info() {
   }
   demo->add_key_value("effects", effects);
 
-  JsonWriter w;
-  return w.print(root);
+  return print_json(root);
 }

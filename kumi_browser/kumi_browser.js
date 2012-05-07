@@ -6,7 +6,7 @@ var fps_series;
 var fps_interval_id;
 var demo_info;
 
-var timeline_scale = 50;
+var timeline_scale = 10;
 var timeline_ofs = 0;
 var horiz_margin = 10;
 var start_move_pos = 0;
@@ -68,6 +68,7 @@ function onError(e)
 
 function onBtnPrev() {
     cur_time = 0;
+    websocket.send(getTimeInfo());
 }
 
 var playing_id;
@@ -84,6 +85,7 @@ function onBtnPlay(playing) {
     } else {
         clearInterval(playing_id);
     }
+    websocket.send(getTimeInfo());
 }
 
 function onBtnNext() {
@@ -122,7 +124,6 @@ function timelineInit() {
 
     canvas.mouseup(function(event) {
         button_state[event.which] = 0;
-        var ofs = canvas.offset();
         
         if (event.which == 1) {
             var x = event.pageX - pos.left;
@@ -138,6 +139,13 @@ function timelineInit() {
         if (button_state[2]) {
             var delta = (rel_pos(event.pageX) - start_move_pos);
             timeline_ofs = Math.max(0, org_timeline_pos + delta);
+        } else if (button_state[1]) {
+            var x = event.pageX - pos.left;
+            var y = event.pageY - pos.top;
+            if (ptInRect(x, y, 15, horiz_margin, 15+25, canvas.width() - horiz_margin)) {
+                cur_time = pixelToTime(x - horiz_margin);
+                websocket.send(getTimeInfo());
+            }
         }
     });
     
