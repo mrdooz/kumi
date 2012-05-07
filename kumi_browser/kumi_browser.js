@@ -165,26 +165,17 @@ function drawTimeline() {
     var canvas = $('#timeline-canvas').get(0);
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+    $('#cur-time').text((cur_time/1000).toFixed(2));
 
     ctx.save();
     var d = demo_info;
 
     ctx.font = "8px Arial";
-    ctx.fillStyle = 'black';
     ctx.textBaseline = "top";
     ctx.textAlign = 'center';
    
-    
-    for (var i = 0; i < canvas.width; i += 50) {
-        var cur = pixelToTime(i);
-        ctx.fillText(cur, horiz_margin + i, 5);
-        ctx.beginPath();
-        ctx.moveTo(horiz_margin + i + 0.5, 13);
-        ctx.lineTo(horiz_margin + i + 0.5, 18);
-        ctx.closePath();
-        ctx.stroke();
-    }
-    
+   
     ctx.fillStyle = '#aaa';
     ctx.beginPath();
     ctx.moveTo(horiz_margin + 0.5, 15.5);
@@ -194,6 +185,21 @@ function drawTimeline() {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+    
+    ctx.fillStyle = 'black';
+    for (var i = 0; i < canvas.width; i += 10) {
+        var cur = pixelToTime(i);
+        var extra = i % 50 == 0;
+        if (extra) {
+            ctx.fillText(cur, horiz_margin + i, 5);
+        }
+        ctx.beginPath();
+        ctx.moveTo(horiz_margin + i + 0.5, 13);
+        ctx.lineTo(horiz_margin + i + 0.5, 15 + (extra ? 3 : 2));
+        ctx.closePath();
+        ctx.stroke();
+    }
+
     
     ctx.strokeStyle = '#f33';
     ctx.beginPath();
