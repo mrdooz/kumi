@@ -56,6 +56,7 @@ function onMessage(e)
     if (res['system.fps']) {
         var fps = res['system.fps'];
         fps_series.append(new Date().getTime(), fps);
+        $('#cur-fps').text(fps.toFixed(2) + ' fps');
     } else if (res['demo']) {
         demo_info = res['demo'];
     }
