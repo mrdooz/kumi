@@ -68,7 +68,12 @@ function onError(e)
 }
 
 function onBtnPrev() {
+    websocket.send(getTimeInfo());
+}
+
+function onBtnPrevSkip() {
     cur_time = 0;
+    timeline_ofs = 0;
     websocket.send(getTimeInfo());
 }
 
@@ -90,6 +95,11 @@ function onBtnPlay(playing) {
 }
 
 function onBtnNext() {
+    websocket.send(getTimeInfo());
+}
+
+function onBtnNextSkip() {
+    websocket.send(getTimeInfo());
 }
 
 function getTimeInfo() {
@@ -167,8 +177,12 @@ function drawTimeline() {
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.strokeRect(0, 0, canvas.width, canvas.height);
-    $('#cur-time').text((cur_time/1000).toFixed(2));
+    $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
 
+    if (timeToPixel(cur_time) > canvas.width - horiz_margin) {
+        timeline_ofs = pixelToTime(canvas.width - horiz_margin);
+    }
+    
     ctx.save();
     var d = demo_info;
 
