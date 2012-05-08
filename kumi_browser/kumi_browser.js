@@ -25,49 +25,53 @@ function ptInRect(x, y, top, left, bottom, right) {
 
 function openWebSocket()
 {
+    var initial_open = true;
+    var retry_count = 0;
     console.log(wsUri);
     websocket = new WebSocket(wsUri);
-    websocket.onopen = function(evt) { onOpen(evt) };
-    websocket.onclose = function(evt) { onClose(evt) };
-    websocket.onmessage = function(evt) { onMessage(evt) };
-    websocket.onerror = function(evt) { onError(evt) };
-}
+        
+    websocket.onopen = function(e) { 
+        // icons from http://findicons.com/pack/2103/discovery
+        $('#connection-status').attr('src', 'assets/gfx/connected.png');
+        websocket.send('DEMO.INFO');
+        fps_interval_id = setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
+        smoothie.start();
+        initial_open = false;
+    };
+    
+    websocket.onclose = function(e) { 
+        clearInterval(fps_interval_id);
+        $('#connection-status').attr('src', 'assets/gfx/disconnected.png');
+        smoothie.stop();
+        if (initial_open && retry_count < 10) {
+            ++retry_count;
+            setTimeout(openWebSocket, 2500);
+        }
+    };
+    
+    websocket.onmessage = function(e) { 
+        var res = JSON.parse(e.data);
 
-function onOpen(evt)
-{
-    // icons from http://findicons.com/pack/2103/discovery
-    $('#connection-status').attr('src', 'assets/gfx/connected.png');
-    websocket.send('DEMO.INFO');
-    fps_interval_id = setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
-    smoothie.start();
-}
-
-function onClose(e)
-{
-    clearInterval(fps_interval_id);
-    $('#connection-status').attr('src', 'assets/gfx/disconnected.png');
-    smoothie.stop();
-}
-
-function onMessage(e)
-{
-    var res = JSON.parse(e.data);
-
-    if (res['system.fps']) {
-        var fps = res['system.fps'];
-        fps_series.append(new Date().getTime(), fps);
-        $('#cur-fps').text(fps.toFixed(2) + ' fps');
-    } else if (res['demo']) {
-        demo_info = res['demo'];
-    }
-}
-
-function onError(e)
-{
-    console.log(e);
+        if (res['system.fps']) {
+            var fps = res['system.fps'];
+            fps_series.append(new Date().getTime(), fps);
+            $('#cur-fps').text(fps.toFixed(2) + ' fps');
+        } else if (res['demo']) {
+            demo_info = res['demo'];
+        }
+    };
+    
+    websocket.onerror = function(e) { 
+        console.log(e);
+    };
 }
 
 function onBtnPrev() {
+    var canvas = $('#timeline-canvas');
+    websocket.send(getTimeInfo());
+    var delta = rawPixelToTime(canvas.width() - (2 * horiz_margin));
+    cur_time = Math.max(0, cur_time - delta);
+    timeline_ofs = Math.max(0, timeline_ofs - delta);
     websocket.send(getTimeInfo());
 }
 
@@ -95,6 +99,11 @@ function onBtnPlay(playing) {
 }
 
 function onBtnNext() {
+    var canvas = $('#timeline-canvas');
+    websocket.send(getTimeInfo());
+    var delta = rawPixelToTime(canvas.width() - (2 * horiz_margin));
+    cur_time = cur_time + delta;
+    timeline_ofs += delta;
     websocket.send(getTimeInfo());
 }
 
@@ -162,6 +171,10 @@ function timelineInit() {
     
     
     requestAnimationFrame(drawTimeline);
+}
+
+function rawPixelToTime(px) {
+    return px * timeline_scale;
 }
 
 function pixelToTime(px) {
