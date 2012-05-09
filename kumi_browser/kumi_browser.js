@@ -124,6 +124,22 @@ function getTimeInfo() {
 function timelineInit() {
     var canvas = $('#timeline-canvas');
 
+    var ctrl = $('#timeline-control');
+    ctrl.mouseup(function(e) {
+        // http://trentrichardson.com/Impromptu/
+        var txt = 'Please enter your name:<br /><input type="text" id="alertName" name="alertName" value="name here" />';
+
+        function mycallbackform(e,v,m,f){
+            if(v != undefined)
+                alert(v +' ' + f.alertName);
+        }
+
+        $.prompt(txt,{
+            callback: mycallbackform,
+            buttons: { Hey: 'Hello', Bye: 'Good Bye' }
+        });
+    });
+
     var rel_pos = function(x) {
         var ofs = canvas.offset();
         return x - ofs.left - timeline_margin;
