@@ -6,16 +6,20 @@ var fps_series;
 var fps_interval_id;
 var demo_info;
 
+var timeline_header_height = 40;
+var timeline_margin = 10;
 var timeline_scale = 10;
 var timeline_ofs = 0;
-var horiz_margin = 10;
 var start_move_pos = 0;
 var org_timeline_ofs = 0;
 
 var is_playing = false;
 var cur_time = 0;
 
-var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame || window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
+var playing_id;
+
+var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
+    window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 
 var button_state = [];
 
@@ -69,7 +73,7 @@ function openWebSocket()
 function onBtnPrev() {
     var canvas = $('#timeline-canvas');
     websocket.send(getTimeInfo());
-    var delta = rawPixelToTime(canvas.width() - (2 * horiz_margin));
+    var delta = rawPixelToTime(canvas.width() -  timeline_margin);
     cur_time = Math.max(0, cur_time - delta);
     timeline_ofs = Math.max(0, timeline_ofs - delta);
     websocket.send(getTimeInfo());
@@ -81,11 +85,10 @@ function onBtnPrevSkip() {
     websocket.send(getTimeInfo());
 }
 
-var playing_id;
 
 function onBtnPlay(playing) {
     is_playing = playing;
-    if (playing) {
+    if (is_playing) {
         var start_time = new Date().getTime();
         playing_id = setInterval(function() {
             var now = new Date().getTime();
@@ -101,7 +104,7 @@ function onBtnPlay(playing) {
 function onBtnNext() {
     var canvas = $('#timeline-canvas');
     websocket.send(getTimeInfo());
-    var delta = rawPixelToTime(canvas.width() - (2 * horiz_margin));
+    var delta = rawPixelToTime(canvas.width() - timeline_margin);
     cur_time = cur_time + delta;
     timeline_ofs += delta;
     websocket.send(getTimeInfo());
@@ -123,7 +126,7 @@ function timelineInit() {
     var pos = canvas.position();
     
     var rel_pos = function(x) {
-        return x - pos.left - horiz_margin;
+        return x - pos.left - timeline_margin;
     };
 
     var ctx = canvas.get(0).getContext('2d');
@@ -148,8 +151,8 @@ function timelineInit() {
         if (event.which == 1) {
             var x = event.pageX - pos.left;
             var y = event.pageY - pos.top;
-            if (ptInRect(x, y, 15, horiz_margin, 15+25, canvas.width() - horiz_margin)) {
-                cur_time = pixelToTime(x - horiz_margin);
+            if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
+                cur_time = pixelToTime(x - timeline_margin);
                 websocket.send(getTimeInfo());
             }
         }
@@ -162,8 +165,8 @@ function timelineInit() {
         } else if (button_state[1]) {
             var x = event.pageX - pos.left;
             var y = event.pageY - pos.top;
-            if (ptInRect(x, y, 15, horiz_margin, 15+25, canvas.width() - horiz_margin)) {
-                cur_time = pixelToTime(x - horiz_margin);
+            if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
+                cur_time = pixelToTime(x - timeline_margin);
                 websocket.send(getTimeInfo());
             }
         }
@@ -185,60 +188,123 @@ function timeToPixel(t) {
     return (t - timeline_ofs) / timeline_scale;
 }
 
-function drawTimeline() {
+function drawTimelineCanvas() {
     var canvas = $('#timeline-canvas').get(0);
     var ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-    $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
 
-    if (timeToPixel(cur_time) > canvas.width - horiz_margin) {
-        timeline_ofs = pixelToTime(canvas.width - horiz_margin);
-    }
-    
     ctx.save();
     var d = demo_info;
 
     ctx.font = "8px Arial";
     ctx.textBaseline = "top";
     ctx.textAlign = 'center';
-   
-   
-    ctx.fillStyle = '#aaa';
-    ctx.beginPath();
-    ctx.moveTo(horiz_margin + 0.5, 15.5);
-    ctx.lineTo(canvas.width - horiz_margin + 0.5, 15.5);
-    ctx.lineTo(canvas.width - horiz_margin + 0.5, 15.5 + 25);
-    ctx.lineTo(horiz_margin + 0.5, 15.5 + 25);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    
-    ctx.fillStyle = 'black';
+
+    var h = 25 - 15;
+    var grad = ctx.createLinearGradient(0, 0, 0, 40);
+    grad.addColorStop(0, '#444');
+    grad.addColorStop(1, '#ccc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,canvas.width, 40);
+    ctx.strokeRect(0,0,canvas.width, 40.5);
+
+    ctx.fillStyle = '#fff'
+    ctx.strokeStyle = '#888'
     for (var i = 0; i < canvas.width; i += 10) {
         var cur = pixelToTime(i);
         var extra = i % 50 == 0;
         if (extra) {
-            ctx.fillText(cur, horiz_margin + i, 5);
+            ctx.fillText(cur, timeline_margin + i, 15);
         }
         ctx.beginPath();
-        ctx.moveTo(horiz_margin + i + 0.5, 13);
-        ctx.lineTo(horiz_margin + i + 0.5, 15 + (extra ? 3 : 2));
+        var x = timeline_margin + i + 0.5;
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 8 + (extra ? 5 : 2));
         ctx.closePath();
         ctx.stroke();
     }
 
-    
+    if (d && d.effects) {
+        var y = timeline_header_height;
+        d.effects.forEach( function(e) {
+            var blue_grad = ctx.createLinearGradient(0, y, 0, y+30);
+            blue_grad.addColorStop(0, '#558');
+            blue_grad.addColorStop(1, '#aae');
+
+            ctx.fillStyle = blue_grad;
+            var delta = e.end_time - e.start_time;
+            ctx.fillRect(timeline_margin + timeToPixel(e.start_time), y, timeToPixel(delta), 30);
+            y += 15;
+        });
+    }
+
+
     ctx.strokeStyle = '#f33';
     ctx.beginPath();
-    ctx.moveTo(horiz_margin + timeToPixel(cur_time), 5);
-    ctx.lineTo(horiz_margin + timeToPixel(cur_time), canvas.height);
+    var x = timeline_margin + timeToPixel(cur_time);
+    ctx.moveTo(x, 5);
+    ctx.lineTo(x, canvas.height);
     ctx.closePath();
     ctx.stroke();
-    
-    
+
+    ctx.strokeStyle = '#111';
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
     ctx.restore();
-    
+}
+
+function drawTimelineControl() {
+    var canvas = $('#timeline-control').get(0);
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    var d = demo_info;
+
+    ctx.font = "15px Arial";
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    var h = 25 - 15;
+    var grey_grad = ctx.createLinearGradient(0, 0, 0, timeline_header_height);
+    grey_grad.addColorStop(0, '#444');
+    grey_grad.addColorStop(1, '#ccc');
+    ctx.fillStyle = grey_grad;
+    ctx.fillRect(0,0,canvas.width, 40);
+    ctx.strokeRect(0,0,canvas.width, 40.5);
+
+    if (d && d.effects) {
+        var y = timeline_header_height;
+        d.effects.forEach( function(e) {
+            var blue_grad = ctx.createLinearGradient(0, y, 0, y+30);
+            blue_grad.addColorStop(0, '#558');
+            blue_grad.addColorStop(1, '#aae');
+
+            ctx.fillStyle = blue_grad;
+            ctx.fillRect(0, y, canvas.width, 30);
+            ctx.fillStyle = '#000';
+            ctx.fillText(e.name, canvas.width/2, y + 15);
+            y += 15;
+        });
+    }
+
+    ctx.strokeStyle = '#111';
+    ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+    ctx.restore();
+
+}
+
+function drawTimeline() {
+
+    $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
+    var canvas = $('#timeline-canvas').get(0);
+    if (timeToPixel(cur_time) > canvas.width) {
+        timeline_ofs = pixelToTime(canvas.width);
+    }
+
+    drawTimelineCanvas();
+    drawTimelineControl();
     requestAnimationFrame(drawTimeline);
 }
 
