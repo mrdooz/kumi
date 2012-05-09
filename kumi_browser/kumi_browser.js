@@ -8,7 +8,7 @@ var demo_info;
 
 var timeline_header_height = 40;
 var timeline_margin = 10;
-var timeline_scale = 10;
+var timeline_scale = 10.0;
 var timeline_ofs = 0;
 var start_move_pos = 0;
 var org_timeline_ofs = 0;
@@ -123,10 +123,10 @@ function getTimeInfo() {
 
 function timelineInit() {
     var canvas = $('#timeline-canvas');
-    var pos = canvas.position();
-    
+
     var rel_pos = function(x) {
-        return x - pos.left - timeline_margin;
+        var ofs = canvas.offset();
+        return x - ofs.left - timeline_margin;
     };
 
     var ctx = canvas.get(0).getContext('2d');
@@ -146,11 +146,12 @@ function timelineInit() {
     });
 
     canvas.mouseup(function(event) {
+        var ofs = canvas.offset();
         button_state[event.which] = 0;
         
         if (event.which == 1) {
-            var x = event.pageX - pos.left;
-            var y = event.pageY - pos.top;
+            var x = event.pageX - ofs.left;
+            var y = event.pageY - ofs.top;
             if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
                 cur_time = pixelToTime(x - timeline_margin);
                 websocket.send(getTimeInfo());
@@ -159,12 +160,13 @@ function timelineInit() {
     });
     
     canvas.mousemove(function(event) {
+        var ofs = canvas.offset();
         if (button_state[2]) {
             var delta = (rel_pos(event.pageX) - start_move_pos);
             timeline_ofs = Math.max(0, org_timeline_pos + delta);
         } else if (button_state[1]) {
-            var x = event.pageX - pos.left;
-            var y = event.pageY - pos.top;
+            var x = event.pageX - ofs.left;
+            var y = event.pageY - ofs.top;
             if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
                 cur_time = pixelToTime(x - timeline_margin);
                 websocket.send(getTimeInfo());
