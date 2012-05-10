@@ -12,6 +12,8 @@ using namespace std::tr1::placeholders;
 
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
+  , _param1(TweakableParam::kTypeBool, TweakableParam::kAnimStep)
+  , _param2(TweakableParam::kTypeFloat, TweakableParam::kAnimSpline)
   , _scene(nullptr) {
 }
 
@@ -31,6 +33,14 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 }
 
 bool ScenePlayer::init() {
+
+  _param1.add_key(0, false);
+  _param1.add_key(1000, true);
+
+  _param2.add_key(0, 10.0f);
+  _param2.add_key(1000, 100.0f);
+  _param2.add_key(3000, -200.0f);
+  _param2.add_key(2000, 300.0f);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
 

@@ -16,5 +16,8 @@ public:
 private:
   bool file_changed(const char *filename, void *token);
 
+  TweakableParam _param1;
+  TweakableParam _param2;
+
   Scene *_scene;
 };

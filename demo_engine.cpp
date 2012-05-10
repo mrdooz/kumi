@@ -7,63 +7,37 @@ using std::sort;
 
 DemoEngine *DemoEngine::_instance = NULL;
 
-struct TweakableParam {
-  enum Type {
-    kTypeUnknown,
-    kTypeBool,
-    kTypeInt,
-    kTypeFloat,
-    kTypeFloat2,
-    kTypeFloat3,
-    kTypeFloat4,
-    kTypeColor,
-    kTypeString,
-    kTypeFile,
-  };
+TweakableParam::TweakableParam() : _type(kTypeUnknown), _animation(kAnimUnknown), _bool(nullptr) {}
 
-  enum Animation {
-    kAnimUnknown,
-    kAnimStatic,
-    kAnimStep,
-    kAnimLinear,
-    kAnimSpline,
-  };
-
-  template<typename T>
-  struct Key {
-    float time;
-    T value;
-  };
-
-  TweakableParam() : _type(kTypeUnknown), _animation(kAnimUnknown), _bool(nullptr) {}
-  ~TweakableParam() {
-    switch (_type) {
-      case kTypeBool: SAFE_DELETE(_bool); break;
-      case kTypeInt: SAFE_DELETE(_int); break;
-      case kTypeFloat: SAFE_DELETE(_float); break;
-      case kTypeFloat2: SAFE_DELETE(_float2); break;
-      case kTypeFloat3: SAFE_DELETE(_float3); break;
-      case kTypeFloat4: SAFE_DELETE(_float4); break;
-      case kTypeColor: SAFE_DELETE(_float4); break;
-      case kTypeString: SAFE_DELETE(_string); break;
-      case kTypeFile: SAFE_DELETE(_string); break;
-    }
+TweakableParam::TweakableParam(Type type, Animation animation) : _type(type), _animation(animation) {
+  switch (_type) {
+    case kTypeBool: _bool = new vector<Key<bool> >; break;
+    case kTypeInt: _int = new vector<Key<int> >; break;
+    case kTypeFloat: _float = new vector<Key<float> >; break;
+    case kTypeFloat2: _float2 = new vector<Key<XMFLOAT2> >; break;
+    case kTypeFloat3: _float3 = new vector<Key<XMFLOAT3> >; break;
+    case kTypeFloat4: 
+    case kTypeColor:
+      _float4 = new vector<Key<XMFLOAT4> >; break;
+    case kTypeString:
+    case kTypeFile:  _string = new std::string; break;
   }
+}
 
-  std::string _name;
-  Type _type;
-  Animation _animation;
-
-  union {
-    vector<Key<bool> > *_bool;
-    vector<Key<int> > *_int;
-    vector<Key<float> > *_float;
-    vector<Key<XMFLOAT2> > *_float2;
-    vector<Key<XMFLOAT3> > *_float3;
-    vector<Key<XMFLOAT4> > *_float4;
-    std::string *_string;
-  };
-};
+TweakableParam::~TweakableParam() {
+  switch (_type) {
+    case kTypeBool: SAFE_DELETE(_bool); break;
+    case kTypeInt: SAFE_DELETE(_int); break;
+    case kTypeFloat: SAFE_DELETE(_float); break;
+    case kTypeFloat2: SAFE_DELETE(_float2); break;
+    case kTypeFloat3: SAFE_DELETE(_float3); break;
+    case kTypeFloat4:
+    case kTypeColor: 
+      SAFE_DELETE(_float4); break;
+    case kTypeString: SAFE_DELETE(_string); break;
+    case kTypeFile: SAFE_DELETE(_string); break;
+  }
+}
 
 DemoEngine& DemoEngine::instance() {
   assert(_instance);
@@ -199,4 +173,14 @@ std::string DemoEngine::get_info() {
   demo->add_key_value("effects", effects);
 
   return print_json(root);
+}
+
+std::string Effect::get_info() const {
+  auto effect = JsonValue::create_object();
+/*
+  effect->add_key_value("name", JsonValue::create_string(cur->_effect->name()));
+  effect->add_key_value("start_time", JsonValue::create_int(cur->_start_time));
+  effect->add_key_value("end_time", JsonValue::create_int(cur->_end_time));
+*/
+  return print_json(effect);
 }
