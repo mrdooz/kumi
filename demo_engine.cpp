@@ -86,10 +86,10 @@ bool DemoEngine::init() {
   B_ERR_BOOL(!!QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency));
 
   sort(_effects.begin(), _effects.end(), 
-    [](const EffectInstance *a, const EffectInstance *b){ return a->_start_time < b->_start_time; });
+    [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
 
   for (size_t i = 0; i < _effects.size(); ++i) {
-    LOG_WRN_BOOL(_effects[i]->_effect->init());
+    LOG_WRN_BOOL(_effects[i]->init());
     _inactive_effects.push_back(_effects[i]);
   }
 
@@ -107,16 +107,16 @@ bool DemoEngine::tick() {
   double elapsed_ms = 1000.0 * delta / _frequency;
 
   // check for any effects that have ended
-  while (!_active_effects.empty() && _active_effects.front()->_end_time <= current_time_ms) {
-    _active_effects.front()->_running = false;
+  while (!_active_effects.empty() && _active_effects.front()->end_time() <= current_time_ms) {
+    _active_effects.front()->set_running(false);
     _active_effects.pop_front();
   }
 
   // check if any effect start now
-  while (!_inactive_effects.empty() && _inactive_effects.front()->_start_time <= current_time_ms) {
-    EffectInstance *e = _inactive_effects.front();
+  while (!_inactive_effects.empty() && _inactive_effects.front()->start_time() <= current_time_ms) {
+    auto e = _inactive_effects.front();
     _inactive_effects.pop_front();
-    e->_running = true;
+    e->set_running(true);
     _active_effects.push_back(e);
   }
 
@@ -128,13 +128,13 @@ bool DemoEngine::tick() {
 
   // tick the active effects
   for (size_t i = 0; i < _active_effects.size(); ++i) {
-    EffectInstance *e = _active_effects[i];
+    auto e = _active_effects[i];
     float global_time = current_time_ms / 1000.0f;
-    float local_time = (current_time_ms - e->_start_time) / 1000.0f;
+    float local_time = (current_time_ms - e->start_time()) / 1000.0f;
     XMFLOAT4 tt(global_time, local_time, 0, 0);
     PROPERTY_MANAGER.set_system_property("g_time", tt);
-    e->_effect->update(current_time_ms, current_time_ms - e->_start_time, ticks_per_s, num_ticks, frac);
-    e->_effect->render();
+    e->update(current_time_ms, current_time_ms - e->start_time(), ticks_per_s, num_ticks, frac);
+    e->render();
   }
 
   _last_time = now;
@@ -149,38 +149,34 @@ bool DemoEngine::close() {
 
 void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
   assert(!_inited);
-  _effects.push_back(new EffectInstance(effect, start_time, end_time));
+  effect->set_duration(start_time, end_time);
+  _effects.push_back(effect);
 }
 
 void DemoEngine::reset_current_effect() {
 
 }
 
-std::string DemoEngine::get_info() {
+JsonValue::JsonValuePtr DemoEngine::get_info() {
   auto root = JsonValue::create_object();
   auto demo = JsonValue::create_object();
   root->add_key_value("demo", demo);
   demo->add_key_value("duration", JsonValue::create_int(_duration_ms));
   auto effects = JsonValue::create_array();
   for (auto it = begin(_effects); it != end(_effects); ++it) {
-    auto effect = JsonValue::create_object();
-    auto cur = *it;
-    effect->add_key_value("name", JsonValue::create_string(cur->_effect->name()));
-    effect->add_key_value("start_time", JsonValue::create_int(cur->_start_time));
-    effect->add_key_value("end_time", JsonValue::create_int(cur->_end_time));
-    effects->add_value(effect);
+    effects->add_value((*it)->get_info());
   }
   demo->add_key_value("effects", effects);
-
-  return print_json(root);
+  return root;
 }
 
-std::string Effect::get_info() const {
-  auto effect = JsonValue::create_object();
-/*
-  effect->add_key_value("name", JsonValue::create_string(cur->_effect->name()));
-  effect->add_key_value("start_time", JsonValue::create_int(cur->_start_time));
-  effect->add_key_value("end_time", JsonValue::create_int(cur->_end_time));
-*/
-  return print_json(effect);
+JsonValue::JsonValuePtr Effect::get_info() const {
+  auto info = JsonValue::create_object();
+  info->add_key_value("name", JsonValue::create_string(name()));
+  info->add_key_value("start_time", JsonValue::create_int(_start_time));
+  info->add_key_value("end_time", JsonValue::create_int(_end_time));
+
+  auto params = JsonValue::create_object();
+  info->add_key_value("params", params);
+  return info;
 }

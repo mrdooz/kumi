@@ -20,8 +20,7 @@ public:
       obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
       con->send(print_json(obj), frame::opcode::TEXT);
     } else if (str == "DEMO.INFO") {
-      con->send(DEMO_ENGINE.get_info(), frame::opcode::TEXT);
-      //con->send(msg->get_payload(),msg->get_opcode());
+      con->send(print_json(DEMO_ENGINE.get_info()), frame::opcode::TEXT);
     } else {
       JsonValue::JsonValuePtr a = parse_json(str.c_str(), str.c_str() + str.size());
       int cur_time = a->get_by_key("cur_time")->get_int();
