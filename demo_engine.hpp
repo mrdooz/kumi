@@ -34,8 +34,8 @@ struct TweakableParam {
     T value;
   };
 
-  TweakableParam();
-  TweakableParam(Type type, Animation animation);
+  //TweakableParam();
+  TweakableParam(const std::string &name, Type type, Animation animation);
   ~TweakableParam();
 
   template<typename T> struct Int2Type {};
@@ -82,7 +82,6 @@ public:
 	virtual bool render() { return true; }
 	virtual bool close() { return true; }
   const std::string name() const { return _name; }
-  //const std::vector<TweakableParam> &params() const { return _params; }
 
   JsonValue::JsonValuePtr get_info() const;
 

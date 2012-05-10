@@ -12,8 +12,6 @@ using namespace std::tr1::placeholders;
 
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
-  , _param1(TweakableParam::kTypeBool, TweakableParam::kAnimStep)
-  , _param2(TweakableParam::kTypeFloat, TweakableParam::kAnimSpline)
   , _scene(nullptr) {
 }
 
@@ -34,13 +32,19 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 
 bool ScenePlayer::init() {
 
-  _param1.add_key(0, false);
-  _param1.add_key(1000, true);
+  auto p1 = new TweakableParam("param1", TweakableParam::kTypeBool, TweakableParam::kAnimStep);
+  auto p2 = new TweakableParam("param2", TweakableParam::kTypeFloat, TweakableParam::kAnimSpline);
 
-  _param2.add_key(0, 10.0f);
-  _param2.add_key(1000, 100.0f);
-  _param2.add_key(3000, -200.0f);
-  _param2.add_key(2000, 300.0f);
+  p1->add_key(0, false);
+  p1->add_key(1000, true);
+
+  p2->add_key(0, 10.0f);
+  p2->add_key(1000, 100.0f);
+  p2->add_key(3000, -200.0f);
+  p2->add_key(2000, 300.0f);
+
+  _params.push_back(unique_ptr<TweakableParam>(p1));
+  _params.push_back(unique_ptr<TweakableParam>(p2));
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
 
