@@ -299,8 +299,8 @@ bool App::init(HINSTANCE hinstance)
     break_on_error(true);
 
   _hinstance = hinstance;
-  _width = GetSystemMetrics(SM_CXSCREEN) / 2;
-  _height = GetSystemMetrics(SM_CYSCREEN) / 2;
+  _width = 800; //GetSystemMetrics(SM_CXSCREEN) / 2;
+  _height = 600; //GetSystemMetrics(SM_CYSCREEN) / 2;
 
 #if WITH_CEF
   CefSettings settings;
@@ -342,8 +342,6 @@ bool App::init(HINSTANCE hinstance)
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
   auto effect = new ScenePlayer(GraphicsObjectHandle(), "simple effect");
   DEMO_ENGINE.add_effect(effect, 0, 7 * 1000);
-
-  B_ERR_BOOL(DEMO_ENGINE.init());
 
   return true;
 }
@@ -631,14 +629,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     }
     break;
     */
-
-  case WM_KEYUP:
-    switch (wParam) {
-      case VK_F5:
-        DEMO_ENGINE.reset_current_effect();
-        break;
-    }
-    break;
 
   case WM_KEYDOWN:
   //case WM_KEYUP:

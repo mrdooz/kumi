@@ -7,7 +7,7 @@
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
 
-#define FILE_VERSION 2
+#define FILE_VERSION 4
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -17,7 +17,6 @@ struct MainHeader {
   int light_ofs;
   int camera_ofs;
   int animation_ofs;
-  int string_ofs;
   int binary_ofs;
   int total_size;
 };
@@ -143,19 +142,27 @@ bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
   return true;
 }
 
+template<class T>
+void load_animation_inner(const uint8 **buf, map<string, vector<KeyFrame<T>>> *out) {
+  const int count = read_and_step<int>(&(*buf));
+  for (int i = 0; i < count; ++i) {
+    const char *node_name = read_and_step<const char *>(&(*buf));
+    auto &keys = (*out)[node_name];
+    const int num_frames = read_and_step<int>(&(*buf));
+    keys.resize(num_frames);
+    read_and_step_raw(&(*buf), &keys[0], num_frames * sizeof(KeyFrame<T>));
+  }
+}
+
 bool KumiLoader::load_animation(const uint8 *buf, Scene *scene) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
-  const int count = read_and_step<int>(&buf);
-  for (int i = 0; i < count; ++i) {
-    const char *node_name = read_and_step<const char *>(&buf);
-    vector<KeyFrame> &keys = scene->animation[node_name];
-    const int num_frames = read_and_step<int>(&buf);
-    keys.resize(num_frames);
-    read_and_step_raw(&buf, &keys[0], num_frames * sizeof(KeyFrame));
-  }
+  // load different animation types
+  load_animation_inner(&buf, &scene->animation_float);
+  load_animation_inner(&buf, &scene->animation_vec3);
+  load_animation_inner(&buf, &scene->animation_mtx);
   return true;
 }
 
@@ -207,9 +214,10 @@ bool KumiLoader::load_materials(const uint8 *buf) {
 bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene **scene) {
   LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
   MainHeader header;
-  B_ERR_BOOL(resource->load_inplace(filename, 0, sizeof(header), (void *)&header));
+  if (!resource->load_inplace(filename, 0, sizeof(header), (void *)&header))
+    return false;
   if (header.version != FILE_VERSION) {
-    LOG_ERROR_LN("Incompatible kumi file version: %d vs %d", header.version, FILE_VERSION);
+    LOG_ERROR_LN("Incompatible kumi file version: want: %d, got: %d", FILE_VERSION, header.version);
     return false;
   }
 
@@ -220,9 +228,6 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
   const int buffer_data_size = header.total_size - header.binary_ofs;
   vector<uint8> buffer_data;
   B_ERR_BOOL(resource->load_partial(filename, header.binary_ofs, buffer_data_size, &buffer_data));
-
-  // apply the string fix-up
-  apply_fixup((int *)(&scene_data[0] + header.string_ofs), &scene_data[0], &scene_data[0]);
 
   // apply the binary fixup
   apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);

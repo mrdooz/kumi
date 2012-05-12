@@ -57,13 +57,13 @@ bool VolumetricEffect::init() {
   return true;
 }
 
-static XMFLOAT4X4 mtx_at_time(const vector<KeyFrame> &frames, double time) {
+static XMFLOAT4X4 mtx_at_time(const vector<KeyFrameMatrix> &frames, double time) {
   for (int i = 0; i < (int)frames.size() - 1; ++i) {
     if (time >= frames[i+0].time && time < frames[i+1].time) {
-      return frames[i].mtx;
+      return frames[i].value;
     }
   }
-  return frames.back().mtx;
+  return frames.back().value;
 }
 
 bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, 
@@ -71,7 +71,7 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
   if (_scene && !_scene->cameras.empty()) {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation[camera->name], global_time / 1000.0);
+    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation_mtx[camera->name], global_time / 1000.0);
 
     XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
 //      XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),

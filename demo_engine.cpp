@@ -49,13 +49,14 @@ DemoEngine& DemoEngine::instance() {
 
 DemoEngine::DemoEngine() 
   : _paused(true)
-  , _inited(false)
   , _frequency(0)
   , _last_time(0)
   , _current_time(0)
   , _cur_effect(0)
   , _duration_ms(3 * 60 * 1000)
+  ,_forced_negative_update(false)
 {
+  QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
 }
 
 bool DemoEngine::create() {
@@ -78,15 +79,16 @@ bool DemoEngine::paused() const {
 }
 
 void DemoEngine::set_pos(uint32 ms) {
-  _current_time = ms * _frequency / 1000;
+  int64 new_pos = ms * _frequency / 1000;
+  _forced_negative_update = new_pos < _current_time;
+  _current_time = new_pos;
 }
 
 uint32 DemoEngine::duration() const {
   return _duration_ms;
 }
-
+/*
 bool DemoEngine::init() {
-  B_ERR_BOOL(!!QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency));
 
   sort(_effects.begin(), _effects.end(), 
     [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
@@ -100,7 +102,7 @@ bool DemoEngine::init() {
 
   return true;
 }
-
+*/
 bool DemoEngine::tick() {
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
@@ -109,9 +111,23 @@ bool DemoEngine::tick() {
   uint32 current_time_ms = uint32((1000 * _current_time) / _frequency);
   double elapsed_ms = 1000.0 * delta / _frequency;
 
+  // if we've been forcefully moved to a previous time, check if we need to reinit any effects
+  if (_forced_negative_update ){
+    _forced_negative_update = false;
+    for (auto it = begin(_expired_effects); it != end(_expired_effects); ) {
+      if (current_time_ms >= (*it)->start_time() && current_time_ms < (*it)->end_time()) {
+        _inactive_effects.push_back(*it);
+        it = _expired_effects.erase(it);
+      } else {
+        ++it;
+      }
+    }
+  }
+
   // check for any effects that have ended
   while (!_active_effects.empty() && _active_effects.front()->end_time() <= current_time_ms) {
     _active_effects.front()->set_running(false);
+    _expired_effects.push_back(_active_effects.front());
     _active_effects.pop_front();
   }
 
@@ -150,14 +166,18 @@ bool DemoEngine::close() {
   return true;
 }
 
-void DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
-  assert(!_inited);
+bool DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) {
   effect->set_duration(start_time, end_time);
   _effects.push_back(effect);
-}
 
-void DemoEngine::reset_current_effect() {
+  sort(RANGE(_effects), [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
 
+  for (size_t i = 0; i < _effects.size(); ++i) {
+    LOG_WRN_BOOL(_effects[i]->init());
+    _inactive_effects.push_back(_effects[i]);
+  }
+
+  return true;
 }
 
 JsonValue::JsonValuePtr DemoEngine::get_info() {

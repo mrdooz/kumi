@@ -631,10 +631,10 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     if (_ri->supports_file_watch()) {
       auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
       if (Shader *vs = t->vertex_shader()) {
-        _ri->add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr);
+        _ri->add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
       }
       if (Shader *ps = t->pixel_shader()) {
-        _ri->add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr);
+        _ri->add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
       }
     }
 
@@ -649,7 +649,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   }
 
   if (_ri->supports_file_watch()) {
-    _ri->add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), false, nullptr);
+    _ri->add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), false, nullptr, -1);
   }
 
   return res;

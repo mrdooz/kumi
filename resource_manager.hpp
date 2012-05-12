@@ -25,7 +25,7 @@ public:
   virtual bool load_inplace(const char *filename, size_t ofs, size_t len, void *buf);
 
   virtual bool supports_file_watch() const;
-  virtual void add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result) override;
+  virtual void add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result, int timeout) override;
   virtual void remove_file_watch(const cbFileChanged &cb);
 
   void copy_on_load(bool enable, const char *dest);
@@ -34,7 +34,7 @@ public:
   std::string resolve_filename(const char *filename);
 
 private:
-  void file_changed(void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
+  void file_changed(int timeout, void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
   void deferred_file_changed(void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
 
   static ResourceManager *_instance;

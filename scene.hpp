@@ -37,10 +37,16 @@ struct Light {
 };
 
 #pragma pack(push, 1)
+template <typename T>
 struct KeyFrame {
   double time;
-  XMFLOAT4X4 mtx;
+  T value;
 };
+
+typedef KeyFrame<float> KeyFrameFloat;
+typedef KeyFrame<XMFLOAT3> KeyFrameVec3;
+typedef KeyFrame<XMFLOAT4X4> KeyFrameMatrix;
+
 #pragma pack(pop)
 
 struct Scene {
@@ -57,5 +63,7 @@ struct Scene {
 	std::vector<Mesh *> meshes;
 	std::vector<Camera *> cameras;
   std::vector<Light *> lights;
-  std::map<std::string, std::vector<KeyFrame>> animation;
+  std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
+  std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;
+  std::map<std::string, std::vector<KeyFrameMatrix>> animation_mtx;
 };

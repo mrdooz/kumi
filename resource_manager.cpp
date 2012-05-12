@@ -173,7 +173,7 @@ string ResourceManager::resolve_filename(const char *filename) {
   return res;
 }
 
-void ResourceManager::add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result) {
+void ResourceManager::add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result, int timeout) {
   if (initial_callback) {
     bool res = cb(filename, token);
     if (initial_result)
@@ -181,7 +181,7 @@ void ResourceManager::add_file_watch(const char *filename, void *token, const cb
   }
 
   FILE_WATCHER.add_file_watch(filename, token, threading::kMainThread, 
-    bind(&ResourceManager::file_changed, this, _1, _2, _3, _4));
+    bind(&ResourceManager::file_changed, this, timeout == -1 ? 2500 : timeout, _1, _2, _3, _4));
 
   _watched_files[filename].push_back(make_pair(cb, token));
 }
@@ -209,8 +209,8 @@ void ResourceManager::deferred_file_changed(void *token, FileWatcher::FileEvent 
   }
 }
 
-void ResourceManager::file_changed(void *token, FileWatcher::FileEvent event, const string &old_name, const string &new_name) {
+void ResourceManager::file_changed(int timeout, void *token, FileWatcher::FileEvent event, const string &old_name, const string &new_name) {
   _file_change_ref_count[old_name]++;
-  DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, 2500, 
+  DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, timeout,
     bind(&ResourceManager::deferred_file_changed, this, token, event, old_name, new_name));
 }

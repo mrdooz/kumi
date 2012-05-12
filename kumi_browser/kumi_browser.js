@@ -126,6 +126,7 @@ function timelineInit() {
 
     var ctrl = $('#timeline-control');
     ctrl.mouseup(function(e) {
+/*
         // http://trentrichardson.com/Impromptu/
         var txt = 'Please enter your name:<br /><input type="text" id="alertName" name="alertName" value="name here" />';
 
@@ -138,6 +139,7 @@ function timelineInit() {
             callback: mycallbackform,
             buttons: { Hey: 'Hello', Bye: 'Good Bye' }
         });
+*/
     });
 
     var rel_pos = function(x) {

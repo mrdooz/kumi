@@ -11,7 +11,7 @@ struct ResourceInterface {
   virtual bool load_inplace(const char *filename, size_t ofs, size_t len, void *buf) = 0;
 
   virtual bool supports_file_watch() const = 0;
-  virtual void add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result) = 0;
+  virtual void add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result, int timeout) = 0;
   virtual void remove_file_watch(const cbFileChanged &cb) = 0;
   virtual std::string resolve_filename(const char *filename) = 0;
 };

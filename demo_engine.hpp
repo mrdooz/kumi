@@ -78,6 +78,7 @@ public:
 	Effect(GraphicsObjectHandle context, const std::string &name) : _context(context), _name(name), _running(false), _start_time(~0), _end_time(~0) {}
 	virtual ~Effect() {}
 	virtual bool init() { return true; }
+  virtual bool reset() { return true; }
 	virtual bool update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, float ticks_fraction) { return true; }
 	virtual bool render() { return true; }
 	virtual bool close() { return true; }
@@ -104,8 +105,7 @@ public:
   static bool create();
   static bool close();
 
-	void add_effect(Effect *effect, uint32 start_time, uint32 end_time);
-  bool init();
+	bool add_effect(Effect *effect, uint32 start_time, uint32 end_time);
 
 	bool start();
 	void set_paused(bool pause);
@@ -117,24 +117,22 @@ public:
 
   JsonValue::JsonValuePtr get_info();
 
-  void reset_current_effect();
-
 private:
 	DemoEngine();
 	static DemoEngine *_instance;
 
 	std::deque<Effect *> _active_effects;
 	std::deque<Effect *> _inactive_effects;
+  std::deque<Effect *> _expired_effects;
 	std::vector<Effect *> _effects;
 	int _cur_effect;
 	int64 _frequency;
 	int64 _last_time;
   int64 _current_time;
+  bool _forced_negative_update;
   uint32 _duration_ms;
-	//int64 _current_time_ms;
 	
 	bool _paused;
-	bool _inited;
 };
 
 #define DEMO_ENGINE DemoEngine::instance()

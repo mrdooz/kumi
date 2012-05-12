@@ -49,18 +49,20 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
-  bool res;
-  RESOURCE_MANAGER.add_file_watch(resolved_name.c_str(), NULL, bind(&ScenePlayer::file_changed, this, _1, _2), true, &res);
-  return res;
 
+  bool res;
+  RESOURCE_MANAGER.add_file_watch(resolved_name.c_str(), NULL, bind(&ScenePlayer::file_changed, this, _1, _2), true, &res, 5000);
+  return res;
 }
-static XMFLOAT4X4 mtx_at_time(const vector<KeyFrame> &frames, double time) {
+
+template<typename T>
+static T value_at_time(const vector<KeyFrame<T>> &frames, double time) {
   for (int i = 0; i < (int)frames.size() - 1; ++i) {
     if (time >= frames[i+0].time && time < frames[i+1].time) {
-      return frames[i].mtx;
+      return frames[i].value;
     }
   }
-  return frames.back().mtx;
+  return frames.back().value;
 }
 
 XMFLOAT4X4 transpose(const XMFLOAT4X4 &mtx) {
@@ -79,9 +81,9 @@ bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, i
 
   double time = global_time / 1000.0;
 
-  for (auto it = begin(_scene->animation); it != end(_scene->animation); ++it) {
+  for (auto it = begin(_scene->animation_mtx); it != end(_scene->animation_mtx); ++it) {
     if (Mesh *mesh = _scene->find_mesh_by_name(it->first)) {
-      XMFLOAT4X4 mtx = transpose(mtx_at_time(it->second, time));
+      XMFLOAT4X4 mtx = transpose(value_at_time(it->second, time));
       PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)mesh, "world", mtx);
     }
   }
@@ -89,13 +91,17 @@ bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, i
   if (!_scene->cameras.empty()) {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation[camera->name], time);
+    XMFLOAT3 pos = value_at_time(_scene->animation_vec3[camera->name], time);
+    XMFLOAT3 target = value_at_time(_scene->animation_vec3[camera->name + ".Target"], time);
+
+    //XMFLOAT4X4 mtx = mtx_at_time(_scene->animation_mtx[camera->name], time);
+    //XMMATRIX mm = XMMatrixTranspose(XMLoadFloat4x4(&mtx));
 
     XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
-//      XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
-      XMVectorSet(mtx._41,mtx._42,mtx._43,0),
-      XMVectorSet(camera->target.x,camera->target.y,camera->target.z,0),
-      XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
+      XMVectorSet(pos.x, pos.y, pos.z,0),
+      XMVectorSet(target.x, target.y, target.z,0),
+      XMVectorSet(0, 1, 0, 0)
+      ));
 
     XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(
       XMConvertToRadians(camera->fov),

@@ -175,3 +175,5 @@ Value lookup_default(Key str, const std::unordered_map<Key, Value> &candidates, 
 	auto it = candidates.find(str);
 	return it != candidates.end() ? it->second : default_value;
 }
+
+#define RANGE(x) begin(x), end(x)
