@@ -24,7 +24,7 @@ ps_input vs_main(vs_input input)
 float4 ps_main(ps_input input) : SV_Target
 {
 	float t = g_time[0].x;
-	t = 5;
+	//t = 5;
 
 	// determine correct y at current x
 	float nx = input.pos.x / g_screen_size.x;

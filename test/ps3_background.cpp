@@ -20,14 +20,14 @@ bool Ps3BackgroundEffect::update(int64 global_time, int64 local_time, int64 freq
 }
 
 bool Ps3BackgroundEffect::render() {
-
+/*
   RenderKey key;
   key.cmd = RenderKey::kSetRenderTarget;
   key.handle = _bloom_rt;
   RENDERER.submit_command(FROM_HERE, key, nullptr);
-
+*/
   RENDERER.submit_technique(_background_technique);
-
+/*
   key.handle = GRAPHICS.default_rt_handle();
   RENDERER.submit_command(FROM_HERE, key, nullptr);
   {
@@ -38,7 +38,7 @@ bool Ps3BackgroundEffect::render() {
     data->render_targets[0] = _bloom_rt;
     RENDERER.submit_command(FROM_HERE, key, data);
   }
-
+*/
   return true;
 }
 

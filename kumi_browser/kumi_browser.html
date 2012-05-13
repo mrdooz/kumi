@@ -11,14 +11,11 @@
     <!-- Le styles -->
     <link href="assets/css/bootstrap.css" rel="stylesheet">
     <link href="assets/css/default.css" rel="stylesheet">
+    <link href="kumi_browser.css" rel="stylesheet">
     <style type="text/css">
         body {
             padding-top: 60px;
             padding-bottom: 40px;
-        }
-
-        .sidebar-nav {
-            padding: 9px 0;
         }
     </style>
 
@@ -37,18 +34,18 @@
             var editor = $('#timeline-canvas');
             editor.get(0).width = editor.parent().width() - $('#timeline-control').get(0).width - 5;
             var playing = false;
-            $('#btn-prev-skip').click(onBtnPrevSkip);
-            $('#btn-prev').click(onBtnPrev);
+            $('#btn-prev-skip').click(KUMI.onBtnPrevSkip);
+            $('#btn-prev').click(KUMI.onBtnPrev);
             $('#btn-play').click(function () {
                 playing = !playing;
                 // icons from http://p.yusukekamiyamane.com/
                 $('#img-play').attr('src', playing ? 'assets/gfx/control-pause.png' : 'assets/gfx/control.png');
-                onBtnPlay(playing);
+                KUMI.onBtnPlay(playing);
             });
-            $('#btn-next').click(onBtnNext);
-            $('#btn-next-skip').click(onBtnNextSkip);
+            $('#btn-next').click(KUMI.onBtnNext);
+            $('#btn-next-skip').click(KUMI.onBtnNextSkip);
 
-            kbInit();
+            KUMI.kbInit();
         });
     </script>
 
