@@ -122,6 +122,149 @@ var KUMI = (function($) {
         return JSON.stringify(o);
     }
 
+    function setCanvasDispatch(fn) {
+        var canvas = $('#timeline-canvas');
+
+        if (fn.mouseup) canvas.mouseup(fn.mouseup);
+        if (fn.mousedown) canvas.mousedown(fn.mousedown);
+        if (fn.mousemove) canvas.mousemove(fn.mousemove);
+        if (fn.mouseleave) canvas.mouseleave(fn.mouseleave);
+/*
+        ['mouseup', 'mousedown', 'mouseleave', 'mousemove'].forEach( function(f) {
+           if (fn[f]) {
+                var x = fn[f];
+                canvas[f].apply(canvas, fn[f]);
+           }
+        });
+*/
+        if (fn.enterState)
+            fn.enterState();
+    }
+
+    var insideTimeline = function(x, y, canvas) {
+        // x,y are relative the document
+        var ofs = canvas.offset();
+        x -= ofs.left;
+        y -= ofs.top;
+        return ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width());
+    };
+
+    var insideEffect = function(x, y, canvas) {
+        var ofs = canvas.offset();
+        x -= ofs.left;
+        y -= ofs.top;
+        var found_effect = null;
+        var start;
+        demo_info.effects.forEach( function(e) {
+            var sx = timeToPixel(e.start_time) + timeline_margin;
+            var ex = timeToPixel(e.end_time) + timeline_margin;
+            if (Math.abs(x-sx) < 5) {
+                found_effect = e;
+                start = true;
+            } else if (Math.abs(x-ex) < 5) {
+                found_effect = e;
+                start = false;
+            }
+        });
+        return { effect : found_effect, start : start };
+    };
+
+    // Normal editor state
+    var stateNormal = function(spec) {
+        var canvas = $('#timeline-canvas');
+        var that = {};
+        var button_state = [];
+        var i;
+
+        that.getCanvas = function() {
+            return canvas;
+        };
+
+        that.mouseleave = function(event) {
+            for (i = 0; i < button_state.length; ++i)
+                button_state[i] = 0;
+        };
+
+        that.mousedown = function(event) {
+            var ofs = canvas.offset();
+            var effect;
+            var x = event.pageX, y = event.pageY;
+            var r;
+            button_state[event.which] = 1;
+            if (insideTimeline(x, y, canvas)) {
+                setCanvasDispatch(stateDraggingTimeline({pos : { x : event.pageX, y : event.pageY }}));
+
+            } else {
+                r = insideEffect(x, y, canvas);
+                if (r.effect)
+                    setCanvasDispatch(stateDraggingEffect({
+                        effect : r.effect,
+                        start : r.start,
+                        pos : { x : event.pageX, y : event.pageY }
+                    }));
+            }
+/*
+            start_move_timeline_pos = event.pageX;
+            start_move_demo_pos = event.pageX;
+            org_timeline_ofs = timeline_ofs;
+*/
+        };
+
+        return that;
+    };
+
+    var stateDraggingTimeline = function(spec) {
+        var that = stateNormal(spec);
+        var start_pos, org_timeline_ofs;
+
+        that.enterState = function() {
+            this.start_pos = spec.pos;
+            this.org_timeline_ofs = timeline_ofs;
+        };
+
+        that.mousemouse = function(event) {
+            var ofs = that.getCanvas().offset();
+            var x = event.pageX - ofs.left;
+            cur_time = pixelToTime(x - timeline_margin);
+            window.setTimeout(function() { websocket.send(getTimeInfo()); }, 1);
+        };
+
+        that.mouseup = function(event) {
+            var ofs = that.getCanvas().offset();
+            var x = event.pageX - ofs.left;
+            var y = event.pageY - ofs.top;
+            button_state[event.which] = 0;
+            cur_time = Math.max(0, pixelToTime(x - timeline_margin));
+
+            window.setTimeout(function() {
+                websocket.send(getTimeInfo());
+                setCanvasDispatch(stateNormal({}));
+            }, 1);
+        };
+
+        that.mouseleave = that.mouseup;
+
+        return that;
+    };
+
+    var stateDraggingEffect = function(spec) {
+        var start_pos, effect;
+        var that = stateNormal(spec);
+
+        that.enterState = function() {
+            this.start_pos = spec.pos;
+            this.effect = spec.effect;
+        };
+
+        that.mouseup = function(event) {
+            setCanvasDispatch(stateNormal({}));
+        };
+
+        that.mouseleave = that.mouseup;
+
+        return that;
+    };
+
     function timelineInit() {
         var canvas = $('#timeline-canvas');
         var ctrl = $('#timeline-control');
@@ -130,32 +273,20 @@ var KUMI = (function($) {
         var start_move_demo_pos = 0;
         var org_timeline_ofs = 0;
 
-        ctrl.mouseup(function(e) {
-            /*
-             // http://trentrichardson.com/Impromptu/
-             var txt = 'Please enter your name:<br /><input type="text" id="alertName" name="alertName" value="name here" />';
-
-             function mycallbackform(e,v,m,f){
-             if(v != undefined)
-             alert(v +' ' + f.alertName);
-             }
-
-             $.prompt(txt,{
-             callback: mycallbackform,
-             buttons: { Hey: 'Hello', Bye: 'Good Bye' }
-             });
-             */
-        });
-/*
-        var rel_pos = function(x) {
-            var ofs = canvas.offset();
-            return x - ofs.left - timeline_margin;
-        };
-*/
         var ctx = canvas.get(0).getContext('2d');
         ctx.font = "8px Arial";
         ctx.fillStyle = 'black';
         ctx.textBaseline = 'top';
+
+        setCanvasDispatch(stateNormal({}));
+/*
+        var setTime = function(x, y) {
+            var ofs = canvas.offset();
+            if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
+                cur_time = pixelToTime(x - timeline_margin);
+                websocket.send(getTimeInfo());
+            }
+        };
 
         canvas.mouseleave(function(event) {
             for (var i = 0; i < button_state.length; ++i) {
@@ -171,14 +302,6 @@ var KUMI = (function($) {
             org_timeline_ofs = timeline_ofs;
             return false;
         });
-
-        var setTime = function(x, y) {
-            var ofs = canvas.offset();
-            if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
-                cur_time = pixelToTime(x - timeline_margin);
-                websocket.send(getTimeInfo());
-            }
-        };
 
         canvas.mouseup(function(event) {
             var ofs = canvas.offset();
@@ -211,6 +334,7 @@ var KUMI = (function($) {
         };
 
         canvas.mousemove(function(event) {
+            var delta;
             var ofs = canvas.offset();
             var x = event.pageX - ofs.left;
             var y = event.pageY - ofs.top;
@@ -218,14 +342,14 @@ var KUMI = (function($) {
             if (button_state[1]) {
                 if (inside_timeline(x,y)) {
                     if (event.shiftKey) {
-                        var delta = rawPixelToTime(event.pageX - start_move_timeline_pos);
+                        delta = rawPixelToTime(event.pageX - start_move_timeline_pos);
                         timeline_ofs = Math.max(0, org_timeline_ofs + delta);
                     } else {
                         cur_time = pixelToTime(x - timeline_margin);
                         websocket.send(getTimeInfo());
                     }
                 } else if (e) {
-                    var delta = rawPixelToTime(event.pageX - start_move_demo_pos);
+                    delta = rawPixelToTime(event.pageX - start_move_demo_pos);
                     start_move_demo_pos = event.pageX;
                     e.start_time += delta;
                 }
@@ -239,7 +363,7 @@ var KUMI = (function($) {
             }
             return false;
         });
-
+  */
         requestAnimationFrame(drawTimeline);
     }
 

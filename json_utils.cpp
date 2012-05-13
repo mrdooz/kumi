@@ -324,7 +324,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
     }
 
   } else {
-    if (isdigit((int)ch)) {
+    if (isdigit((int)ch) || ch == '-' || ch == '+') {
       int v = atoi(s);
       while (isdigit((int)*s))
         s++;
