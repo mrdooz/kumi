@@ -3,7 +3,7 @@
 #include "logger.hpp"
 #include "json_utils.hpp"
 
-using std::sort;
+using namespace std;
 
 DemoEngine *DemoEngine::_instance = NULL;
 
@@ -54,7 +54,6 @@ DemoEngine::DemoEngine()
   , _current_time(0)
   , _cur_effect(0)
   , _duration_ms(3 * 60 * 1000)
-  ,_forced_negative_update(false)
 {
   QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
 }
@@ -67,6 +66,7 @@ bool DemoEngine::create() {
 
 bool DemoEngine::start() {
   QueryPerformanceCounter((LARGE_INTEGER *)&_last_time);
+  _last_time *= 1000;
   return true;
 }
 
@@ -79,50 +79,49 @@ bool DemoEngine::paused() const {
 }
 
 void DemoEngine::set_pos(uint32 ms) {
-  int64 new_pos = ms * _frequency / 1000;
-  _forced_negative_update = new_pos < _current_time;
+  int64 new_pos = ms * _frequency;
   _current_time = new_pos;
+  reclassify_effects();
 }
 
 uint32 DemoEngine::duration() const {
   return _duration_ms;
 }
-/*
-bool DemoEngine::init() {
 
-  sort(_effects.begin(), _effects.end(), 
-    [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
+void DemoEngine::reclassify_effects() {
+  uint32 current_time_ms = uint32(_current_time / _frequency);
 
-  for (size_t i = 0; i < _effects.size(); ++i) {
-    LOG_WRN_BOOL(_effects[i]->init());
-    _inactive_effects.push_back(_effects[i]);
+  sort(RANGE(_effects), [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
+  _expired_effects.clear();
+  _inactive_effects.clear();
+  _active_effects.clear();
+
+  bool started = false;
+  bool ended = false;
+  bool in_running_span = false;
+  for (int i = 0; i < (int)_effects.size(); ++i) {
+    auto e = _effects[i];
+    started = current_time_ms >= e->start_time();
+    ended = current_time_ms >= e->end_time();
+    e->set_running(started && !ended);
+    if (!started)
+      _inactive_effects.push_back(e);
+    else if (ended)
+      _expired_effects.push_back(e);
+    else
+      _active_effects.push_back(e);
   }
 
-  _inited = true;
-
-  return true;
 }
-*/
+
 bool DemoEngine::tick() {
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
+  now *= 1000;
   int64 delta = _paused ? 0 : (now - _last_time);
   _current_time += delta;
-  uint32 current_time_ms = uint32((1000 * _current_time) / _frequency);
+  uint32 current_time_ms = uint32(_current_time / _frequency);
   double elapsed_ms = 1000.0 * delta / _frequency;
-
-  // if we've been forcefully moved to a previous time, check if we need to reinit any effects
-  if (_forced_negative_update ){
-    _forced_negative_update = false;
-    for (auto it = begin(_expired_effects); it != end(_expired_effects); ) {
-      if (current_time_ms >= (*it)->start_time() && current_time_ms < (*it)->end_time()) {
-        _inactive_effects.push_back(*it);
-        it = _expired_effects.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
 
   // check for any effects that have ended
   while (!_active_effects.empty() && _active_effects.front()->end_time() <= current_time_ms) {
@@ -178,6 +177,29 @@ bool DemoEngine::add_effect(Effect *effect, uint32 start_time, uint32 end_time) 
   }
 
   return true;
+}
+
+Effect *DemoEngine::find_effect_by_name(const std::string &name) {
+  auto it = find_if(RANGE(_effects), [&](const Effect *e) { return e->name() == name; });
+  return it == end(_effects) ? nullptr : *it;
+}
+
+void DemoEngine::update(JsonValue::JsonValuePtr state) {
+  _duration_ms = state->get_by_key("duration")->get_int();
+  auto effects = state->get_by_key("effects");
+  for (int i = 0; i < effects->get_count(); ++i) {
+    auto cur = effects->get_at_index(i);
+    auto name = cur->get_by_key("name")->get_string();
+    if (Effect *ie = find_effect_by_name(name)) {
+      auto start_time = cur->get_by_key("start_time")->get_int();
+      auto end_time = cur->get_by_key("end_time")->get_int();
+      ie->set_duration(start_time, end_time);
+    } else {
+      LOG_ERROR_LN("unknown effect: %s", name.c_str());
+    }
+  }
+
+  reclassify_effects();
 }
 
 JsonValue::JsonValuePtr DemoEngine::get_info() {

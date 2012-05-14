@@ -116,10 +116,15 @@ public:
 	bool tick();
 
   JsonValue::JsonValuePtr get_info();
+  void update(JsonValue::JsonValuePtr state);
 
 private:
 	DemoEngine();
 	static DemoEngine *_instance;
+
+  void reclassify_effects();
+
+  Effect *find_effect_by_name(const std::string &name);
 
 	std::deque<Effect *> _active_effects;
 	std::deque<Effect *> _inactive_effects;
@@ -129,7 +134,6 @@ private:
 	int64 _frequency;
 	int64 _last_time;
   int64 _current_time;
-  bool _forced_negative_update;
   uint32 _duration_ms;
 	
 	bool _paused;

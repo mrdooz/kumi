@@ -276,6 +276,10 @@ static bool between_delim(const char *start, const char *end, char delim, const 
   return false;
 }
 
+static bool is_json_digit(char ch) {
+  return isdigit((int)ch) || ch == '-' || ch == '+';
+}
+
 static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *end, const char **next) {
   const int len = end - start;
   const char *s = skip_whitespace(start, end);
@@ -323,23 +327,30 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
       return a;
     }
 
-  } else {
-    if (isdigit((int)ch) || ch == '-' || ch == '+') {
-      int v = atoi(s);
-      while (isdigit((int)*s))
-        s++;
-      *next = s;
-      return JsonValue::create_int(v);
-    } else if (strncmp(s, "true", min(4, len)) == 0) {
+  } else if (is_json_digit(ch)) {
+    int v = atoi(s);
+    while (is_json_digit((int)*s))
+      s++;
+    *next = s;
+    return JsonValue::create_int(v);
+
+  } else if (strncmp(s, "true", min(4, len)) == 0) {
       *next = s + 4;
       return JsonValue::create_bool(true);
 
-    } else if (strncmp(s, "false", min(5, len)) == 0) {
+  } else if (strncmp(s, "false", min(5, len)) == 0) {
       *next = s + 5;
       return JsonValue::create_bool(false);
-    }
 
-    // todo, parse moar stuff, but i'm doing this on demand :)
+  } else if (ch == '\"') {
+    const char *key_start, *key_end;
+    if (between_delim(s, end, '"', &key_start, &key_end)) {
+      string key(key_start, key_end - key_start);
+      *next = key_end + 1;
+      return JsonValue::create_string(key);
+    }
+  } else {
+    assert(!"UNKNOWN JSON VALUE");
   }
 
   return JsonValue::JsonValuePtr();

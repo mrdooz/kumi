@@ -12,12 +12,20 @@ var KUMI = (function($) {
     var timeline_header_height = 40;
     var timeline_margin = 10;
     var ms_per_pixel = 10.0;
+    var timeline_scales = [1, 5, 10, 20, 50, 100, 250, 500, 1000];
+    var cur_timeline_scale = 1;
     var timeline_ofs = 0;
+
+    var effect_height = 30;
 
     var is_playing = false;
     var cur_time = 0;
 
     var playing_id;
+
+    var snapping_size = 50; // ms
+    var snapping = true;
+
 
     var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -38,8 +46,8 @@ var KUMI = (function($) {
         websocket.onopen = function(e) {
             // icons from http://findicons.com/pack/2103/discovery
             $('#connection-status').attr('src', 'assets/gfx/connected.png');
-            websocket.send('DEMO.INFO');
-            fps_interval_id = setInterval(function() { websocket.send('SYSTEM.FPS'); }, 100);
+            websocket.send('REQ:DEMO.INFO');
+            fps_interval_id = setInterval(function() { websocket.send('REQ:SYSTEM.FPS'); }, 100);
             smoothie.start();
             initial_open = false;
         };
@@ -73,17 +81,16 @@ var KUMI = (function($) {
 
     kumi.onBtnPrev = function() {
         var canvas = $('#timeline-canvas');
-        websocket.send(getTimeInfo());
         var delta = rawPixelToTime(canvas.width() -  timeline_margin);
         cur_time = Math.max(0, cur_time - delta);
         timeline_ofs = Math.max(0, timeline_ofs - delta);
-        websocket.send(getTimeInfo());
+        sendTimeInfo();
     };
 
     kumi.onBtnPrevSkip = function() {
         cur_time = 0;
         timeline_ofs = 0;
-        websocket.send(getTimeInfo());
+        sendTimeInfo();
     };
 
 
@@ -99,44 +106,51 @@ var KUMI = (function($) {
         } else {
             clearInterval(playing_id);
         }
-        websocket.send(getTimeInfo());
+        sendTimeInfo();
     };
 
     kumi.onBtnNext = function() {
         var canvas = $('#timeline-canvas');
-        websocket.send(getTimeInfo());
         var delta = rawPixelToTime(canvas.width() - timeline_margin);
         cur_time = cur_time + delta;
         timeline_ofs += delta;
-        websocket.send(getTimeInfo());
+        sendTimeInfo();
     };
 
     kumi.onBtnNextSkip = function() {
-        websocket.send(getTimeInfo());
+        sendTimeInfo();
     };
 
-    function getTimeInfo() {
-        var o = {};
-        o.state = is_playing ? true : false;
-        o.cur_time = cur_time;
-        return JSON.stringify(o);
+    function sendJson(type, data) {
+        websocket.send(JSON.stringify( { msg : {
+            type : type,
+            data : data }
+        }));
+
+    }
+
+    function sendTimeInfo() {
+        sendJson("time", { is_playing : (is_playing ? true : false), cur_time : cur_time} );
+    }
+
+    function sendDemoInfo() {
+        sendJson("demo", demo_info);
     }
 
     function setCanvasDispatch(fn) {
         var canvas = $('#timeline-canvas');
+        var fns = ['mouseup', 'mousedown', 'mousemove', 'mouseleave', 'mousewheel'];
+        if (setCanvasDispatch.prev_fn) {
+            fns.forEach(function(f) {
+                if (setCanvasDispatch.prev_fn[f]) canvas.unbind(f, setCanvasDispatch.prev_fn[f]);
+            });
+        }
+        setCanvasDispatch.prev_fn = fn;
 
-        if (fn.mouseup) canvas.mouseup(fn.mouseup);
-        if (fn.mousedown) canvas.mousedown(fn.mousedown);
-        if (fn.mousemove) canvas.mousemove(fn.mousemove);
-        if (fn.mouseleave) canvas.mouseleave(fn.mouseleave);
-/*
-        ['mouseup', 'mousedown', 'mouseleave', 'mousemove'].forEach( function(f) {
-           if (fn[f]) {
-                var x = fn[f];
-                canvas[f].apply(canvas, fn[f]);
-           }
+        fns.forEach(function(f) {
+            if (fn[f]) canvas[f].apply(canvas, [fn[f]]);
         });
-*/
+
         if (fn.enterState)
             fn.enterState();
     }
@@ -152,62 +166,86 @@ var KUMI = (function($) {
     var insideEffect = function(x, y, canvas) {
         var ofs = canvas.offset();
         x -= ofs.left;
-        y -= ofs.top;
+        y -= (ofs.top + timeline_header_height);
         var found_effect = null;
         var start;
-        demo_info.effects.forEach( function(e) {
-            var sx = timeToPixel(e.start_time) + timeline_margin;
-            var ex = timeToPixel(e.end_time) + timeline_margin;
-            if (Math.abs(x-sx) < 5) {
-                found_effect = e;
-                start = true;
-            } else if (Math.abs(x-ex) < 5) {
-                found_effect = e;
-                start = false;
+        $.each(demo_info.effects, function(i, e) {
+            if (y >= i * effect_height & y < (i+1) * effect_height) {
+                var sx = timeToPixel(e.start_time) + timeline_margin;
+                var ex = timeToPixel(e.end_time) + timeline_margin;
+                if (Math.abs(x-sx) < 5) {
+                    found_effect = e;
+                    start = true;
+                } else if (Math.abs(x-ex) < 5) {
+                    found_effect = e;
+                    start = false;
+                }
             }
         });
         return { effect : found_effect, start : start };
     };
+
+    function snap(value) {
+        if (!snapping)
+            return value;
+        return value -= (value % snapping_size);
+    }
 
     // Normal editor state
     var stateNormal = function(spec) {
         var canvas = $('#timeline-canvas');
         var that = {};
         var button_state = [];
-        var i;
 
         that.getCanvas = function() {
             return canvas;
         };
 
+        that.enterState = function() {
+            canvas.get(0).style.cursor = 'default';
+            $('#dbg-time').text('---');
+        };
+
         that.mouseleave = function(event) {
+            var i;
             for (i = 0; i < button_state.length; ++i)
                 button_state[i] = 0;
         };
 
+        that.mousewheel = function(event, delta) {
+            cur_timeline_scale = Math.min(timeline_scales.length-1, Math.max(0, cur_timeline_scale + (delta < 0 ? -1 : 1)));
+            ms_per_pixel = timeline_scales[cur_timeline_scale];
+        };
+
+        that.mousemove = function(event) {
+            var x = event.pageX, y = event.pageY;
+            var r = insideEffect(x, y, canvas);
+            if (r.effect) {
+                canvas.get(0).style.cursor = 'w-resize';
+            } else {
+                canvas.get(0).style.cursor = 'default';
+            }
+        };
+
         that.mousedown = function(event) {
             var ofs = canvas.offset();
-            var effect;
+            var effect, r;
             var x = event.pageX, y = event.pageY;
-            var r;
             button_state[event.which] = 1;
             if (insideTimeline(x, y, canvas)) {
-                setCanvasDispatch(stateDraggingTimeline({pos : { x : event.pageX, y : event.pageY }}));
-
+                setCanvasDispatch(stateDraggingTimeline({
+                    pos : { x : event.pageX, y : event.pageY },
+                    move_offset : event.shiftKey
+                }));
             } else {
                 r = insideEffect(x, y, canvas);
-                if (r.effect)
+                if (r.effect && event.shiftKey )
                     setCanvasDispatch(stateDraggingEffect({
                         effect : r.effect,
                         start : r.start,
                         pos : { x : event.pageX, y : event.pageY }
                     }));
             }
-/*
-            start_move_timeline_pos = event.pageX;
-            start_move_demo_pos = event.pageX;
-            org_timeline_ofs = timeline_ofs;
-*/
         };
 
         return that;
@@ -218,28 +256,34 @@ var KUMI = (function($) {
         var start_pos, org_timeline_ofs;
 
         that.enterState = function() {
-            this.start_pos = spec.pos;
-            this.org_timeline_ofs = timeline_ofs;
+            that.start_pos = spec.pos;
+            that.move_offset = spec.move_offset;
+            that.org_timeline_ofs = timeline_ofs;
         };
 
-        that.mousemouse = function(event) {
+        var updateTime = function(pageX) {
             var ofs = that.getCanvas().offset();
-            var x = event.pageX - ofs.left;
-            cur_time = pixelToTime(x - timeline_margin);
-            window.setTimeout(function() { websocket.send(getTimeInfo()); }, 1);
+            var x = pageX - ofs.left;
+            cur_time = snap(Math.max(0, pixelToTime(x - timeline_margin)));
+            sendTimeInfo();
+        };
+
+        that.mousemove = function(event) {
+            var delta, x;
+            if (that.move_offset) {
+                delta = rawPixelToTime(event.pageX - that.start_pos.x);
+                timeline_ofs = snap(Math.max(0, that.org_timeline_ofs - delta));
+            } else {
+                updateTime(event.pageX);
+            }
         };
 
         that.mouseup = function(event) {
-            var ofs = that.getCanvas().offset();
-            var x = event.pageX - ofs.left;
-            var y = event.pageY - ofs.top;
             button_state[event.which] = 0;
-            cur_time = Math.max(0, pixelToTime(x - timeline_margin));
-
-            window.setTimeout(function() {
-                websocket.send(getTimeInfo());
-                setCanvasDispatch(stateNormal({}));
-            }, 1);
+            if (!that.move_offset) {
+                updateTime(event.pageX);
+            }
+            setCanvasDispatch(stateNormal({}));
         };
 
         that.mouseleave = that.mouseup;
@@ -251,13 +295,39 @@ var KUMI = (function($) {
         var start_pos, effect;
         var that = stateNormal(spec);
 
+        var canvas = $('#timeline-canvas').get(0);
+        var ctx = canvas.getContext('2d');
+
         that.enterState = function() {
-            this.start_pos = spec.pos;
-            this.effect = spec.effect;
+            that.effect = spec.effect;
+            that.start_pos = spec.pos;
+            that.dragging_start = spec.start; // are we dragging the start of end time?
+            that.org_start = that.effect.start_time;
+            that.org_end = that.effect.end_time;
         };
 
         that.mouseup = function(event) {
+            sendDemoInfo();
             setCanvasDispatch(stateNormal({}));
+        };
+
+        var updateTime = function(pageX) {
+            var ofs = that.getCanvas().offset();
+            var x = pageX - ofs.left;
+            cur_time = snap(Math.max(0, pixelToTime(x - timeline_margin)));
+            sendTimeInfo();
+        };
+
+        that.mousemove = function(event) {
+            var delta = rawPixelToTime(event.pageX - that.start_pos.x);
+            if (that.dragging_start) {
+                that.effect.start_time = snap(Math.max(0, Math.min(that.org_start + delta, that.org_end - 50)));
+                $('#dbg-time').text((that.effect.start_time/1000).toFixed(2)+'s');
+            } else {
+                that.effect.end_time = snap(Math.max(that.org_start + 50, that.org_end + delta));
+                $('#dbg-time').text((that.effect.end_time/1000).toFixed(2)+'s');
+            }
+            sendDemoInfo();
         };
 
         that.mouseleave = that.mouseup;
@@ -266,104 +336,8 @@ var KUMI = (function($) {
     };
 
     function timelineInit() {
-        var canvas = $('#timeline-canvas');
-        var ctrl = $('#timeline-control');
-
-        var start_move_timeline_pos = 0;
-        var start_move_demo_pos = 0;
-        var org_timeline_ofs = 0;
-
-        var ctx = canvas.get(0).getContext('2d');
-        ctx.font = "8px Arial";
-        ctx.fillStyle = 'black';
-        ctx.textBaseline = 'top';
-
         setCanvasDispatch(stateNormal({}));
-/*
-        var setTime = function(x, y) {
-            var ofs = canvas.offset();
-            if (ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width())) {
-                cur_time = pixelToTime(x - timeline_margin);
-                websocket.send(getTimeInfo());
-            }
-        };
 
-        canvas.mouseleave(function(event) {
-            for (var i = 0; i < button_state.length; ++i) {
-                button_state[i] = 0;
-            }
-        });
-
-        canvas.mousedown(function(event) {
-            var ofs = canvas.offset();
-            button_state[event.which] = 1;
-            start_move_timeline_pos = event.pageX;
-            start_move_demo_pos = event.pageX;
-            org_timeline_ofs = timeline_ofs;
-            return false;
-        });
-
-        canvas.mouseup(function(event) {
-            var ofs = canvas.offset();
-            var x = event.pageX - ofs.left;
-            var y = event.pageY - ofs.top;
-            button_state[event.which] = 0;
-            if (event.which === 1 && !event.shiftKey) {
-                setTime(x, y);
-            }
-            return false;
-        });
-
-        var inside_timeline = function(x, y) {
-            var ofs = canvas.offset();
-            return ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width());
-        };
-
-        var inside_effect = function(x, y) {
-            var found_effect = null;
-            demo_info.effects.forEach( function(e) {
-                var sx = timeToPixel(e.start_time) + timeline_margin;
-                var ex = timeToPixel(e.end_time) + timeline_margin;
-                if (Math.abs(x-sx) < 5) {
-                    found_effect = e;
-                } else if (Math.abs(x-ex) < 5) {
-                    found_effect = e;
-                }
-            });
-            return found_effect;
-        };
-
-        canvas.mousemove(function(event) {
-            var delta;
-            var ofs = canvas.offset();
-            var x = event.pageX - ofs.left;
-            var y = event.pageY - ofs.top;
-            var e = inside_effect(x,y);
-            if (button_state[1]) {
-                if (inside_timeline(x,y)) {
-                    if (event.shiftKey) {
-                        delta = rawPixelToTime(event.pageX - start_move_timeline_pos);
-                        timeline_ofs = Math.max(0, org_timeline_ofs + delta);
-                    } else {
-                        cur_time = pixelToTime(x - timeline_margin);
-                        websocket.send(getTimeInfo());
-                    }
-                } else if (e) {
-                    delta = rawPixelToTime(event.pageX - start_move_demo_pos);
-                    start_move_demo_pos = event.pageX;
-                    e.start_time += delta;
-                }
-            } else {
-                // check if we're close to the edge of any effect
-                if (e) {
-                    canvas.get(0).style.cursor = 'w-resize';
-                } else {
-                    canvas.get(0).style.cursor = 'default';
-                }
-            }
-            return false;
-        });
-  */
         requestAnimationFrame(drawTimeline);
     }
 
@@ -420,21 +394,21 @@ var KUMI = (function($) {
 
         var y = timeline_header_height;
         demo_info.effects.forEach( function(e) {
-            var blue_grad = ctx.createLinearGradient(0, y, 0, y+30);
+            var blue_grad = ctx.createLinearGradient(0, y, 0, y+effect_height);
             blue_grad.addColorStop(0, '#558');
             blue_grad.addColorStop(1, '#aae');
 
             ctx.fillStyle = blue_grad;
             var o = timeline_margin + Math.max(0, timeToPixel(e.start_time));
             var w = Math.max(0,timeToPixel(e.end_time - e.start_time));
-            ctx.fillRect(o, y, w, 30);
+            ctx.fillRect(o, y, w, effect_height);
             y += 15;
         });
 
         ctx.strokeStyle = '#f33';
         ctx.beginPath();
         var m = timeline_margin + timeToPixel(cur_time);
-        ctx.moveTo(m, 5);
+        ctx.moveTo(m, 0);
         ctx.lineTo(m, canvas.height);
         ctx.closePath();
         ctx.stroke();
@@ -467,12 +441,12 @@ var KUMI = (function($) {
 
         var y = timeline_header_height;
         demo_info.effects.forEach( function(e) {
-            var blue_grad = ctx.createLinearGradient(0, y, 0, y+30);
+            var blue_grad = ctx.createLinearGradient(0, y, 0, y+effect_height);
             blue_grad.addColorStop(0, '#558');
             blue_grad.addColorStop(1, '#aae');
 
             ctx.fillStyle = blue_grad;
-            ctx.fillRect(0, y, canvas.width, 30);
+            ctx.fillRect(0, y, canvas.width, effect_height);
             ctx.fillStyle = '#000';
             ctx.fillText(e.name, canvas.width/2, y + 15);
             y += 15;
@@ -489,6 +463,7 @@ var KUMI = (function($) {
 
         $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
         var canvas = $('#timeline-canvas').get(0);
+        // scroll timeline into view
         if (timeToPixel(cur_time) > canvas.width) {
             timeline_ofs = pixelToTime(canvas.width);
         }

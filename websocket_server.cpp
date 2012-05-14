@@ -13,22 +13,39 @@ using namespace websocketpp;
 
 class echo_server_handler : public server::handler {
 public:
-  void on_message(connection_ptr con, message_ptr msg) {
-    const string &str = msg->get_payload();
-    if (str == "SYSTEM.FPS") {
+
+  static void on_main_thread(connection_ptr con, std::string str) {
+    if (str == "REQ:SYSTEM.FPS") {
       auto obj = JsonValue::create_object();
       obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
       con->send(print_json(obj), frame::opcode::TEXT);
-    } else if (str == "DEMO.INFO") {
+    } else if (str == "REQ:DEMO.INFO") {
       con->send(print_json(DEMO_ENGINE.get_info()), frame::opcode::TEXT);
     } else {
-      JsonValue::JsonValuePtr a = parse_json(str.c_str(), str.c_str() + str.size());
-      int cur_time = a->get_by_key("cur_time")->get_int();
-      bool playing = a->get_by_key("state")->get_bool();
-      DEMO_ENGINE.set_pos(cur_time);
-      DEMO_ENGINE.set_paused(!playing);
-      //LOG_WARNING_LN("Unknown websocket message: %s", str);
+      JsonValue::JsonValuePtr m = parse_json(str.c_str(), str.c_str() + str.size());
+      if (m->has_key("msg")) {
+        // msg has type and data fields
+        auto d = m->get_by_key("msg");
+        auto type = d->get_by_key("type")->get_string();
+        auto data = d->get_by_key("data");
+
+        if (type == "time") {
+          bool playing = data->get_by_key("is_playing")->get_bool();
+          int cur_time = data->get_by_key("cur_time")->get_int();
+          DEMO_ENGINE.set_pos(cur_time);
+          DEMO_ENGINE.set_paused(!playing);
+
+        } else if (type == "demo") {
+          DEMO_ENGINE.update(data);
+        }
+      } else {
+        LOG_WARNING_LN("Unknown websocket message: %s", str);
+      }
     }
+  }
+
+  void on_message(connection_ptr con, message_ptr msg) {
+    DISPATCHER.invoke(FROM_HERE, threading::kMainThread, boost::bind(&echo_server_handler::on_main_thread, con, msg->get_payload()));
   }
 };
 
