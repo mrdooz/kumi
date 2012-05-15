@@ -6,13 +6,27 @@
 #include "../scene.hpp"
 #include "../renderer.hpp"
 #include "../threading.hpp"
+#include "../mesh.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
 
+XMFLOAT4X4 transpose(const XMFLOAT4X4 &mtx) {
+  return XMFLOAT4X4(
+    mtx._11, mtx._21, mtx._31, mtx._41,
+    mtx._12, mtx._22, mtx._32, mtx._42,
+    mtx._13, mtx._23, mtx._33, mtx._43,
+    mtx._14, mtx._24, mtx._34, mtx._44);
+}
+
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
-  , _scene(nullptr) {
+  , _scene(nullptr) 
+  , _light_pos_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightPos"))
+  , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightColor"))
+  , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("view"))
+  , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("proj"))
+{
 }
 
 bool ScenePlayer::file_changed(const char *filename, void *token) {
@@ -22,10 +36,7 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
     return false;
 
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-    XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
-    XMFLOAT4X4 tmp;
-    XMStoreFloat4x4(&tmp, mtx);
-    PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
+    PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
   }
   return true;
 }
@@ -65,13 +76,6 @@ static T value_at_time(const vector<KeyFrame<T>> &frames, double time) {
   return frames.back().value;
 }
 
-XMFLOAT4X4 transpose(const XMFLOAT4X4 &mtx) {
-  return XMFLOAT4X4(
-    mtx._11, mtx._21, mtx._31, mtx._41,
-    mtx._12, mtx._22, mtx._32, mtx._42,
-    mtx._13, mtx._23, mtx._33, mtx._43,
-    mtx._14, mtx._24, mtx._34, mtx._44);
-}
 
 bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, 
                               float ticks_fraction) {
@@ -84,11 +88,14 @@ bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, i
   for (auto it = begin(_scene->animation_mtx); it != end(_scene->animation_mtx); ++it) {
     if (Mesh *mesh = _scene->find_mesh_by_name(it->first)) {
       XMFLOAT4X4 mtx = transpose(value_at_time(it->second, time));
-      PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)mesh, "world", mtx);
+      PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, mtx);
     }
   }
 
   if (!_scene->cameras.empty()) {
+
+    _scene->update();
+
     Camera *camera = _scene->cameras[0];
 
     XMFLOAT3 pos = value_at_time(_scene->animation_vec3[camera->name], time);
@@ -113,12 +120,12 @@ bool ScenePlayer::update(int64 global_time, int64 local_time, int64 frequency, i
     XMStoreFloat4x4(&proj_tmp, proj);
 
     if (!_scene->lights.empty()) {
-      PROPERTY_MANAGER.set_system_property("LightPos", _scene->lights[0]->pos);
-      PROPERTY_MANAGER.set_system_property("LightColor", _scene->lights[0]->color);
+      PROPERTY_MANAGER.set_property(_light_pos_id, _scene->lights[0]->pos);
+      PROPERTY_MANAGER.set_property(_light_color_id, _scene->lights[0]->color);
     }
 
-    PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
-    PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
+    PROPERTY_MANAGER.set_property(_view_mtx_id, lookat_tmp);
+    PROPERTY_MANAGER.set_property(_proj_mtx_id, proj_tmp);
   }
 
   return true;

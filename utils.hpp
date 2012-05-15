@@ -176,4 +176,12 @@ Value lookup_default(Key str, const std::unordered_map<Key, Value> &candidates, 
 	return it != candidates.end() ? it->second : default_value;
 }
 
+// Add an empty element at the back of the container, and return a ref to it
+template<class Cont>
+typename Cont::value_type &dummy_push_back(Cont *cont) {
+  typedef typename Cont::value_type T;
+  cont->emplace_back(T());
+  return cont->back();
+}
+
 #define RANGE(x) begin(x), end(x)

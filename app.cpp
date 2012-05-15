@@ -307,6 +307,7 @@ bool App::init(HINSTANCE hinstance)
   settings.multi_threaded_message_loop = false;
 #endif
 
+  B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());
   B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
   B_ERR_BOOL(Renderer::create());
@@ -353,6 +354,7 @@ bool App::close() {
   B_ERR_BOOL(Graphics::close());
   B_ERR_BOOL(MaterialManager::close());
   B_ERR_BOOL(ResourceManager::close());
+  B_ERR_BOOL(PropertyManager::close());
   Logger::close();
   Dispatcher::close();
   delete exch_null(_instance);

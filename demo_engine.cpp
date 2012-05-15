@@ -54,6 +54,7 @@ DemoEngine::DemoEngine()
   , _current_time(0)
   , _cur_effect(0)
   , _duration_ms(3 * 60 * 1000)
+  , _time_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_time"))
 {
   QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
 }
@@ -150,7 +151,7 @@ bool DemoEngine::tick() {
     float global_time = current_time_ms / 1000.0f;
     float local_time = (current_time_ms - e->start_time()) / 1000.0f;
     XMFLOAT4 tt(global_time, local_time, 0, 0);
-    PROPERTY_MANAGER.set_system_property("g_time", tt);
+    PROPERTY_MANAGER.set_property(_time_id, tt);
     e->update(current_time_ms, current_time_ms - e->start_time(), ticks_per_s, num_ticks, frac);
     e->render();
   }

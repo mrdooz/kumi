@@ -6,7 +6,7 @@ static const int MAX_SAMPLERS = 8;
 static const int MAX_TEXTURES = 8;
 
 struct MeshRenderData {
-	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
+	MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST), cbuffer_staged(nullptr), cbuffer_len(0) {}
 	GraphicsObjectHandle vb, ib;
 	DXGI_FORMAT index_format;
 	int index_count;
@@ -15,7 +15,9 @@ struct MeshRenderData {
 	D3D_PRIMITIVE_TOPOLOGY topology;
 	GraphicsObjectHandle technique;
 	uint16 material_id;
-	PropertyManager::Id mesh_id;
+	PropertyManager::Token mesh_id;
+  void *cbuffer_staged;
+  int cbuffer_len;
 };
 
 struct TechniqueRenderData {

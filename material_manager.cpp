@@ -39,13 +39,14 @@ void MaterialManager::remove_material(const std::string &name) {
   if (it == end(_materials))
     return;
 
-  _id_to_materials.erase((*it).second->id);
-  _materials.erase(it);
+  assert(!"fix plz!");
+  //_id_to_materials.erase((*it).second->id);
+  //_materials.erase(it);
 }
 
 uint16 MaterialManager::find_material(const string &name) {
   auto it = _materials.find(name);
-  return it != end(_materials) ? it->second->id : -1;
+  return it != end(_materials) ? (uint16)it->second->id : -1;
 }
 
 uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
@@ -56,7 +57,7 @@ uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
   uint16 prev_key = ~0;
   if (it != end(_materials)) {
     if (delete_existing) {
-      prev_key = (*it).second->id;
+      prev_key = (uint16)(*it).second->id;
       _id_to_materials.erase(prev_key);
       _materials.erase(it);
     } else {
@@ -65,17 +66,17 @@ uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
   }
 
   uint16 key = prev_key == (uint16)~0 ? _next_material_id++ : prev_key;
-  material->id = key;
+  material->id = (PropertyManager::Token)key;
   _materials.insert(make_pair(material->name, unique_ptr<Material>(material)));
 
   for (auto i = begin(material->properties); i != end(material->properties); ++i) {
-    const MaterialProperty &p = *i;
+    const Material::Property &p = *i;
     switch (p.type) {
     case PropertyType::kFloat:
-      PROPERTY_MANAGER.set_material_property(key, p.name.c_str(), p._float[0]);
+      PROPERTY_MANAGER.set_property<float>(p.id, p.value.x);
       break;
     case PropertyType::kFloat4:
-      PROPERTY_MANAGER.set_material_property(key, p.name.c_str(), XMFLOAT4(p._float[0], p._float[1], p._float[2], p._float[3]));
+      PROPERTY_MANAGER.set_property<XMFLOAT4>(p.id, p.value);
       break;
     }
   }

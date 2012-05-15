@@ -3,6 +3,7 @@
 #include <queue>
 #include "graphics.hpp"
 #include "json_utils.hpp"
+#include "property_manager.hpp"
 
 struct TweakableParam {
   enum Type {
@@ -135,6 +136,8 @@ private:
 	int64 _last_time;
   int64 _current_time;
   uint32 _duration_ms;
+
+  PropertyManager::PropertyId _time_id;
 	
 	bool _paused;
 };

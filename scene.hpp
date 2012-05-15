@@ -2,30 +2,16 @@
 #include "graphics_submit.hpp"
 
 struct TrackedLocation;
-
-struct SubMesh {
-	SubMesh();
-	~SubMesh();
-	RenderKey key;
-	MeshRenderData data;
-};
-
-struct Mesh {
-	Mesh(const std::string &name) : name(name) { }
-	void submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
-	std::string name;
-	XMFLOAT4X4 obj_to_world;
-	std::vector<SubMesh *> submeshes;
-};
+struct Mesh;
 
 struct Camera {
-	Camera(const std::string &name) : name(name) {}
-	std::string name;
-	XMFLOAT3 pos, target, up;
-	float roll;
-	float aspect_ratio;
-	float fov;
-	float near_plane, far_plane;
+  Camera(const std::string &name) : name(name) {}
+  std::string name;
+  XMFLOAT3 pos, target, up;
+  float roll;
+  float aspect_ratio;
+  float fov;
+  float near_plane, far_plane;
 };
 
 struct Light {
@@ -51,17 +37,21 @@ typedef KeyFrame<XMFLOAT4X4> KeyFrameMatrix;
 
 struct Scene {
 
-	~Scene();
+  ~Scene();
 
-	void submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
-	void submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+  void update();
+
+  void submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+  void submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
   Mesh *find_mesh_by_name(const std::string &name);
 
-  std::map<std::string, Mesh *> _meshes_by_name;
+  bool on_loaded();
 
-	std::vector<Mesh *> meshes;
-	std::vector<Camera *> cameras;
+  std::unordered_map<std::string, Mesh *> _meshes_by_name;
+
+  std::vector<Mesh *> meshes;
+  std::vector<Camera *> cameras;
   std::vector<Light *> lights;
   std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
   std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;

@@ -53,6 +53,7 @@ Graphics::Graphics(ResourceInterface *ri)
   , _vs_profile("vs_4_0")
   , _ps_profile("ps_4_0")
   , _ri(ri)
+  , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_screen_size"))
 {
   assert(!_instance);
 }
@@ -433,7 +434,7 @@ void Graphics::resize(const int width, const int height)
 {
   if (!_swap_chain || width == 0 || height == 0)
     return;
-  PROPERTY_MANAGER.set_system_property("g_screen_size", XMFLOAT4((float)width, (float)height, 0, 0));
+  PROPERTY_MANAGER.set_property(_screen_size_id, XMFLOAT4((float)width, (float)height, 0, 0));
   create_back_buffers(width, height);
 }
 
@@ -755,70 +756,6 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
 
 }
 
-void Graphics::set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id) {
-
-  ID3D11DeviceContext *ctx = _immediate_context;
-
-  vector<CBuffer> &cbuffers = technique->get_cbuffers();
-
-  // copy the parameters into the technique's cbuffer staging area
-  for (size_t i = 0; i < shader->cbuffer_params().size(); ++i) {
-    const CBufferParam &p = shader->cbuffer_params()[i];
-    if (p.cbuffer == -1)
-      continue;
-    const CBuffer &cb = cbuffers[p.cbuffer];
-
-    switch (p.source) {
-
-      case PropertySource::kMaterial:
-        memcpy((void *)&cb.staging[p.start_offset], 
-               &PROPERTY_MANAGER.get_material_property<XMFLOAT4>(material_id, p.name.c_str()), p.size);
-        break;
-
-      case PropertySource::kMesh: {
-          XMFLOAT4X4 mtx = PROPERTY_MANAGER.get_mesh_property<XMFLOAT4X4>(mesh_id, p.name.c_str());
-          memcpy((void *)&cb.staging[p.start_offset], &mtx, p.size);
-          break;
-        }
-
-      case PropertySource::kSystem: {
-        switch (p.type) {
-          case PropertyType::kFloat4: {
-            XMFLOAT4 v = PROPERTY_MANAGER.get_system_property<XMFLOAT4>(p.name.c_str());
-            memcpy((void *)&cb.staging[p.start_offset], &v, p.size);
-            break;
-          }
-
-          case PropertyType::kFloat4x4: {
-            XMFLOAT4X4 v = PROPERTY_MANAGER.get_system_property<XMFLOAT4X4>(p.name.c_str());
-            memcpy((void *)&cb.staging[p.start_offset], &v, p.size);
-            break;
-          }
-        }
-        break;
-      }
-
-      case PropertySource::kUser:
-        break;
-    }
-  }
-
-  // commit the staging area
-  for (auto i = begin(cbuffers); i != end(cbuffers); ++i) {
-    const CBuffer &cb = *i;
-    ID3D11Buffer *buffer = _res._constant_buffers.get(cb.handle);
-    D3D11_MAPPED_SUBRESOURCE sub;
-    ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    float *p = (float *)&cb.staging[0];
-    memcpy(sub.pData, &cb.staging[0], cb.staging.size());
-    ctx->Unmap(buffer, 0);
-    if (shader->type() == Shader::kVertexShader)
-      ctx->VSSetConstantBuffers(0, 1, &buffer);
-    else
-      ctx->PSSetConstantBuffers(0, 1, &buffer);
-  }
-}
-
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
   switch (h._type) {
     case GraphicsObjectHandle::kTexture:
@@ -859,3 +796,6 @@ void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src)
   _immediate_context->CopyResource(_res._textures.get(dst)->texture, _res._textures.get(src)->texture);
 }
 
+Technique *Graphics::get_technique(GraphicsObjectHandle h) {
+  return _res._techniques.get(h);
+}

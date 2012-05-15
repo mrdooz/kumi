@@ -4,6 +4,8 @@
 #include "property.hpp"
 #include "graphics_object_handle.hpp"
 #include "graphics_submit.hpp"
+#include "property_manager.hpp"
+#include "shader.hpp"
 
 struct GraphicsInterface;
 struct ResourceInterface;
@@ -14,137 +16,6 @@ using std::string;
 struct Material;
 class Technique;
 
-namespace PropertySource {
-  enum Enum {
-    kUnknown,
-    kMaterial,
-    kSystem,
-    kUser,
-    kMesh,
-    kTechnique,
-  };
-}
-
-struct ParamBase {
-  ParamBase(const string &name, PropertyType::Enum type, PropertySource::Enum source) : name(name), type(type), source(source), used(true) {}
-  string name;
-  PropertyType::Enum type;
-  PropertySource::Enum source;
-  bool used;
-};
-
-struct CBufferParam : public ParamBase {
-  CBufferParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source), cbuffer(-1) {}
-
-  union DefaultValue {
-    int _int;
-    float _float[16];
-  };
-
-  int cbuffer;
-  int start_offset;  // offset in cbuffer
-  int size;
-  DefaultValue default_value;
-};
-
-struct SamplerParam : public ParamBase {
-  SamplerParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
-  int bind_point;
-};
-
-struct ResourceViewParam : public ParamBase {
-  ResourceViewParam(const string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
-  int bind_point;
-};
-
-class Shader {
-public:
-  enum Type {
-    kVertexShader,
-    kPixelShader,
-    kGeometryShader,
-  };
-
-  Shader(const string &entry_point) : _entry_point(entry_point), _valid(false) {}
-  virtual ~Shader() {}
-
-  CBufferParam *find_cbuffer_param(const char *name) {
-    return find_by_name(name, _cbuffer_params);
-  }
-
-  SamplerParam *find_sampler_param(const char *name) {
-    return find_by_name(name, _sampler_params);
-  }
-
-  ResourceViewParam *find_resource_view_param(const char *name) {
-    return find_by_name(name, _resource_view_params);
-  }
-
-  template<class T>
-  T* find_by_name(const char *name, vector<T> &v) {
-    for (size_t i = 0; i < v.size(); ++i) {
-      if (v[i].name == name)
-        return &v[i];
-    }
-    return NULL;
-  }
-
-  virtual void set_buffers() = 0;
-  virtual Type type() const = 0;
-  bool is_valid() const { return _valid; }
-  void set_source_filename(const string &filename) { _source_filename = filename; }
-  const string &source_filename() const { return _source_filename; }
-  void set_entry_point(const string &entry_point) { _entry_point = entry_point; }
-  const string &entry_point() const { return _entry_point; }
-  void set_obj_filename(const string &filename) { _obj_filename = filename; }
-  const string &obj_filename() const { return _obj_filename; }
-
-  vector<CBufferParam> &cbuffer_params() { return _cbuffer_params; }
-  vector<SamplerParam> &sampler_params() { return _sampler_params; }
-  vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
-
-  void set_handle(GraphicsObjectHandle handle) { _handle = handle; }
-  GraphicsObjectHandle handle() const { return _handle; }
-  void validate() { _valid = true; } // tihi
-
-  std::string id() const;
-
-private:
-
-  bool _valid;
-  string _source_filename;
-  string _obj_filename;
-  string _entry_point;
-  vector<CBufferParam> _cbuffer_params;
-  vector<SamplerParam> _sampler_params;
-  vector<ResourceViewParam> _resource_view_params;
-  GraphicsObjectHandle _handle;
-};
-
-struct VertexShader : public Shader{
-  VertexShader() : Shader("vs_main") {}
-  virtual void set_buffers() {
-  }
-  virtual Type type() const { return kVertexShader; }
-};
-
-struct PixelShader : public Shader {
-  PixelShader() : Shader("ps_main") {}
-  virtual void set_buffers() {
-  }
-  virtual Type type() const { return kPixelShader; }
-};
-
-struct CBuffer {
-  CBuffer(const string &name, int size, GraphicsObjectHandle handle) 
-    : name(name), handle(handle) 
-  {
-    staging.resize(size);
-  }
-  string name;
-  vector<uint8> staging;
-  GraphicsObjectHandle handle;
-};
 
 class Technique {
   friend class TechniqueParser;

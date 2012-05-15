@@ -9,6 +9,7 @@
 #include "../material.hpp"
 #include "../renderer.hpp"
 #include "../logger.hpp"
+#include "../mesh.hpp"
 
 VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
@@ -29,7 +30,7 @@ bool VolumetricEffect::init() {
     XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
     XMFLOAT4X4 tmp;
     XMStoreFloat4x4(&tmp, mtx);
-    PROPERTY_MANAGER.set_mesh_property((PropertyManager::Id)_scene->meshes[i], "world", tmp);
+    //PROPERTY_MANAGER.set_mesh_property(_scene->meshes[i], "world", tmp);
   }
 
   MaterialManager &m = MATERIAL_MANAGER;
@@ -89,12 +90,13 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
     XMStoreFloat4x4(&proj_tmp, proj);
 
     if (!_scene->lights.empty()) {
-      PROPERTY_MANAGER.set_system_property("LightPos", _scene->lights[0]->pos);
-      PROPERTY_MANAGER.set_system_property("LightColor", _scene->lights[0]->color);
+      // TODO, make this id based
+      //PROPERTY_MANAGER.set_system_property("LightPos", _scene->lights[0]->pos);
+      //PROPERTY_MANAGER.set_system_property("LightColor", _scene->lights[0]->color);
     }
 
-    PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
-    PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
+    //PROPERTY_MANAGER.set_system_property("view", lookat_tmp);
+    //PROPERTY_MANAGER.set_system_property("proj", proj_tmp);
   }
 
   return true;

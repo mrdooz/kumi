@@ -640,10 +640,10 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
 		scope->munch(kSymSemicolon);
 		switch (prop_type) {
 			case PropertyType::kFloat:
-				material->properties.push_back(MaterialProperty(name, out[0]));
+        material->add_property(name, out[4]);
 				break;
 			case PropertyType::kFloat4:
-				material->properties.push_back(MaterialProperty(name, XMFLOAT4(out[0], out[1], out[2], out[3])));
+        material->add_property(name, XMFLOAT4(out[0], out[1], out[2], out[3]));
 				break;
 			default:
 				THROW_ON_FALSE(false);

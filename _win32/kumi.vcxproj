@@ -156,11 +156,13 @@
     <ClCompile Include="..\logger.cpp" />
     <ClCompile Include="..\log_server.cpp" />
     <ClCompile Include="..\material_manager.cpp" />
+    <ClCompile Include="..\mesh.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
     <ClCompile Include="..\property_manager.cpp" />
     <ClCompile Include="..\renderer.cpp" />
     <ClCompile Include="..\resource_manager.cpp" />
     <ClCompile Include="..\scene.cpp" />
+    <ClCompile Include="..\shader.cpp" />
     <ClCompile Include="..\stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -207,6 +209,7 @@
     <ClInclude Include="..\log_server.hpp" />
     <ClInclude Include="..\material.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
+    <ClInclude Include="..\mesh.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
     <ClInclude Include="..\property.hpp" />
     <ClInclude Include="..\property_manager.hpp" />
@@ -214,6 +217,7 @@
     <ClInclude Include="..\resource_interface.hpp" />
     <ClInclude Include="..\resource_manager.hpp" />
     <ClInclude Include="..\scene.hpp" />
+    <ClInclude Include="..\shader.hpp" />
     <ClInclude Include="..\stdafx.h" />
     <ClInclude Include="..\string_utils.hpp" />
     <ClInclude Include="..\technique.hpp" />

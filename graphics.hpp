@@ -6,6 +6,7 @@
 #include "graphics_object_handle.hpp"
 #include "graphics_interface.hpp"
 #include "technique.hpp"
+#include "property_manager.hpp"
 #include <D3DX11tex.h>
 #include <functional>
 
@@ -207,6 +208,7 @@ public:
 	void size(int *width, int *height) const { *width = _width; *height = _height; }
 
 	bool load_techniques(const char *filename, bool add_materials);
+  Technique *get_technique(GraphicsObjectHandle h);
 	GraphicsObjectHandle find_technique(const char *name);
   void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
   GraphicsObjectHandle get_sampler_state(const char *technique, const char *sampler_state);
@@ -220,7 +222,6 @@ public:
 
 	GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
-	void set_cbuffer_params(Technique *technique, Shader *shader, uint16 material_id, intptr_t mesh_id);
 	void set_samplers(Technique *technique, Shader *shader);
 	void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
 	void unbind_resource_views(int resource_bitmask);
@@ -278,6 +279,7 @@ private:
   CComPtr<IFW1Factory> _fw1_factory;
 #endif
 
+  PropertyManager::PropertyId _screen_size_id;
 };
 
 #define GRAPHICS Graphics::instance()

@@ -100,8 +100,8 @@ void Renderer::render() {
         ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), 
           GRAPHICS.default_sample_mask());
 
-        GRAPHICS.set_cbuffer_params(technique, vertex_shader, -1, -1);
-        GRAPHICS.set_cbuffer_params(technique, pixel_shader, -1, -1);
+        //GRAPHICS.set_cbuffer_params(technique, vertex_shader, -1, -1);
+        //GRAPHICS.set_cbuffer_params(technique, pixel_shader, -1, -1);
         GRAPHICS.set_samplers(technique, pixel_shader);
         int resource_mask = 0;
         GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
@@ -140,9 +140,20 @@ void Renderer::render() {
         ctx->RSSetState(res->_rasterizer_states.get(technique->rasterizer_state()));
         ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(technique->depth_stencil_state()), ~0);
         ctx->OMSetBlendState(res->_blend_states.get(technique->blend_state()), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
+/*
         GRAPHICS.set_cbuffer_params(technique, vertex_shader, material_id, render_data->mesh_id);
         GRAPHICS.set_cbuffer_params(technique, pixel_shader, material_id, render_data->mesh_id);
+*/
+
+        GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
+        ID3D11Buffer *buffer = res->_constant_buffers.get(cb);
+        D3D11_MAPPED_SUBRESOURCE sub;
+        ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+        memcpy(sub.pData, render_data->cbuffer_staged, render_data->cbuffer_len);
+        ctx->Unmap(buffer, 0);
+        ctx->VSSetConstantBuffers(0, 1, &buffer);
+        ctx->PSSetConstantBuffers(0, 1, &buffer);
+
         GRAPHICS.set_samplers(technique, pixel_shader);
         int resource_mask;
         GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);

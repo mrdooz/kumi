@@ -6,6 +6,7 @@
 #include "graphics.hpp"
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
+#include "mesh.hpp"
 
 #define FILE_VERSION 4
 
@@ -85,22 +86,22 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
       const char *material_name = read_and_step<const char *>(&buf);
       SubMesh *submesh = new SubMesh;
       mesh->submeshes.push_back(submesh);
-      submesh->data.material_id = _material_ids[material_name];
+      submesh->render_data.material_id = _material_ids[material_name];
       // set the default technique for the material
       GraphicsObjectHandle h = GRAPHICS.find_technique(_default_techniques[material_name].c_str());
-      submesh->data.technique = h;
+      submesh->render_data.technique = h;
       const int vb_flags = read_and_step<int>(&buf);
-      submesh->data.vertex_size = read_and_step<int>(&buf);
-      submesh->data.index_format = index_size_to_format(read_and_step<int>(&buf));
+      submesh->render_data.vertex_size = read_and_step<int>(&buf);
+      submesh->render_data.index_format = index_size_to_format(read_and_step<int>(&buf));
       const int *vb = read_and_step<const int*>(&buf);
       const int vb_size = *vb;
-      submesh->data.vertex_count = vb_size / submesh->data.vertex_size;
-      submesh->data.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
+      submesh->render_data.vertex_count = vb_size / submesh->render_data.vertex_size;
+      submesh->render_data.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
       const int *ib = read_and_step<const int*>(&buf);
       const int ib_size = *ib;
-      submesh->data.index_count = ib_size / index_format_to_size(submesh->data.index_format);
-      submesh->data.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
-      submesh->data.mesh_id = (PropertyManager::Id)mesh;
+      submesh->render_data.index_count = ib_size / index_format_to_size(submesh->render_data.index_format);
+      submesh->render_data.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
+      submesh->render_data.mesh_id = (PropertyManager::Token)mesh;
     }
   }
 
@@ -179,33 +180,39 @@ bool KumiLoader::load_materials(const uint8 *buf) {
     technique = read_and_step<const char *>(&buf);
     _default_techniques[name] = technique;
     Material *material = new Material(name);
+    _material_ids[material->name] = MATERIAL_MANAGER.add_material(material, true);
+
     int props = read_and_step<int>(&buf);
     for (int j = 0; j < props; ++j) {
       const char *name = read_and_step<const char *>(&buf);
       PropertyType::Enum type = read_and_step<PropertyType::Enum>(&buf);
 
       switch (type) {
-
+/*
         case PropertyType::kInt:
           material->properties.push_back(MaterialProperty(name, read_and_step<int>(&buf)));
           break;
-
+*/
         case PropertyType::kFloat:
-          material->properties.push_back(MaterialProperty(name, read_and_step<float>(&buf)));
+          material->add_property(name, read_and_step<float>(&buf));
           break;
 
-        case PropertyType::kFloat3:
-          // note, this is converted to XMFLOAT4 internally
-          material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT3>(&buf)));
+        case PropertyType::kFloat3: {
+          XMFLOAT3 tmp = read_and_step<XMFLOAT3>(&buf);
+          material->add_property(name, XMFLOAT4(tmp.x, tmp.y, tmp.z, 0));
           break;
+        }
 
         case PropertyType::kFloat4:
-          material->properties.push_back(MaterialProperty(name, read_and_step<XMFLOAT4>(&buf)));
+          material->add_property(name, read_and_step<XMFLOAT4>(&buf));
+          break;
+
+        default:
+          LOG_ERROR_LN("Unknown material type");
           break;
 
       }
     }
-    _material_ids[material->name] = MATERIAL_MANAGER.add_material(material, true);
   }
 
   return true;
@@ -239,6 +246,8 @@ bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene *
   B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
   B_ERR_BOOL(load_lights(&scene_data[0] + header.light_ofs, s));
   B_ERR_BOOL(load_animation(&scene_data[0] + header.animation_ofs, s));
+
+  B_ERR_BOOL(s->on_loaded());
 
   return true;
 }
