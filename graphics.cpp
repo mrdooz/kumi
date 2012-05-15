@@ -21,7 +21,10 @@ namespace
 {
   template <class T>
   void set_private_data(const TrackedLocation &loc, T *t) {
-    t->SetPrivateData(WKPDID_D3DDebugObjectName, loc.function.size(), loc.function.c_str());
+#if WITH_TRACKED_LOCATION
+    t->SetPrivateData(WKPDID_D3DDebugObjectName, strlen(loc.function), loc.function);
+#else
+#endif
   }
 
   HRESULT create_buffer_inner(const TrackedLocation &loc, ID3D11Device* device, const D3D11_BUFFER_DESC& desc, const void* data, ID3D11Buffer** buffer)

@@ -5,11 +5,13 @@
 #define WITH_ZMQ_LOGSERVER 0
 #define WITH_WEBSOCKETS 0
 #define WITH_GWEN 0
+#define WITH_TRACKED_LOCATION 0
 #else
 #define WITH_CEF 0
 #define WITH_ZMQ_LOGSERVER 0
 #define WITH_WEBSOCKETS 1
 #define WITH_GWEN 0
+#define WITH_TRACKED_LOCATION 1
 #endif
 
 #if WITH_CEF
