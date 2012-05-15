@@ -47,23 +47,12 @@ void Renderer::render() {
   stable_sort(begin(_render_commands), end(_render_commands), 
     [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
 
-  // delete commands are sorted before render commands, so we can just save the
-  // deleted items when we find them
-  set<void *> deleted_items;
-
   for (size_t i = 0; i < _render_commands.size(); ++i) {
     const RenderCmd &cmd = _render_commands[i];
     RenderKey key = cmd.key;
     void *data = cmd.data;
 
-    if (deleted_items.find(data) != deleted_items.end())
-      continue;
-
     switch (key.cmd) {
-
-      case RenderKey::kDelete:
-        deleted_items.insert(data);
-        break;
 
       case RenderKey::kSetRenderTarget: {
         GraphicsObjectHandle h = key.handle;
@@ -102,6 +91,16 @@ void Renderer::render() {
 
         //GRAPHICS.set_cbuffer_params(technique, vertex_shader, -1, -1);
         //GRAPHICS.set_cbuffer_params(technique, pixel_shader, -1, -1);
+/*
+        GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
+        ID3D11Buffer *buffer = res->_constant_buffers.get(cb);
+        D3D11_MAPPED_SUBRESOURCE sub;
+        ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+        memcpy(sub.pData, render_data->cbuffer_staged, render_data->cbuffer_len);
+        ctx->Unmap(buffer, 0);
+        ctx->VSSetConstantBuffers(0, 1, &buffer);
+        ctx->PSSetConstantBuffers(0, 1, &buffer);
+*/
         GRAPHICS.set_samplers(technique, pixel_shader);
         int resource_mask = 0;
         GRAPHICS.set_resource_views(technique, pixel_shader, &resource_mask);
@@ -121,8 +120,6 @@ void Renderer::render() {
 
       case RenderKey::kRenderMesh: {
         MeshRenderData *render_data = (MeshRenderData *)data;
-        const uint16 material_id = render_data->material_id;
-        const Material *material = MATERIAL_MANAGER.get_material(material_id);
         Technique *technique = res->_techniques.get(render_data->technique);
         Shader *vertex_shader = technique->vertex_shader();
         Shader *pixel_shader = technique->pixel_shader();
@@ -248,8 +245,8 @@ void Renderer::validate_command(RenderKey key, const void *data) {
 
     case RenderKey::kRenderMesh: {
       MeshRenderData *render_data = (MeshRenderData *)data;
-      const uint16 material_id = render_data->material_id;
-      const Material *material = MATERIAL_MANAGER.get_material(material_id);
+      //const uint16 material_id = render_data->material_id;
+      //const Material *material = MATERIAL_MANAGER.get_material(material_id);
       Technique *technique = res->_techniques.get(render_data->technique);
       assert(technique);
       Shader *vertex_shader = technique->vertex_shader();

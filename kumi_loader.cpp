@@ -86,7 +86,7 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
       const char *material_name = read_and_step<const char *>(&buf);
       SubMesh *submesh = new SubMesh;
       mesh->submeshes.push_back(submesh);
-      submesh->render_data.material_id = _material_ids[material_name];
+      submesh->material_id = _material_ids[material_name];
       // set the default technique for the material
       GraphicsObjectHandle h = GRAPHICS.find_technique(_default_techniques[material_name].c_str());
       submesh->render_data.technique = h;
@@ -101,7 +101,6 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
       const int ib_size = *ib;
       submesh->render_data.index_count = ib_size / index_format_to_size(submesh->render_data.index_format);
       submesh->render_data.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
-      submesh->render_data.mesh_id = (PropertyManager::Token)mesh;
     }
   }
 

@@ -4,6 +4,7 @@
 #include "property_manager.hpp"
 
 struct TrackedLocation;
+struct SubMesh;
 
 struct SubMesh {
   SubMesh();
@@ -22,6 +23,7 @@ struct SubMesh {
 
   RenderKey render_key;
   MeshRenderData render_data;
+  uint32 material_id;
 };
 
 struct Mesh {

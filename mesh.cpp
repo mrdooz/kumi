@@ -35,8 +35,9 @@ void Mesh::submit(const TrackedLocation &location, uint16 seq_nr, int material_i
     if (material_override || technique_override) {
       p = RENDERER.alloc_command_data<MeshRenderData>();
       *p = s->render_data;
-      if (material_override)
-        p->material_id = (uint16)material_id;
+      // TODO: handle override by creating a tmp cbuffer
+      //if (material_override)
+        //p->material_id = (uint16)material_id;
       if (technique_override)
         p->technique = technique;
     } else {
@@ -59,6 +60,7 @@ void Mesh::prepare_cbuffer() {
     Shader *ps = technique->pixel_shader();
 
     int cbuffer_size = 0;
+    void *that = this;  // i am sooo proud of this :)
     auto collect_params = [&](const std::vector<CBufferParam> &params) {
       for (auto j = begin(params), e = end(params); j != e; ++j) {
         const CBufferParam &param = *j;
@@ -72,10 +74,10 @@ void Mesh::prepare_cbuffer() {
             var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
             break;
           case PropertySource::kMesh:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)submesh->render_data.mesh_id, var.len, nullptr);
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), that, var.len, nullptr);
             break;
           case PropertySource::kMaterial:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)submesh->render_data.material_id, var.len, nullptr);
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)submesh->material_id, var.len, nullptr);
             break;
           }
         }
