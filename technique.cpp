@@ -5,6 +5,7 @@
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
 #include "path_utils.hpp"
+#include "graphics.hpp"
 
 using namespace boost::assign;
 using namespace std;
@@ -319,4 +320,17 @@ GraphicsObjectHandle Technique::sampler_state(const char *name) const {
       return p.first == name; 
   });
   return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
+}
+
+void Technique::get_render_objects(RenderObjects *obj) {
+  obj->vs = _vertex_shader->handle();
+  obj->gs = GraphicsObjectHandle();
+  obj->ps = _pixel_shader->handle();
+  obj->layout = _input_layout;
+  obj->rs = _rasterizer_state;
+  obj->dss = _depth_stencil_state;
+  obj->bs = _blend_state;
+  obj->stencil_ref = GRAPHICS.default_stencil_ref();
+  memcpy(obj->blend_factors, GRAPHICS.default_blend_factors(), sizeof(obj->blend_factors));
+  obj->sample_mask = GRAPHICS.default_sample_mask();
 }

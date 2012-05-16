@@ -65,8 +65,9 @@ var KUMI = (function($) {
         websocket.onmessage = function(e) {
             var res = JSON.parse(e.data);
 
-            if (res['system.ms'] !== undefined) {
-                var fps = 1000 * res['system.ms'];
+            if (res['system.fps'] !== undefined) {
+                var fps = res['system.fps'];
+                //var fps = 1000 * res['system.ms'];
                 fps_series.append(new Date().getTime(), fps);
                 $('#cur-fps').text(fps.toFixed(2) + ' fps');
             } else if (res.demo) {

@@ -16,6 +16,17 @@ using std::string;
 struct Material;
 class Technique;
 
+#pragma pack(push, 1)
+struct RenderObjects {
+  GraphicsObjectHandle vs, gs, ps;
+  GraphicsObjectHandle layout;
+  GraphicsObjectHandle rs, dss, bs;
+  UINT stencil_ref;
+  float blend_factors[4];
+  UINT sample_mask;
+  GraphicsObjectHandle samplers[8];
+};
+#pragma pack(pop)
 
 class Technique {
   friend class TechniqueParser;
@@ -30,6 +41,8 @@ public:
   Shader *pixel_shader() { return _pixel_shader; }
 
   vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
+
+  void get_render_objects(RenderObjects *obj);
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }

@@ -10,8 +10,6 @@ SubMesh::SubMesh()
 }
 
 SubMesh::~SubMesh() {
-  render_key.cmd = RenderKey::kDelete;
-  RENDERER.submit_command(FROM_HERE, render_key, (void *)&render_data);
 }
 
 void SubMesh::update() {
