@@ -39,9 +39,6 @@ private:
 
   std::unique_ptr<uint8> _effect_data;
   int _effect_data_ofs;
-
-  std::vector<uint8> _cmd_buffer;
-
 };
 
 #define RENDERER Renderer::instance()
