@@ -32,10 +32,6 @@
 #include "gwen/Controls/StatusBar.h"
 #endif
 
-#if WITH_CEF
-#include "v8_handler.hpp"
-#endif
-
 using std::swap;
 using namespace threading;
 
@@ -51,205 +47,6 @@ const TCHAR *g_app_window_title = _T("kumi - magnus österlind");
 #define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
 #endif
 
-#if WITH_CEF
-#pragma comment(lib, "libcef.lib")
-#pragma comment(lib, "libcef_dll_wrapper.lib")
-
-#define REQUIRE_UI_THREAD()
-
-void App::OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, const void* buffer) {
-  D3D11_MAPPED_SUBRESOURCE sub;
-  GRAPHICS.map(_cef_staging, 0, D3D11_MAP_WRITE, 0, &sub);
-  uint8_t *dst = (uint8_t *)sub.pData + 4 * dirtyRect.x + dirtyRect.y * sub.RowPitch;
-  uint8_t *src = (uint8_t *)buffer + 4 * (dirtyRect.x + dirtyRect.y * _width);
-  const int src_pitch = _width * 4;
-  for (int i = 0; i < dirtyRect.height; ++i) {
-    memcpy(dst, src, src_pitch);
-    dst += sub.RowPitch;
-    src += src_pitch;
-  }
-  GRAPHICS.unmap(_cef_staging, 0);
-  GRAPHICS.copy_resource(_cef_texture, _cef_staging);
-}
-
-void App::OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor)
-{
-  REQUIRE_UI_THREAD();
-
-  // Change the plugin window's cursor.
-  SetClassLong(_hwnd, GCL_HCURSOR, static_cast<LONG>(reinterpret_cast<LONG_PTR>(cursor)));
-  SetCursor(cursor);
-}
-
-bool App::GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
-{
-  REQUIRE_UI_THREAD();
-
-  // The simulated screen and view rectangle are the same. This is necessary
-  // for popup menus to be located and sized inside the view.
-  rect.x = rect.y = 0;
-  rect.width = _width;
-  rect.height = _height;
-  return true;
-}
-
-bool App::GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect)
-{
-  return GetViewRect(browser, rect);
-}
-
-bool App::GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY)
-{
-  REQUIRE_UI_THREAD();
-
-  // Convert the point from view coordinates to actual screen coordinates.
-  POINT screen_pt = {viewX, viewY};
-  MapWindowPoints(_hwnd, HWND_DESKTOP, &screen_pt, 1);
-  screenX = screen_pt.x;
-  screenY = screen_pt.y;
-  return true;
-}
-
-
-void App::OnAfterCreated(CefRefPtr<CefBrowser> browser)
-{
-  REQUIRE_UI_THREAD();
-
-  AutoLock lock_scope(this);
-  if(!browser->IsPopup())
-  {
-    // We need to keep the main child window, but not popup windows
-    m_Browser = browser;
-    _browser_hwnd = browser->GetWindowHandle();
-    browser->SetSize(PET_VIEW, _width, _height);
-  }
-}
-
-void App::OnBeforeClose(CefRefPtr<CefBrowser> browser)
-{
-  REQUIRE_UI_THREAD();
-
-  if(_browser_hwnd == browser->GetWindowHandle()) {
-    // Free the browser pointer so that the browser can be destroyed
-    m_Browser = NULL;
-  }
-}
-
-void App::OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame)
-{
-  REQUIRE_UI_THREAD();
-
-  if(!browser->IsPopup() && frame->IsMain()) {
-    // We've just started loading a page
-    SetLoading(true);
-  }
-}
-
-void App::OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode)
-{
-  REQUIRE_UI_THREAD();
-
-  if(!browser->IsPopup() && frame->IsMain()) {
-    // We've just finished loading a page
-    SetLoading(false);
-
-    CefRefPtr<CefDOMVisitor> visitor = GetDOMVisitor(frame->GetURL());
-    if(visitor.get())
-      frame->VisitDOM(visitor);
-  }
-}
-
-bool App::OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
-                      const CefString& failedUrl, CefString& errorText)
-{
-  REQUIRE_UI_THREAD();
-
-  if(errorCode == ERR_CACHE_MISS) {
-    // Usually caused by navigating to a page with POST data via back or
-    // forward buttons.
-    errorText = "<html><head><title>Expired Form Data</title></head>"
-      "<body><h1>Expired Form Data</h1>"
-      "<h2>Your form request has expired. "
-      "Click reload to re-submit the form data.</h2></body>"
-      "</html>";
-  } else {
-    // All other messages.
-    std::stringstream ss;
-    ss <<       "<html><head><title>Load Failed</title></head>"
-      "<body><h1>Load Failed</h1>"
-      "<h2>Load of URL " << std::string(failedUrl) <<
-      " failed with error code " << static_cast<int>(errorCode) <<
-      ".</h2></body>"
-      "</html>";
-    errorText = ss.str();
-  }
-
-  return false;
-}
-
-std::string App::GetLogFile()
-{
-  AutoLock lock_scope(this);
-  return m_LogFile;
-}
-
-void App::SetLastDownloadFile(const std::string& fileName)
-{
-  AutoLock lock_scope(this);
-  m_LastDownloadFile = fileName;
-}
-
-std::string App::GetLastDownloadFile()
-{
-  AutoLock lock_scope(this);
-  return m_LastDownloadFile;
-}
-
-void App::AddDOMVisitor(const std::string& path, CefRefPtr<CefDOMVisitor> visitor)
-{
-  AutoLock lock_scope(this);
-  DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
-  if (it == m_DOMVisitors.end())
-    m_DOMVisitors.insert(std::make_pair(path, visitor));
-  else
-    it->second = visitor;
-}
-
-CefRefPtr<CefDOMVisitor> App::GetDOMVisitor(const std::string& path)
-{
-  AutoLock lock_scope(this);
-  DOMVisitorMap::iterator it = m_DOMVisitors.find(path);
-  if (it != m_DOMVisitors.end())
-    return it->second;
-  return NULL;
-}
-
-bool App::OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatures& popupFeatures, 
-                        CefWindowInfo& windowInfo, const CefString& url, CefRefPtr<CefClient>& client, 
-                        CefBrowserSettings& settings)
-{
-  REQUIRE_UI_THREAD();
-
-  return false;
-}
-
-
-void App::SetLoading(bool isLoading)
-{
-  //ASSERT(m_EditHwnd != NULL && m_ReloadHwnd != NULL && m_StopHwnd != NULL);
-  EnableWindow(_edit_hwnd, TRUE);
-  EnableWindow(_reload_hwnd, !isLoading);
-  EnableWindow(_stop_hwnd, isLoading);
-}
-
-void App::SetNavState(bool canGoBack, bool canGoForward)
-{
-  //ASSERT(m_BackHwnd != NULL && m_ForwardHwnd != NULL);
-  EnableWindow(_back_hwnd, canGoBack);
-  EnableWindow(_forward_hwnd, canGoForward);
-}
-#endif // #if WITH_CEF
-
 App::App()
   : GreedyThread(threading::kMainThread)
   , _hinstance(NULL)
@@ -261,15 +58,7 @@ App::App()
   , _cur_camera(1)
   , _draw_plane(false)
   , _ref_count(1)
-#if WITH_CEF
-  , _main_hwnd(NULL)
-  , _browser_hwnd(NULL)
-  , _edit_hwnd(NULL)
-  , _back_hwnd(NULL)
-  , _forward_hwnd(NULL)
-  , _stop_hwnd(NULL)
-  , _reload_hwnd(NULL)
-#endif
+  , _frame_time(0)
 {
   find_app_root();
 }
@@ -301,11 +90,6 @@ bool App::init(HINSTANCE hinstance)
   _hinstance = hinstance;
   _width = 800; //GetSystemMetrics(SM_CXSCREEN) / 2;
   _height = 600; //GetSystemMetrics(SM_CYSCREEN) / 2;
-
-#if WITH_CEF
-  CefSettings settings;
-  settings.multi_threaded_message_loop = false;
-#endif
 
   B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());
@@ -430,11 +214,11 @@ UINT App::run(void *userdata) {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
-      process_deferred();
 
-#if WITH_CEF
-      CefDoMessageLoopWork();
-#endif
+      LARGE_INTEGER start, end;
+      QueryPerformanceCounter(&start);
+
+      process_deferred();
 
       GRAPHICS.clear(XMFLOAT4(0,0,0,1));
       DEMO_ENGINE.tick();
@@ -447,57 +231,22 @@ UINT App::run(void *userdata) {
 #endif
       RENDERER.render();
       GRAPHICS.present();
+
+      QueryPerformanceCounter(&end);
+      int64 delta = end.QuadPart - start.QuadPart;
+      double cur_frame = delta / (double)freq.QuadPart;
+      if (_frame_time > 0) {
+        double p = 0.4;
+        _frame_time = p * _frame_time + (1-p) * cur_frame;
+      } else {
+        _frame_time = cur_frame;
+      }
+
     }
   }
   return 0;
 }
 
-/*
-int funky(int a, float b, CefString c) {
-  return 42;
-}
-
-CefString monkey(CefString c) {
-  return CefString("apa");
-}
-
-void monkey2(int a) {
-
-}
-
-
-struct something {
-  something() : a(20) {}
-  int inner(bool) {
-    return 10;
-  }
-  int a;
-};
-*/
-
-/*
-void InitExtensionTest()
-{
-
-//make_funky(&something::inner);
-
-something *a = new something;
-//auto x = boost::bind(&something::inner, a);
-//make_funky(x);
-
-MyV8Handler *vv = new MyV8Handler;
-
-vv->AddFunction("funky", "funky", funky);
-vv->AddFunction("funky2", "funky", funky);
-vv->AddFunction("monkey", "monkey", monkey);
-vv->AddFunction("monkey2", "monkey2", monkey2);
-
-vv->AddFunction("xxx", "xxx", a, &something::inner);
-vv->AddVariable("apa", &apa);
-vv->AddVariable("apa2", &a->a);
-vv->Register();
-}
-*/
 LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
 {
 
@@ -510,36 +259,11 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_KILLFOCUS:
     {
       SetFocus(_instance->_hwnd);
-#if WITH_CEF
-      if (GetBrowser())
-        GetBrowser()->SetFocus(message == WM_SETFOCUS);
-#endif
     }
     return 0;
 
   case WM_SIZE:
     GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
-#if WITH_CEF
-    _cef_texture = GRAPHICS.create_texture(
-      CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, D3D11_BIND_SHADER_RESOURCE, 
-      D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE),
-      "cef_texture");
-
-    _cef_staging = GRAPHICS.create_texture(
-      CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_B8G8R8A8_UNORM, _width, _height, 1, 1, 0, D3D11_USAGE_STAGING, 
-      D3D11_CPU_ACCESS_WRITE),
-      "cef_staging");
-
-    if (GetBrowserHwnd()) {
-      RECT rect;
-      GetClientRect(hWnd, &rect);
-      HDWP hdwp = BeginDeferWindowPos(1);
-      hdwp = DeferWindowPos(hdwp, GetBrowserHwnd(), 0, rect.left, rect.top, rect.right - rect.left, 
-        rect.bottom - rect.top, SWP_NOZORDER);
-      EndDeferWindowPos(hdwp);
-      GetBrowser()->SetSize(PET_VIEW, rect.right - rect.left, rect.bottom - rect.top);
-    }
-#endif
     break;
 
   case WM_APP_CLOSE:
@@ -558,19 +282,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     {
       _instance->_hwnd = hWnd;
       B_ERR_BOOL(GRAPHICS.init(hWnd, _instance->_width, _instance->_height));
-#if WITH_CEF
-      CefWindowInfo info;
-      info.m_bIsTransparent = TRUE;
-      CefBrowserSettings settings;
-
-      RECT rect;
-      GetClientRect(hWnd, &rect);
-      info.SetAsOffScreen(hWnd);
-      info.SetIsTransparent(TRUE);
-      CefBrowser::CreateBrowser(info, CefRefPtr<CefClient>(this), "file://C:/temp/tjong.html", settings);
-#endif
-      //InitExtensionTest();
-      //CefBrowser::CreateBrowser(info, static_cast<CefRefPtr<CefClient> >(this), "http://www.google.com", settings);
     }
     break;
 
@@ -581,34 +292,14 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_LBUTTONUP:
   case WM_MBUTTONUP:
   case WM_RBUTTONUP:
-#if WITH_CEF
-    if (GetBrowser()) {
-      if (GetCapture() == hWnd)
-        ReleaseCapture();
-      cef_mouse_button_type_t btn = message == WM_LBUTTONUP ? MBT_LEFT : (message == WM_MBUTTONUP ? MBT_MIDDLE : MBT_RIGHT);
-      GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, true, 1);
-    }
-#endif
     break;
 
   case WM_LBUTTONDOWN:
   case WM_MBUTTONDOWN:
   case WM_RBUTTONDOWN:
-#if WITH_CEF
-    if (GetBrowser()) {
-      SetCapture(hWnd);
-      SetFocus(hWnd);
-      cef_mouse_button_type_t btn = message == WM_LBUTTONDOWN ? MBT_LEFT : (message == WM_MBUTTONDOWN ? MBT_MIDDLE : MBT_RIGHT);
-      GetBrowser()->SendMouseClickEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), btn, false, 1);
-    }
-#endif
     break;
 
   case WM_MOUSEMOVE:
-#if WITH_CEF
-    if (GetBrowser())
-      GetBrowser()->SendMouseMoveEvent(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), false);
-#endif
     break;
 
   case WM_MOUSEWHEEL:
@@ -639,22 +330,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
   case WM_CHAR:
   case WM_SYSCHAR:
   case WM_IME_CHAR:
-#if WITH_CEF
-    if (GetBrowser()) {
-      const CefBrowser::KeyType type = 
-        (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) ? KT_KEYDOWN :
-        (message == WM_KEYUP || message == WM_SYSKEYUP) ? KT_KEYUP :
-        KT_CHAR;
-
-      const bool sys_char = message == WM_SYSKEYDOWN || message == WM_SYSKEYUP || message == WM_SYSCHAR;
-      const bool ime_char = message == WM_IME_CHAR;
-
-      if (wParam == VK_F5)
-        GetBrowser()->Reload();
-      else
-        GetBrowser()->SendKeyEvent(type, wParam, lParam, sys_char, ime_char);
-    }
-#endif
     break;
 
   }

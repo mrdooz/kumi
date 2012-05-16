@@ -52,9 +52,6 @@ namespace Gwen {
 #endif
 
 class App : 
-#if WITH_CEF 
-  public CefClient, public CefLifeSpanHandler, public CefLoadHandler, public CefRenderHandler, 
-#endif
   public threading::GreedyThread
 {
 public:
@@ -70,6 +67,7 @@ public:
   void on_idle();
 
   void debug_text(const char *fmt, ...);
+  double frame_time() const { return _frame_time; }
 
 private:
   DISALLOW_COPY_AND_ASSIGN(App);
@@ -80,99 +78,11 @@ private:
   void set_client_size();
   void find_app_root();
 
+
   static LRESULT CALLBACK wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
-  //static LRESULT CALLBACK tramp_wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
-#if WITH_CEF
-  // CefClient methods
-  virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() OVERRIDE { return this; }
-  virtual CefRefPtr<CefLoadHandler> GetLoadHandler() OVERRIDE { return this; }
-  virtual CefRefPtr<CefRenderHandler> GetRenderHandler() OVERRIDE { return this; }
-
-  // CefLifeSpanHandler methods
-  virtual bool OnBeforePopup(CefRefPtr<CefBrowser> parentBrowser, const CefPopupFeatures& popupFeatures, 
-                             CefWindowInfo& windowInfo, const CefString& url, CefRefPtr<CefClient>& client, 
-                             CefBrowserSettings& settings) OVERRIDE;
-  virtual void OnAfterCreated(CefRefPtr<CefBrowser> browser) OVERRIDE;
-  virtual void OnBeforeClose(CefRefPtr<CefBrowser> browser) OVERRIDE;
-
-  // CefLoadHandler methods
-  virtual void OnLoadStart(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame) OVERRIDE;
-  virtual void OnLoadEnd(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, int httpStatusCode) OVERRIDE;
-  virtual bool OnLoadError(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, ErrorCode errorCode, 
-                           const CefString& failedUrl, CefString& errorText) OVERRIDE;
-
-  // CefRenderHandler methods
-  virtual void OnPaint(CefRefPtr<CefBrowser> browser, PaintElementType type, const CefRect& dirtyRect, 
-                       const void* buffer);
-  virtual bool GetViewRect(CefRefPtr<CefBrowser> browser, CefRect& rect);
-  virtual bool GetScreenRect(CefRefPtr<CefBrowser> browser, CefRect& rect);
-  virtual bool GetScreenPoint(CefRefPtr<CefBrowser> browser, int viewX, int viewY, int& screenX, int& screenY);
-
-  // CefJSBindingHandler
-  //virtual void OnJSBinding(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame, CefRefPtr<CefV8Value> object);
-
-  virtual void OnCursorChange(CefRefPtr<CefBrowser> browser, CefCursorHandle cursor) OVERRIDE;
-
-  CefRefPtr<CefBrowser> GetBrowser() { return m_Browser; }
-  CefWindowHandle GetBrowserHwnd() { return _browser_hwnd; }
-
-  std::string GetLogFile();
-
-  void SetLastDownloadFile(const std::string& fileName);
-  std::string GetLastDownloadFile();
-
-  // DOM visitors will be called after the associated path is loaded.
-  void AddDOMVisitor(const std::string& path, CefRefPtr<CefDOMVisitor> visitor);
-  CefRefPtr<CefDOMVisitor> GetDOMVisitor(const std::string& path);
-
-  // Send a notification to the application. Notifications should not block the
-  // caller.
-  enum NotificationType {
-    NOTIFY_CONSOLE_MESSAGE,
-    NOTIFY_DOWNLOAD_COMPLETE,
-    NOTIFY_DOWNLOAD_ERROR,
-  };
-  void SendNotification(NotificationType type);
-#endif
 protected:
-#if WITH_CEF
-  void SetLoading(bool isLoading);
-  void SetNavState(bool canGoBack, bool canGoForward);
 
-  // The child browser window
-  CefRefPtr<CefBrowser> m_Browser;
-
-  // The main frame window handle
-  CefWindowHandle _main_hwnd;
-
-  // The child browser window handle
-  CefWindowHandle _browser_hwnd;
-
-  // The edit window handle
-  CefWindowHandle _edit_hwnd;
-
-  // The button window handles
-  CefWindowHandle _back_hwnd;
-  CefWindowHandle _forward_hwnd;
-  CefWindowHandle _stop_hwnd;
-  CefWindowHandle _reload_hwnd;
-
-  // Support for logging.
-  std::string m_LogFile;
-
-  // Support for downloading files.
-  std::string m_LastDownloadFile;
-
-  // Support for DOM visitors.
-  typedef std::map<std::string, CefRefPtr<CefDOMVisitor> > DOMVisitorMap;
-  DOMVisitorMap m_DOMVisitors;
-
-  // Include the default reference counting implementation.
-  IMPLEMENT_REFCOUNTING(App);
-  // Include the default locking implementation.
-  IMPLEMENT_LOCKING(App);
-#endif
   static App* _instance;
   EffectBase* _test_effect;
   HINSTANCE _hinstance;
@@ -181,14 +91,12 @@ protected:
   HWND _hwnd;
   int _dbg_message_count;
 
+  double _frame_time;
+
   int _cur_camera;
   bool _draw_plane;
   string _app_root;
   int _ref_count;
-#if WITH_CEF
-  GraphicsObjectHandle _cef_texture;
-  GraphicsObjectHandle _cef_staging;
-#endif
 
 #if WITH_GWEN
   std::unique_ptr<Gwen::Controls::StatusBar> _gwen_status_bar;
