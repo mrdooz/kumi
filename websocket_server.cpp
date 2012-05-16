@@ -7,6 +7,7 @@
 #include "json_utils.hpp"
 #include "demo_engine.hpp"
 #include "logger.hpp"
+#include "app.hpp"
 
 using namespace std;
 using namespace websocketpp;
@@ -18,6 +19,7 @@ public:
     if (str == "REQ:SYSTEM.FPS") {
       auto obj = JsonValue::create_object();
       obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
+      obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
       con->send(print_json(obj), frame::opcode::TEXT);
     } else if (str == "REQ:DEMO.INFO") {
       con->send(print_json(DEMO_ENGINE.get_info()), frame::opcode::TEXT);
