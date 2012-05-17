@@ -559,43 +559,46 @@ Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
 
 void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
 
-	auto valid_sources = map_list_of
-		("material", PropertySource::kMaterial)
-		("system", PropertySource::kSystem)
-		("user", PropertySource::kUser)
-		("mesh", PropertySource::kMesh)
-		("technique", PropertySource::kTechnique);
+  auto valid_sources = map_list_of
+    ("material", PropertySource::kMaterial)
+    ("system", PropertySource::kSystem)
+    ("user", PropertySource::kUser)
+    ("mesh", PropertySource::kMesh);
+  //("technique", PropertySource::kTechnique);
 
-	THROW_ON_FALSE(param.size() >= 3);
+  THROW_ON_FALSE(param.size() >= 3);
 
-	// type, name and source are required. the default value is optional
-	Symbol sym_type = _symbol_trie->find_symbol(param[0]);
-	PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
+  // type, name and source are required. the default value is optional
+  Symbol sym_type = _symbol_trie->find_symbol(param[0]);
+  PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
 
-	string name = param[1];
-	PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[2], valid_sources);
-	
-	bool cbuffer_param = false;
-	if (type == PropertyType::kSampler) {
-		shader->sampler_params().push_back(SamplerParam(name, type, source));
-	} else if (type == PropertyType::kTexture2d) {
-		shader->resource_view_params().push_back(ResourceViewParam(name, type, source));
-	} else {
-		shader->cbuffer_params().push_back(CBufferParam(name, type, source));
-		cbuffer_param = true;
-	}
+  string name = param[1];
+  PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[2], valid_sources);
 
-	// TODO: add defaults again
+  bool cbuffer_param = false;
 /*
-	EXPECT(scope, kSymSemicolon);
-
-	// check for default value
-	if (cbuffer_param && scope->consume_if(kSymDefault)) {
-		string value = scope->string_until(';');
-		EXPECT(scope, kSymSemicolon);
-		parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
-	}
+  if (type == PropertyType::kSampler) {
+    shader->sampler_params().push_back(SamplerParam(name, type, source));
+  } else 
 */
+  if (type == PropertyType::kTexture2d) {
+    shader->resource_view_params().push_back(ResourceViewParam(name, type, source));
+  } else {
+    shader->cbuffer_params().push_back(CBufferParam(name, type, source));
+    cbuffer_param = true;
+  }
+
+    // TODO: add defaults again
+    /*
+    EXPECT(scope, kSymSemicolon);
+
+    // check for default value
+    if (cbuffer_param && scope->consume_if(kSymDefault)) {
+    string value = scope->string_until(';');
+    EXPECT(scope, kSymSemicolon);
+    parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
+    }
+    */
 }
 
 template<typename T> T id(T t) { return t; }

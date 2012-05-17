@@ -41,57 +41,80 @@ public:
   CmdGen(Graphics::BackedResources *res, ID3D11DeviceContext *ctx) : res(res), ctx(ctx) {}
 
   void set_vs(GraphicsObjectHandle vs) {
-    if (prev_vs != vs)
+    if (prev_vs != vs) {
       ctx->VSSetShader(res->_vertex_shaders.get(vs), NULL, 0);
-    prev_vs = vs;
+      prev_vs = vs;
+    }
   }
 
   void set_ps(GraphicsObjectHandle ps) {
-    if (prev_ps != ps)
+    if (prev_ps != ps) {
       ctx->PSSetShader(res->_pixel_shaders.get(ps), NULL, 0);
-    prev_ps = ps;
+      prev_ps = ps;
+    }
   }
 
   void set_layout(GraphicsObjectHandle layout) {
-    if (prev_layout != layout)
+    if (prev_layout != layout) {
       ctx->IASetInputLayout(res->_input_layouts.get(layout));
-    prev_layout = layout;
+      prev_layout = layout;
+    }
   }
 
   void set_vb(GraphicsObjectHandle vb, int vertex_size) {
-    if (prev_vb != vb)
+    if (prev_vb != vb) {
       GRAPHICS.set_vb(ctx, res->_vertex_buffers.get(vb), vertex_size);
-    prev_vb = vb;
+      prev_vb = vb;
+    }
   }
 
   void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format) {
-    if (prev_ib != ib)
+    if (prev_ib != ib) {
       ctx->IASetIndexBuffer(res->_index_buffers.get(ib), format, 0);
-    prev_ib = ib;
+      prev_ib = ib;
+    }
   }
 
   void set_topology(D3D11_PRIMITIVE_TOPOLOGY top) {
-    if (prev_topology != top)
+    if (prev_topology != top) {
       ctx->IASetPrimitiveTopology(top);
-    prev_topology = top;
+      prev_topology = top;
+    }
   }
 
   void set_rs(GraphicsObjectHandle rs) {
-    if (prev_rs != rs)
+    if (prev_rs != rs) {
       ctx->RSSetState(res->_rasterizer_states.get(rs));
-    prev_rs = rs;
+      prev_rs = rs;
+    }
   }
 
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref) {
-    if (prev_dss != dss)
+    if (prev_dss != dss) {
       ctx->OMSetDepthStencilState(res->_depth_stencil_states.get(dss), stencil_ref);
-    prev_dss = dss;
+      prev_dss = dss;
+    }
   }
 
   void set_bs(GraphicsObjectHandle bs, float *blend_factors, UINT sample_mask) {
-    if (prev_bs != bs)
+    if (prev_bs != bs) {
       ctx->OMSetBlendState(res->_blend_states.get(bs), blend_factors, sample_mask);
-    prev_bs = bs;
+      prev_bs = bs;
+    }
+  }
+
+  void set_samplers(GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers) {
+    if (!num_samplers)
+      return;
+    ID3D11SamplerState *samplers[MAX_SAMPLERS];
+    for (int i = 0; i < num_samplers; ++i) {
+      samplers[i] = res->_sampler_states.get(sampler_handles[i]);
+    }
+
+    if (memcmp(sampler_handles, prev_samplers, num_samplers * sizeof(GraphicsObjectHandle))) {
+      ctx->PSSetSamplers(first_sampler, num_samplers, samplers);
+      memcpy(prev_samplers, sampler_handles, num_samplers * sizeof(GraphicsObjectHandle));
+    }
   }
 
   void set_cbuffer(GraphicsObjectHandle cb, void *data, int len) {
@@ -116,6 +139,7 @@ private:
   GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
   GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
   GraphicsObjectHandle prev_ib, prev_vb;
+  GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
   D3D11_PRIMITIVE_TOPOLOGY prev_topology;
 };
 
@@ -133,6 +157,9 @@ void Renderer::render() {
 #if 1
   CmdGen gen(res, ctx);
   // build the cmd buffer from the render commands
+  RenderObjects objects;
+  Technique *prev_technique = nullptr;
+
   for (auto it = begin(_render_commands), e = end(_render_commands); it != e; ++it) {
     const RenderCmd &cmd = *it;
     RenderKey key = cmd.key;
@@ -143,8 +170,10 @@ void Renderer::render() {
       case RenderKey::kRenderMesh: {
         MeshRenderData *render_data = (MeshRenderData *)data;
         Technique *technique = res->_techniques.get(render_data->technique);
-        RenderObjects objects;
-        technique->get_render_objects(&objects);
+        if (technique != prev_technique) {
+          technique->get_render_objects(&objects);
+          prev_technique = technique;
+        }
         gen.set_vs(objects.vs);
         gen.set_ps(objects.ps);
 
@@ -156,6 +185,8 @@ void Renderer::render() {
         gen.set_rs(objects.rs);
         gen.set_dss(objects.dss, objects.stencil_ref);
         gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
+
+        gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
 
         GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
         gen.set_cbuffer(cb, render_data->cbuffer_staged, render_data->cbuffer_len);

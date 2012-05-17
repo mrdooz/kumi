@@ -57,7 +57,7 @@ bool ScenePlayer::init() {
   _params.push_back(unique_ptr<TweakableParam>(p1));
   _params.push_back(unique_ptr<TweakableParam>(p2));
 
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
 

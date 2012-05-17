@@ -13,5 +13,5 @@ private:
 	bool load_materials(const uint8 *buf);
   bool load_animation(const uint8 *buf, Scene *scene);
 	std::unordered_map<std::string, uint16> _material_ids;
-	std::unordered_map<std::string, std::string> _default_techniques;
+	std::unordered_map<std::string, std::string> _technique_for_material;
 };

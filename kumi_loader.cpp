@@ -84,11 +84,11 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
     const int sub_meshes = read_and_step<int>(&buf);
     for (int j = 0; j < sub_meshes; ++j) {
       const char *material_name = read_and_step<const char *>(&buf);
-      SubMesh *submesh = new SubMesh;
+      SubMesh *submesh = new SubMesh(mesh);
       mesh->submeshes.push_back(submesh);
       submesh->material_id = _material_ids[material_name];
       // set the default technique for the material
-      GraphicsObjectHandle h = GRAPHICS.find_technique(_default_techniques[material_name].c_str());
+      GraphicsObjectHandle h = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
       submesh->render_data.technique = h;
       const int vb_flags = read_and_step<int>(&buf);
       submesh->render_data.vertex_size = read_and_step<int>(&buf);
@@ -177,7 +177,7 @@ bool KumiLoader::load_materials(const uint8 *buf) {
     string name, technique;
     name = read_and_step<const char *>(&buf);
     technique = read_and_step<const char *>(&buf);
-    _default_techniques[name] = technique;
+    _technique_for_material[name] = technique;
     Material *material = new Material(name);
     _material_ids[material->name] = MATERIAL_MANAGER.add_material(material, true);
 

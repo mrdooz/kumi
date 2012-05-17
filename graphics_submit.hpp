@@ -5,6 +5,9 @@
 static const int MAX_SAMPLERS = 8;
 static const int MAX_TEXTURES = 8;
 
+struct Mesh;
+struct SubMesh;
+
 struct MeshRenderData {
   MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST), cbuffer_staged(nullptr), cbuffer_len(0) {}
   GraphicsObjectHandle vb, ib;
@@ -16,6 +19,10 @@ struct MeshRenderData {
   GraphicsObjectHandle technique;
   void *cbuffer_staged;
   int cbuffer_len;
+#if _DEBUG
+  Mesh *mesh;
+  SubMesh *submesh;
+#endif
 };
 
 struct TechniqueRenderData {

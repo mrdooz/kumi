@@ -671,14 +671,14 @@ void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, 
     if (dss) *dss = technique->depth_stencil_state();
   }
 }
-
+/*
 GraphicsObjectHandle Graphics::get_sampler_state(const char *name, const char *sampler_state) {
   if (Technique *technique = _res._techniques.find(name, (Technique *)NULL)) {
     return technique->sampler_state(sampler_state);
   }
   return GraphicsObjectHandle();
 }
-
+*/
 GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_id) {
   if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL)) {
     if (technique->vertex_shader()->id() == shader_id) {
@@ -697,7 +697,7 @@ GraphicsObjectHandle Graphics::get_input_layout(const char *technique_name) {
     return technique->input_layout();
   return GraphicsObjectHandle();
 }
-
+/*
 void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
   ID3D11DeviceContext *ctx = _immediate_context;
@@ -714,7 +714,7 @@ void Graphics::set_samplers(Technique *technique, Shader *shader) {
 
   ctx->PSSetSamplers(0, num_samplers, &samplers[0]);
 }
-
+*/
 void Graphics::unbind_resource_views(int resource_bitmask) {
 
   ID3D11ShaderResourceView *null_view = nullptr;

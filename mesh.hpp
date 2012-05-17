@@ -5,12 +5,14 @@
 
 struct TrackedLocation;
 struct SubMesh;
+struct Mesh;
 
 struct SubMesh {
-  SubMesh();
+  SubMesh(Mesh *mesh);
   ~SubMesh();
 
   void update();
+  void prepare_cbuffers();
 
   struct CBufferVariable {
     int ofs;
@@ -21,6 +23,7 @@ struct SubMesh {
   std::vector<CBufferVariable> cbuffer_vars;
   std::vector<uint8> cbuffer_staged;
 
+  Mesh *mesh;
   RenderKey render_key;
   MeshRenderData render_data;
   uint32 material_id;

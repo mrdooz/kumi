@@ -40,7 +40,7 @@ technique gwen_texture {
 	pixel_shader {
 		params [
 			texture2d diffuse_texture system;
-			sampler diffuse_sampler technique;
+			//sampler diffuse_sampler technique;
 		];
 
 		file effects/gwen.fx;

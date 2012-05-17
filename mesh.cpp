@@ -4,12 +4,50 @@
 #include "graphics.hpp"
 #include "technique.hpp"
 
-SubMesh::SubMesh()
+SubMesh::SubMesh(Mesh *mesh)
 {
   render_key.cmd = RenderKey::kRenderMesh;
+  render_data.mesh = mesh;
+  render_data.submesh = this;
 }
 
 SubMesh::~SubMesh() {
+}
+
+void SubMesh::prepare_cbuffers() {
+  Technique *technique = GRAPHICS.get_technique(render_data.technique);
+  Shader *vs = technique->vertex_shader();
+  Shader *ps = technique->pixel_shader();
+
+  int cbuffer_size = 0;
+  auto collect_params = [&, this](const std::vector<CBufferParam> &params) {
+    for (auto j = std::begin(params), e = std::end(params); j != e; ++j) {
+      const CBufferParam &param = *j;
+      int len = PropertyType::len(param.type);;
+      if (param.cbuffer != -1) {
+        SubMesh::CBufferVariable &var = dummy_push_back(&cbuffer_vars);
+        var.ofs = param.start_offset;
+        var.len = len;
+        switch (param.source) {
+        case PropertySource::kSystem:
+          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
+          break;
+        case PropertySource::kMesh:
+          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), this, var.len, nullptr);
+          break;
+        case PropertySource::kMaterial:
+          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)material_id, var.len, nullptr);
+          break;
+        }
+      }
+      cbuffer_size += len;
+    }
+  };
+
+  collect_params(vs->cbuffer_params());
+  collect_params(ps->cbuffer_params());
+  cbuffer_staged.resize(cbuffer_size);
+
 }
 
 void SubMesh::update() {
@@ -51,42 +89,8 @@ void Mesh::prepare_cbuffer() {
   _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
 
   // collect all the variables we need to fill our cbuffer.
-  for (size_t i = 0; i < submeshes.size(); ++i) {
-    SubMesh *submesh = submeshes[i];
-    Technique *technique = GRAPHICS.get_technique(submeshes[i]->render_data.technique);
-    Shader *vs = technique->vertex_shader();
-    Shader *ps = technique->pixel_shader();
-
-    int cbuffer_size = 0;
-    void *that = this;  // i am sooo proud of this :)
-    auto collect_params = [&](const std::vector<CBufferParam> &params) {
-      for (auto j = begin(params), e = end(params); j != e; ++j) {
-        const CBufferParam &param = *j;
-        int len = PropertyType::len(param.type);;
-        if (param.cbuffer != -1) {
-          SubMesh::CBufferVariable &var = dummy_push_back(&submesh->cbuffer_vars);
-          var.ofs = param.start_offset;
-          var.len = len;
-          switch (param.source) {
-          case PropertySource::kSystem:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
-            break;
-          case PropertySource::kMesh:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), that, var.len, nullptr);
-            break;
-          case PropertySource::kMaterial:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)submesh->material_id, var.len, nullptr);
-            break;
-          }
-        }
-        cbuffer_size += len;
-      }
-    };
-
-    collect_params(vs->cbuffer_params());
-    collect_params(ps->cbuffer_params());
-    submesh->cbuffer_staged.resize(cbuffer_size);
-  }
+  for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)
+    (*i)->prepare_cbuffers();
 }
 
 void Mesh::update() {

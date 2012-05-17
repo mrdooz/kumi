@@ -48,12 +48,12 @@ struct CBufferParam : public ParamBase {
   PropertyManager::PropertyId id;
   DefaultValue default_value;
 };
-
+/*
 struct SamplerParam : public ParamBase {
   SamplerParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
   int bind_point;
 };
-
+*/
 struct ResourceViewParam : public ParamBase {
   ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
   int bind_point;
@@ -73,11 +73,11 @@ public:
   CBufferParam *find_cbuffer_param(const char *name) {
     return find_by_name(name, _cbuffer_params);
   }
-
+/*
   SamplerParam *find_sampler_param(const char *name) {
     return find_by_name(name, _sampler_params);
   }
-
+*/
   ResourceViewParam *find_resource_view_param(const char *name) {
     return find_by_name(name, _resource_view_params);
   }
@@ -102,7 +102,7 @@ public:
   const std::string &obj_filename() const { return _obj_filename; }
 
   std::vector<CBufferParam> &cbuffer_params() { return _cbuffer_params; }
-  std::vector<SamplerParam> &sampler_params() { return _sampler_params; }
+  //std::vector<SamplerParam> &sampler_params() { return _sampler_params; }
   std::vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
 
   void set_handle(GraphicsObjectHandle handle) { _handle = handle; }
@@ -118,7 +118,7 @@ private:
   std::string _obj_filename;
   std::string _entry_point;
   std::vector<CBufferParam> _cbuffer_params;
-  std::vector<SamplerParam> _sampler_params;
+  //std::vector<SamplerParam> _sampler_params;
   std::vector<ResourceViewParam> _resource_view_params;
   GraphicsObjectHandle _handle;
 };

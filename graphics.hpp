@@ -211,7 +211,7 @@ public:
   Technique *get_technique(GraphicsObjectHandle h);
   GraphicsObjectHandle find_technique(const char *name);
   void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
-  GraphicsObjectHandle get_sampler_state(const char *technique, const char *sampler_state);
+  //GraphicsObjectHandle get_sampler_state(const char *technique, const char *sampler_state);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
 
@@ -222,7 +222,7 @@ public:
 
   GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
 
-  void set_samplers(Technique *technique, Shader *shader);
+  //void set_samplers(Technique *technique, Shader *shader);
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
   void unbind_resource_views(int resource_bitmask);
 

@@ -19,6 +19,8 @@ Technique::Technique()
   , _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
   , _valid(false)
+  , _first_sampler(MAX_SAMPLERS)
+  , _num_valid_samplers(0)
 {
 }
 
@@ -147,12 +149,17 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       }
 
       case D3D10_SIT_SAMPLER: {
-        SamplerParam *param = shader->find_sampler_param(input_desc.Name);
-        if (!param) {
-          add_error_msg("Sampler %s not found", input_desc.Name);
-          return false;
+        _first_sampler = min(_first_sampler, (int)input_desc.BindPoint);
+        _num_valid_samplers = max((int)input_desc.BindPoint - _first_sampler + 1, _num_valid_samplers);
+        // find out where this sampler goes..
+        for (auto i = begin(_sampler_states), e = end(_sampler_states); i != e; ++i) {
+          if (i->first == input_desc.Name) {
+            _ordered_sampler_states[input_desc.BindPoint] = i->second;
+            goto FOUND_SAMPLER;
+          }
         }
-        param->bind_point = input_desc.BindPoint;
+        add_error_msg("Sampler %s not found", input_desc.Name);
+        FOUND_SAMPLER:
         break;
       }
     }
@@ -276,34 +283,46 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   for (auto i = first_unused; i != end(params); ++i)
     i->used = false;
 
-  GraphicsObjectHandle handle;
   switch (shader->type()) {
     case Shader::kVertexShader: 
-      handle = graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->id());
+      shader->set_handle(graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
       break;
     case Shader::kPixelShader: 
-      handle = graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->id());
+      shader->set_handle(graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->id()));
       break;
     case Shader::kGeometryShader: break;
   }
-  shader->set_handle(handle);
+
   shader->validate();
+
+  // check that our samplers are sequential
+  if (_ordered_sampler_states[_first_sampler].is_valid()) {
+    bool prev_valid = true;
+    for (int i = _first_sampler + 1; i < MAX_SAMPLERS; ++i) {
+      bool cur_valid = _ordered_sampler_states[i].is_valid();
+      if (cur_valid && !prev_valid) {
+        add_error_msg("Nonsequential sampler states found!");
+      }
+      prev_valid = cur_valid;
+    }
+  }
   return true;
 }
 
 bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
+
+  _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
+  _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);
+  _depth_stencil_state = graphics->create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
+  for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
+    _sampler_states.push_back(make_pair(i->first, graphics->create_sampler_state(FROM_HERE, i->second)));
+  }
 
   if (_vertex_shader && !init_shader(graphics, res, _vertex_shader))
     return false;
 
   if (_pixel_shader && !init_shader(graphics, res, _pixel_shader))
     return false;
-
-  _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
-  _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);
-  _depth_stencil_state = graphics->create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
-  for (size_t i = 0; i < _sampler_descs.size(); ++i)
-    _sampler_states.push_back(make_pair(_sampler_descs[i].first, graphics->create_sampler_state(FROM_HERE, _sampler_descs[i].second)));
 
   return true;
 }
@@ -315,11 +334,11 @@ void Technique::submit() {
 }
 */
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
-  auto it = find_if(begin(_sampler_states), end(_sampler_states), 
-    [&](const pair<string, GraphicsObjectHandle> &p) { 
-      return p.first == name; 
-  });
-  return it == _sampler_states.end() ? GraphicsObjectHandle() : it->second;
+  for (auto it = begin(_sampler_states), e = end(_sampler_states); it != e; ++it) {
+    if (it->first == name)
+      return it->second;
+  }
+  return GraphicsObjectHandle();
 }
 
 void Technique::get_render_objects(RenderObjects *obj) {
@@ -332,5 +351,8 @@ void Technique::get_render_objects(RenderObjects *obj) {
   obj->bs = _blend_state;
   obj->stencil_ref = GRAPHICS.default_stencil_ref();
   memcpy(obj->blend_factors, GRAPHICS.default_blend_factors(), sizeof(obj->blend_factors));
+  memcpy(obj->samplers, &_ordered_sampler_states[_first_sampler], _num_valid_samplers * sizeof(GraphicsObjectHandle));
+  obj->first_sampler = _first_sampler;
+  obj->num_valid_samplers = _num_valid_samplers;
   obj->sample_mask = GRAPHICS.default_sample_mask();
 }

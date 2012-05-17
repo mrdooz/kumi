@@ -24,7 +24,9 @@ struct RenderObjects {
   UINT stencil_ref;
   float blend_factors[4];
   UINT sample_mask;
-  GraphicsObjectHandle samplers[8];
+  GraphicsObjectHandle samplers[MAX_SAMPLERS];
+  int first_sampler;
+  int num_valid_samplers;
 };
 #pragma pack(pop)
 
@@ -90,6 +92,11 @@ private:
   std::vector<std::pair<std::string, GraphicsObjectHandle> > _sampler_states;
   GraphicsObjectHandle _blend_state;
   GraphicsObjectHandle _depth_stencil_state;
+
+  GraphicsObjectHandle _ordered_sampler_states[MAX_SAMPLERS];
+  int _first_sampler;
+  int _num_valid_samplers;
+
 
   CD3D11_RASTERIZER_DESC _rasterizer_desc;
   std::vector<std::pair<std::string, CD3D11_SAMPLER_DESC>> _sampler_descs;
