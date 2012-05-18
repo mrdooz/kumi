@@ -8,8 +8,10 @@
 SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 {
   render_key.cmd = RenderKey::kRenderMesh;
+#if _DEBUG
   render_data.mesh = mesh;
   render_data.submesh = this;
+#endif
 }
 
 SubMesh::~SubMesh() {
