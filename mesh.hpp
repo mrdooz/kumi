@@ -13,6 +13,7 @@ struct SubMesh {
 
   void update();
   void prepare_cbuffers();
+  void prepare_textures();
 
   struct CBufferVariable {
     int ofs;
@@ -26,7 +27,7 @@ struct SubMesh {
   Mesh *mesh;
   RenderKey render_key;
   MeshRenderData render_data;
-  uint32 material_id;
+  GraphicsObjectHandle material_id;
 };
 
 struct Mesh {

@@ -9,9 +9,9 @@ using namespace std;
 MaterialManager* MaterialManager::_instance = nullptr;
 
 bool MaterialManager::create() {
-    assert(!_instance);
-    _instance = new MaterialManager;
-    return true;
+  assert(!_instance);
+  _instance = new MaterialManager;
+  return true;
 }
 
 bool MaterialManager::close() {
@@ -27,61 +27,38 @@ MaterialManager &MaterialManager::instance() {
 
 
 MaterialManager::MaterialManager() 
-  : _next_material_id(0) {
+  : _materials(delete_obj<Material *>)
+{
 }
 
-const Material *MaterialManager::get_material(uint16 id) {
-  return _id_to_materials[id];
+Material *MaterialManager::get_material(GraphicsObjectHandle obj) {
+  return _materials.get(obj);
 }
 
 void MaterialManager::remove_material(const std::string &name) {
+  assert(!"fix plz!");
+  /*
   auto it = _materials.find(name);
   if (it == end(_materials))
-    return;
+  return;
 
-  assert(!"fix plz!");
   //_id_to_materials.erase((*it).second->id);
   //_materials.erase(it);
+  */
 }
 
-uint16 MaterialManager::find_material(const string &name) {
-  auto it = _materials.find(name);
-  return it != end(_materials) ? (uint16)it->second->id : -1;
+GraphicsObjectHandle MaterialManager::find_material(const string &name) {
+  int idx = _materials.idx_from_token(name);
+  return idx == -1 ? GraphicsObjectHandle() : GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
 }
 
-uint16 MaterialManager::add_material(Material *material, bool delete_existing) {
+GraphicsObjectHandle MaterialManager::add_material(Material *material, bool delete_existing) {
 
-  // don't allow duplicate material names. this shouldn't impose any real limitations, as material names are
-  // prefixed with the technique name when they are loaded
-  auto it = _materials.find(material->name);
-  uint16 prev_key = ~0;
-  if (it != end(_materials)) {
-    if (delete_existing) {
-      prev_key = (uint16)(*it).second->id;
-      _id_to_materials.erase(prev_key);
-      _materials.erase(it);
-    } else {
-      LOG_ERROR_LN("Duplicate material added: %s", material->name.c_str());
-    }
+  const std::string &id = material->name;
+  int idx = _materials.idx_from_token(id);
+  if (idx != -1 || (idx = _materials.find_free_index()) != -1) {
+    _materials.set_pair(idx, make_pair(id, material));
+    return GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
   }
-
-  uint16 key = prev_key == (uint16)~0 ? _next_material_id++ : prev_key;
-  material->id = (PropertyManager::Token)key;
-  _materials.insert(make_pair(material->name, unique_ptr<Material>(material)));
-
-  for (auto i = begin(material->properties); i != end(material->properties); ++i) {
-    const Material::Property &p = *i;
-    switch (p.type) {
-    case PropertyType::kFloat:
-      PROPERTY_MANAGER.set_property<float>(p.id, p.value.x);
-      break;
-    case PropertyType::kFloat4:
-      PROPERTY_MANAGER.set_property<XMFLOAT4>(p.id, p.value);
-      break;
-    }
-  }
-
-  _id_to_materials[key] = material;
-
-  return key;
+  return GraphicsObjectHandle();
 }

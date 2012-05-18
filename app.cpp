@@ -304,6 +304,17 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
 
   case WM_MOUSEWHEEL:
     break;
+
+  case WM_KEYUP:
+    switch (wParam) {
+      case VK_ESCAPE:
+        PostQuitMessage( 0 );
+        break;
+      default:
+        break;
+      }
+    break;
+
     /*
     case WM_KEYDOWN:
     break;

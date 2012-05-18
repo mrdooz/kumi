@@ -573,7 +573,9 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
   PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
 
   string name = param[1];
-  PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[2], valid_sources);
+  string friendly_name = param.size() == 4 ? param[2] : "";
+  int src_pos = friendly_name.empty() ? 2 : 3;
+  PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[src_pos], valid_sources);
 
   bool cbuffer_param = false;
 /*
@@ -582,7 +584,7 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
   } else 
 */
   if (type == PropertyType::kTexture2d) {
-    shader->resource_view_params().push_back(ResourceViewParam(name, type, source));
+    shader->resource_view_params().push_back(ResourceViewParam(name, type, source, friendly_name));
   } else {
     shader->cbuffer_params().push_back(CBufferParam(name, type, source));
     cbuffer_param = true;

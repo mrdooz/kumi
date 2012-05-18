@@ -184,7 +184,7 @@ public:
 
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
-  GraphicsObjectHandle load_texture(const char *filename, D3DX11_IMAGE_INFO *info);
+  GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
   bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
 
@@ -211,9 +211,9 @@ public:
   Technique *get_technique(GraphicsObjectHandle h);
   GraphicsObjectHandle find_technique(const char *name);
   void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
-  //GraphicsObjectHandle get_sampler_state(const char *technique, const char *sampler_state);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
+  GraphicsObjectHandle find_resource(const char *name);
 
   HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
   HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);

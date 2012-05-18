@@ -201,7 +201,7 @@ GraphicsObjectHandle Graphics::get_texture(const char *filename) {
   return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
 }
 
-GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_INFO *info) {
+GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info) {
 
   if (info) {
     HRESULT hr;
@@ -221,11 +221,11 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, D3DX11_IMAGE_I
   if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->srv)))
     return GraphicsObjectHandle();
 
-  int idx = _res._resources.idx_from_token(filename);
+  int idx = _res._resources.idx_from_token(friendly_name);
   if (idx != -1 || (idx = _res._resources.find_free_index()) != -1) {
     if (_res._resources[idx])
       _res._resources[idx]->reset();
-    _res._resources.set_pair(idx, make_pair(filename, data));
+    _res._resources.set_pair(idx, make_pair(friendly_name, data));
     return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
   }
   return GraphicsObjectHandle();
@@ -657,6 +657,11 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   }
 
   return res;
+}
+
+GraphicsObjectHandle Graphics::find_resource(const char *name) {
+  int idx = _res._resources.idx_from_token(name);
+  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx) : GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {

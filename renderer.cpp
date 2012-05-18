@@ -106,15 +106,39 @@ public:
   void set_samplers(GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers) {
     if (!num_samplers)
       return;
-    ID3D11SamplerState *samplers[MAX_SAMPLERS];
-    for (int i = 0; i < num_samplers; ++i) {
-      samplers[i] = res->_sampler_states.get(sampler_handles[i]);
-    }
-
     if (memcmp(sampler_handles, prev_samplers, num_samplers * sizeof(GraphicsObjectHandle))) {
+      ID3D11SamplerState *samplers[MAX_SAMPLERS];
+      for (int i = 0; i < num_samplers; ++i) {
+        samplers[i] = res->_sampler_states.get(sampler_handles[i]);
+      }
+
       ctx->PSSetSamplers(first_sampler, num_samplers, samplers);
       memcpy(prev_samplers, sampler_handles, num_samplers * sizeof(GraphicsObjectHandle));
     }
+  }
+
+  void set_shader_resources(GraphicsObjectHandle *view_handles, int first_view, int num_views) {
+    if (!num_views)
+      return;
+    // force setting the views because we always unset them..
+    bool force = true;
+    if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
+      ID3D11ShaderResourceView *views[MAX_SAMPLERS];
+      for (int i = 0; i < num_views; ++i) {
+        ResourceData *data = res->_resources.get(view_handles[i]);
+        views[i] = data->srv;
+      }
+      ctx->PSSetShaderResources(first_view, num_views, views);
+
+      memcpy(prev_views, view_handles, num_views * sizeof(GraphicsObjectHandle));
+    }
+  }
+
+  void unset_shader_resource(int first_view, int num_views) {
+    if (!num_views)
+      return;
+    static ID3D11ShaderResourceView *null_views[MAX_SAMPLERS] = {0, 0, 0, 0, 0, 0, 0, 0};
+    ctx->PSSetShaderResources(first_view, num_views, null_views);
   }
 
   void set_cbuffer(GraphicsObjectHandle cb, void *data, int len) {
@@ -140,6 +164,7 @@ private:
   GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
   GraphicsObjectHandle prev_ib, prev_vb;
   GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
+  GraphicsObjectHandle prev_views[MAX_SAMPLERS];
   D3D11_PRIMITIVE_TOPOLOGY prev_topology;
 };
 
@@ -187,10 +212,14 @@ void Renderer::render() {
         gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
 
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
+        gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
 
         GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
         gen.set_cbuffer(cb, render_data->cbuffer_staged, render_data->cbuffer_len);
         gen.draw_indexed(render_data->index_count, 0, 0);
+
+        gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
+
         break;
       }
     }

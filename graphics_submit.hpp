@@ -9,7 +9,9 @@ struct Mesh;
 struct SubMesh;
 
 struct MeshRenderData {
-  MeshRenderData() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST), cbuffer_staged(nullptr), cbuffer_len(0) {}
+  MeshRenderData() 
+    : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST)
+    , cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
   GraphicsObjectHandle vb, ib;
   DXGI_FORMAT index_format;
   int index_count;
@@ -19,6 +21,9 @@ struct MeshRenderData {
   GraphicsObjectHandle technique;
   void *cbuffer_staged;
   int cbuffer_len;
+  GraphicsObjectHandle textures[MAX_SAMPLERS];
+  int first_texture;
+  int num_textures;
 #if _DEBUG
   Mesh *mesh;
   SubMesh *submesh;

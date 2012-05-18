@@ -8,7 +8,7 @@
 #include "tracked_location.hpp"
 #include "mesh.hpp"
 
-#define FILE_VERSION 4
+#define FILE_VERSION 5
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -184,6 +184,13 @@ bool KumiLoader::load_materials(const uint8 *buf) {
     int props = read_and_step<int>(&buf);
     for (int j = 0; j < props; ++j) {
       const char *name = read_and_step<const char *>(&buf);
+      string filename(read_and_step<const char *>(&buf));
+      if (!filename.empty()) {
+        D3DX11_IMAGE_INFO info;
+        GraphicsObjectHandle texture = GRAPHICS.load_texture(filename.c_str(), name, &info);
+        if (!texture.is_valid())
+          LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());
+      }
       PropertyType::Enum type = read_and_step<PropertyType::Enum>(&buf);
 
       switch (type) {
@@ -209,7 +216,6 @@ bool KumiLoader::load_materials(const uint8 *buf) {
         default:
           LOG_ERROR_LN("Unknown material type");
           break;
-
       }
     }
   }

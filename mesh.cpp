@@ -3,8 +3,9 @@
 #include "renderer.hpp"
 #include "graphics.hpp"
 #include "technique.hpp"
+#include "material_manager.hpp"
 
-SubMesh::SubMesh(Mesh *mesh)
+SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 {
   render_key.cmd = RenderKey::kRenderMesh;
   render_data.mesh = mesh;
@@ -14,7 +15,25 @@ SubMesh::SubMesh(Mesh *mesh)
 SubMesh::~SubMesh() {
 }
 
+void SubMesh::prepare_textures() {
+  // get the pixel shader, check what textures he's using, and what slots to place them in
+  // then we look these guys up in the current material
+  Technique *technique = GRAPHICS.get_technique(render_data.technique);
+  assert(technique);
+  Shader *pixel_shader = technique->pixel_shader();
+  auto &params = pixel_shader->resource_view_params();
+  for (auto it = begin(params), e = end(params); it != e; ++it) {
+    auto &name = it->name;
+    auto &friendly_name = it->friendly_name;
+    int bind_point = it->bind_point;
+    render_data.textures[bind_point] = GRAPHICS.find_resource(friendly_name.c_str());
+    render_data.first_texture = min(render_data.first_texture, bind_point);
+    render_data.num_textures = max(render_data.num_textures, bind_point - render_data.first_texture + 1);
+  }
+}
+
 void SubMesh::prepare_cbuffers() {
+
   Technique *technique = GRAPHICS.get_technique(render_data.technique);
   Shader *vs = technique->vertex_shader();
   Shader *ps = technique->pixel_shader();
@@ -28,16 +47,19 @@ void SubMesh::prepare_cbuffers() {
         SubMesh::CBufferVariable &var = dummy_push_back(&cbuffer_vars);
         var.ofs = param.start_offset;
         var.len = len;
+
         switch (param.source) {
-        case PropertySource::kSystem:
-          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
-          break;
-        case PropertySource::kMesh:
-          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), this, var.len, nullptr);
-          break;
-        case PropertySource::kMaterial:
-          var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), (PropertyManager::Token)material_id, var.len, nullptr);
-          break;
+          case PropertySource::kSystem:
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
+            break;
+          case PropertySource::kMesh:
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), mesh, var.len, nullptr);
+            break;
+          case PropertySource::kMaterial: {
+            Material *material = MATERIAL_MANAGER.get_material(material_id);
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), material, var.len, nullptr);
+            break;
+          }
         }
       }
       cbuffer_size += len;
@@ -89,8 +111,10 @@ void Mesh::prepare_cbuffer() {
   _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
 
   // collect all the variables we need to fill our cbuffer.
-  for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)
+  for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i) {
     (*i)->prepare_cbuffers();
+    (*i)->prepare_textures();
+  }
 }
 
 void Mesh::update() {

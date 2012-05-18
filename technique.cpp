@@ -314,6 +314,8 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
   _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
   _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);
   _depth_stencil_state = graphics->create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
+
+  // create all the sampler states from the descs
   for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
     _sampler_states.push_back(make_pair(i->first, graphics->create_sampler_state(FROM_HERE, i->second)));
   }

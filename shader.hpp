@@ -55,7 +55,12 @@ struct SamplerParam : public ParamBase {
 };
 */
 struct ResourceViewParam : public ParamBase {
-  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
+  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
+    : ParamBase(name, type, source)
+    , friendly_name(friendly_name)
+  {
+  }
+  std::string friendly_name;
   int bind_point;
 };
 
