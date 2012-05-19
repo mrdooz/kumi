@@ -30,6 +30,7 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
 }
 
 bool ScenePlayer::file_changed(const char *filename, void *token) {
+/*
   LOG_VERBOSE_LN(__FUNCTION__);
   KumiLoader loader;
   if (!loader.load(filename, &RESOURCE_MANAGER, &_scene))
@@ -38,6 +39,7 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
     PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
   }
+*/
   return true;
 }
 
@@ -60,10 +62,21 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
+  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes\\torus_materials.json");
 
+  KumiLoader loader;
+  if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
+    return false;
+
+  for (size_t i = 0; i < _scene->meshes.size(); ++i) {
+    PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
+  }
+/*
   bool res;
   RESOURCE_MANAGER.add_file_watch(resolved_name.c_str(), NULL, bind(&ScenePlayer::file_changed, this, _1, _2), true, &res, 5000);
   return res;
+*/
+  return true;
 }
 
 template<typename T>

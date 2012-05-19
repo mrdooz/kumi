@@ -29,7 +29,7 @@ void split_path(const char *path, std::string *drive, std::string *dir, std::str
 	if (fname) *fname = fname_buf;
 	if (ext) *ext = ext_buf;
 }
-
+/*
 bool load_file(const char *filename, std::vector<uint8> *buf) {
   ScopedHandle h(CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
   if (!h) return false;
@@ -41,6 +41,7 @@ bool load_file(const char *filename, std::vector<uint8> *buf) {
     return false;
   return true;
 }
+*/
 /*
 bool load_file(const char *filename, void **buf, size_t *size)
 {

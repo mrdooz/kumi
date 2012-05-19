@@ -87,7 +87,7 @@ bool JsonObject::add_key_value(const string &key, JsonValuePtr value) {
   return true;
 }
 
-JsonObject::JsonValuePtr JsonObject::get_by_key(const std::string &key) const { 
+JsonObject::JsonValuePtr JsonObject::operator[](const std::string &key) const { 
   auto it = _key_value.find(key);
   return it == _key_value.end() ? _empty_value : it->second;
 }
@@ -115,7 +115,7 @@ bool JsonArray::add_value(JsonValuePtr value) {
 }
 
 
-JsonValue::JsonValuePtr JsonArray::get_at_index(int idx) const 
+JsonValue::JsonValuePtr JsonArray::operator[](int idx) const 
 { 
   return _value[idx]; 
 }

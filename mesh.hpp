@@ -24,6 +24,7 @@ struct SubMesh {
   std::vector<CBufferVariable> cbuffer_vars;
   std::vector<uint8> cbuffer_staged;
 
+  std::string name;
   Mesh *mesh;
   RenderKey render_key;
   MeshRenderData render_data;

@@ -35,10 +35,12 @@ public:
   bool get_bool() const { assert(_type == JS_BOOL); return _bool; }
   std::string get_string() const { assert(_type == JS_STRING); return _string; }
 
-  virtual JsonValuePtr get_at_index(int idx) const { assert(!"Not an array"); return _empty_value; }
-  virtual int get_count() const { assert(!"Not an array"); return -1; }
+  //virtual JsonValuePtr get_at_index(int idx) const { assert(!"Not an array"); return _empty_value; }
+  virtual JsonValuePtr operator[](int idx) const { assert(!"Not an array"); return _empty_value; }
+  virtual JsonValuePtr operator[](const std::string &key) const { assert(!"Not an object"); return _empty_value; }
+  virtual int count() const { assert(!"Not an array"); return -1; }
 
-  virtual JsonValuePtr get_by_key(const std::string &key) const { assert(!"Not an object"); return _empty_value; }
+  //virtual JsonValuePtr get_by_key(const std::string &key) const { assert(!"Not an object"); return _empty_value; }
   virtual bool has_key(const std::string &key) const { assert(!"Not an object"); return false; }
 
 protected:
@@ -63,7 +65,7 @@ class JsonObject : public JsonValue {
   friend void print_inner(const JsonObject *obj, int indent_level, std::string *res);
 public:
   virtual bool add_key_value(const std::string &key, JsonValuePtr value);
-  virtual JsonValuePtr get_by_key(const std::string &key) const;
+  virtual JsonValuePtr operator[](const std::string &key) const override;
   virtual bool has_key(const std::string &key) const;
 
 protected:
@@ -77,8 +79,8 @@ class JsonArray : public JsonValue {
   friend void print_inner(const JsonArray *obj, int indent_level, std::string *res);
 public:
   virtual bool add_value(JsonValuePtr value);
-  virtual JsonValuePtr get_at_index(int idx) const;
-  virtual int get_count() const { return (int)_value.size(); }
+  virtual JsonValuePtr operator[](int idx) const override;
+  virtual int count() const override { return (int)_value.size(); }
 
 private:
   JsonArray();

@@ -24,7 +24,7 @@ bool VolumetricEffect::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/diffuse.tec", true));
 
   KumiLoader loader;
-  loader.load("meshes\\torus.kumi", &RESOURCE_MANAGER, &_scene);
+  loader.load("meshes\\torus.kumi", nullptr, &RESOURCE_MANAGER, &_scene);
 
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
     XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));

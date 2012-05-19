@@ -7,8 +7,10 @@
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
 #include "mesh.hpp"
+#include "file_utils.hpp"
+#include "json_utils.hpp"
 
-#define FILE_VERSION 5
+#define FILE_VERSION 6
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -78,18 +80,30 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
 
   const int mesh_count = read_and_step<int>(&buf);
   for (int i = 0; i < mesh_count; ++i) {
+
     Mesh *mesh = new Mesh(read_and_step<const char *>(&buf));
     mesh->obj_to_world = read_and_step<XMFLOAT4X4>(&buf);
     scene->meshes.push_back(mesh);
     const int sub_meshes = read_and_step<int>(&buf);
+
     for (int j = 0; j < sub_meshes; ++j) {
-      const char *material_name = read_and_step<const char *>(&buf);
       SubMesh *submesh = new SubMesh(mesh);
+      submesh->name = read_and_step<const char *>(&buf);
+      const char *material_name = read_and_step<const char *>(&buf);
       mesh->submeshes.push_back(submesh);
-      submesh->material_id = _material_ids[material_name];
-      // set the default technique for the material
-      GraphicsObjectHandle h = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
-      submesh->render_data.technique = h;
+      // check if we have a material/technique override
+      auto it = _material_overrides.find(submesh->name);
+      if (it != end(_material_overrides)) {
+        auto &technique = it->second.first;
+        auto &material = it->second.second;
+        submesh->material_id = _material_ids[material];
+        submesh->render_data.technique = GRAPHICS.find_technique(technique.c_str());
+      } else {
+        // set the default technique for the material
+        submesh->material_id = _material_ids[material_name];
+        submesh->render_data.technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
+      }
+
       const int vb_flags = read_and_step<int>(&buf);
       submesh->render_data.vertex_size = read_and_step<int>(&buf);
       submesh->render_data.index_format = index_size_to_format(read_and_step<int>(&buf));
@@ -223,8 +237,23 @@ bool KumiLoader::load_materials(const uint8 *buf) {
   return true;
 }
 
-bool KumiLoader::load(const char *filename, ResourceInterface *resource, Scene **scene) {
+bool KumiLoader::load(const char *filename, const char *material_connections, ResourceInterface *resource, Scene **scene) {
   LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
+
+  if (material_connections) {
+    vector<char> buf;
+    load_file(material_connections, &buf);
+    JsonValue::JsonValuePtr root = parse_json(buf.data(), buf.data() + buf.size());
+    auto &connections = (*root)["material_connections"];
+    for (int i = 0; i < connections->count(); ++i) {
+      auto &cur = (*connections)[i];
+      auto &submesh = (*cur)["submesh"]->get_string();
+      auto &technique = (*cur)["technique"]->get_string();
+      auto &material = (*cur)["material"]->get_string();
+      _material_overrides[submesh] = make_pair(technique, material);
+    }
+  }
+
   MainHeader header;
   if (!resource->load_inplace(filename, 0, sizeof(header), (void *)&header))
     return false;
