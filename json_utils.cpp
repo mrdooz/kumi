@@ -63,14 +63,6 @@ JsonValue::JsonValuePtr JsonValue::create_object() {
   return JsonValuePtr(new JsonObject());
 }
 
-bool JsonValue::add_value(JsonValuePtr value) {
-  return false;
-}
-
-bool JsonValue::add_key_value(const string &key, JsonValuePtr value) {
-  return false;
-}
-
 //////////////////////////////////////////////////////////////////////////
 // 
 // JsonObject
@@ -86,6 +78,32 @@ bool JsonObject::add_key_value(const string &key, JsonValuePtr value) {
   _key_value[key] = value;
   return true;
 }
+
+bool JsonObject::add_key_value(const std::string &key, int value) {
+  _key_value[key] = JsonValue::create_int(value);
+  return true;
+}
+
+bool JsonObject::add_key_value(const std::string &key, uint32 value) {
+  _key_value[key] = JsonValue::create_int(value);
+  return true;
+}
+
+bool JsonObject::add_key_value(const std::string &key, double value) {
+  _key_value[key] = JsonValue::create_number(value);
+  return true;
+}
+
+bool JsonObject::add_key_value(const std::string &key, const std::string &value) {
+  _key_value[key] = JsonValue::create_string(value);
+  return true;
+}
+
+bool JsonObject::add_key_value(const std::string &key, bool value) {
+  _key_value[key] = JsonValue::create_bool(value);
+  return true;
+}
+
 
 JsonObject::JsonValuePtr JsonObject::operator[](const std::string &key) const { 
   auto it = _key_value.find(key);

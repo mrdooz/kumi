@@ -25,15 +25,15 @@ public:
       con->send(print_json(DEMO_ENGINE.get_info()), frame::opcode::TEXT);
     } else {
       JsonValue::JsonValuePtr m = parse_json(str.c_str(), str.c_str() + str.size());
-      if (m->has_key("msg")) {
+      if ((*m)["msg"]) {
         // msg has type and data fields
-        auto d = m->get_by_key("msg");
-        auto type = d->get_by_key("type")->get_string();
-        auto data = d->get_by_key("data");
+        auto d = (*m)["msg"];
+        auto type = (*d)["type"]->get_string();
+        auto data = (*d)["data"];
 
         if (type == "time") {
-          bool playing = data->get_by_key("is_playing")->get_bool();
-          int cur_time = data->get_by_key("cur_time")->get_int();
+          bool playing = (*data)["is_playing"]->get_bool();
+          int cur_time = (*data)["cur_time"]->get_int();
           DEMO_ENGINE.set_pos(cur_time);
           DEMO_ENGINE.set_paused(!playing);
 

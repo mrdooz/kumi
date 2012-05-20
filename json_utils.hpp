@@ -27,8 +27,13 @@ public:
 
   JsonType type() const { return _type; }
 
-  virtual bool add_value(JsonValuePtr value);
-  virtual bool add_key_value(const std::string &key, JsonValuePtr value);
+  virtual bool add_value(JsonValuePtr value) { assert(!"Not an array"); return false; }
+  virtual bool add_key_value(const std::string &key, JsonValuePtr value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, int value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, uint32 value)  { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, double value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, const std::string &value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, bool value) { assert(!"Not an object"); return false; }
 
   int get_int() const { assert(_type == JS_INT); return _int; }
   double get_number() const { assert(_type == JS_NUMBER); return _number; }
@@ -64,7 +69,13 @@ class JsonObject : public JsonValue {
   friend class JsonWriter;
   friend void print_inner(const JsonObject *obj, int indent_level, std::string *res);
 public:
-  virtual bool add_key_value(const std::string &key, JsonValuePtr value);
+  virtual bool add_key_value(const std::string &key, JsonValuePtr value) override;
+  virtual bool add_key_value(const std::string &key, int value) override;
+  virtual bool add_key_value(const std::string &key, uint32 value) override;
+  virtual bool add_key_value(const std::string &key, double value) override;
+  virtual bool add_key_value(const std::string &key, const std::string &value) override;
+  virtual bool add_key_value(const std::string &key, bool value) override;
+
   virtual JsonValuePtr operator[](const std::string &key) const override;
   virtual bool has_key(const std::string &key) const;
 

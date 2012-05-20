@@ -181,7 +181,7 @@ bool KumiLoader::load_animation(const uint8 *buf, Scene *scene) {
 }
 
 
-bool KumiLoader::load_materials(const uint8 *buf) {
+bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
@@ -232,6 +232,7 @@ bool KumiLoader::load_materials(const uint8 *buf) {
           break;
       }
     }
+    scene->materials.push_back(material);
   }
 
   return true;
@@ -273,9 +274,9 @@ bool KumiLoader::load(const char *filename, const char *material_connections, Re
   // apply the binary fixup
   apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);
 
-  B_ERR_BOOL(load_materials(&scene_data[0] + header.material_ofs));
-
   Scene *s = *scene = new Scene;
+
+  B_ERR_BOOL(load_materials(&scene_data[0] + header.material_ofs, s));
   B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
   B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
   B_ERR_BOOL(load_lights(&scene_data[0] + header.light_ofs, s));

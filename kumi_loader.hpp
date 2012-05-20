@@ -12,7 +12,7 @@ private:
   bool load_meshes(const uint8 *buf, Scene *scene);
   bool load_cameras(const uint8 *buf, Scene *scene);
   bool load_lights(const uint8 *buf, Scene *scene);
-  bool load_materials(const uint8 *buf);
+  bool load_materials(const uint8 *buf, Scene *scene);
   bool load_animation(const uint8 *buf, Scene *scene);
   std::unordered_map<std::string, GraphicsObjectHandle> _material_ids;
   std::unordered_map<std::string, std::string> _technique_for_material;

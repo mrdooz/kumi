@@ -7,6 +7,7 @@
 #include "../renderer.hpp"
 #include "../threading.hpp"
 #include "../mesh.hpp"
+#include "../tweakable_param.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
