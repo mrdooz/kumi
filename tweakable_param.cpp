@@ -31,8 +31,78 @@ static string anim_to_string(TweakableParam::Animation anim) {
   return "";
 }
 
+TweakableParam::TweakableParam(const std::string &name, Type type, Animation animation) 
+  : _name(name)
+  , _type(type)
+  , _animation(animation) {
+    switch (_type) {
+    case kTypeBool: _bool = new vector<Key<bool> >; break;
+    case kTypeInt: _int = new vector<Key<int> >; break;
+    case kTypeFloat: _float = new vector<Key<float> >; break;
+    case kTypeFloat2: _float2 = new vector<Key<XMFLOAT2> >; break;
+    case kTypeFloat3: _float3 = new vector<Key<XMFLOAT3> >; break;
+    case kTypeFloat4: 
+    case kTypeColor:
+      _float4 = new vector<Key<XMFLOAT4> >; break;
+    case kTypeString:
+    case kTypeFile:  _string = new std::string; break;
+    }
+}
 
-JsonValue::JsonValuePtr get_keys(const TweakableParam *p) {
+TweakableParam::TweakableParam(const std::string &name)
+  : _name(name)
+  , _type(kTypeUnknown)
+  , _animation(kAnimUnknown)
+{
+}
+
+TweakableParam::~TweakableParam() {
+  switch (_type) {
+  case kTypeBool: SAFE_DELETE(_bool); break;
+  case kTypeInt: SAFE_DELETE(_int); break;
+  case kTypeFloat: SAFE_DELETE(_float); break;
+  case kTypeFloat2: SAFE_DELETE(_float2); break;
+  case kTypeFloat3: SAFE_DELETE(_float3); break;
+  case kTypeFloat4:
+  case kTypeColor: 
+    SAFE_DELETE(_float4); break;
+  case kTypeString: SAFE_DELETE(_string); break;
+  case kTypeFile: SAFE_DELETE(_string); break;
+  }
+
+  seq_delete(&_children);
+}
+
+void TweakableParam::add_child(TweakableParam *child) {
+  _children.push_back(child);
+}
+
+JsonValue::JsonValuePtr TweakableParam::to_json() {
+
+  auto obj = JsonValue::create_object();
+  obj->add_key_value("name", _name);
+
+  if (_type != kTypeUnknown) {
+    obj->add_key_value("type", type_to_string(_type));
+    obj->add_key_value("anim", anim_to_string(_animation));
+    obj->add_key_value("keys", get_keys(this));
+  }
+
+  if (!_children.empty()) {
+    auto children = JsonValue::create_array();
+    for (auto it = begin(_children); it != end(_children); ++it) {
+      children->add_value((*it)->to_json());
+    }
+
+    obj->add_key_value("children", children);
+  }
+
+  return obj;
+}
+
+
+
+JsonValue::JsonValuePtr TweakableParam::get_keys(const TweakableParam *p) {
   auto a = JsonValue::create_array();
   auto type = p->_type;
 
@@ -127,57 +197,12 @@ JsonValue::JsonValuePtr get_keys(const TweakableParam *p) {
   return a;
 }
 
-JsonValue::JsonValuePtr add_param(const TweakableParam *param) {
+JsonValue::JsonValuePtr TweakableParam::add_param(const TweakableParam *param) {
   auto obj = JsonValue::create_object();
   obj->add_key_value("name", JsonValue::create_string(param->_name));
   obj->add_key_value("type", JsonValue::create_string(type_to_string(param->_type)));
   obj->add_key_value("anim", JsonValue::create_string(anim_to_string(param->_animation)));
   obj->add_key_value("keys", get_keys(param));
-
-  return obj;
-}
-
-
-TweakableParam::TweakableParam(const std::string &name, Type type, Animation animation) 
-  : _name(name)
-  , _type(type)
-  , _animation(animation) {
-    switch (_type) {
-    case kTypeBool: _bool = new vector<Key<bool> >; break;
-    case kTypeInt: _int = new vector<Key<int> >; break;
-    case kTypeFloat: _float = new vector<Key<float> >; break;
-    case kTypeFloat2: _float2 = new vector<Key<XMFLOAT2> >; break;
-    case kTypeFloat3: _float3 = new vector<Key<XMFLOAT3> >; break;
-    case kTypeFloat4: 
-    case kTypeColor:
-      _float4 = new vector<Key<XMFLOAT4> >; break;
-    case kTypeString:
-    case kTypeFile:  _string = new std::string; break;
-    }
-}
-
-TweakableParam::~TweakableParam() {
-  switch (_type) {
-  case kTypeBool: SAFE_DELETE(_bool); break;
-  case kTypeInt: SAFE_DELETE(_int); break;
-  case kTypeFloat: SAFE_DELETE(_float); break;
-  case kTypeFloat2: SAFE_DELETE(_float2); break;
-  case kTypeFloat3: SAFE_DELETE(_float3); break;
-  case kTypeFloat4:
-  case kTypeColor: 
-    SAFE_DELETE(_float4); break;
-  case kTypeString: SAFE_DELETE(_string); break;
-  case kTypeFile: SAFE_DELETE(_string); break;
-  }
-}
-
-JsonValue::JsonValuePtr TweakableParam::to_json() {
-
-  auto obj = JsonValue::create_object();
-  obj->add_key_value("name", _name);
-  obj->add_key_value("type", type_to_string(_type));
-  obj->add_key_value("anim", anim_to_string(_animation));
-  obj->add_key_value("keys", get_keys(this));
 
   return obj;
 }

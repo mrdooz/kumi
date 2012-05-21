@@ -36,6 +36,50 @@ var KUMI = (function($) {
         return x >= left && x < right && y >= top && y < bottom;
     }
 
+    function findKeys(keys, time) {
+        var t1, t2, i;
+        for (i = 0; i < keys.length - 1; ++i) {
+            t1 = keys[i].time;
+            t2 = keys[i+1].time;
+            if (time >= t1 && time < t2) {
+                return { k1: keys[i].value, k2: keys[i+1].value, t : (time - t1) / (t2 - t1) };
+            }
+        }
+        return { k1 : keys[i].value, k2 : keys[i].value, t : 0 };
+    }
+
+    function evalStep(keys) {
+        return function(t) {
+            var keyPair = findKeys(keys, t);
+            return keyPair.k1;
+        };
+    }
+
+    function evalLinearFloat(keys) {
+        return function(t) {
+            var keyPair = findKeys(keys, t);
+            return keyPair.k1.x + keyPair.t * (keyPair.k2.x - keyPair.k1.x);
+        };
+    }
+
+    function evalSplineFloat(keys) {
+        return function(t) {
+
+        };
+    }
+
+    function evalDummy(keys) {
+        return function(t) {
+            return keys[0].value;
+        };
+    }
+
+    var evalLookup = {
+        "step" : { "bool" : evalStep, "float" : evalStep },
+        "linear" : { "bool" : evalDummy, "float" : evalLinearFloat },
+        "spline" : { "bool" : evalDummy, "float" : evalLinearFloat }
+    };
+
     function openWebSocket()
     {
         var initial_open = true;
@@ -71,7 +115,20 @@ var KUMI = (function($) {
                 fps_series.append(new Date().getTime(), fps);
                 $('#cur-fps').text(fps.toFixed(2) + ' fps');
             } else if (res.demo) {
+                // append interpolation functions to the parameters
                 demo_info = res.demo;
+                demo_info.effects.forEach( function(effect) {
+                    function decorateParam(param) {
+                        if (param.children) {
+                            param.children.forEach(decorateParam);
+                        }
+
+                        if (param.keys) {
+                            param.evalParam = evalLookup[param.anim][param.type](param.keys);
+                        }
+                    }
+                    effect.params.forEach(decorateParam);
+                });
             }
         };
 
@@ -171,7 +228,7 @@ var KUMI = (function($) {
         var found_effect = null;
         var start;
         $.each(demo_info.effects, function(i, e) {
-            if (y >= i * effect_height & y < (i+1) * effect_height) {
+            if (y >= i * effect_height && y < (i+1) * effect_height) {
                 var sx = timeToPixel(e.start_time) + timeline_margin;
                 var ex = timeToPixel(e.end_time) + timeline_margin;
                 if (Math.abs(x-sx) < 5) {
@@ -358,25 +415,16 @@ var KUMI = (function($) {
         return t / ms_per_pixel;
     }
 
-    function drawTimelineCanvas() {
-        var canvas = $('#timeline-canvas').get(0);
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    function fillLinearGrad(ctx, x, y, w, h, startColor, endColor) {
+        var gradient = ctx.createLinearGradient(x, y, x, y+h);
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
 
-        ctx.save();
+        ctx.fillStyle = gradient;
+        ctx.fillRect(x, y, w, h);
+    }
 
-        ctx.font = "8px Arial";
-        ctx.textBaseline = "top";
-        ctx.textAlign = 'center';
-
-        var h = 25 - 15;
-        var grad = ctx.createLinearGradient(0, 0, 0, 40);
-        grad.addColorStop(0, '#444');
-        grad.addColorStop(1, '#ccc');
-        ctx.fillStyle = grad;
-        ctx.fillRect(0,0,canvas.width, 40);
-        ctx.strokeRect(0,0,canvas.width, 40.5);
-
+    function drawTimelineTicker(ctx, canvas) {
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#888';
         for (var i = 0; i < canvas.width; i += 10) {
@@ -392,18 +440,63 @@ var KUMI = (function($) {
             ctx.closePath();
             ctx.stroke();
         }
+    }
+
+
+    function drawTimelineCanvas() {
+        var canvas = $('#timeline-canvas').get(0);
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+
+        ctx.font = "8px Arial";
+        ctx.textBaseline = "top";
+        ctx.textAlign = 'center';
+
+        fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
+        ctx.strokeRect(0,0,canvas.width, 40.5);
+        drawTimelineTicker(ctx, canvas);
+
+        // draw the effects
+        ctx.textBaseline = 'left';
+        ctx.textAlign = 'left';
 
         var y = timeline_header_height;
-        demo_info.effects.forEach( function(e) {
-            var blue_grad = ctx.createLinearGradient(0, y, 0, y+effect_height);
-            blue_grad.addColorStop(0, '#558');
-            blue_grad.addColorStop(1, '#aae');
+        demo_info.effects.forEach( function(effect) {
+            var x = timeline_margin + Math.max(0, timeToPixel(effect.start_time));
+            var w = Math.max(0,timeToPixel(effect.end_time - effect.start_time));
+            fillLinearGrad(ctx, x, y, w, effect_height, '#558', '#aae');
 
-            ctx.fillStyle = blue_grad;
-            var o = timeline_margin + Math.max(0, timeToPixel(e.start_time));
-            var w = Math.max(0,timeToPixel(e.end_time - e.start_time));
-            ctx.fillRect(o, y, w, effect_height);
-            y += 15;
+            y += effect_height;
+
+            var indent = 10;
+
+            var drawSingleParam = function(param) {
+                var value = param.evalParam(cur_time);
+                if (typeof(value) === 'number')
+                    value = value.toFixed(2);
+                ctx.textAlign = 'right';
+                ctx.fillText(value, canvas.width - 5, y + 15);
+                ctx.textAlign = 'left';
+            };
+
+            var drawParams = function drawParams(param) {
+                ctx.fillText(param.name, 5 + indent, y + 15);
+                if (param.keys) {
+                    drawSingleParam(param);
+                }
+                y += 15;
+
+                if (param.children) {
+                    indent += 10;
+                    param.children.forEach(drawParams);
+                    indent -= 10;
+                }
+            };
+
+            effect.params.forEach(drawParams);
+
         });
 
         ctx.strokeStyle = '#f33';
@@ -428,29 +521,46 @@ var KUMI = (function($) {
         ctx.save();
         var d = demo_info;
 
-        ctx.font = "15px Arial";
-        ctx.textBaseline = 'middle';
-        ctx.textAlign = 'center';
+        ctx.font = "10px Arial";
+        ctx.textBaseline = 'left';
+        ctx.textAlign = 'left';
 
-        var h = 25 - 15;
-        var grey_grad = ctx.createLinearGradient(0, 0, 0, timeline_header_height);
-        grey_grad.addColorStop(0, '#444');
-        grey_grad.addColorStop(1, '#ccc');
-        ctx.fillStyle = grey_grad;
-        ctx.fillRect(0,0,canvas.width, 40);
+        fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
         ctx.strokeRect(0,0,canvas.width, 40.5);
 
         var y = timeline_header_height;
-        demo_info.effects.forEach( function(e) {
-            var blue_grad = ctx.createLinearGradient(0, y, 0, y+effect_height);
-            blue_grad.addColorStop(0, '#558');
-            blue_grad.addColorStop(1, '#aae');
-
-            ctx.fillStyle = blue_grad;
-            ctx.fillRect(0, y, canvas.width, effect_height);
+        demo_info.effects.forEach( function(effect) {
+            fillLinearGrad(ctx, 0, y, canvas.width, effect_height, '#558', '#aae');
             ctx.fillStyle = '#000';
-            ctx.fillText(e.name, canvas.width/2, y + 15);
-            y += 15;
+            ctx.fillText(effect.name, 5, y + effect_height);
+            y += effect_height;
+
+            var indent = 10;
+
+            var drawSingleParam = function(param) {
+                var value = param.evalParam(cur_time);
+                if (typeof(value) === 'number')
+                    value = value.toFixed(2);
+                ctx.textAlign = 'right';
+                ctx.fillText(value, canvas.width - 5, y + 15);
+                ctx.textAlign = 'left';
+            };
+
+            var drawParams = function drawParams(param) {
+                ctx.fillText(param.name, 5 + indent, y + 15);
+                if (param.keys) {
+                    drawSingleParam(param);
+                }
+                y += 15;
+
+                if (param.children) {
+                    indent += 10;
+                    param.children.forEach(drawParams);
+                    indent -= 10;
+                }
+            };
+
+            effect.params.forEach(drawParams);
         });
 
         ctx.strokeStyle = '#111';

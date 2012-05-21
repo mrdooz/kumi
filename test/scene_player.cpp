@@ -57,8 +57,14 @@ bool ScenePlayer::init() {
   p2->add_key(3000, -200.0f);
   p2->add_key(2000, 300.0f);
 
-  _params.push_back(unique_ptr<TweakableParam>(p1));
-  _params.push_back(unique_ptr<TweakableParam>(p2));
+  auto parent1 = new TweakableParam("parent1");
+  auto parent2 = new TweakableParam("parent2");
+
+  parent1->add_child(parent2);
+  parent1->add_child(p1);
+  parent2->add_child(p2);
+
+  _params.push_back(unique_ptr<TweakableParam>(parent1));
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
 

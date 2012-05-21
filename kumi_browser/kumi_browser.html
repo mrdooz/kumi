@@ -35,7 +35,12 @@
             fps.get(0).height = 100;
 
             var editor = $('#timeline-canvas');
-            editor.get(0).width = editor.parent().width() - $('#timeline-control').get(0).width - 5;
+            var control = $('#timeline-control');
+            editor.get(0).width = editor.parent().width() - control.get(0).width - 5;
+            var ofs = editor.offset();
+            var canvasHeight = window.innerHeight - editor.offset().top - 60;
+            editor.get(0).height = canvasHeight;
+            control.get(0).height = canvasHeight;
             var playing = false;
             $('#btn-prev-skip').click(KUMI.onBtnPrevSkip);
             $('#btn-prev').click(KUMI.onBtnPrev);

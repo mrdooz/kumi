@@ -94,10 +94,10 @@ void safe_erase(Container& c, const typename Container::value_type& v)
 }
 
 template<class T> 
-void seq_delete(T* t) {
-	for (T::iterator it = t->begin(); it != t->end(); ++it)
-		delete *it;
-	t->clear();
+void seq_delete(T *seq) {
+  for (auto it = begin(*seq); it != end(*seq); ++it)
+    delete *it;
+  seq->clear();
 }
 
 template<class T> 
