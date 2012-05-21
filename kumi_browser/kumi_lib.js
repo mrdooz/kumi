@@ -1,3 +1,32 @@
+var KUMI_LIB = (function($) {
+    "use strict";
+    var kumi_lib = {};
+
+    var id = function(x) { return x; };
+
+    // return the min of an array, using the fn function to extract the element to compare
+    kumi_lib.min = function(a, fn) {
+        if (a.length === 0)
+            return undefined;
+        fn = fn || id;
+
+        var v = fn(a[0]);
+        a.forEach(function(e) { v = Math.min(v, fn(e)); });
+        return v;
+    };
+
+    kumi_lib.max = function(a, fn) {
+        if (a.length === 0)
+            return undefined;
+        fn = fn || id;
+        var v = fn(a[0]);
+        a.forEach(function(e) { v = Math.max(v, fn(e)); });
+        return v;
+    };
+
+    return kumi_lib;
+}(window.jQuery));
+
 // stuff stolen from JavaScript the Good Parts
 if (typeof Object.create !== 'function') {
     Object.create = function (o) {

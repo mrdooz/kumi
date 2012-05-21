@@ -1,5 +1,5 @@
 #pragma once
-#include "../demo_engine.hpp"
+#include "../effect.hpp"
 
 struct SimpleEffect : public Effect {
 	SimpleEffect(GraphicsObjectHandle context, const std::string &name) : Effect(context, name) {}

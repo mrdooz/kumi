@@ -129,6 +129,9 @@
     <ClCompile Include="..\tweakable_param.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\effect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -273,6 +276,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\tweakable_param.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\effect.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

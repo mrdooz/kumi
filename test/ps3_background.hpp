@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../demo_engine.hpp"
+#include "../effect.hpp"
 
 class Ps3BackgroundEffect : public Effect {
 public:

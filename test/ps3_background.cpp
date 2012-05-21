@@ -2,6 +2,7 @@
 #include "ps3_background.hpp"
 #include "../logger.hpp"
 #include "../renderer.hpp"
+#include "../graphics.hpp"
 
 bool Ps3BackgroundEffect::init() {
   LOG_VERBOSE_LN(__FUNCTION__);

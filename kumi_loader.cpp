@@ -10,7 +10,7 @@
 #include "file_utils.hpp"
 #include "json_utils.hpp"
 
-#define FILE_VERSION 6
+#define FILE_VERSION 7
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -214,17 +214,18 @@ bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
           break;
 */
         case PropertyType::kFloat:
-          material->add_property(name, read_and_step<float>(&buf));
+          material->add_property(name, type, read_and_step<float>(&buf));
           break;
 
         case PropertyType::kFloat3: {
           XMFLOAT3 tmp = read_and_step<XMFLOAT3>(&buf);
-          material->add_property(name, XMFLOAT4(tmp.x, tmp.y, tmp.z, 0));
+          material->add_property(name, type, XMFLOAT4(tmp.x, tmp.y, tmp.z, 0));
           break;
         }
 
         case PropertyType::kFloat4:
-          material->add_property(name, read_and_step<XMFLOAT4>(&buf));
+        case PropertyType::kColor:
+          material->add_property(name, type, read_and_step<XMFLOAT4>(&buf));
           break;
 
         default:

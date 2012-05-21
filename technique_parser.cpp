@@ -101,6 +101,7 @@ enum Symbol {
 	kSymFloat2,
 	kSymFloat3,
 	kSymFloat4,
+  kSymColor,
 	kSymFloat4x4,
 	kSymTexture2d,
 	kSymSampler,
@@ -184,6 +185,7 @@ struct {
 	{ kSymFloat, "float1" },
 	{ kSymFloat2, "float2" },
 	{ kSymFloat3, "float3" },
+  { kSymColor, "color" },
 	{ kSymFloat4, "float4" },
 	{ kSymFloat4x4, "float4x4" },
 	{ kSymInt, "int" },
@@ -632,28 +634,29 @@ void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string
 
 void TechniqueParser::parse_material(Scope *scope, Material *material) {
 
-	auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
+  auto tmp = list_of(kSymFloat)(kSymFloat2)(kSymFloat3)(kSymFloat4);
 
-	Symbol type;
-	while (scope->consume_in(tmp, &type)) {
-		PropertyType::Enum prop_type = lookup_throw<Symbol, PropertyType::Enum>(type, valid_property_types);
-		string name = scope->next_identifier();
-		scope->munch(kSymEquals);
-		string value = scope->string_until(';');
-		float out[16];
-		parse_value(value, prop_type, out);
-		scope->munch(kSymSemicolon);
-		switch (prop_type) {
-			case PropertyType::kFloat:
-        material->add_property(name, out[4]);
-				break;
-			case PropertyType::kFloat4:
-        material->add_property(name, XMFLOAT4(out[0], out[1], out[2], out[3]));
-				break;
-			default:
-				THROW_ON_FALSE(false);
-		}
-	}
+  Symbol type;
+  while (scope->consume_in(tmp, &type)) {
+    PropertyType::Enum prop_type = lookup_throw<Symbol, PropertyType::Enum>(type, valid_property_types);
+    string name = scope->next_identifier();
+    scope->munch(kSymEquals);
+    string value = scope->string_until(';');
+    float out[16];
+    parse_value(value, prop_type, out);
+    scope->munch(kSymSemicolon);
+    switch (prop_type) {
+      case PropertyType::kFloat:
+        material->add_property(name, prop_type, out[4]);
+        break;
+      case PropertyType::kColor:
+      case PropertyType::kFloat4:
+        material->add_property(name, prop_type, XMFLOAT4(out[0], out[1], out[2], out[3]));
+        break;
+      default:
+        THROW_ON_FALSE(false);
+    }
+  }
 }
 
 void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {

@@ -141,6 +141,7 @@
     <ClCompile Include="..\bitmap_utils.cpp" />
     <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
+    <ClCompile Include="..\effect.cpp" />
     <ClCompile Include="..\effect_wrapper.cpp" />
     <ClCompile Include="..\file_utils.cpp" />
     <ClCompile Include="..\file_watcher.cpp" />
@@ -194,6 +195,7 @@
     <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />
     <ClInclude Include="..\dynamic_vb.hpp" />
+    <ClInclude Include="..\effect.hpp" />
     <ClInclude Include="..\effect_wrapper.hpp" />
     <ClInclude Include="..\file_utils.hpp" />
     <ClInclude Include="..\file_watcher.hpp" />

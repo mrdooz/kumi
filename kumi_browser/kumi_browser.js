@@ -1,4 +1,4 @@
-var KUMI = (function($) {
+var KUMI = (function($, KUMI_LIB) {
     "use strict";
     var kumi = {};
     var wsUri = "ws://127.0.0.1:9002";
@@ -10,13 +10,16 @@ var KUMI = (function($) {
     var demo_info = { effects :[] };
 
     var timeline_header_height = 40;
-    var timeline_margin = 10;
+    var timeline_margin = 5;
     var ms_per_pixel = 10.0;
     var timeline_scales = [1, 5, 10, 20, 50, 100, 250, 500, 1000];
     var cur_timeline_scale = 1;
     var timeline_ofs = 0;
 
-    var effect_height = 30;
+    var effectHeight = 30;
+    var paramHeight = 50;
+    var paramHeightSingle = 15;
+    var paramContainerHeight = 10;
 
     var is_playing = false;
     var cur_time = 0;
@@ -26,11 +29,14 @@ var KUMI = (function($) {
     var snapping_size = 50; // ms
     var snapping = true;
 
-
     var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 
     var button_state = [];
+
+    function toRgb(o) {
+        return "rgb(" + (255 * o.r).toFixed() + ", " + (255 * o.g).toFixed() + ", " +(255 * o.b).toFixed() + ")";
+    }
 
     function ptInRect(x, y, top, left, bottom, right) {
         return x >= left && x < right && y >= top && y < bottom;
@@ -68,16 +74,17 @@ var KUMI = (function($) {
         };
     }
 
-    function evalDummy(keys) {
+    function evalId(keys) {
         return function(t) {
             return keys[0].value;
         };
     }
 
     var evalLookup = {
+        "static" : { "bool" : evalId, "float" : evalId, "color" : evalId },
         "step" : { "bool" : evalStep, "float" : evalStep },
-        "linear" : { "bool" : evalDummy, "float" : evalLinearFloat },
-        "spline" : { "bool" : evalDummy, "float" : evalLinearFloat }
+        "linear" : { "bool" : evalId, "float" : evalLinearFloat },
+        "spline" : { "bool" : evalId, "float" : evalLinearFloat }
     };
 
     function openWebSocket()
@@ -139,7 +146,7 @@ var KUMI = (function($) {
 
     kumi.onBtnPrev = function() {
         var canvas = $('#timeline-canvas');
-        var delta = rawPixelToTime(canvas.width() -  timeline_margin);
+        var delta = rawPixelToTime(canvas.width());
         cur_time = Math.max(0, cur_time - delta);
         timeline_ofs = Math.max(0, timeline_ofs - delta);
         sendTimeInfo();
@@ -169,7 +176,7 @@ var KUMI = (function($) {
 
     kumi.onBtnNext = function() {
         var canvas = $('#timeline-canvas');
-        var delta = rawPixelToTime(canvas.width() - timeline_margin);
+        var delta = rawPixelToTime(canvas.width());
         cur_time = cur_time + delta;
         timeline_ofs += delta;
         sendTimeInfo();
@@ -228,7 +235,7 @@ var KUMI = (function($) {
         var found_effect = null;
         var start;
         $.each(demo_info.effects, function(i, e) {
-            if (y >= i * effect_height && y < (i+1) * effect_height) {
+            if (y >= i * effectHeight && y < (i+1) * effectHeight) {
                 var sx = timeToPixel(e.start_time) + timeline_margin;
                 var ex = timeToPixel(e.end_time) + timeline_margin;
                 if (Math.abs(x-sx) < 5) {
@@ -322,7 +329,7 @@ var KUMI = (function($) {
         var updateTime = function(pageX) {
             var ofs = that.getCanvas().offset();
             var x = pageX - ofs.left;
-            cur_time = snap(Math.max(0, pixelToTime(x - timeline_margin)));
+            cur_time = snap(Math.max(0, pixelToTime(x)));
             sendTimeInfo();
         };
 
@@ -372,7 +379,7 @@ var KUMI = (function($) {
         var updateTime = function(pageX) {
             var ofs = that.getCanvas().offset();
             var x = pageX - ofs.left;
-            cur_time = snap(Math.max(0, pixelToTime(x - timeline_margin)));
+            cur_time = snap(Math.max(0, pixelToTime(x)));
             sendTimeInfo();
         };
 
@@ -400,11 +407,11 @@ var KUMI = (function($) {
     }
 
     function rawPixelToTime(px) {
-        return px * ms_per_pixel;
+        return (px - timeline_margin) * ms_per_pixel;
     }
 
     function pixelToTime(px) {
-        return timeline_ofs + px * ms_per_pixel;
+        return timeline_ofs + (px - timeline_margin) * ms_per_pixel;
     }
 
     function timeToPixel(t) {
@@ -424,17 +431,26 @@ var KUMI = (function($) {
         ctx.fillRect(x, y, w, h);
     }
 
+    function setFont(ctx, font, textBaseline, textAlign) {
+        ctx.font = font;
+        ctx.textBaseline = textBaseline;
+        ctx.textAlign = textAlign;
+    }
+
     function drawTimelineTicker(ctx, canvas) {
+
+        setFont(ctx, "8px Arial", "top", "center");
+
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#888';
-        for (var i = 0; i < canvas.width; i += 10) {
+        for (var i = timeline_margin; i < canvas.width; i += 10) {
             var cur = pixelToTime(i);
-            var extra = (i % 50) === 0;
+            var extra = ((i - timeline_margin) % 50) === 0;
             if (extra) {
-                ctx.fillText(cur, timeline_margin + i, 15);
+                ctx.fillText(cur, i, 15);
             }
             ctx.beginPath();
-            var x = timeline_margin + i + 0.5;
+            var x = i + 0.5;
             ctx.moveTo(x, 0);
             ctx.lineTo(x, 8 + (extra ? 5 : 2));
             ctx.closePath();
@@ -442,6 +458,15 @@ var KUMI = (function($) {
         }
     }
 
+    function drawTimeMarker(ctx, canvas) {
+        ctx.strokeStyle = '#f33';
+        ctx.beginPath();
+        var m = timeline_margin + timeToPixel(cur_time);
+        ctx.moveTo(m, 0);
+        ctx.lineTo(m, canvas.height);
+        ctx.closePath();
+        ctx.stroke();
+    }
 
     function drawTimelineCanvas() {
         var canvas = $('#timeline-canvas').get(0);
@@ -450,43 +475,103 @@ var KUMI = (function($) {
 
         ctx.save();
 
-        ctx.font = "8px Arial";
-        ctx.textBaseline = "top";
-        ctx.textAlign = 'center';
-
         fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
         ctx.strokeRect(0,0,canvas.width, 40.5);
         drawTimelineTicker(ctx, canvas);
 
         // draw the effects
-        ctx.textBaseline = 'left';
-        ctx.textAlign = 'left';
+        setFont(ctx, "10px Arial", "alphabetic", "left");
 
         var y = timeline_header_height;
         demo_info.effects.forEach( function(effect) {
+            var startTime = Math.max(effect.start_time, pixelToTime(0));
+            var endTime = Math.min(effect.end_time, pixelToTime(canvas.width));
+
             var x = timeline_margin + Math.max(0, timeToPixel(effect.start_time));
             var w = Math.max(0,timeToPixel(effect.end_time - effect.start_time));
-            fillLinearGrad(ctx, x, y, w, effect_height, '#558', '#aae');
+            fillLinearGrad(ctx, x, y, w, effectHeight, '#558', '#aae');
 
-            y += effect_height;
+            y += effectHeight;
 
             var indent = 10;
 
-            var drawSingleParam = function(param) {
-                var value = param.evalParam(cur_time);
-                if (typeof(value) === 'number')
-                    value = value.toFixed(2);
-                ctx.textAlign = 'right';
-                ctx.fillText(value, canvas.width - 5, y + 15);
-                ctx.textAlign = 'left';
+            var drawParamValues = function(param) {
+                var pixelStep = 5;
+                var timeStep = rawTimeToPixel(endTime - startTime) / pixelStep;
+                var i, minValue, maxValue;
+
+                // find all active keys
+                var keys = [];
+
+                if (param.keys.length === 1) {
+                    keys.push(param.keys[0]);
+                } else {
+                    for (i = 0; i < param.keys.length - 1; ++i) {
+                        if (param.keys[i].time <= startTime && param.keys[i+1].time >= startTime) {
+                            // stradling the start
+                            keys.push(param.keys[i]);
+                            keys.push(param.keys[i+1]);
+                        } else if (param.keys[i].time >= startTime && param.keys[i+1].time < endTime) {
+                            // fully inside
+                            keys.push(param.keys[i+1]);
+                        } else if (param.keys[i].time < endTime && param.keys[i+1].time >= endTime) {
+                            // stradling the end
+                            keys.push(param.keys[i+1]);
+                        }
+                    }
+                }
+
+                if (keys.length === 0)
+                    return;
+
+                if (param.type === "float") {
+                    minValue = KUMI_LIB.min(keys, function(x) { return x.value.x; });
+                    maxValue = KUMI_LIB.max(keys, function(x) { return x.value.x; });
+
+                    var rescale = function(value) {
+                        return y + paramHeight - scale * (value - minValue);
+                    };
+
+                    // small hack for single value keys
+                    if (Math.abs(minValue - maxValue) < 0.01)
+                        minValue -= 10;
+
+                    // draw the active keys
+                    var scale = paramHeight / (maxValue - minValue);
+                    for (i = 0; i < keys.length; ++i) {
+                        var x = timeline_margin + timeToPixel(keys[i].time);
+                        if (x >= 0 && x < canvas.width) {
+                            ctx.beginPath();
+                            ctx.arc(x, rescale(keys[i].value.x), 3, 0, 2 * Math.PI, 0);
+                            ctx.fillStyle = "Black";
+                            ctx.closePath();
+                            ctx.fill();
+                        }
+                    }
+
+                    // draw the interpolated values
+                    var t = Math.max(keys[0].time, startTime);
+                    ctx.moveTo(timeline_margin + timeToPixel(t), rescale(param.evalParam(t)));
+                    for (i = 1; i < keys.length; ++i) {
+                        ctx.lineTo(timeline_margin + timeToPixel(keys[i].time), rescale(param.keys[i].value.x));
+                    }
+                    ctx.lineTo(timeline_margin + timeToPixel(endTime), rescale(param.evalParam(endTime)));
+                    ctx.strokeStyle = "Black";
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                } else if (param.type === "color") {
+                    ctx.fillStyle = toRgb(param.keys[0].value);
+                    ctx.fillRect(timeline_margin, y, canvas.width, paramHeight);
+                }
+
             };
 
             var drawParams = function drawParams(param) {
-                ctx.fillText(param.name, 5 + indent, y + 15);
                 if (param.keys) {
-                    drawSingleParam(param);
+                    drawParamValues(param);
                 }
-                y += 15;
+
+                y += param.keys ? paramHeight : paramContainerHeight;
 
                 if (param.children) {
                     indent += 10;
@@ -495,17 +580,26 @@ var KUMI = (function($) {
                 }
             };
 
+            var paramParity = 0;
+            var tmpY = y;
+            var drawParamBackground = function drawParamBackground(param) {
+                paramParity = !paramParity;
+                ctx.fillStyle = paramParity ? "#999" : "#ccc";
+                ctx.fillRect(timeline_margin, tmpY, canvas.width, paramHeight);
+
+                tmpY += param.keys ? paramHeight : paramContainerHeight;
+
+                if (param.children) {
+                    param.children.forEach(drawParamBackground);
+                }
+            };
+
+            effect.params.forEach(drawParamBackground);
             effect.params.forEach(drawParams);
 
         });
 
-        ctx.strokeStyle = '#f33';
-        ctx.beginPath();
-        var m = timeline_margin + timeToPixel(cur_time);
-        ctx.moveTo(m, 0);
-        ctx.lineTo(m, canvas.height);
-        ctx.closePath();
-        ctx.stroke();
+        drawTimeMarker(ctx, canvas);
 
         ctx.strokeStyle = '#111';
         ctx.strokeRect(0, 0, canvas.width, canvas.height);
@@ -521,37 +615,39 @@ var KUMI = (function($) {
         ctx.save();
         var d = demo_info;
 
+        fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
+        ctx.strokeRect(0,0,canvas.width, 40.5);
+
         ctx.font = "10px Arial";
         ctx.textBaseline = 'left';
         ctx.textAlign = 'left';
 
-        fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
-        ctx.strokeRect(0,0,canvas.width, 40.5);
-
         var y = timeline_header_height;
         demo_info.effects.forEach( function(effect) {
-            fillLinearGrad(ctx, 0, y, canvas.width, effect_height, '#558', '#aae');
+            fillLinearGrad(ctx, 0, y, canvas.width, effectHeight, '#558', '#aae');
             ctx.fillStyle = '#000';
-            ctx.fillText(effect.name, 5, y + effect_height);
-            y += effect_height;
+            ctx.fillText(effect.name, 5, y + effectHeight);
+            y += effectHeight;
 
             var indent = 10;
 
             var drawSingleParam = function(param) {
+                var h = param.keys ? paramHeight : paramContainerHeight;
                 var value = param.evalParam(cur_time);
                 if (typeof(value) === 'number')
                     value = value.toFixed(2);
                 ctx.textAlign = 'right';
-                ctx.fillText(value, canvas.width - 5, y + 15);
+                ctx.fillText(value, canvas.width - 5, y + h);
                 ctx.textAlign = 'left';
             };
 
             var drawParams = function drawParams(param) {
-                ctx.fillText(param.name, 5 + indent, y + 15);
+                var h = param.keys ? paramHeight : paramContainerHeight;
+                ctx.fillText(param.name, 5 + indent, y + h);
                 if (param.keys) {
                     drawSingleParam(param);
                 }
-                y += 15;
+                y += h;
 
                 if (param.children) {
                     indent += 10;
@@ -596,5 +692,5 @@ var KUMI = (function($) {
     };
 
     return kumi;
-}(window.jQuery));
+}(window.jQuery, window.KUMI_LIB));
 

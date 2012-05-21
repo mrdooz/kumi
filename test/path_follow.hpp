@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../demo_engine.hpp"
+#include "../effect.hpp"
 
 struct PathFollowEffect : public Effect {
 	PathFollowEffect(GraphicsObjectHandle context, const std::string &name) : Effect(context, name) {}

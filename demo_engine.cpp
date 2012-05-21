@@ -2,6 +2,7 @@
 #include "demo_engine.hpp"
 #include "logger.hpp"
 #include "json_utils.hpp"
+#include "effect.hpp"
 
 using namespace std;
 
@@ -181,16 +182,3 @@ JsonValue::JsonValuePtr DemoEngine::get_info() {
   return root;
 }
 
-JsonValue::JsonValuePtr Effect::get_info() const {
-  auto info = JsonValue::create_object();
-  info->add_key_value("name", name());
-  info->add_key_value("start_time", _start_time);
-  info->add_key_value("end_time", _end_time);
-
-  auto params = JsonValue::create_array();
-  for (auto it = begin(_params); it != end(_params); ++it) {
-    params->add_value((*it)->to_json());
-  }
-  info->add_key_value("params", params);
-  return info;
-}

@@ -8,6 +8,8 @@
 #include "../threading.hpp"
 #include "../mesh.hpp"
 #include "../tweakable_param.hpp"
+#include "../graphics.hpp"
+#include "../material.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -45,7 +47,7 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 }
 
 bool ScenePlayer::init() {
-
+/*
   auto p1 = new TweakableParam("param1", TweakableParam::kTypeBool, TweakableParam::kAnimStep);
   auto p2 = new TweakableParam("param2", TweakableParam::kTypeFloat, TweakableParam::kAnimSpline);
 
@@ -65,7 +67,7 @@ bool ScenePlayer::init() {
   parent2->add_child(p2);
 
   _params.push_back(unique_ptr<TweakableParam>(parent1));
-
+*/
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
@@ -78,6 +80,42 @@ bool ScenePlayer::init() {
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
     PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
   }
+
+  // create properties from the materials
+  for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
+    Material *mat = *it;
+    TweakableParam *mp = new TweakableParam(mat->name);
+
+    for (auto j = begin(mat->properties); j != end(mat->properties); ++j) {
+      const Material::Property &prop = *j;
+      switch (prop.type) {
+        case PropertyType::kFloat: {
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat, TweakableParam::kAnimStatic);
+          p->add_key(0, prop.value.x);
+          mp->add_child(p);
+          break;
+        }
+
+        case PropertyType::kColor: {
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeColor, TweakableParam::kAnimStatic);
+          p->add_key(0, prop.value);
+          mp->add_child(p);
+          break;
+        }
+
+        case PropertyType::kFloat4: {
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat4, TweakableParam::kAnimStatic);
+          p->add_key(0, prop.value);
+          mp->add_child(p);
+          break;
+        }
+
+      }
+    }
+
+    _params.push_back(unique_ptr<TweakableParam>(mp));
+  }
+
 /*
   bool res;
   RESOURCE_MANAGER.add_file_watch(resolved_name.c_str(), NULL, bind(&ScenePlayer::file_changed, this, _1, _2), true, &res, 5000);

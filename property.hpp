@@ -7,6 +7,7 @@ namespace PropertyType {
     kFloat2,
     kFloat3,
     kFloat4,
+    kColor,
     kFloat4x4,
     kTexture2d,
     kSampler,
