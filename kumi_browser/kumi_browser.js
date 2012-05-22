@@ -7,19 +7,19 @@ var KUMI = (function($, KUMI_LIB) {
     var websocket;
     var fps_series;
     var fps_interval_id;
-    var demo_info = { effects :[] };
+    var demoInfo = { effects :[] };
 
-    var timeline_header_height = 40;
-    var timeline_margin = 5;
+    var controlWidth = 250;
+    var timelineHeaderHeight = 40;
     var ms_per_pixel = 10.0;
     var timeline_scales = [1, 5, 10, 20, 50, 100, 250, 500, 1000];
     var cur_timeline_scale = 1;
     var timeline_ofs = 0;
 
     var effectHeight = 30;
-    var paramHeight = 50;
+    var paramHeightDefault = 50;
     var paramHeightSingle = 15;
-    var paramContainerHeight = 10;
+    var paramHeightContainer = 15;
 
     var is_playing = false;
     var cur_time = 0;
@@ -28,6 +28,7 @@ var KUMI = (function($, KUMI_LIB) {
 
     var snapping_size = 50; // ms
     var snapping = true;
+    var curSelected;
 
     var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -80,11 +81,36 @@ var KUMI = (function($, KUMI_LIB) {
         };
     }
 
+    function evalStaticFloat(keys) {
+        return function(t) {
+            return keys[0].value.x;
+        };
+    }
+
+    function floatToString(v) {
+        return v.toFixed(2);
+    }
+
+    function boolToString(v) {
+        return v;
+    }
+
+    function colorToString(v) {
+        return "(" + (255* v.r).toFixed() +
+            ", " + (255* v.g).toFixed() +
+            ", " + (255* v.b).toFixed() +
+            ", " + (255* v.a).toFixed() + ")";
+    }
+
     var evalLookup = {
-        "static" : { "bool" : evalId, "float" : evalId, "color" : evalId },
+        "static" : { "bool" : evalId, "float" : evalStaticFloat, "color" : evalId },
         "step" : { "bool" : evalStep, "float" : evalStep },
         "linear" : { "bool" : evalId, "float" : evalLinearFloat },
         "spline" : { "bool" : evalId, "float" : evalLinearFloat }
+    };
+
+    var toStringLookup = {
+        "bool" : boolToString, "float" : floatToString, "color" : colorToString
     };
 
     function openWebSocket()
@@ -123,8 +149,8 @@ var KUMI = (function($, KUMI_LIB) {
                 $('#cur-fps').text(fps.toFixed(2) + ' fps');
             } else if (res.demo) {
                 // append interpolation functions to the parameters
-                demo_info = res.demo;
-                demo_info.effects.forEach( function(effect) {
+                demoInfo = res.demo;
+                demoInfo.effects.forEach( function(effect) {
                     function decorateParam(param) {
                         if (param.children) {
                             param.children.forEach(decorateParam);
@@ -132,6 +158,7 @@ var KUMI = (function($, KUMI_LIB) {
 
                         if (param.keys) {
                             param.evalParam = evalLookup[param.anim][param.type](param.keys);
+                            param.valueToString = toStringLookup[param.type];
                         }
                     }
                     effect.params.forEach(decorateParam);
@@ -199,7 +226,7 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     function sendDemoInfo() {
-        sendJson("demo", demo_info);
+        sendJson("demo", demoInfo);
     }
 
     function setCanvasDispatch(fn) {
@@ -220,24 +247,32 @@ var KUMI = (function($, KUMI_LIB) {
             fn.enterState();
     }
 
-    var insideTimeline = function(x, y, canvas) {
+    var insideTimelineHeader = function(x, y, canvas) {
         // x,y are relative the document
         var ofs = canvas.offset();
         x -= ofs.left;
         y -= ofs.top;
-        return ptInRect(x, y, 0, timeline_margin, timeline_header_height, canvas.width());
+        return ptInRect(x, y, 0, controlWidth, timelineHeaderHeight, canvas.width());
+    };
+
+    var insideControl = function(x, y, canvas) {
+        // x,y are relative the document
+        var ofs = canvas.offset();
+        x -= ofs.left;
+        y -= ofs.top;
+        return ptInRect(0, 0, 0, 0, canvas.height(), controlWidth);
     };
 
     var insideEffect = function(x, y, canvas) {
         var ofs = canvas.offset();
         x -= ofs.left;
-        y -= (ofs.top + timeline_header_height);
+        y -= (ofs.top + timelineHeaderHeight);
         var found_effect = null;
         var start;
-        $.each(demo_info.effects, function(i, e) {
+        $.each(demoInfo.effects, function(i, e) {
             if (y >= i * effectHeight && y < (i+1) * effectHeight) {
-                var sx = timeToPixel(e.start_time) + timeline_margin;
-                var ex = timeToPixel(e.end_time) + timeline_margin;
+                var sx = timeToPixel(e.start_time) + controlWidth;
+                var ex = timeToPixel(e.end_time) + controlWidth;
                 if (Math.abs(x-sx) < 5) {
                     found_effect = e;
                     start = true;
@@ -295,21 +330,85 @@ var KUMI = (function($, KUMI_LIB) {
         that.mousedown = function(event) {
             var ofs = canvas.offset();
             var effect, r;
-            var x = event.pageX, y = event.pageY;
+            var x = event.pageX;
+            var y = event.pageY;
             button_state[event.which] = 1;
-            if (insideTimeline(x, y, canvas)) {
+            if (insideTimelineHeader(x, y, canvas)) {
+                // dragging inside the timeline header
                 setCanvasDispatch(stateDraggingTimeline({
                     pos : { x : event.pageX, y : event.pageY },
                     move_offset : event.shiftKey
                 }));
             } else {
                 r = insideEffect(x, y, canvas);
-                if (r.effect && event.shiftKey )
+                if (r.effect && event.shiftKey) {
+                    // dragging an effect
                     setCanvasDispatch(stateDraggingEffect({
                         effect : r.effect,
                         start : r.start,
                         pos : { x : event.pageX, y : event.pageY }
                     }));
+                } else if (insideControl(x, y, canvas)) {
+                    // selecting a new property
+                    x -= ofs.left;
+                    y -= ofs.top;
+                    var selected;
+                    var curY = timelineHeaderHeight;
+
+                    var checkParams = function checkParams(idx, param) {
+                        var curHeight = paramHeight(param);
+                        if (y >= curY && y < curY + curHeight) {
+                            selected = param;
+                        } else {
+                            curY += curHeight;
+                            if (param.children) {
+                                $.each(param.children, checkParams);
+                            }
+                        }
+                        return selected ? false : true; // break iteration if we've found an item
+                    };
+
+                    $.each(demoInfo.effects, function(idx, effect) {
+                        if (y >= curY && y < curY + effectHeight) {
+                            selected = effect;
+                        } else {
+                            curY += effectHeight;
+                            if (effect.params) {
+                                $.each(effect.params, checkParams);
+                            }
+                        }
+                        return selected ? false : true;
+                    });
+                    if (curSelected) {
+                        curSelected.selected = false;
+                    }
+                    if (selected) {
+                        curSelected = selected;
+                        curSelected.selected = true;
+                        if (curSelected.type) {
+                            if (curSelected.type === "float") {
+                                var cur = $("#editX");
+                                cur.text(curSelected.valueToString(curSelected.evalParam(0)));
+                                cur.editable("enable");
+                                $.each(["editY", "editZ", "editW"], function(idx, id) {
+                                    $("#" + id).editable("disable");
+                                });
+
+                            } else if (curSelected.type === "color") {
+                                var cols = ["r", "g", "b", "a"];
+                                $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
+                                    var cur = $("#" + id);
+                                    cur.editable("enable");
+                                    cur.text((255 * curSelected.keys[0].value[cols[idx]]).toFixed());
+                                });
+                            }
+                        } else {
+                            $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
+                                $("#" + id).editable("disable");
+                            });
+                        }
+                    }
+                }
             }
         };
 
@@ -407,11 +506,11 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     function rawPixelToTime(px) {
-        return (px - timeline_margin) * ms_per_pixel;
+        return (px - controlWidth) * ms_per_pixel;
     }
 
     function pixelToTime(px) {
-        return timeline_ofs + (px - timeline_margin) * ms_per_pixel;
+        return timeline_ofs + (px - controlWidth) * ms_per_pixel;
     }
 
     function timeToPixel(t) {
@@ -443,9 +542,9 @@ var KUMI = (function($, KUMI_LIB) {
 
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#888';
-        for (var i = timeline_margin; i < canvas.width; i += 10) {
+        for (var i = controlWidth; i < canvas.width; i += 10) {
             var cur = pixelToTime(i);
-            var extra = ((i - timeline_margin) % 50) === 0;
+            var extra = ((i - controlWidth) % 50) === 0;
             if (extra) {
                 ctx.fillText(cur, i, 15);
             }
@@ -461,11 +560,37 @@ var KUMI = (function($, KUMI_LIB) {
     function drawTimeMarker(ctx, canvas) {
         ctx.strokeStyle = '#f33';
         ctx.beginPath();
-        var m = timeline_margin + timeToPixel(cur_time);
+        var m = controlWidth + timeToPixel(cur_time);
         ctx.moveTo(m, 0);
         ctx.lineTo(m, canvas.height);
         ctx.closePath();
         ctx.stroke();
+    }
+
+    function findActiveKeys(param, startTime, endTime) {
+        var keys = [];
+        if (param.keys.length === 1) {
+            keys.push(param.keys[0]);
+        } else {
+            for (var i = 0; i < param.keys.length - 1; ++i) {
+                if (param.keys[i].time <= startTime && param.keys[i+1].time >= startTime) {
+                    // stradling the start
+                    keys.push(param.keys[i]);
+                    keys.push(param.keys[i+1]);
+                } else if (param.keys[i].time >= startTime && param.keys[i+1].time < endTime) {
+                    // fully inside
+                    keys.push(param.keys[i+1]);
+                } else if (param.keys[i].time < endTime && param.keys[i+1].time >= endTime) {
+                    // stradling the end
+                    keys.push(param.keys[i+1]);
+                }
+            }
+        }
+        return keys;
+    }
+
+    function paramHeight(param) {
+        return param.keys ? (param.keys.length === 1 ? paramHeightSingle : paramHeightDefault) : paramHeightContainer;
     }
 
     function drawTimelineCanvas() {
@@ -480,56 +605,37 @@ var KUMI = (function($, KUMI_LIB) {
         drawTimelineTicker(ctx, canvas);
 
         // draw the effects
-        setFont(ctx, "10px Arial", "alphabetic", "left");
+        setFont(ctx, "10px Arial", "middle", "left");
 
-        var y = timeline_header_height;
-        demo_info.effects.forEach( function(effect) {
+        var y = timelineHeaderHeight;
+        demoInfo.effects.forEach( function(effect) {
+
+            // draw the effect gradient
             var startTime = Math.max(effect.start_time, pixelToTime(0));
             var endTime = Math.min(effect.end_time, pixelToTime(canvas.width));
 
-            var x = timeline_margin + Math.max(0, timeToPixel(effect.start_time));
+            var x = controlWidth + Math.max(0, timeToPixel(effect.start_time));
             var w = Math.max(0,timeToPixel(effect.end_time - effect.start_time));
             fillLinearGrad(ctx, x, y, w, effectHeight, '#558', '#aae');
-
             y += effectHeight;
 
             var indent = 10;
 
             var drawParamValues = function(param) {
-                var pixelStep = 5;
-                var timeStep = rawTimeToPixel(endTime - startTime) / pixelStep;
+                // draw the paramter values over time
                 var i, minValue, maxValue;
+                var curHeight = paramHeight(param);
 
-                // find all active keys
-                var keys = [];
-
-                if (param.keys.length === 1) {
-                    keys.push(param.keys[0]);
-                } else {
-                    for (i = 0; i < param.keys.length - 1; ++i) {
-                        if (param.keys[i].time <= startTime && param.keys[i+1].time >= startTime) {
-                            // stradling the start
-                            keys.push(param.keys[i]);
-                            keys.push(param.keys[i+1]);
-                        } else if (param.keys[i].time >= startTime && param.keys[i+1].time < endTime) {
-                            // fully inside
-                            keys.push(param.keys[i+1]);
-                        } else if (param.keys[i].time < endTime && param.keys[i+1].time >= endTime) {
-                            // stradling the end
-                            keys.push(param.keys[i+1]);
-                        }
-                    }
-                }
-
+                var keys = findActiveKeys(param, startTime, endTime);
                 if (keys.length === 0)
                     return;
 
-                if (param.type === "float") {
+                if (param.type === "float" && keys.length > 1) {
                     minValue = KUMI_LIB.min(keys, function(x) { return x.value.x; });
                     maxValue = KUMI_LIB.max(keys, function(x) { return x.value.x; });
 
                     var rescale = function(value) {
-                        return y + paramHeight - scale * (value - minValue);
+                        return y + curHeight - scale * (value - minValue);
                     };
 
                     // small hack for single value keys
@@ -537,9 +643,9 @@ var KUMI = (function($, KUMI_LIB) {
                         minValue -= 10;
 
                     // draw the active keys
-                    var scale = paramHeight / (maxValue - minValue);
+                    var scale = curHeight / (maxValue - minValue);
                     for (i = 0; i < keys.length; ++i) {
-                        var x = timeline_margin + timeToPixel(keys[i].time);
+                        var x = controlWidth + timeToPixel(keys[i].time);
                         if (x >= 0 && x < canvas.width) {
                             ctx.beginPath();
                             ctx.arc(x, rescale(keys[i].value.x), 3, 0, 2 * Math.PI, 0);
@@ -551,17 +657,16 @@ var KUMI = (function($, KUMI_LIB) {
 
                     // draw the interpolated values
                     var t = Math.max(keys[0].time, startTime);
-                    ctx.moveTo(timeline_margin + timeToPixel(t), rescale(param.evalParam(t)));
+                    ctx.moveTo(controlWidth + timeToPixel(t), rescale(param.evalParam(t)));
                     for (i = 1; i < keys.length; ++i) {
-                        ctx.lineTo(timeline_margin + timeToPixel(keys[i].time), rescale(param.keys[i].value.x));
+                        ctx.lineTo(controlWidth + timeToPixel(keys[i].time), rescale(param.keys[i].value.x));
                     }
-                    ctx.lineTo(timeline_margin + timeToPixel(endTime), rescale(param.evalParam(endTime)));
+                    ctx.lineTo(controlWidth + timeToPixel(endTime), rescale(param.evalParam(endTime)));
                     ctx.strokeStyle = "Black";
-                    ctx.lineWidth = 1;
                     ctx.stroke();
                 } else if (param.type === "color") {
                     ctx.fillStyle = toRgb(param.keys[0].value);
-                    ctx.fillRect(timeline_margin, y, canvas.width, paramHeight);
+                    ctx.fillRect(controlWidth, y, canvas.width, curHeight);
                 }
 
             };
@@ -571,7 +676,26 @@ var KUMI = (function($, KUMI_LIB) {
                     drawParamValues(param);
                 }
 
-                y += param.keys ? paramHeight : paramContainerHeight;
+                var curHeight = paramHeight(param);
+                var textPos = y + curHeight / 2;
+                if (param.selected) {
+                    ctx.fillStyle = "#eea";
+                    ctx.fillRect(0, y, controlWidth, curHeight);
+                }
+                ctx.strokeStyle = '#111';
+                ctx.strokeRect(0, y + 0.5, canvas.width, curHeight);
+                ctx.fillStyle = "Black";
+                setFont(ctx, "10px Arial", "middle", "left");
+                ctx.fillText(param.name, 5 + indent, textPos);
+
+                // display the current paramter value
+                if (param.evalParam) {
+                    var value = param.evalParam(cur_time);
+                    setFont(ctx, "10px Arial", "middle", "right");
+                    ctx.fillText(param.valueToString(value), controlWidth - 5, textPos);
+                }
+
+                y += curHeight;
 
                 if (param.children) {
                     indent += 10;
@@ -580,21 +704,6 @@ var KUMI = (function($, KUMI_LIB) {
                 }
             };
 
-            var paramParity = 0;
-            var tmpY = y;
-            var drawParamBackground = function drawParamBackground(param) {
-                paramParity = !paramParity;
-                ctx.fillStyle = paramParity ? "#999" : "#ccc";
-                ctx.fillRect(timeline_margin, tmpY, canvas.width, paramHeight);
-
-                tmpY += param.keys ? paramHeight : paramContainerHeight;
-
-                if (param.children) {
-                    param.children.forEach(drawParamBackground);
-                }
-            };
-
-            effect.params.forEach(drawParamBackground);
             effect.params.forEach(drawParams);
 
         });
@@ -607,65 +716,6 @@ var KUMI = (function($, KUMI_LIB) {
         ctx.restore();
     }
 
-    function drawTimelineControl() {
-        var canvas = $('#timeline-control').get(0);
-        var ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        var d = demo_info;
-
-        fillLinearGrad(ctx, 0, 0, canvas.width, 40, '#444', '#ccc');
-        ctx.strokeRect(0,0,canvas.width, 40.5);
-
-        ctx.font = "10px Arial";
-        ctx.textBaseline = 'left';
-        ctx.textAlign = 'left';
-
-        var y = timeline_header_height;
-        demo_info.effects.forEach( function(effect) {
-            fillLinearGrad(ctx, 0, y, canvas.width, effectHeight, '#558', '#aae');
-            ctx.fillStyle = '#000';
-            ctx.fillText(effect.name, 5, y + effectHeight);
-            y += effectHeight;
-
-            var indent = 10;
-
-            var drawSingleParam = function(param) {
-                var h = param.keys ? paramHeight : paramContainerHeight;
-                var value = param.evalParam(cur_time);
-                if (typeof(value) === 'number')
-                    value = value.toFixed(2);
-                ctx.textAlign = 'right';
-                ctx.fillText(value, canvas.width - 5, y + h);
-                ctx.textAlign = 'left';
-            };
-
-            var drawParams = function drawParams(param) {
-                var h = param.keys ? paramHeight : paramContainerHeight;
-                ctx.fillText(param.name, 5 + indent, y + h);
-                if (param.keys) {
-                    drawSingleParam(param);
-                }
-                y += h;
-
-                if (param.children) {
-                    indent += 10;
-                    param.children.forEach(drawParams);
-                    indent -= 10;
-                }
-            };
-
-            effect.params.forEach(drawParams);
-        });
-
-        ctx.strokeStyle = '#111';
-        ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-        ctx.restore();
-
-    }
-
     function drawTimeline() {
 
         $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
@@ -676,9 +726,22 @@ var KUMI = (function($, KUMI_LIB) {
         }
 
         drawTimelineCanvas();
-        drawTimelineControl();
         requestAnimationFrame(drawTimeline);
     }
+
+    kumi.onEdited = function(idx, value) {
+        if (curSelected.type === "float") {
+            curSelected.keys[0].value.x = parseFloat(value);
+            return curSelected.keys[0].value.x.toFixed(2);
+        } else if (curSelected.type === "color") {
+            var cols = ["r", "g", "b", "a"];
+            var v = parseFloat(value);
+            if (v >= 0 && v <= 255) {
+                curSelected.keys[0].value[cols[idx]] = v / 255;
+            }
+            return (255 * curSelected.keys[0].value[cols[idx]]).toFixed();
+        }
+    };
 
     kumi.kbInit = function() {
         output = document.getElementById("output");

@@ -24,6 +24,7 @@
     <script type="text/javascript" src="assets/js/jquery.mousewheel.js"></script>
     <script type="text/javascript" src="assets/js/smoothie.js"></script>
     <script type="text/javascript" src="assets/js/jquery-impromptu.js"></script>
+    <script type="text/javascript" src="assets/js/jquery.jeditable.js"></script>
     <script type="text/javascript" src="kumi_lib.js"></script>
     <script type="text/javascript" src="kumi_browser.js"></script>
 
@@ -35,12 +36,10 @@
             fps.get(0).height = 100;
 
             var editor = $('#timeline-canvas');
-            var control = $('#timeline-control');
-            editor.get(0).width = editor.parent().width() - control.get(0).width - 5;
+            editor.get(0).width = editor.parent().width();
             var ofs = editor.offset();
             var canvasHeight = window.innerHeight - editor.offset().top - 60;
             editor.get(0).height = canvasHeight;
-            control.get(0).height = canvasHeight;
             var playing = false;
             $('#btn-prev-skip').click(KUMI.onBtnPrevSkip);
             $('#btn-prev').click(KUMI.onBtnPrev);
@@ -52,6 +51,18 @@
             });
             $('#btn-next').click(KUMI.onBtnNext);
             $('#btn-next-skip').click(KUMI.onBtnNextSkip);
+
+            var makeEditFunc = function(idx) {
+                return function(value, settings) {
+                    return KUMI.onEdited(idx, value);
+                };
+            };
+
+            $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
+                var cur = $("#" + id);
+                cur.editable(makeEditFunc(idx));
+                cur.editable("disable");
+            });
 
             KUMI.kbInit();
         });
@@ -79,14 +90,23 @@
 
 <div class="container">
     <div class="row-fluid">
-        <div class="span12">
-            <canvas id="fps-canvas"></canvas>
-        </div>
-    </div>
-    <!-- row -->
-    <div>
-        <div class="row">
+        <div class="span6">
             <div class="span6">
+                <div class="row-fluid">
+                    <div class="label">X</div><div class="edit" id="editX">-</div>
+                    <div class="label">Y</div><div class="edit" id="editY">-</div>
+                </div>
+            </div>
+            <div class="span6">
+                <div class="row-fluid">
+                    <div class="label">Z</div><div class="edit" id="editZ">-</div>
+                    <div class="label">W</div><div class="edit" id="editW">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="span6">
+            <canvas id="fps-canvas"></canvas>
+            <div class="row-fluid">
                 <div class="btn-toolbar">
                     <div class="btn-group">
                         <button id="btn-prev-skip" class="btn"><img src="assets/gfx/control-skip-180.png"/></button>
@@ -102,9 +122,13 @@
                 </div>
             </div>
         </div>
+    </div>
+    <!-- row -->
+    <div>
+        <div class="row">
+        </div>
         <div class="row-fluid">
-            <canvas id="timeline-control" width="200"></canvas>
-            <canvas id="timeline-canvas" style="margin-left: -5px"></canvas>
+            <canvas id="timeline-canvas"></canvas>
         </div>
 
     </div>
