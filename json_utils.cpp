@@ -14,6 +14,10 @@ JsonValue::JsonValuePtr JsonValue::_empty_value = JsonValuePtr(new JsonValue);
 //
 //////////////////////////////////////////////////////////////////////////
 
+JsonValue::JsonValuePtr JsonValue::emptyValue() {
+  return _empty_value;
+}
+
 JsonValue::JsonValue() : _type(JS_NULL) {}
 
 JsonValue::JsonValue(JsonType type)
@@ -311,8 +315,6 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
         const char *key_start, *key_end;
         if (between_delim(s, end, '"', &key_start, &key_end)) {
           string key(key_start, key_end - key_start);
-          OutputDebugStringA(key.c_str());
-          OutputDebugStringA("\n");
           s = skip_delim(key_end, end, ':');
           a->add_key_value(key, parse_json_inner(s, end, &s));
           s = skip_whitespace(s, end);

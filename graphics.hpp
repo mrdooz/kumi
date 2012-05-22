@@ -12,7 +12,7 @@
 
 struct Io;
 class Shader;
-struct Material;
+class Material;
 
 using std::map;
 using std::string;

@@ -3,7 +3,7 @@
 
 struct TrackedLocation;
 struct Mesh;
-struct Material;
+class Material;
 
 struct Camera {
   Camera(const std::string &name) : name(name) {}

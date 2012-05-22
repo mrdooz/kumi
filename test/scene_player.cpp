@@ -10,6 +10,7 @@
 #include "../tweakable_param.hpp"
 #include "../graphics.hpp"
 #include "../material.hpp"
+#include "../material_manager.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -64,28 +65,28 @@ bool ScenePlayer::init() {
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
     Material *mat = *it;
-    TweakableParam *mp = new TweakableParam(mat->name);
+    TweakableParam *mp = new TweakableParam(mat->name());
 
-    for (auto j = begin(mat->properties); j != end(mat->properties); ++j) {
-      const Material::Property &prop = *j;
-      switch (prop.type) {
+    for (auto j = begin(mat->properties()); j != end(mat->properties()); ++j) {
+      const Material::Property *prop = *j;
+      switch (prop->type) {
         case PropertyType::kFloat: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat, prop.id);
-          p->add_key(0, prop.value.x);
+          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat, prop->id);
+          p->add_key(0, prop->value.x);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kColor: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeColor, prop.id);
-          p->add_key(0, prop.value);
+          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeColor, prop->id);
+          p->add_key(0, prop->value);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kFloat4: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat4, prop.id);
-          p->add_key(0, prop.value);
+          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat4, prop->id);
+          p->add_key(0, prop->value);
           mp->add_child(p);
           break;
         }
@@ -190,37 +191,53 @@ bool ScenePlayer::close() {
 void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
   Effect::update_from_json(state);
 
-  deque<JsonValue::JsonValuePtr> param_stack;
+  deque<pair<JsonValue::JsonValuePtr, JsonValue::JsonValuePtr>> param_stack;
+
   if (state->has_key("params")) {
-    auto params = (*state)["params"];
+    auto params = state->get("params");
     for (int i = 0; i < params->count(); ++i)
-      param_stack.push_back((*params)[i]);
+      param_stack.push_back(make_pair(JsonValue::emptyValue(), params->get(i)));
 
     while (!param_stack.empty()) {
-      auto param = param_stack.front();
-      if (param->has_key("keys") && param->has_key("id")) {
+      auto pp = param_stack.front();
+      auto parent = pp.first;
+      auto param = pp.second;
+
+      if (param->has_key("keys")) {
+        auto &param_name = param->get("name")->get_string();
         auto &first_key = param->get("keys")->get(0);
         auto &first_value = first_key->get("value");
-        auto id = param->get("id")->get_int();
-        XMFLOAT4 value;
-        auto type = param->get("type")->get_string();
-        if (type == "float") {
-          value.x = (float)first_value->get("x")->get_number();
-          PROPERTY_MANAGER.set_property(id, value.x);
-        } else if (type == "color") {
-          value.x = (float)first_value->get("r")->get_number();
-          value.y = (float)first_value->get("g")->get_number();
-          value.z = (float)first_value->get("b")->get_number();
-          value.w = (float)first_value->get("a")->get_number();
-          PROPERTY_MANAGER.set_property(id, value);
+
+        // this should be a material
+        GraphicsObjectHandle mat_handle = MATERIAL_MANAGER.find_material(parent->get("name")->get_string());
+        Material *cur_material = MATERIAL_MANAGER.get_material(mat_handle);
+        assert(cur_material);
+
+        if (Material::Property *prop = cur_material->property_by_name(param_name)) {
+          XMFLOAT4 value;
+          auto type = param->get("type")->get_string();
+          if (type == "float") {
+            value.x = (float)first_value->get("x")->get_number();
+            PROPERTY_MANAGER.set_property(prop->id, value.x);
+          } else if (type == "color") {
+            value.x = (float)first_value->get("r")->get_number();
+            value.y = (float)first_value->get("g")->get_number();
+            value.z = (float)first_value->get("b")->get_number();
+            value.w = (float)first_value->get("a")->get_number();
+            PROPERTY_MANAGER.set_property(prop->id, value);
+          }
+          prop->value = value;
+        } else {
+          LOG_WARNING_LN("Trying to set unknown property: %s (material: %s)", 
+            param_name.c_str(), cur_material->name().c_str());
         }
+
       }
 
       if (param->has_key("children")) {
-        auto children = (*param)["children"];
+        auto children = param->get("children");
         for (int i = 0; i < children->count(); ++i)
-          param_stack.push_back((*children)[i]);
-
+          param_stack.push_back(make_pair(param, children->get(i)));
       }
 
       param_stack.pop_front();

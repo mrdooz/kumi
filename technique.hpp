@@ -13,7 +13,7 @@ struct ResourceInterface;
 using std::vector;
 using std::string;
 
-struct Material;
+class Material;
 class Technique;
 
 #pragma pack(push, 1)

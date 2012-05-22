@@ -193,7 +193,7 @@ bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
     technique = read_and_step<const char *>(&buf);
     _technique_for_material[name] = technique;
     Material *material = new Material(name);
-    _material_ids[material->name] = MATERIAL_MANAGER.add_material(material, true);
+    _material_ids[material->name()] = MATERIAL_MANAGER.add_material(material, true);
 
     int props = read_and_step<int>(&buf);
     for (int j = 0; j < props; ++j) {

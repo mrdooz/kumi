@@ -54,10 +54,10 @@ GraphicsObjectHandle MaterialManager::find_material(const string &name) {
 
 GraphicsObjectHandle MaterialManager::add_material(Material *material, bool delete_existing) {
 
-  const std::string &id = material->name;
-  int idx = _materials.idx_from_token(id);
+  const std::string &key = material->name();
+  int idx = _materials.idx_from_token(key);
   if (idx != -1 || (idx = _materials.find_free_index()) != -1) {
-    _materials.set_pair(idx, make_pair(id, material));
+    _materials.set_pair(idx, make_pair(key, material));
     return GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
   }
   return GraphicsObjectHandle();

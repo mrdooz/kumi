@@ -13,7 +13,7 @@ namespace technique_parser_details {
 }
 
 struct Scope;
-struct Material;
+class Material;
 
 // my take on a recursive descent parser
 class TechniqueParser {

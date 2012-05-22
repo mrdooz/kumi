@@ -156,6 +156,7 @@
     <ClCompile Include="..\kumi_loader.cpp" />
     <ClCompile Include="..\logger.cpp" />
     <ClCompile Include="..\log_server.cpp" />
+    <ClCompile Include="..\material.cpp" />
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\mesh.cpp" />
     <ClCompile Include="..\path_utils.cpp" />

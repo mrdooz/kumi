@@ -51,6 +51,8 @@ public:
   //virtual JsonValuePtr get_by_key(const std::string &key) const { assert(!"Not an object"); return _empty_value; }
   virtual bool has_key(const std::string &key) const { assert(!"Not an object"); return false; }
 
+  static JsonValuePtr emptyValue();
+
 protected:
 
   static JsonValuePtr _empty_value;

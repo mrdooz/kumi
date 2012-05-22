@@ -3,15 +3,15 @@
 #include "property.hpp"
 #include "property_manager.hpp"
 
-struct Material {
-
+class Material {
+public:
   struct Property {
 
-    Property(const std::string &name, PropertyType::Enum type, float value) 
-      : name(name), type(type) { this->value.x = value; }
+    Property(const std::string &name, PropertyType::Enum type, float value, PropertyManager::PropertyId id)
+      : name(name), type(type), id(id) { this->value.x = value; }
 
-    Property(const std::string &name, PropertyType::Enum type, const XMFLOAT4 &value) 
-      : name(name), type(type), value(value) {}
+    Property(const std::string &name, PropertyType::Enum type, const XMFLOAT4 &value, PropertyManager::PropertyId id)
+      : name(name), type(type), value(value), id(id) {}
 
     std::string name;
     std::string filename;
@@ -20,15 +20,25 @@ struct Material {
     PropertyManager::PropertyId id;
   };
 
-  Material(const std::string &name) : name(name) {}
+  Material(const std::string &name);
+  ~Material();
 
   template<typename T>
   void add_property(const std::string &name, PropertyType::Enum type, const T &value) {
-    properties.push_back(Property(name, type, value));
-    auto prop_id = PROPERTY_MANAGER.get_or_create<T>(name.c_str(), this);
-    properties.back().id = prop_id;
-    PROPERTY_MANAGER.set_property(prop_id, value);
+    auto id = PROPERTY_MANAGER.get_or_create<T>(name.c_str(), this);
+    Property *prop = new Property(name, type, value, id);
+    _properties.push_back(prop);
+    _properties_by_name[name] = prop;
+    PROPERTY_MANAGER.set_property(id, value);
   }
-  std::string name;
-  std::vector<Property> properties;
+
+  const std::string &name() const { return _name; }
+  const std::vector<Property *> &properties() const { return _properties; }
+
+  Property *property_by_name(const std::string &name);
+
+private:
+  std::string _name;
+  std::vector<Property *> _properties;
+  std::map<std::string, Property *> _properties_by_name;
 };
