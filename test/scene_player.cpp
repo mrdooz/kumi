@@ -47,27 +47,7 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 }
 
 bool ScenePlayer::init() {
-/*
-  auto p1 = new TweakableParam("param1", TweakableParam::kTypeBool, TweakableParam::kAnimStep);
-  auto p2 = new TweakableParam("param2", TweakableParam::kTypeFloat, TweakableParam::kAnimSpline);
 
-  p1->add_key(0, false);
-  p1->add_key(1000, true);
-
-  p2->add_key(0, 10.0f);
-  p2->add_key(1000, 100.0f);
-  p2->add_key(3000, -200.0f);
-  p2->add_key(2000, 300.0f);
-
-  auto parent1 = new TweakableParam("parent1");
-  auto parent2 = new TweakableParam("parent2");
-
-  parent1->add_child(parent2);
-  parent1->add_child(p1);
-  parent2->add_child(p2);
-
-  _params.push_back(unique_ptr<TweakableParam>(parent1));
-*/
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
@@ -90,21 +70,21 @@ bool ScenePlayer::init() {
       const Material::Property &prop = *j;
       switch (prop.type) {
         case PropertyType::kFloat: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat, TweakableParam::kAnimStatic);
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat, prop.id);
           p->add_key(0, prop.value.x);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kColor: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeColor, TweakableParam::kAnimStatic);
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeColor, prop.id);
           p->add_key(0, prop.value);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kFloat4: {
-          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat4, TweakableParam::kAnimStatic);
+          TweakableParam *p = new TweakableParam(prop.name, TweakableParam::kTypeFloat4, prop.id);
           p->add_key(0, prop.value);
           mp->add_child(p);
           break;
@@ -205,4 +185,46 @@ bool ScenePlayer::render() {
 
 bool ScenePlayer::close() {
   return true;
+}
+
+void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
+  Effect::update_from_json(state);
+
+  deque<JsonValue::JsonValuePtr> param_stack;
+  if (state->has_key("params")) {
+    auto params = (*state)["params"];
+    for (int i = 0; i < params->count(); ++i)
+      param_stack.push_back((*params)[i]);
+
+    while (!param_stack.empty()) {
+      auto param = param_stack.front();
+      if (param->has_key("keys") && param->has_key("id")) {
+        auto &first_key = param->get("keys")->get(0);
+        auto &first_value = first_key->get("value");
+        auto id = param->get("id")->get_int();
+        XMFLOAT4 value;
+        auto type = param->get("type")->get_string();
+        if (type == "float") {
+          value.x = (float)first_value->get("x")->get_number();
+          PROPERTY_MANAGER.set_property(id, value.x);
+        } else if (type == "color") {
+          value.x = (float)first_value->get("r")->get_number();
+          value.y = (float)first_value->get("g")->get_number();
+          value.z = (float)first_value->get("b")->get_number();
+          value.w = (float)first_value->get("a")->get_number();
+          PROPERTY_MANAGER.set_property(id, value);
+        }
+      }
+
+      if (param->has_key("children")) {
+        auto children = (*param)["children"];
+        for (int i = 0; i < children->count(); ++i)
+          param_stack.push_back((*children)[i]);
+
+      }
+
+      param_stack.pop_front();
+    }
+  }
+
 }

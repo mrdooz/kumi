@@ -36,13 +36,16 @@ public:
   virtual bool add_key_value(const std::string &key, bool value) { assert(!"Not an object"); return false; }
 
   int get_int() const { assert(_type == JS_INT); return _int; }
-  double get_number() const { assert(_type == JS_NUMBER); return _number; }
+  double get_number() const { assert(_type == JS_NUMBER || _type == JS_INT); return _type == JS_NUMBER ? _number : _int; }
   bool get_bool() const { assert(_type == JS_BOOL); return _bool; }
   std::string get_string() const { assert(_type == JS_STRING); return _string; }
 
-  //virtual JsonValuePtr get_at_index(int idx) const { assert(!"Not an array"); return _empty_value; }
   virtual JsonValuePtr operator[](int idx) const { assert(!"Not an array"); return _empty_value; }
   virtual JsonValuePtr operator[](const std::string &key) const { assert(!"Not an object"); return _empty_value; }
+
+  virtual JsonValuePtr get(int idx) const { return (*this)[idx]; }
+  virtual JsonValuePtr get(const std::string &key) const { return (*this)[key]; }
+
   virtual int count() const { assert(!"Not an array"); return -1; }
 
   //virtual JsonValuePtr get_by_key(const std::string &key) const { assert(!"Not an object"); return _empty_value; }

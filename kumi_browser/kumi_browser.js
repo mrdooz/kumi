@@ -379,6 +379,15 @@ var KUMI = (function($, KUMI_LIB) {
                         }
                         return selected ? false : true;
                     });
+                    var cols = ["r", "g", "b", "a"];
+                    var labels = ["labelX", "labelY", "labelZ", "labelW"];
+                    $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
+                        var cur = $("#" + id);
+                        cur.editable("disable");
+                        cur.text("-");
+                        $("#" + labels[idx]).text("-");
+                    });
+
                     if (curSelected) {
                         curSelected.selected = false;
                     }
@@ -390,22 +399,16 @@ var KUMI = (function($, KUMI_LIB) {
                                 var cur = $("#editX");
                                 cur.text(curSelected.valueToString(curSelected.evalParam(0)));
                                 cur.editable("enable");
-                                $.each(["editY", "editZ", "editW"], function(idx, id) {
-                                    $("#" + id).editable("disable");
-                                });
+                                $("#labelX").text("x");
 
                             } else if (curSelected.type === "color") {
-                                var cols = ["r", "g", "b", "a"];
                                 $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
                                     var cur = $("#" + id);
                                     cur.editable("enable");
                                     cur.text((255 * curSelected.keys[0].value[cols[idx]]).toFixed());
+                                    $("#" + labels[idx]).text(cols[idx]);
                                 });
                             }
-                        } else {
-                            $.each(["editX", "editY", "editZ", "editW"], function(idx, id) {
-                                $("#" + id).editable("disable");
-                            });
                         }
                     }
                 }
@@ -730,14 +733,17 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     kumi.onEdited = function(idx, value) {
+        // TODO: send deltas
         if (curSelected.type === "float") {
             curSelected.keys[0].value.x = parseFloat(value);
+            sendDemoInfo();
             return curSelected.keys[0].value.x.toFixed(2);
         } else if (curSelected.type === "color") {
             var cols = ["r", "g", "b", "a"];
             var v = parseFloat(value);
             if (v >= 0 && v <= 255) {
                 curSelected.keys[0].value[cols[idx]] = v / 255;
+                sendDemoInfo();
             }
             return (255 * curSelected.keys[0].value[cols[idx]]).toFixed();
         }

@@ -15,6 +15,8 @@ public:
   virtual bool render() override;
   virtual bool close() override;
 private:
+
+  virtual void update_from_json(const JsonValue::JsonValuePtr &state) override;
   bool file_changed(const char *filename, void *token);
 
   PropertyManager::PropertyId _light_pos_id, _light_color_id;

@@ -295,7 +295,7 @@ static bool between_delim(const char *start, const char *end, char delim, const 
 }
 
 static bool is_json_digit(char ch) {
-  return isdigit((int)ch) || ch == '-' || ch == '+';
+  return isdigit((int)ch) || ch == '-' || ch == '+' || ch == '.';
 }
 
 static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *end, const char **next) {
@@ -311,6 +311,8 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
         const char *key_start, *key_end;
         if (between_delim(s, end, '"', &key_start, &key_end)) {
           string key(key_start, key_end - key_start);
+          OutputDebugStringA(key.c_str());
+          OutputDebugStringA("\n");
           s = skip_delim(key_end, end, ':');
           a->add_key_value(key, parse_json_inner(s, end, &s));
           s = skip_whitespace(s, end);
@@ -319,6 +321,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
             break;
           if (ch != ',') {
             LOG_WARNING_LN("invalid json at: %s", s-1);
+            assert(false);
             break;
           }
         }
@@ -338,6 +341,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
           break;
         if (ch != ',') {
           LOG_WARNING_LN("invalid json at: %s", s-1);
+          assert(false);
           break;
         }
       }
@@ -346,11 +350,14 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
     }
 
   } else if (is_json_digit(ch)) {
-    int v = atoi(s);
-    while (is_json_digit((int)*s))
+    double v = atof(s);
+    bool is_double = false;
+    while (s != end && is_json_digit((int)*s)) {
+      is_double |= *s == '.';
       s++;
+    }
     *next = s;
-    return JsonValue::create_int(v);
+    return is_double ? JsonValue::create_number(v) : JsonValue::create_int((int)v);
 
   } else if (strncmp(s, "true", min(4, len)) == 0) {
       *next = s + 4;

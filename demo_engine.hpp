@@ -24,7 +24,7 @@ public:
 	bool tick();
 
   JsonValue::JsonValuePtr get_info();
-  void update(JsonValue::JsonValuePtr state);
+  void update(const JsonValue::JsonValuePtr &state);
 
 private:
 	DemoEngine();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "json_utils.hpp"
+#include "property_manager.hpp"
 
 class TweakableParam {
 public:
@@ -28,6 +29,7 @@ public:
 
   TweakableParam(const std::string &name);
   TweakableParam(const std::string &name, Type type, Animation animation);
+  TweakableParam(const std::string &name, Type type, PropertyManager::PropertyId id);
   ~TweakableParam();
 
   // TODO: handle strings..
@@ -67,6 +69,8 @@ private:
   std::vector<Key<XMFLOAT3> > *&get_values(Int2Type<XMFLOAT3>) { assert(_type == kTypeFloat3); return _float3; }
   std::vector<Key<XMFLOAT4> > *&get_values(Int2Type<XMFLOAT4>) { assert(_type == kTypeFloat4 || _type == kTypeColor); return _float4; }
   std::string *&get_values(Int2Type<std::string>) { assert(_type == kTypeString || _type == kTypeFile); return _string; }
+
+  PropertyManager::PropertyId _id;
 
   std::string _name;
   Type _type;

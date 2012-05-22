@@ -34,7 +34,27 @@ static string anim_to_string(TweakableParam::Animation anim) {
 TweakableParam::TweakableParam(const std::string &name, Type type, Animation animation) 
   : _name(name)
   , _type(type)
-  , _animation(animation) {
+  , _animation(animation)
+  , _id(~0) {
+    switch (_type) {
+    case kTypeBool: _bool = new vector<Key<bool> >; break;
+    case kTypeInt: _int = new vector<Key<int> >; break;
+    case kTypeFloat: _float = new vector<Key<float> >; break;
+    case kTypeFloat2: _float2 = new vector<Key<XMFLOAT2> >; break;
+    case kTypeFloat3: _float3 = new vector<Key<XMFLOAT3> >; break;
+    case kTypeFloat4: 
+    case kTypeColor:
+      _float4 = new vector<Key<XMFLOAT4> >; break;
+    case kTypeString:
+    case kTypeFile:  _string = new std::string; break;
+    }
+}
+
+TweakableParam::TweakableParam(const std::string &name, Type type, PropertyManager::PropertyId id)
+  : _name(name)
+  , _type(type)
+  , _animation(kAnimStatic)
+  , _id(id) {
     switch (_type) {
     case kTypeBool: _bool = new vector<Key<bool> >; break;
     case kTypeInt: _int = new vector<Key<int> >; break;
@@ -53,7 +73,7 @@ TweakableParam::TweakableParam(const std::string &name)
   : _name(name)
   , _type(kTypeUnknown)
   , _animation(kAnimUnknown)
-{
+  , _id(~0) {
 }
 
 TweakableParam::~TweakableParam() {
@@ -81,6 +101,8 @@ JsonValue::JsonValuePtr TweakableParam::to_json() {
 
   auto obj = JsonValue::create_object();
   obj->add_key_value("name", _name);
+  if (_id != ~0)
+    obj->add_key_value("id", _id);
 
   if (_type != kTypeUnknown) {
     obj->add_key_value("type", type_to_string(_type));

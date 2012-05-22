@@ -16,6 +16,7 @@ public:
   virtual bool close();
 
   JsonValue::JsonValuePtr get_info() const;
+  virtual void update_from_json(const JsonValue::JsonValuePtr &state);
 
   const std::string &name() const { return _name; }
   uint32 start_time() const { return _start_time; }

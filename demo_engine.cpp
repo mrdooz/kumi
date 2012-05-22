@@ -151,16 +151,14 @@ Effect *DemoEngine::find_effect_by_name(const std::string &name) {
   return it == end(_effects) ? nullptr : *it;
 }
 
-void DemoEngine::update(JsonValue::JsonValuePtr state) {
+void DemoEngine::update(const JsonValue::JsonValuePtr &state) {
   _duration_ms = (*state)["duration"]->get_int();
   auto effects = (*state)["effects"];
   for (int i = 0; i < effects->count(); ++i) {
     auto cur = (*effects)[i];
     auto name = (*cur)["name"]->get_string();
     if (Effect *ie = find_effect_by_name(name)) {
-      auto start_time = (*cur)["start_time"]->get_int();
-      auto end_time = (*cur)["end_time"]->get_int();
-      ie->set_duration(start_time, end_time);
+      ie->update_from_json(cur);
     } else {
       LOG_ERROR_LN("unknown effect: %s", name.c_str());
     }
