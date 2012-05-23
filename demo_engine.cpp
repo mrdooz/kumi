@@ -152,11 +152,11 @@ Effect *DemoEngine::find_effect_by_name(const std::string &name) {
 }
 
 void DemoEngine::update(const JsonValue::JsonValuePtr &state) {
-  _duration_ms = (*state)["duration"]->get_int();
+  _duration_ms = (*state)["duration"]->to_int();
   auto effects = (*state)["effects"];
   for (int i = 0; i < effects->count(); ++i) {
     auto cur = (*effects)[i];
-    auto name = (*cur)["name"]->get_string();
+    auto name = (*cur)["name"]->to_string();
     if (Effect *ie = find_effect_by_name(name)) {
       ie->update_from_json(cur);
     } else {

@@ -239,20 +239,48 @@ bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
   return true;
 }
 
-bool KumiLoader::load(const char *filename, const char *material_connections, ResourceInterface *resource, Scene **scene) {
+bool KumiLoader::load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene) {
   LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
 
-  if (material_connections) {
+  if (material_override) {
     vector<char> buf;
-    load_file(material_connections, &buf);
+    load_file(material_override, &buf);
     JsonValue::JsonValuePtr root = parse_json(buf.data(), buf.data() + buf.size());
-    auto &connections = (*root)["material_connections"];
-    for (int i = 0; i < connections->count(); ++i) {
-      auto &cur = (*connections)[i];
-      auto &submesh = (*cur)["submesh"]->get_string();
-      auto &technique = (*cur)["technique"]->get_string();
-      auto &material = (*cur)["material"]->get_string();
-      _material_overrides[submesh] = make_pair(technique, material);
+
+    if (root->has_key("material_connections")) {
+      auto &connections = root->get("material_connections");
+      for (int i = 0; i < connections->count(); ++i) {
+        auto &cur = connections->get(i);
+        auto &submesh = cur->get("submesh")->to_string();
+        auto &technique = cur->get("technique")->to_string();
+        auto &material = cur->get("material")->to_string();
+        _material_overrides[submesh] = make_pair(technique, material);
+      }
+    }
+
+    if (root->has_key("materials")) {
+      auto &materials = root->get("materials");
+      for (int i = 0; i < materials->count(); ++i) {
+        auto &cur = materials->get(i);
+        auto &name = cur->get("name")->to_string();
+        auto &properties = cur->get("properties");
+        for (int j = 0; j < properties->count(); ++j) {
+          auto &property = properties->get(j);
+          auto &name = property->get("name")->to_string();
+          auto &type = property->get("type")->to_string();
+          auto &value = property->get("value");
+          XMFLOAT4 v;
+          if (type == "float") {
+            v.x = (float)value->get("x")->to_number();
+          } else if (type == "color") {
+            v.x = (float)value->get("r")->to_number();
+            v.y = (float)value->get("g")->to_number();
+            v.z = (float)value->get("b")->to_number();
+            v.w = (float)value->get("a")->to_number();
+          }
+        }
+
+      }
     }
   }
 

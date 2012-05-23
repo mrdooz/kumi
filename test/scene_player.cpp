@@ -204,26 +204,26 @@ void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
       auto param = pp.second;
 
       if (param->has_key("keys")) {
-        auto &param_name = param->get("name")->get_string();
+        auto &param_name = param->get("name")->to_string();
         auto &first_key = param->get("keys")->get(0);
         auto &first_value = first_key->get("value");
 
         // this should be a material
-        GraphicsObjectHandle mat_handle = MATERIAL_MANAGER.find_material(parent->get("name")->get_string());
+        GraphicsObjectHandle mat_handle = MATERIAL_MANAGER.find_material(parent->get("name")->to_string());
         Material *cur_material = MATERIAL_MANAGER.get_material(mat_handle);
         assert(cur_material);
 
         if (Material::Property *prop = cur_material->property_by_name(param_name)) {
           XMFLOAT4 value;
-          auto type = param->get("type")->get_string();
+          auto type = param->get("type")->to_string();
           if (type == "float") {
-            value.x = (float)first_value->get("x")->get_number();
+            value.x = (float)first_value->get("x")->to_number();
             PROPERTY_MANAGER.set_property(prop->id, value.x);
           } else if (type == "color") {
-            value.x = (float)first_value->get("r")->get_number();
-            value.y = (float)first_value->get("g")->get_number();
-            value.z = (float)first_value->get("b")->get_number();
-            value.w = (float)first_value->get("a")->get_number();
+            value.x = (float)first_value->get("r")->to_number();
+            value.y = (float)first_value->get("g")->to_number();
+            value.z = (float)first_value->get("b")->to_number();
+            value.w = (float)first_value->get("a")->to_number();
             PROPERTY_MANAGER.set_property(prop->id, value);
           }
           prop->value = value;

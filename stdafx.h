@@ -65,35 +65,6 @@ typedef uint64_t uint64;
 #include <direct.h>
 #include <io.h>
 #include <sys/stat.h>
-/*
-#include <boost/spirit/include/qi.hpp>
-#include <boost/spirit/include/phoenix_core.hpp>
-#include <boost/spirit/include/phoenix_operator.hpp>
-#include <boost/spirit/include/phoenix_fusion.hpp>
-#include <boost/spirit/include/phoenix_stl.hpp>
-#include <boost/spirit/include/phoenix_bind.hpp>
-#include <boost/fusion/include/adapt_struct.hpp>
-#include <boost/variant/recursive_variant.hpp>
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/scoped_array.hpp>
-
-#include <boost/any.hpp>
-#include <boost/function_types/function_arity.hpp>
-#include <boost/function_types/parameter_types.hpp>
-#include <boost/function_types/result_type.hpp>
-#include <boost/mpl/at.hpp>
-#include <boost/mpl/for_each.hpp>
-#include <boost/mpl/if.hpp> 
-#include <boost/mpl/int.hpp>
-#include <boost/mpl/size.hpp>
-#include <boost/mpl/transform.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/type_traits/is_void.hpp> 
-#include <boost/type_traits/remove_reference.hpp>
-#include <boost/type_traits/is_member_function_pointer.hpp>
-
-*/
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/assign/list_of.hpp>
@@ -110,6 +81,7 @@ typedef uint64_t uint64;
 #include <set>
 #include <time.h>
 #include <functional>
+#include <sstream>
 
 #include <concurrent_queue.h>
 

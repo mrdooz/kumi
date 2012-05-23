@@ -46,8 +46,8 @@ JsonValue::JsonValuePtr Effect::get_info() const {
 
 void Effect::update_from_json(const JsonValue::JsonValuePtr &state) {
 
-  _start_time = (*state)["start_time"]->get_int();
-  _end_time = (*state)["end_time"]->get_int();
+  _start_time = (*state)["start_time"]->to_int();
+  _end_time = (*state)["end_time"]->to_int();
 }
 
 void Effect::set_duration(uint32 start_time, uint32 end_time) {

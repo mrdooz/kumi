@@ -28,12 +28,12 @@ public:
       if ((*m)["msg"]) {
         // msg has type and data fields
         auto d = (*m)["msg"];
-        auto type = (*d)["type"]->get_string();
+        auto type = (*d)["type"]->to_string();
         auto data = (*d)["data"];
 
         if (type == "time") {
-          bool playing = (*data)["is_playing"]->get_bool();
-          int cur_time = (*data)["cur_time"]->get_int();
+          bool playing = (*data)["is_playing"]->to_bool();
+          int cur_time = (*data)["cur_time"]->to_int();
           DEMO_ENGINE.set_pos(cur_time);
           DEMO_ENGINE.set_paused(!playing);
 

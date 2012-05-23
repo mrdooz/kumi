@@ -7,7 +7,7 @@ struct ResourceInterface;
 
 class KumiLoader {
 public:
-  bool load(const char *filename, const char *material_connections, ResourceInterface *resource, Scene **scene);
+  bool load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene);
 private:
   bool load_meshes(const uint8 *buf, Scene *scene);
   bool load_cameras(const uint8 *buf, Scene *scene);

@@ -2,7 +2,6 @@
 #include "json_utils.hpp"
 #include "utils.hpp"
 #include "logger.hpp"
-#include <sstream>
 
 using namespace std;
 
@@ -160,25 +159,25 @@ static void print_inner(const JsonValue *obj, int indent_level, std::string *res
   switch (obj->type()) {
   case JsonValue::JS_STRING: 
     res->append("\"");
-    res->append(obj->get_string());
+    res->append(obj->to_string());
     res->append("\"");
     break;
 
   case JsonValue::JS_NUMBER: {
     static char buf[2048];
-    sprintf(buf, "%f", obj->get_number());
+    sprintf(buf, "%f", obj->to_number());
     res->append(buf);
     break;
                   }
 
   case JsonValue::JS_INT:
     static char buf2[32];
-    sprintf(buf2, "%d", obj->get_int());
+    sprintf(buf2, "%d", obj->to_int());
     res->append(buf2);
     break;
 
   case JsonValue::JS_BOOL:
-    res->append(obj->get_bool() ? "true" : "false");
+    res->append(obj->to_bool() ? "true" : "false");
     break;
 
   default:
