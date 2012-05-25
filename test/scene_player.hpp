@@ -11,6 +11,7 @@ struct FreeFlyCamera {
   float rho;
   float roll;
   XMFLOAT3 pos;
+  XMFLOAT3 dir, right, up;
 };
 
 class ScenePlayer : public Effect {

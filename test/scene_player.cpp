@@ -158,7 +158,7 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
   , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightColor"))
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("view"))
   , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("proj"))
-  , _use_freefly_camera(false)
+  , _use_freefly_camera(true)
   , _mouse_horiz(0)
   , _mouse_vert(0)
   , _mouse_lbutton(false)
@@ -259,43 +259,43 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
     float zf = 2500;
     *proj = transpose(perspective_foh(fov, aspect, zn, zf));
 
-    XMFLOAT3 old_dir = vec3_from_spherical(_freefly_camera.theta, _freefly_camera.rho);
-
     if (_keystate['W'])
-      _freefly_camera.pos += (float)(100 * delta) * old_dir;
+      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.dir;
     if (_keystate['S'])
-      _freefly_camera.pos -= (float)(100 * delta) * old_dir;
+      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.dir;
     if (_keystate['A'])
-      _freefly_camera.rho += (float)delta;
+      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.right;
     if (_keystate['D'])
-      _freefly_camera.rho -= (float)delta;
+      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.right;
     if (_keystate['Q'])
       _freefly_camera.theta -= (float)delta;
     if (_keystate['E'])
       _freefly_camera.theta += (float)delta;
 
     if (_mouse_lbutton) {
-      _freefly_camera.rho -= _mouse_horiz / 200.0f;
-      _freefly_camera.theta += _mouse_vert / 200.0f;
+      float dx = _mouse_horiz / 200.0f;
+      float dy = _mouse_vert / 200.0f;
+      _freefly_camera.rho -= dx;
+      _freefly_camera.theta += dy;
     }
 
-    XMFLOAT3 dir = vec3_from_spherical(_freefly_camera.theta, _freefly_camera.rho);
-    XMFLOAT3 up = drop(XMFLOAT4(0,1,0,0) * mtx_from_axis_angle(dir, _freefly_camera.roll));
-    XMFLOAT3 right = cross(up, dir);
-    up = cross(dir, right);
+    _freefly_camera.dir = vec3_from_spherical(_freefly_camera.theta, _freefly_camera.rho);
+    _freefly_camera.up = drop(XMFLOAT4(0,1,0,0) * mtx_from_axis_angle(_freefly_camera.dir, _freefly_camera.roll));
+    _freefly_camera.right = cross(_freefly_camera.up, _freefly_camera.dir);
+    _freefly_camera.up = cross(_freefly_camera.dir, _freefly_camera.right);
 
     // Camera mtx = inverse of camera -> world mtx
     // R^-1         0
     // -R^-1 * t    1
 
     XMFLOAT4X4 tmp(mtx_identity());
-    set_col(right, 0, &tmp);
-    set_col(up, 1, &tmp);
-    set_col(dir, 2, &tmp);
+    set_col(_freefly_camera.right, 0, &tmp);
+    set_col(_freefly_camera.up, 1, &tmp);
+    set_col(_freefly_camera.dir, 2, &tmp);
 
-    tmp._41 = -dot(right, _freefly_camera.pos);
-    tmp._42 = -dot(up, _freefly_camera.pos);
-    tmp._43 = -dot(dir, _freefly_camera.pos);
+    tmp._41 = -dot(_freefly_camera.right, _freefly_camera.pos);
+    tmp._42 = -dot(_freefly_camera.up, _freefly_camera.pos);
+    tmp._43 = -dot(_freefly_camera.dir, _freefly_camera.pos);
 
     *view = transpose(tmp);
 
