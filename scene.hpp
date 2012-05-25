@@ -11,7 +11,7 @@ struct Camera {
   XMFLOAT3 pos, target, up;
   float roll;
   float aspect_ratio;
-  float fov;
+  float fov_x, fov_y;
   float near_plane, far_plane;
 };
 

@@ -17,7 +17,8 @@ DemoEngine::DemoEngine()
   : _paused(true)
   , _frequency(0)
   , _last_time(0)
-  , _current_time(0)
+  , _active_time(0)
+  , _running_time(0)
   , _cur_effect(0)
   , _duration_ms(3 * 60 * 1000)
   , _time_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_time"))
@@ -46,8 +47,7 @@ bool DemoEngine::paused() const {
 }
 
 void DemoEngine::set_pos(uint32 ms) {
-  int64 new_pos = ms * _frequency;
-  _current_time = new_pos;
+  _active_time = 1000 * ms * _frequency;
   reclassify_effects();
 }
 
@@ -56,7 +56,7 @@ uint32 DemoEngine::duration() const {
 }
 
 void DemoEngine::reclassify_effects() {
-  uint32 current_time_ms = uint32(_current_time / _frequency);
+  uint32 current_time_ms = uint32(_active_time / (1000 * _frequency));
 
   sort(RANGE(_effects), [](const Effect *a, const Effect *b){ return a->start_time() < b->start_time(); });
   _expired_effects.clear();
@@ -84,11 +84,15 @@ void DemoEngine::reclassify_effects() {
 bool DemoEngine::tick() {
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
-  now *= 1000;
-  int64 delta = _paused ? 0 : (now - _last_time);
-  _current_time += delta;
-  uint32 current_time_ms = uint32(_current_time / _frequency);
-  double elapsed_ms = 1000.0 * delta / _frequency;
+  now = now * 1000000 / _frequency;
+
+  int64 active_delta = _paused ? 0 : (now - _last_time);
+  int64 running_delta = (now - _last_time);
+  _active_time += active_delta;
+  _running_time += running_delta;
+
+  uint32 current_time_ms = uint32(_active_time / (1000 * _frequency));
+  double elapsed_ms = (double)active_delta / 1000;
 
   // check for any effects that have ended
   while (!_active_effects.empty() && _active_effects.front()->end_time() <= current_time_ms) {
@@ -107,7 +111,7 @@ bool DemoEngine::tick() {
 
   // calc the number of ticks to step
   const int64 ticks_per_s = 100;
-  const double tmp = (double)elapsed_ms * ticks_per_s / 1000;
+  const double tmp = (double)active_delta * ticks_per_s / 1000000;
   const int num_ticks = (int)tmp;
   const float frac = (float)(tmp - floor(tmp));
 
@@ -118,7 +122,7 @@ bool DemoEngine::tick() {
     float local_time = (current_time_ms - e->start_time()) / 1000.0f;
     XMFLOAT4 tt(global_time, local_time, 0, 0);
     PROPERTY_MANAGER.set_property(_time_id, tt);
-    e->update(current_time_ms, current_time_ms - e->start_time(), ticks_per_s, num_ticks, frac);
+    e->update(current_time_ms - e->start_time(), running_delta, _paused, ticks_per_s, num_ticks, frac);
     e->render();
   }
 
@@ -180,3 +184,9 @@ JsonValue::JsonValuePtr DemoEngine::get_info() {
   return root;
 }
 
+
+void DemoEngine::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
+  for (size_t i = 0; i < _active_effects.size(); ++i) {
+    _active_effects[i]->wnd_proc(message, wParam, lParam);
+  }
+}

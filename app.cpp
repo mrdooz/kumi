@@ -88,8 +88,8 @@ bool App::init(HINSTANCE hinstance)
     break_on_error(true);
 
   _hinstance = hinstance;
-  _width = 800; //GetSystemMetrics(SM_CXSCREEN) / 2;
-  _height = 600; //GetSystemMetrics(SM_CYSCREEN) / 2;
+  _width = GetSystemMetrics(SM_CXSCREEN) / 2;
+  _height = GetSystemMetrics(SM_CYSCREEN) / 2;
 
   B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());
@@ -247,13 +247,12 @@ UINT App::run(void *userdata) {
   return 0;
 }
 
-LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam ) 
+LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 
-  //HDC hdc;
-  //PAINTSTRUCT ps;
-  switch( message ) 
-  {
+  DEMO_ENGINE.wnd_proc(message, wParam, lParam);
+
+  switch( message ) {
 
   case WM_SETFOCUS:
   case WM_KILLFOCUS:
@@ -270,14 +269,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
     DestroyWindow(hWnd);
     break;
 
-  //case WM_ERASEBKGND:
-    //return 0;
-/*
-  case WM_PAINT:
-    hdc = BeginPaint(hWnd, &ps);
-    EndPaint(hWnd, &ps);
-    return 0;
-*/
   case WM_CREATE:
     {
       _instance->_hwnd = hWnd;
@@ -313,34 +304,6 @@ LRESULT App::wnd_proc( HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam )
       default:
         break;
       }
-    break;
-
-    /*
-    case WM_KEYDOWN:
-    break;
-
-    case WM_CHAR:
-    break;
-
-    case WM_KEYUP:
-    switch (wParam) 
-    {
-    case VK_ESCAPE:
-    PostQuitMessage( 0 );
-    break;
-    default:
-    break;
-    }
-    break;
-    */
-
-  case WM_KEYDOWN:
-  //case WM_KEYUP:
-  case WM_SYSKEYDOWN:
-  case WM_SYSKEYUP:
-  case WM_CHAR:
-  case WM_SYSCHAR:
-  case WM_IME_CHAR:
     break;
 
   }

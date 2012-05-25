@@ -10,7 +10,7 @@
 #include "file_utils.hpp"
 #include "json_utils.hpp"
 
-#define FILE_VERSION 7
+#define FILE_VERSION 8
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -149,7 +149,8 @@ bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
     camera->up = read_and_step<XMFLOAT3>(&buf);
     camera->roll = read_and_step<float>(&buf);
     camera->aspect_ratio = read_and_step<float>(&buf);
-    camera->fov = read_and_step<float>(&buf);
+    camera->fov_x = XMConvertToRadians(read_and_step<float>(&buf));
+    camera->fov_y = XMConvertToRadians(read_and_step<float>(&buf));
     camera->near_plane = read_and_step<float>(&buf);
     camera->far_plane = read_and_step<float>(&buf);
   }

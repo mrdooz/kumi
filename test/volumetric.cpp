@@ -67,12 +67,11 @@ static XMFLOAT4X4 mtx_at_time(const vector<KeyFrameMatrix> &frames, double time)
   return frames.back().value;
 }
 
-bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequency, int32 num_ticks, 
-                              float ticks_fraction) {
+bool VolumetricEffect::update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
   if (_scene && !_scene->cameras.empty()) {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation_mtx[camera->name], global_time / 1000.0);
+    XMFLOAT4X4 mtx = mtx_at_time(_scene->animation_mtx[camera->name], local_time / 1000.0);
 
     XMMATRIX lookat = XMMatrixTranspose(XMMatrixLookAtLH(
 //      XMVectorSet(camera->pos.x,camera->pos.y,camera->pos.z,0),
@@ -81,7 +80,7 @@ bool VolumetricEffect::update(int64 global_time, int64 local_time, int64 frequen
       XMVectorSet(camera->up.x,camera->up.y,camera->up.z,0)));
 
     XMMATRIX proj = XMMatrixTranspose(XMMatrixPerspectiveFovLH(
-      XMConvertToRadians(camera->fov),
+      camera->fov_y,
       camera->aspect_ratio,
       camera->near_plane, camera->far_plane));
 
