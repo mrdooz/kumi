@@ -44,6 +44,8 @@ private:
   bool _mouse_lbutton;
   bool _mouse_rbutton;
   DWORD _mouse_pos_prev;
-
   int _keystate[256];
+
+  GraphicsObjectHandle _rt_pos;
+  GraphicsObjectHandle _rt_normal;
 };

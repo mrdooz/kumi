@@ -125,7 +125,7 @@ public:
     if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
       ID3D11ShaderResourceView *views[MAX_SAMPLERS];
       for (int i = 0; i < num_views; ++i) {
-        ResourceData *data = res->_resources.get(view_handles[i]);
+        Graphics::ResourceData *data = res->_resources.get(view_handles[i]);
         views[i] = data->srv;
       }
       ctx->PSSetShaderResources(first_view, num_views, views);
@@ -177,11 +177,10 @@ void Renderer::render() {
   ctx->RSSetViewports(1, &GRAPHICS.viewport());
 
   // sort by keys (just using the depth)
-  stable_sort(begin(_render_commands), end(_render_commands), 
-    [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
+  //stable_sort(begin(_render_commands), end(_render_commands), 
+//    [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
 #if 1
   CmdGen gen(res, ctx);
-  // build the cmd buffer from the render commands
   RenderObjects objects;
   Technique *prev_technique = nullptr;
 
@@ -191,6 +190,25 @@ void Renderer::render() {
     void *data = cmd.data;
 
     switch (key.cmd) {
+
+      case RenderKey::kSetRenderTarget: {
+        RenderTargetData *rt_data = (RenderTargetData *)data;
+        ID3D11RenderTargetView *rts[8] = { nullptr };
+        ID3D11DepthStencilView *dsv = nullptr;
+        int rt_count = 0;
+        for (int i = 0; i < 8; ++i) {
+          GraphicsObjectHandle h = rt_data->render_targets[i];
+          if (!h.is_valid())
+            break;
+          Graphics::RenderTargetData *rt = res->_render_targets.get(h);
+          if (!dsv && rt->dsv) {
+            dsv = rt->dsv;
+          }
+          rts[rt_count++] = rt->rtv;
+        }
+        ctx->OMSetRenderTargets(rt_count, rts, dsv);
+        break;
+      }
 
       case RenderKey::kRenderMesh: {
         MeshRenderData *render_data = (MeshRenderData *)data;

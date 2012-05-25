@@ -184,10 +184,9 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 
 bool ScenePlayer::init() {
 
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
-
-  string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes\\torus.kumi");
-  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes\\torus_materials.json");
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
+  string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
+  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
   KumiLoader loader;
   if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
@@ -231,6 +230,9 @@ bool ScenePlayer::init() {
 
     _params.push_back(unique_ptr<TweakableParam>(mp));
   }
+
+  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
+  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
 
 /*
   bool res;
@@ -355,12 +357,18 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 
 bool ScenePlayer::render() {
 
-  static XMFLOAT4 clear_white(1, 1, 1, 1);
-  static XMFLOAT4 clear_black(0, 0, 0, 1);
-
   RenderKey key;
 
   if (_scene) {
+    RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
+    data->render_targets[0] = GRAPHICS.default_render_target();
+    data->render_targets[1] = _rt_pos;
+    data->render_targets[1] = _rt_normal;
+
+    RenderKey key;
+    key.cmd = RenderKey::kSetRenderTarget;
+    RENDERER.submit_command(FROM_HERE, key, data);
+
     _scene->submit_meshes(FROM_HERE, RENDERER.next_seq_nr());
   }
 

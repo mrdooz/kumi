@@ -65,6 +65,10 @@ struct TextRenderData {
   uint32 flags;
 };
 
+struct RenderTargetData {
+  GraphicsObjectHandle render_targets[8]; // if there's a depth buffer, it's attached to rt0
+};
+
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
   enum Cmd {

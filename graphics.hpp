@@ -21,74 +21,71 @@ using std::pair;
 
 enum FileEvent;
 
-struct RenderTargetData;
-struct TextureData;
-
 #if WITH_GWEN
 struct IFW1Factory;
 struct IFW1FontWrapper;
 #endif
 
-struct RenderTargetData {
-  RenderTargetData() {
-    reset();
-  }
-
-  void reset() {
-    texture = NULL;
-    depth_stencil = NULL;
-    rtv = NULL;
-    dsv = NULL;
-    srv = NULL;
-  }
-
-  operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
-
-  D3D11_TEXTURE2D_DESC texture_desc;
-  D3D11_TEXTURE2D_DESC depth_buffer_desc;
-  D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
-  D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
-  D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-  CComPtr<ID3D11Texture2D> texture;
-  CComPtr<ID3D11Texture2D> depth_stencil;
-  CComPtr<ID3D11RenderTargetView> rtv;
-  CComPtr<ID3D11DepthStencilView> dsv;
-  CComPtr<ID3D11ShaderResourceView> srv;
-};
-
-struct TextureData {
-  ~TextureData() {
-    reset();
-  }
-
-  void reset() {
-    texture.Release();
-    srv.Release();
-  }
-  operator bool() { return texture || srv; }
-  D3D11_TEXTURE2D_DESC texture_desc;
-  D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-  CComPtr<ID3D11Texture2D> texture;
-  CComPtr<ID3D11ShaderResourceView> srv;
-};
-
-struct ResourceData {
-  ~ResourceData() {
-    reset();
-  }
-
-  void reset() {
-    resource.Release();
-    srv.Release();
-  }
-  operator bool() { return resource || srv; }
-  D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-  CComPtr<ID3D11Resource> resource;
-  CComPtr<ID3D11ShaderResourceView> srv;
-};
-
 class Graphics : public GraphicsInterface {
 public:
+
+  struct RenderTargetData {
+    RenderTargetData() {
+      reset();
+    }
+
+    void reset() {
+      texture = NULL;
+      depth_stencil = NULL;
+      rtv = NULL;
+      dsv = NULL;
+      srv = NULL;
+    }
+
+    operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
+
+    D3D11_TEXTURE2D_DESC texture_desc;
+    D3D11_TEXTURE2D_DESC depth_stencil_desc;
+    D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
+    D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    CComPtr<ID3D11Texture2D> texture;
+    CComPtr<ID3D11Texture2D> depth_stencil;
+    CComPtr<ID3D11RenderTargetView> rtv;
+    CComPtr<ID3D11DepthStencilView> dsv;
+    CComPtr<ID3D11ShaderResourceView> srv;
+  };
+
+  struct TextureData {
+    ~TextureData() {
+      reset();
+    }
+
+    void reset() {
+      texture.Release();
+      srv.Release();
+    }
+    operator bool() { return texture || srv; }
+    D3D11_TEXTURE2D_DESC texture_desc;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    CComPtr<ID3D11Texture2D> texture;
+    CComPtr<ID3D11ShaderResourceView> srv;
+  };
+
+  struct ResourceData {
+    ~ResourceData() {
+      reset();
+    }
+
+    void reset() {
+      resource.Release();
+      srv.Release();
+    }
+    operator bool() { return resource || srv; }
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
+    CComPtr<ID3D11Resource> resource;
+    CComPtr<ID3D11ShaderResourceView> srv;
+  };
 
   struct BackedResources {
     BackedResources()
@@ -183,6 +180,7 @@ public:
   BackedResources *get_backed_resources() { return &_res; }
 
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name);
+  GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, const char *name);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
   GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
@@ -220,7 +218,7 @@ public:
   HRESULT create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
   void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
 
-  GraphicsObjectHandle default_rt_handle() const { return _default_rt_handle; }
+  GraphicsObjectHandle default_render_target() const { return _default_render_target; }
 
   //void set_samplers(Technique *technique, Shader *shader);
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
@@ -232,7 +230,7 @@ private:
   Graphics(ResourceInterface *ri);
   ~Graphics();
 
-  bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, RenderTargetData *out);
+  bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, RenderTargetData *out);
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
 
   bool create_back_buffers(int width, int height);
@@ -250,7 +248,7 @@ private:
   CComPtr<ID3D11Device> _device;
   CComPtr<IDXGISwapChain> _swap_chain;
 
-  GraphicsObjectHandle _default_rt_handle;
+  GraphicsObjectHandle _default_render_target;
 
 #ifdef _DEBUG
   CComPtr<ID3D11Debug> _d3d_debug;

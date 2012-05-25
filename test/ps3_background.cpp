@@ -29,7 +29,7 @@ bool Ps3BackgroundEffect::render() {
 */
   RENDERER.submit_technique(_background_technique);
 /*
-  key.handle = GRAPHICS.default_rt_handle();
+  key.handle = GRAPHICS.default_render_target();
   RENDERER.submit_command(FROM_HERE, key, nullptr);
   {
     RenderKey key;

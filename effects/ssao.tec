@@ -1,0 +1,36 @@
+technique ssao {
+    
+    vertex_shader {
+        file effects/ssao.fx;
+        entry_point vs_main;
+        params [
+            float4x4 view system;
+            float4x4 proj system;
+            float4x4 world mesh;
+        ];
+    };
+    
+    pixel_shader {
+        file effects/ssao.fx;
+        entry_point ps_main;
+        params [
+            float4 Diffuse material;
+            float4 LightPos system;
+            float4 LightColor system;
+        ];
+    };
+   
+    rasterizer_desc {
+        cull_mode = back;
+    };
+    
+    depth_stencil_desc {
+        depth_enable = true;
+    };
+    
+    blend_desc {
+        render_target[0] = {
+            blend_enable = false;
+        };
+    };
+};
