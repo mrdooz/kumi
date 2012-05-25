@@ -238,10 +238,10 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
     }
     add_error_msg(err_msg.c_str());
     LOG_WARNING_LN(err_msg.c_str());
-
-    CloseHandle(stdout_read);
-    CloseHandle(stdout_write);
   }
+  CloseHandle(stdout_read);
+  CloseHandle(stdout_write);
+
   return exit_code == 0;
 }
 

@@ -26,17 +26,18 @@ ps_input vs_main(vs_input input)
     output.pos_ws = mul(input.pos, world);
     output.pos = mul(output.pos_ws, view);
     output.pos = mul(output.pos, proj);
-    output.normal = mul(float4(input.normal, 0), world);
+    output.normal = mul(input.normal, world).xyz;
     output.tex = input.tex;
     return output;
 }
 
 ps_output ps_main(ps_input input) : SV_Target
 {
-    ps_output out;
+    ps_output output = (ps_output)0;
     float3 dir = float3(LightPos.x - input.pos_ws.x, LightPos.y - input.pos_ws.y, LightPos.z - input.pos_ws.z);
     dir = normalize(dir);
-    out.rt0 = dot(dir, normalize(input.normal)) * Diffuse;
-    out.rt1 = ps_input.pos;
-    out.rt2 = ps_input.normal;
+    output.rt0 = dot(dir, normalize(input.normal)) * Diffuse;
+    output.rt1 = input.pos;
+    output.rt2 = float4(input.normal,0);
+    return output;
 }

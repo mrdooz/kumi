@@ -37,7 +37,7 @@ private:
 
   std::vector<RenderCmd > _render_commands;
 
-  std::unique_ptr<uint8> _effect_data;
+  std::vector<uint8> _effect_data;
   int _effect_data_ofs;
 };
 

@@ -13,9 +13,9 @@ static const int cEffectDataSize = 1024 * 1024;
 Renderer *Renderer::_instance;
 
 Renderer::Renderer()
-  : _effect_data(new uint8[cEffectDataSize])
-  , _effect_data_ofs(0)
+  : _effect_data_ofs(0)
 {
+  _effect_data.resize(cEffectDataSize);
 }
 
 bool Renderer::create() {
@@ -423,7 +423,8 @@ void *Renderer::raw_alloc(size_t size) {
   if (size + _effect_data_ofs >= cEffectDataSize)
     return nullptr;
 
-  void *ptr = &_effect_data.get()[_effect_data_ofs];
+  void *ptr = &_effect_data[_effect_data_ofs];
+  assert(_effect_data_ofs + size <= _effect_data.size());
   _effect_data_ofs += size;
   return ptr;
 }
