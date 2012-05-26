@@ -195,8 +195,9 @@ void Renderer::render() {
         RenderTargetData *rt_data = (RenderTargetData *)data;
         ID3D11RenderTargetView *rts[8] = { nullptr };
         ID3D11DepthStencilView *dsv = nullptr;
-        int rt_count = 0;
-        for (int i = 0; i < 8; ++i) {
+        int i;
+        float color[4] = {0,0,0,0};
+        for (i = 0; i < 8; ++i) {
           GraphicsObjectHandle h = rt_data->render_targets[i];
           if (!h.is_valid())
             break;
@@ -204,9 +205,16 @@ void Renderer::render() {
           if (!dsv && rt->dsv) {
             dsv = rt->dsv;
           }
-          rts[rt_count++] = rt->rtv;
+          rts[i] = rt->rtv;
+          // clear render target (and depth stenci)
+          if (rt_data->clear_target[i]) {
+            ctx->ClearRenderTargetView(rts[i], color);
+            if (rt->dsv) {
+              ctx->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+            }
+          }
         }
-        ctx->OMSetRenderTargets(rt_count, rts, dsv);
+        ctx->OMSetRenderTargets(i, rts, dsv);
         break;
       }
 
@@ -440,8 +448,6 @@ void Renderer::validate_command(RenderKey key, const void *data) {
 
     case RenderKey::kRenderMesh: {
       MeshRenderData *render_data = (MeshRenderData *)data;
-      //const uint16 material_id = render_data->material_id;
-      //const Material *material = MATERIAL_MANAGER.get_material(material_id);
       Technique *technique = res->_techniques.get(render_data->technique);
       assert(technique);
       Shader *vertex_shader = technique->vertex_shader();
@@ -461,11 +467,6 @@ void Renderer::submit_command(const TrackedLocation &location, RenderKey key, vo
   validate_command(key, data);
 #endif
   _render_commands.push_back(RenderCmd(location, key, data));
-}
-
-uint16 Renderer::next_seq_nr() const { 
-  assert(_render_commands.size() < 65536); 
-  return (uint16)_render_commands.size(); 
 }
 
 void Renderer::submit_technique(GraphicsObjectHandle technique) {

@@ -30,6 +30,7 @@ public:
 
 private:
   DemoEngine();
+  ~DemoEngine();
   static DemoEngine *_instance;
 
   void reclassify_effects();

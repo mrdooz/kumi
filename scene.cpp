@@ -9,20 +9,20 @@ Scene::~Scene() {
   seq_delete(&cameras);
 }
 
-void Scene::submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Scene::submit_meshes(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
   for (auto i = begin(meshes), e = end(meshes); i != e; ++i)
-    (*i)->submit(location, seq_nr, material_id, technique);
+    (*i)->submit(location, material_id, technique);
 }
 
-void Scene::submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Scene::submit_mesh(const TrackedLocation &location, const char *name, int material_id, GraphicsObjectHandle technique) {
   static Mesh *prev_mesh = nullptr;
   if (prev_mesh && prev_mesh->name == name) {
-    prev_mesh->submit(location, seq_nr, material_id, technique);
+    prev_mesh->submit(location, material_id, technique);
   } else {
     for (size_t i = 0; i < meshes.size(); ++i) {
       Mesh *cur = meshes[i];
       if (cur->name == name) {
-        cur->submit(location, seq_nr, material_id, technique);
+        cur->submit(location, material_id, technique);
         prev_mesh = cur;
         break;
       }
@@ -43,7 +43,6 @@ bool Scene::on_loaded() {
 
   return true;
 }
-
 
 void Scene::update() {
   for (auto i = begin(meshes), e = end(meshes); i != e; ++i)

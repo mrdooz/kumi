@@ -142,10 +142,9 @@ bool VolumetricEffect::render() {
     // render scene as usual to default render target
     key.cmd = RenderKey::kSetRenderTarget;
     key.handle = GRAPHICS.default_render_target();
-    key.seq_nr = RENDERER.next_seq_nr();
     RENDERER.submit_command(FROM_HERE, key, NULL);
 
-    _scene->submit_meshes(FROM_HERE, RENDERER.next_seq_nr());
+    _scene->submit_meshes(FROM_HERE);
 
     // add shafts
   }

@@ -20,7 +20,6 @@ public:
   void *strdup(const char *str);
   void submit_command(const TrackedLocation &location, RenderKey key, void *data);
   void submit_technique(GraphicsObjectHandle technique);
-  uint16 next_seq_nr() const;
   void render();
 
 private:

@@ -129,6 +129,8 @@ bool Graphics::create_render_target(
   out->rtv_desc = CD3D11_RENDER_TARGET_VIEW_DESC(D3D11_RTV_DIMENSION_TEXTURE2D, out->texture_desc.Format);
   B_WRN_HR(_device->CreateRenderTargetView(out->texture, &out->rtv_desc, &out->rtv.p));
   set_private_data(loc, out->rtv.p);
+  float color[4] = { 0 };
+  _immediate_context->ClearRenderTargetView(out->rtv.p, color);
 
   if (depth_buffer) {
     // create the depth stencil texture

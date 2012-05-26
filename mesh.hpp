@@ -34,7 +34,7 @@ struct SubMesh {
 struct Mesh {
 
   Mesh(const std::string &name) : name(name) {}
-  void submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique);
+  void submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique);
 
   void prepare_cbuffer();
   void update();

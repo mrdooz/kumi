@@ -168,6 +168,10 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
   ZeroMemory(_keystate, sizeof(_keystate));
 }
 
+ScenePlayer::~ScenePlayer() {
+  delete exch_null(_scene);
+}
+
 bool ScenePlayer::file_changed(const char *filename, void *token) {
 /*
   LOG_VERBOSE_LN(__FUNCTION__);
@@ -185,17 +189,18 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 bool ScenePlayer::init() {
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
+  _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
   KumiLoader loader;
   if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
     return false;
-
+/*
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
     PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
   }
-
+*/
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
     Material *mat = *it;
@@ -231,7 +236,7 @@ bool ScenePlayer::init() {
     _params.push_back(unique_ptr<TweakableParam>(mp));
   }
 
-  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
+  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
 
 /*
@@ -361,15 +366,16 @@ bool ScenePlayer::render() {
 
   if (_scene) {
     RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
-    data->render_targets[0] = GRAPHICS.default_render_target();
-    data->render_targets[1] = _rt_pos;
+    data->render_targets[0] = _rt_pos;
     data->render_targets[1] = _rt_normal;
+    data->clear_target[0] = true;
+    data->clear_target[1] = true;
 
     RenderKey key;
     key.cmd = RenderKey::kSetRenderTarget;
     RENDERER.submit_command(FROM_HERE, key, data);
 
-    _scene->submit_meshes(FROM_HERE, RENDERER.next_seq_nr());
+    _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
   }
 
   return true;

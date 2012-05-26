@@ -42,8 +42,8 @@ struct Scene {
 
   void update();
 
-  void submit_meshes(const TrackedLocation &location, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
-  void submit_mesh(const TrackedLocation &location, const char *name, uint16 seq_nr, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+  void submit_meshes(const TrackedLocation &location, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
+  void submit_mesh(const TrackedLocation &location, const char *name, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
   Mesh *find_mesh_by_name(const std::string &name);
 

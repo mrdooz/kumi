@@ -42,8 +42,8 @@ void SubMesh::prepare_cbuffers() {
 
   int cbuffer_size = 0;
   auto collect_params = [&, this](const std::vector<CBufferParam> &params) {
-    for (auto j = std::begin(params), e = std::end(params); j != e; ++j) {
-      const CBufferParam &param = *j;
+    for (auto i = std::begin(params), e = std::end(params); i != e; ++i) {
+      const CBufferParam &param = *i;
       int len = PropertyType::len(param.type);;
       if (param.cbuffer != -1) {
         SubMesh::CBufferVariable &var = dummy_push_back(&cbuffer_vars);
@@ -71,7 +71,6 @@ void SubMesh::prepare_cbuffers() {
   collect_params(vs->cbuffer_params());
   collect_params(ps->cbuffer_params());
   cbuffer_staged.resize(cbuffer_size);
-
 }
 
 void SubMesh::update() {
@@ -83,10 +82,9 @@ void SubMesh::update() {
   render_data.cbuffer_len = cbuffer_staged.size();
 }
 
-void Mesh::submit(const TrackedLocation &location, uint16 seq_nr, int material_id, GraphicsObjectHandle technique) {
+void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
   for (size_t i = 0; i < submeshes.size(); ++i) {
     SubMesh *s = submeshes[i];
-    s->render_key.seq_nr = seq_nr;
 
     // make a copy of the render data if we're using a material or technique override
     bool material_override = material_id != -1;

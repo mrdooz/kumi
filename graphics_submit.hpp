@@ -66,7 +66,13 @@ struct TextRenderData {
 };
 
 struct RenderTargetData {
+  RenderTargetData() {
+    for (int i = 0; i < 8; ++i) {
+      clear_target[i] = false;
+    }
+  }
   GraphicsObjectHandle render_targets[8]; // if there's a depth buffer, it's attached to rt0
+  bool clear_target[8];
 };
 
 // from http://realtimecollisiondetection.net/blog/?p=86

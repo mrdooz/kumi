@@ -88,6 +88,9 @@ public:
   };
 
   struct BackedResources {
+    ~BackedResources() {
+
+    }
     BackedResources()
       : _vertex_shaders(release_obj<ID3D11VertexShader *>)
       , _pixel_shaders(release_obj<ID3D11PixelShader *>)

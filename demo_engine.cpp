@@ -26,6 +26,13 @@ DemoEngine::DemoEngine()
   QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
 }
 
+DemoEngine::~DemoEngine() {
+  seq_delete(&_effects);
+  _active_effects.clear();
+  _inactive_effects.clear();
+  _expired_effects.clear();
+}
+
 bool DemoEngine::create() {
   assert(!_instance);
   _instance = new DemoEngine;

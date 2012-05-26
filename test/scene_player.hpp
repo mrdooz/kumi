@@ -18,6 +18,7 @@ class ScenePlayer : public Effect {
 public:
 
   ScenePlayer(GraphicsObjectHandle context, const std::string &name);
+  ~ScenePlayer();
   virtual bool init() override;
   virtual bool update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
   virtual bool render() override;
@@ -48,4 +49,7 @@ private:
 
   GraphicsObjectHandle _rt_pos;
   GraphicsObjectHandle _rt_normal;
+
+  GraphicsObjectHandle _ssao_fill;
+  GraphicsObjectHandle _ssao_render;
 };

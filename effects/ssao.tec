@@ -1,8 +1,8 @@
-technique ssao {
+technique ssao_fill {
     
     vertex_shader {
         file effects/ssao.fx;
-        entry_point vs_main;
+        entry_point fill_vs_main;
         params [
             float4x4 view system;
             float4x4 proj system;
@@ -12,7 +12,7 @@ technique ssao {
     
     pixel_shader {
         file effects/ssao.fx;
-        entry_point ps_main;
+        entry_point fill_ps_main;
         params [
             float4 Diffuse material;
             float4 LightPos system;
@@ -34,3 +34,4 @@ technique ssao {
         };
     };
 };
+
