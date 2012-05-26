@@ -11,19 +11,25 @@ struct SubMesh;
 struct MeshRenderData {
   MeshRenderData() 
     : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST)
-    , cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
+    , cur_technique_data(nullptr) {}
   GraphicsObjectHandle vb, ib;
   DXGI_FORMAT index_format;
   int index_count;
   int vertex_size;
   int vertex_count;
   D3D_PRIMITIVE_TOPOLOGY topology;
-  GraphicsObjectHandle technique;
-  void *cbuffer_staged;
-  int cbuffer_len;
-  GraphicsObjectHandle textures[MAX_SAMPLERS];
-  int first_texture;
-  int num_textures;
+  GraphicsObjectHandle cur_technique;
+  static const int MAX_TECHNIQUES = 16;
+  struct TechniqueData {
+    TechniqueData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
+    GraphicsObjectHandle technique;
+    void *cbuffer_staged;
+    int cbuffer_len;
+    GraphicsObjectHandle textures[MAX_SAMPLERS];
+    int first_texture;
+    int num_textures;
+  } technique_data[MAX_TECHNIQUES];
+  TechniqueData *cur_technique_data;
 #if _DEBUG
   Mesh *mesh;
   SubMesh *submesh;

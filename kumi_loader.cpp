@@ -97,11 +97,11 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
         auto &technique = it->second.first;
         auto &material = it->second.second;
         submesh->material_id = _material_ids[material];
-        submesh->render_data.technique = GRAPHICS.find_technique(technique.c_str());
+        submesh->render_data.cur_technique = GRAPHICS.find_technique(technique.c_str());
       } else {
         // set the default technique for the material
         submesh->material_id = _material_ids[material_name];
-        submesh->render_data.technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
+        submesh->render_data.cur_technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
       }
 
       const int vb_flags = read_and_step<int>(&buf);

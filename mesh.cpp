@@ -4,6 +4,7 @@
 #include "graphics.hpp"
 #include "technique.hpp"
 #include "material_manager.hpp"
+#include "logger.hpp"
 
 SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 {
@@ -17,26 +18,54 @@ SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 SubMesh::~SubMesh() {
 }
 
-void SubMesh::prepare_textures() {
+int SubMesh::find_technique_index(GraphicsObjectHandle technique) {
+  for (int i = 0; i < 16; ++i) {
+    if (render_data.technique_data[i].technique == technique) {
+      return i;
+    }
+    if (!render_data.technique_data[i].technique.is_valid())
+      return -i;
+  }
+  LOG_ERROR_LN("Max # techniques used for submesh! About to croak!");
+  return MeshRenderData::MAX_TECHNIQUES;
+}
+
+void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
   // get the pixel shader, check what textures he's using, and what slots to place them in
   // then we look these guys up in the current material
-  Technique *technique = GRAPHICS.get_technique(render_data.technique);
-  assert(technique);
+  Technique *technique = GRAPHICS.get_technique(technique_handle);
+  if (!technique)
+    return;
+  int idx = find_technique_index(technique_handle);
+  // bail if at max # techniques, or we've already prepared that techinque
+  if (idx >= 0)
+    return;
+  idx = -idx;
+
   Shader *pixel_shader = technique->pixel_shader();
   auto &params = pixel_shader->resource_view_params();
   for (auto it = begin(params), e = end(params); it != e; ++it) {
     auto &name = it->name;
     auto &friendly_name = it->friendly_name;
     int bind_point = it->bind_point;
-    render_data.textures[bind_point] = GRAPHICS.find_resource(friendly_name.c_str());
-    render_data.first_texture = min(render_data.first_texture, bind_point);
-    render_data.num_textures = max(render_data.num_textures, bind_point - render_data.first_texture + 1);
+    render_data.technique_data[idx].textures[bind_point] = GRAPHICS.find_resource(friendly_name.c_str());
+    render_data.technique_data[idx].first_texture = min(render_data.technique_data[idx].first_texture, bind_point);
+    render_data.technique_data[idx].num_textures = max(render_data.technique_data[idx].num_textures, bind_point - render_data.technique_data[idx].first_texture + 1);
   }
 }
 
-void SubMesh::prepare_cbuffers() {
+void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
 
-  Technique *technique = GRAPHICS.get_technique(render_data.technique);
+  Technique *technique = GRAPHICS.get_technique(technique_handle);
+  if (!technique)
+    return;
+
+  int idx = find_technique_index(technique_handle);
+  // bail if at max # techniques, or we've already prepared that techinque
+  if (idx >= 0)
+    return;
+  idx = -idx;
+
   Shader *vs = technique->vertex_shader();
   Shader *ps = technique->pixel_shader();
 
@@ -74,12 +103,14 @@ void SubMesh::prepare_cbuffers() {
 }
 
 void SubMesh::update() {
-  for (auto i = begin(cbuffer_vars), e = end(cbuffer_vars); i != e; ++i) {
-    const CBufferVariable &var = *i;
-    PROPERTY_MANAGER.get_property_raw(var.id, &cbuffer_staged[var.ofs], var.len);
+  if (!cbuffer_vars.empty()) {
+    for (auto i = begin(cbuffer_vars), e = end(cbuffer_vars); i != e; ++i) {
+      const CBufferVariable &var = *i;
+      PROPERTY_MANAGER.get_property_raw(var.id, &cbuffer_staged[var.ofs], var.len);
+    }
+    render_data.cur_technique_data->cbuffer_staged = &cbuffer_staged[0];
+    render_data.cur_technique_data->cbuffer_len = cbuffer_staged.size();
   }
-  render_data.cbuffer_staged = &cbuffer_staged[0];
-  render_data.cbuffer_len = cbuffer_staged.size();
 }
 
 void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
@@ -91,16 +122,22 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
     bool technique_override = technique.is_valid();
     MeshRenderData *p;
     if (material_override || technique_override) {
-      p = RENDERER.alloc_command_data<MeshRenderData>();
-      *p = s->render_data;
+      // I'm not really sure how to handle material overrides, so i'll just defer it :)
+      // p = RENDERER.alloc_command_data<MeshRenderData>();
       // TODO: handle override by creating a tmp cbuffer
       //if (material_override)
         //p->material_id = (uint16)material_id;
-      if (technique_override)
-        p->technique = technique;
+      if (technique_override) {
+        s->prepare_cbuffers(technique);
+        s->prepare_textures(technique);
+        s->render_data.cur_technique = technique;
+        int idx = s->find_technique_index(technique);
+        s->render_data.cur_technique_data = &s->render_data.technique_data[idx];
+      }
+      //*p = s->render_data;
     } else {
-      p = &s->render_data;
     }
+    p = &s->render_data;
     RENDERER.submit_command(location, s->render_key, p);
   }
 }
@@ -112,8 +149,9 @@ void Mesh::prepare_cbuffer() {
 
   // collect all the variables we need to fill our cbuffer.
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i) {
-    (*i)->prepare_cbuffers();
-    (*i)->prepare_textures();
+    SubMesh *submesh = *i;
+    submesh->prepare_cbuffers(submesh->render_data.cur_technique);
+    submesh->prepare_textures(submesh->render_data.cur_technique);
   }
 }
 

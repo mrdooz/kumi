@@ -42,3 +42,33 @@ fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
 ///////////////////////////////////
 // actual render
 ///////////////////////////////////
+
+Texture2D rt_pos : register(t0);
+Texture2D rt_normal : register(t1);
+sampler ssao_sampler : register(s0);
+
+struct render_vs_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+struct render_ps_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+render_ps_input render_vs_main(render_vs_input input)
+{
+    render_ps_input output = (render_ps_input)0;
+    output.pos = input.pos;
+    output.tex = input.tex;
+    return output;
+}
+
+float4 render_ps_main(render_ps_input input) : SV_Target
+{
+    float4 pos = rt_pos.Sample(ssao_sampler, input.tex);
+    float4 normal = rt_normal.Sample(ssao_sampler, input.tex);
+
+    return pos + normal;
+}

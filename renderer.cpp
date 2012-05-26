@@ -197,6 +197,8 @@ void Renderer::render() {
         ID3D11DepthStencilView *dsv = nullptr;
         int i;
         float color[4] = {0,0,0,0};
+        // Collect the valid render targets, set the first available depth buffer
+        // and clear targets if specified
         for (i = 0; i < 8; ++i) {
           GraphicsObjectHandle h = rt_data->render_targets[i];
           if (!h.is_valid())
@@ -220,7 +222,7 @@ void Renderer::render() {
 
       case RenderKey::kRenderMesh: {
         MeshRenderData *render_data = (MeshRenderData *)data;
-        Technique *technique = res->_techniques.get(render_data->technique);
+        Technique *technique = res->_techniques.get(render_data->cur_technique);
         if (technique != prev_technique) {
           technique->get_render_objects(&objects);
           prev_technique = technique;
@@ -238,16 +240,19 @@ void Renderer::render() {
         gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
 
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
-        gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
+        gen.set_shader_resources(render_data->cur_technique_data->textures, render_data->cur_technique_data->first_texture, render_data->cur_technique_data->num_textures);
 
         GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
-        gen.set_cbuffer(cb, render_data->cbuffer_staged, render_data->cbuffer_len);
+        gen.set_cbuffer(cb, render_data->cur_technique_data->cbuffer_staged, render_data->cur_technique_data->cbuffer_len);
         gen.draw_indexed(render_data->index_count, 0, 0);
 
-        gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
-
+        gen.unset_shader_resource(render_data->cur_technique_data->first_texture, render_data->cur_technique_data->num_textures);
         break;
       }
+
+      case RenderKey::kRenderTechnique: {
+        int a = 10;
+      }                                  
     }
   }
 #else
@@ -448,7 +453,7 @@ void Renderer::validate_command(RenderKey key, const void *data) {
 
     case RenderKey::kRenderMesh: {
       MeshRenderData *render_data = (MeshRenderData *)data;
-      Technique *technique = res->_techniques.get(render_data->technique);
+      Technique *technique = res->_techniques.get(render_data->cur_technique);
       assert(technique);
       Shader *vertex_shader = technique->vertex_shader();
       assert(vertex_shader);
