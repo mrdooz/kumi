@@ -37,10 +37,17 @@ struct MeshRenderData {
 };
 
 struct TechniqueRenderData {
-  GraphicsObjectHandle technique;
+  TechniqueRenderData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
+  void *cbuffer_staged;
+  int cbuffer_len;
+  GraphicsObjectHandle textures[MAX_SAMPLERS];
+  int first_texture;
+  int num_textures;
+/*
   uint16 material_id;
   GraphicsObjectHandle textures[MAX_TEXTURES];
   GraphicsObjectHandle render_targets[MAX_TEXTURES];
+*/
 };
 
 struct BufferRenderData {
@@ -86,7 +93,7 @@ struct RenderKey {
   enum Cmd {
     kSetRenderTarget,
     kRenderMesh,
-    kRenderTechnique,
+    kRenderTechnique, // this should probably be changed to "render fullscreen"
     kRenderBuffers,
     kRenderText,
     kSetScissorRect,

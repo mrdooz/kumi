@@ -97,6 +97,9 @@ bool App::init(HINSTANCE hinstance)
   B_ERR_BOOL(Renderer::create());
   B_ERR_BOOL(MaterialManager::create());
   B_ERR_BOOL(DemoEngine::create());
+#if WITH_WEBSOCKETS
+  B_ERR_BOOL(WebSocketServer::create());
+#endif
 
   B_ERR_BOOL(create_window());
 
@@ -132,7 +135,11 @@ bool App::init(HINSTANCE hinstance)
 }
 
 bool App::close() {
-  FileWatcher::close();
+
+#if WITH_WEBSOCKETS
+  B_ERR_BOOL(WebSocketServer::close());
+#endif
+  B_ERR_BOOL(FileWatcher::close());
   B_ERR_BOOL(DemoEngine::close());
   B_ERR_BOOL(Renderer::close());
   B_ERR_BOOL(Graphics::close());

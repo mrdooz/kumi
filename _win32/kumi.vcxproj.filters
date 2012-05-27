@@ -284,5 +284,8 @@
     <ClInclude Include="..\effect.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\xmath.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

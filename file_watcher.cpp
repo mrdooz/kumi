@@ -330,9 +330,9 @@ void FileWatcher::remove_watch(const CbFileChanged &fn) {
   DISPATCHER.invoke_and_wait(FROM_HERE, kFileMonitorThread, bind(&WatcherThread::remove_watch, _thread, fn));
 }
 
-void FileWatcher::close() {
+bool FileWatcher::close() {
   if (!_instance)
-    return;
+    return false;
 
   if (_instance->_thread) {
     _instance->_thread->join();
@@ -340,4 +340,5 @@ void FileWatcher::close() {
   }
 
   delete exch_null(_instance);
+  return true;
 }

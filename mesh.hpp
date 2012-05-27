@@ -15,7 +15,11 @@ struct SubMesh {
   void prepare_cbuffers(GraphicsObjectHandle technique_handle);
   void prepare_textures(GraphicsObjectHandle technique_handle);
 
-  int find_technique_index(GraphicsObjectHandle technique);
+  // low word: 
+  // 0 not found, free idx in HIWORD
+  // 1 found technique at idx HIWORD
+  // 2 too many techniques
+  uint32 find_technique_index(GraphicsObjectHandle technique);
 
   struct CBufferVariable {
     int ofs;

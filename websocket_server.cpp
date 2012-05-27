@@ -12,6 +12,21 @@
 using namespace std;
 using namespace websocketpp;
 
+WebSocketServer *WebSocketServer::_instance;
+
+bool WebSocketServer::create() {
+  assert(!_instance);
+  _instance = new WebSocketServer();
+  return _instance->_thread.start();
+}
+
+bool WebSocketServer::close() {
+  assert(_instance);
+  _instance->_thread.stop();
+  delete exch_null(_instance);
+  return true;
+}
+
 class echo_server_handler : public server::handler {
 public:
 
@@ -94,6 +109,7 @@ UINT WebSocketThread::blocking_run(void *data) {
 void WebSocketThread::stop() {
   if (_impl && _impl->_server)
     _impl->_server->stop();
+  join();
 }
 
 #endif

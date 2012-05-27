@@ -239,6 +239,7 @@
     <ClInclude Include="..\v8_handler.hpp" />
     <ClInclude Include="..\vertex_types.hpp" />
     <ClInclude Include="..\websocket_server.hpp" />
+    <ClInclude Include="..\xmath.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

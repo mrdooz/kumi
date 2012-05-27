@@ -96,14 +96,14 @@ public:
     }
   }
 
-  void set_bs(GraphicsObjectHandle bs, float *blend_factors, UINT sample_mask) {
+  void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask) {
     if (prev_bs != bs) {
       ctx->OMSetBlendState(res->_blend_states.get(bs), blend_factors, sample_mask);
       prev_bs = bs;
     }
   }
 
-  void set_samplers(GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers) {
+  void set_samplers(const GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers) {
     if (!num_samplers)
       return;
     if (memcmp(sampler_handles, prev_samplers, num_samplers * sizeof(GraphicsObjectHandle))) {
@@ -117,7 +117,7 @@ public:
     }
   }
 
-  void set_shader_resources(GraphicsObjectHandle *view_handles, int first_view, int num_views) {
+  void set_shader_resources(const GraphicsObjectHandle *view_handles, int first_view, int num_views) {
     if (!num_views)
       return;
     // force setting the views because we always unset them..
@@ -125,8 +125,14 @@ public:
     if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
       ID3D11ShaderResourceView *views[MAX_SAMPLERS];
       for (int i = 0; i < num_views; ++i) {
-        Graphics::ResourceData *data = res->_resources.get(view_handles[i]);
-        views[i] = data->srv;
+        GraphicsObjectHandle h = view_handles[i];
+        if (h.type() == GraphicsObjectHandle::kResource) {
+          Graphics::ResourceData *data = res->_resources.get(h);
+          views[i] = data->srv;
+        } else if (h.type() == GraphicsObjectHandle::kRenderTarget) {
+          Graphics::RenderTargetData *data = res->_render_targets.get(h);
+          views[i] = data->srv;
+        }
       }
       ctx->PSSetShaderResources(first_view, num_views, views);
 
@@ -192,31 +198,42 @@ void Renderer::render() {
     switch (key.cmd) {
 
       case RenderKey::kSetRenderTarget: {
-        RenderTargetData *rt_data = (RenderTargetData *)data;
-        ID3D11RenderTargetView *rts[8] = { nullptr };
+        ID3D11RenderTargetView *rts[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
         ID3D11DepthStencilView *dsv = nullptr;
-        int i;
-        float color[4] = {0,0,0,0};
-        // Collect the valid render targets, set the first available depth buffer
-        // and clear targets if specified
-        for (i = 0; i < 8; ++i) {
-          GraphicsObjectHandle h = rt_data->render_targets[i];
-          if (!h.is_valid())
-            break;
-          Graphics::RenderTargetData *rt = res->_render_targets.get(h);
-          if (!dsv && rt->dsv) {
-            dsv = rt->dsv;
-          }
-          rts[i] = rt->rtv;
-          // clear render target (and depth stenci)
-          if (rt_data->clear_target[i]) {
-            ctx->ClearRenderTargetView(rts[i], color);
-            if (rt->dsv) {
-              ctx->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+        int num_targets = 0;
+        if (!data) {
+          // set default render target
+          Graphics::RenderTargetData *rt = res->_render_targets.get(GRAPHICS.default_render_target());
+          rts[0] = rt->rtv;
+          dsv = rt->dsv;
+          num_targets = 1;
+
+        } else {
+          RenderTargetData *rt_data = (RenderTargetData *)data;
+          int i;
+          float color[4] = {0,0,0,0};
+          // Collect the valid render targets, set the first available depth buffer
+          // and clear targets if specified
+          for (i = 0; i < 8; ++i) {
+            GraphicsObjectHandle h = rt_data->render_targets[i];
+            if (!h.is_valid())
+              break;
+            Graphics::RenderTargetData *rt = res->_render_targets.get(h);
+            if (!dsv && rt->dsv) {
+              dsv = rt->dsv;
+            }
+            rts[i] = rt->rtv;
+            // clear render target (and depth stenci)
+            if (rt_data->clear_target[i]) {
+              ctx->ClearRenderTargetView(rts[i], color);
+              if (rt->dsv) {
+                ctx->ClearDepthStencilView(rt->dsv, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+              }
             }
           }
+          num_targets = i;
         }
-        ctx->OMSetRenderTargets(i, rts, dsv);
+        ctx->OMSetRenderTargets(num_targets, rts, dsv);
         break;
       }
 
@@ -240,18 +257,41 @@ void Renderer::render() {
         gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
 
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
-        gen.set_shader_resources(render_data->cur_technique_data->textures, render_data->cur_technique_data->first_texture, render_data->cur_technique_data->num_textures);
+        MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
+        gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
 
         GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
-        gen.set_cbuffer(cb, render_data->cur_technique_data->cbuffer_staged, render_data->cur_technique_data->cbuffer_len);
+        gen.set_cbuffer(cb, d->cbuffer_staged, d->cbuffer_len);
         gen.draw_indexed(render_data->index_count, 0, 0);
 
-        gen.unset_shader_resource(render_data->cur_technique_data->first_texture, render_data->cur_technique_data->num_textures);
+        gen.unset_shader_resource(d->first_texture, d->num_textures);
         break;
       }
 
       case RenderKey::kRenderTechnique: {
-        int a = 10;
+        Technique *technique = res->_techniques.get(key.handle);
+        const TechniqueRenderData *render_data = &technique->render_data();
+
+        technique->get_render_objects(&objects);
+        gen.set_vs(objects.vs);
+        gen.set_ps(objects.ps);
+
+        gen.set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        gen.set_vb(technique->vb(), technique->vertex_size());
+        gen.set_layout(technique->input_layout());
+        gen.set_ib(technique->ib(), technique->index_format());
+
+        gen.set_rs(objects.rs);
+        gen.set_dss(objects.dss, objects.stencil_ref);
+        gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
+
+        gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
+        gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
+
+        gen.draw_indexed(technique->index_count(), 0, 0);
+
+        gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
+
       }                                  
     }
   }
@@ -477,7 +517,6 @@ void Renderer::submit_command(const TrackedLocation &location, RenderKey key, vo
 void Renderer::submit_technique(GraphicsObjectHandle technique) {
   RenderKey key;
   key.cmd = RenderKey::kRenderTechnique;
-  TechniqueRenderData *data = RENDERER.alloc_command_data<TechniqueRenderData>();
-  data->technique = technique;
-  RENDERER.submit_command(FROM_HERE, key, data);
+  key.handle = technique;
+  RENDERER.submit_command(FROM_HERE, key, nullptr);
 }

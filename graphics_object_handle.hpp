@@ -1,13 +1,7 @@
 #pragma once
 
 class GraphicsObjectHandle {
-  friend class Graphics;
-  friend class MaterialManager;
-  enum { 
-    cTypeBits = 8,
-    cGenerationBits = 8,
-    cIdBits = 12 
-  };
+public:
   enum Type {
     kInvalid = -1,
     kContext,
@@ -30,6 +24,14 @@ class GraphicsObjectHandle {
     kFontFamily,
     kMaterial,
   };	
+private:
+  friend class Graphics;
+  friend class MaterialManager;
+  enum { 
+    cTypeBits = 8,
+    cGenerationBits = 8,
+    cIdBits = 12 
+  };
   GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
   union {
     struct {
@@ -45,6 +47,7 @@ public:
   bool is_valid() const { return _data != kInvalid; }
   operator int() const { return _data; }
   uint32 id() const { return _id; }
+  Type type() const { return (Type)_type; }
 };
 
 static_assert(sizeof(GraphicsObjectHandle) <= sizeof(uint32_t), "GraphicsObjectHandle too large");

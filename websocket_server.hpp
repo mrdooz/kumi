@@ -2,6 +2,7 @@
 #if WITH_WEBSOCKETS
 
 #include "threading.hpp"
+
 class WebSocketThread : public threading::BlockingThread {
 
 public:
@@ -13,6 +14,16 @@ protected:
   UINT blocking_run(void *data);
   struct Impl;
   Impl *_impl;
+};
+
+class WebSocketServer {
+public:
+  static bool create();
+  static bool close();
+private:
+  static WebSocketServer *_instance;
+
+  WebSocketThread _thread;
 };
 
 #endif

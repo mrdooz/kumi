@@ -65,7 +65,10 @@ public:
   const std::string &error_msg() const { return _error_msg; }
 
   const std::string &get_default_sampler_state() const { return _default_sampler_state; }
+  const TechniqueRenderData &render_data() const { return _render_data; }
+
 private:
+  void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
@@ -107,4 +110,6 @@ private:
 
   std::string _error_msg;
   bool _valid;
+
+  TechniqueRenderData _render_data;
 };

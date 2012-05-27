@@ -11,145 +11,10 @@
 #include "../graphics.hpp"
 #include "../material.hpp"
 #include "../material_manager.hpp"
+#include "../xmath.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
-
-XMFLOAT4X4 transpose(const XMFLOAT4X4 &mtx) {
-  return XMFLOAT4X4(
-    mtx._11, mtx._21, mtx._31, mtx._41,
-    mtx._12, mtx._22, mtx._32, mtx._42,
-    mtx._13, mtx._23, mtx._33, mtx._43,
-    mtx._14, mtx._24, mtx._34, mtx._44);
-}
-
-XMFLOAT4X4 perspective_foh(float fov_y, float aspect, float zn, float zf) {
-  float y_scale = (float)(1 / tan(fov_y/2));
-  float x_scale = y_scale / aspect;
-  return XMFLOAT4X4(
-    x_scale,    0,          0,              0,
-    0,          y_scale,    0,              0,
-    0,          0,          zf/(zf-zn),     1,
-    0,          0,          -zn*zf/(zf-zn), 0
-    );
-}
-
-XMFLOAT3 operator*(float s, const XMFLOAT3 &rhs) {
-  return XMFLOAT3(s*rhs.x, s*rhs.y, s*rhs.z);
-}
-
-XMFLOAT3 &operator+=(XMFLOAT3 &lhs, const XMFLOAT3 &rhs) {
-  lhs.x += rhs.x;
-  lhs.y += rhs.y;
-  lhs.z += rhs.z;
-  return lhs;
-}
-
-XMFLOAT3 &operator-=(XMFLOAT3 &lhs, const XMFLOAT3 &rhs) {
-  lhs.x -= rhs.x;
-  lhs.y -= rhs.y;
-  lhs.z -= rhs.z;
-  return lhs;
-}
-
-XMFLOAT4X4 mtx_identity() {
-  return XMFLOAT4X4(
-    1,0,0,0,
-    0,1,0,0,
-    0,0,1,0,
-    0,0,0,1);
-}
-
-XMFLOAT3 vec3_from_spherical(float theta, float rho) {
-  // theta is angle around the x-axis
-  // rho is angle around the y-axis
-  float st = sinf(theta);
-  float sr = sinf(rho);
-  float ct = cosf(theta);
-  float cr = cosf(rho);
-  return XMFLOAT3(st*cr, ct, st*sr);
-}
-
-XMFLOAT4 row(const XMFLOAT4X4 &m, int row) {
-  return XMFLOAT4(m.m[row][0], m.m[row][1], m.m[row][2], m.m[row][3]);
-}
-
-void set_row(const XMFLOAT3 &v, int row, XMFLOAT4X4 *mtx) {
-  mtx->m[row][0] = v.x;
-  mtx->m[row][1] = v.y;
-  mtx->m[row][2] = v.z;
-}
-
-void set_col(const XMFLOAT3 &v, int col, XMFLOAT4X4 *mtx) {
-  mtx->m[0][col] = v.x;
-  mtx->m[1][col] = v.y;
-  mtx->m[2][col] = v.z;
-}
-
-XMFLOAT4 col(const XMFLOAT4X4 &m, int col) {
-  return XMFLOAT4(m.m[0][col], m.m[1][col], m.m[2][col], m.m[3][col]);
-}
-
-float dot(const XMFLOAT4 &a, const XMFLOAT4 &b) {
-  return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
-}
-
-float dot(const XMFLOAT3 &a, const XMFLOAT3 &b) {
-  return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
-float len(const XMFLOAT3 &a) {
-  return sqrtf(dot(a,a));
-}
-
-XMFLOAT3 normalize(const XMFLOAT3 &a) {
-  return 1/len(a) * a;
-}
-
-XMFLOAT3 cross(const XMFLOAT3 &a, const XMFLOAT3 &b) {
-  return XMFLOAT3(
-    a.y * b.z - a.z * b.y,
-    a.z * b.x - a.x * b.z,
-    a.x * b.y - a.y * b.x
-    );
-}
-
-XMFLOAT4 expand(const XMFLOAT3 &a, float w) {
-  return XMFLOAT4(a.x, a.y, a.z, w);
-}
-
-XMFLOAT3 project(const XMFLOAT4 &a) {
-  return XMFLOAT3(a.x/a.w, a.y/a.w, a.z/a.w);
-}
-
-XMFLOAT3 drop(const XMFLOAT4 &a) {
-  return XMFLOAT3(a.x, a.y, a.z);
-}
-
-
-XMFLOAT4 operator*(const XMFLOAT4 &v, const XMFLOAT4X4 &m) {
-  return XMFLOAT4(
-    dot(v, col(m, 0)),
-    dot(v, col(m, 1)),
-    dot(v, col(m, 2)),
-    dot(v, col(m, 3)));
-}
-
-XMFLOAT4X4 mtx_from_axis_angle(const XMFLOAT3 &v, float angle) {
-
-  XMFLOAT4X4 res(mtx_identity());
-  res.m[0][0] = (1.0f - cos(angle)) * v.x * v.x + cos(angle);
-  res.m[1][0] = (1.0f - cos(angle)) * v.x * v.y - sin(angle) * v.z;
-  res.m[2][0] = (1.0f - cos(angle)) * v.x * v.z + sin(angle) * v.y;
-  res.m[0][1] = (1.0f - cos(angle)) * v.y * v.x + sin(angle) * v.z;
-  res.m[1][1] = (1.0f - cos(angle)) * v.y * v.y + cos(angle);
-  res.m[2][1] = (1.0f - cos(angle)) * v.y * v.z - sin(angle) * v.x;
-  res.m[0][2] = (1.0f - cos(angle)) * v.z * v.x - sin(angle) * v.y;
-  res.m[1][2] = (1.0f - cos(angle)) * v.z * v.y + sin(angle) * v.x;
-  res.m[2][2] = (1.0f - cos(angle)) * v.z * v.z + cos(angle);
-
-  return res;
-}
 
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
@@ -188,13 +53,19 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 
 bool ScenePlayer::init() {
 
+  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
+  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
+
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
+
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
+  _ssao_render = GRAPHICS.find_technique("ssao_render");
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
   KumiLoader loader;
-  if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
+  if (!loader.load(resolved_name.c_str(), nullptr/*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))
     return false;
 /*
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
@@ -235,9 +106,6 @@ bool ScenePlayer::init() {
 
     _params.push_back(unique_ptr<TweakableParam>(mp));
   }
-
-  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
-  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
 
 /*
   bool res;
@@ -365,6 +233,7 @@ bool ScenePlayer::render() {
   RenderKey key;
 
   if (_scene) {
+
     RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
     data->render_targets[0] = _rt_pos;
     data->render_targets[1] = _rt_normal;
@@ -376,6 +245,11 @@ bool ScenePlayer::render() {
     RENDERER.submit_command(FROM_HERE, key, data);
 
     _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
+
+    // set default render target
+    RENDERER.submit_command(FROM_HERE, key, nullptr);
+    RENDERER.submit_technique(_ssao_render);
+
   }
 
   return true;

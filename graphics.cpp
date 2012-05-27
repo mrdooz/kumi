@@ -374,10 +374,9 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   adapter = perfhud != -1 ? adapters[perfhud] : adapters.front();
 
+  int flags = 0;
 #ifdef _DEBUG
-  const int flags = D3D11_CREATE_DEVICE_DEBUG | D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-#else
-  const int flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+  flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
   // Create the DX11 device
@@ -673,8 +672,12 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 }
 
 GraphicsObjectHandle Graphics::find_resource(const char *name) {
+  // first check resources, then check render targets
   int idx = _res._resources.idx_from_token(name);
-  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx) : GraphicsObjectHandle();
+  if (idx != -1)
+    return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
+  idx = _res._render_targets.idx_from_token(name);
+  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx) : GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {

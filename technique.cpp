@@ -326,6 +326,8 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
   if (_pixel_shader && !init_shader(graphics, res, _pixel_shader))
     return false;
 
+  prepare_textures();
+
   return true;
 }
 /*
@@ -357,4 +359,18 @@ void Technique::get_render_objects(RenderObjects *obj) {
   obj->first_sampler = _first_sampler;
   obj->num_valid_samplers = _num_valid_samplers;
   obj->sample_mask = GRAPHICS.default_sample_mask();
+}
+
+
+void Technique::prepare_textures() {
+
+  auto &params = _pixel_shader->resource_view_params();
+  for (auto it = begin(params), e = end(params); it != e; ++it) {
+    auto &name = it->name;
+    auto &friendly_name = it->friendly_name;
+    int bind_point = it->bind_point;
+    _render_data.textures[bind_point] = GRAPHICS.find_resource(friendly_name.empty() ? name.c_str() : friendly_name.c_str());
+    _render_data.first_texture = min(_render_data.first_texture, bind_point);
+    _render_data.num_textures = max(_render_data.num_textures, bind_point - _render_data.first_texture + 1);
+  }
 }

@@ -3,6 +3,9 @@
 
 #include "graphics.hpp"
 #include "threading.hpp"
+#if WITH_WEBSOCKETS
+#include "websocket_server.hpp"
+#endif
 
 using std::string;
 using std::map;
@@ -105,6 +108,7 @@ protected:
   std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
   std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
 #endif
+
 };
 
 #define APP App::instance()

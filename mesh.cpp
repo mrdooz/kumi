@@ -18,16 +18,16 @@ SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 SubMesh::~SubMesh() {
 }
 
-int SubMesh::find_technique_index(GraphicsObjectHandle technique) {
+uint32 SubMesh::find_technique_index(GraphicsObjectHandle technique) {
   for (int i = 0; i < 16; ++i) {
-    if (render_data.technique_data[i].technique == technique) {
-      return i;
-    }
     if (!render_data.technique_data[i].technique.is_valid())
-      return -i;
+      return MAKEWORD(0, i);
+    if (render_data.technique_data[i].technique == technique) {
+      return MAKEWORD(1, i);
+    }
   }
   LOG_ERROR_LN("Max # techniques used for submesh! About to croak!");
-  return MeshRenderData::MAX_TECHNIQUES;
+  return MAKEWORD(2, 0);
 }
 
 void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
@@ -36,21 +36,22 @@ void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
   Technique *technique = GRAPHICS.get_technique(technique_handle);
   if (!technique)
     return;
-  int idx = find_technique_index(technique_handle);
+  uint32 res = find_technique_index(technique_handle);
   // bail if at max # techniques, or we've already prepared that techinque
-  if (idx >= 0)
+  if (LOWORD(res) > 0)
     return;
-  idx = -idx;
+  int idx = HIWORD(res);
 
+  auto data = &render_data.technique_data[idx];
   Shader *pixel_shader = technique->pixel_shader();
   auto &params = pixel_shader->resource_view_params();
   for (auto it = begin(params), e = end(params); it != e; ++it) {
     auto &name = it->name;
     auto &friendly_name = it->friendly_name;
     int bind_point = it->bind_point;
-    render_data.technique_data[idx].textures[bind_point] = GRAPHICS.find_resource(friendly_name.c_str());
-    render_data.technique_data[idx].first_texture = min(render_data.technique_data[idx].first_texture, bind_point);
-    render_data.technique_data[idx].num_textures = max(render_data.technique_data[idx].num_textures, bind_point - render_data.technique_data[idx].first_texture + 1);
+    data->textures[bind_point] = GRAPHICS.find_resource(friendly_name.c_str());
+    data->first_texture = min(data->first_texture, bind_point);
+    data->num_textures = max(data->num_textures, bind_point - data->first_texture + 1);
   }
 }
 
@@ -60,11 +61,11 @@ void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
   if (!technique)
     return;
 
-  int idx = find_technique_index(technique_handle);
+  uint32 res = find_technique_index(technique_handle);
   // bail if at max # techniques, or we've already prepared that techinque
-  if (idx >= 0)
+  if (LOWORD(res) > 0)
     return;
-  idx = -idx;
+  int idx = HIWORD(idx);
 
   Shader *vs = technique->vertex_shader();
   Shader *ps = technique->pixel_shader();
@@ -121,6 +122,7 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
     bool material_override = material_id != -1;
     bool technique_override = technique.is_valid();
     MeshRenderData *p;
+    int idx;
     if (material_override || technique_override) {
       // I'm not really sure how to handle material overrides, so i'll just defer it :)
       // p = RENDERER.alloc_command_data<MeshRenderData>();
@@ -131,12 +133,13 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
         s->prepare_cbuffers(technique);
         s->prepare_textures(technique);
         s->render_data.cur_technique = technique;
-        int idx = s->find_technique_index(technique);
-        s->render_data.cur_technique_data = &s->render_data.technique_data[idx];
+        idx = s->find_technique_index(technique);
       }
       //*p = s->render_data;
     } else {
+      idx = s->find_technique_index(s->render_data.cur_technique);
     }
+    s->render_data.cur_technique_data = &s->render_data.technique_data[idx];
     p = &s->render_data;
     RENDERER.submit_command(location, s->render_key, p);
   }
@@ -150,10 +153,14 @@ void Mesh::prepare_cbuffer() {
   // collect all the variables we need to fill our cbuffer.
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i) {
     SubMesh *submesh = *i;
-    submesh->prepare_cbuffers(submesh->render_data.cur_technique);
-    submesh->prepare_textures(submesh->render_data.cur_technique);
+    auto rd = &submesh->render_data;
+    auto technique = rd->cur_technique;
+    submesh->prepare_cbuffers(technique);
+    submesh->prepare_textures(technique);
+    rd->cur_technique_data = &rd->technique_data[HIWORD(submesh->find_technique_index(technique))];
   }
 }
+
 
 void Mesh::update() {
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)

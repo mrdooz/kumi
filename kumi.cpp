@@ -88,10 +88,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
   if (!global_init())
     return 1;
 
-#if WITH_WEBSOCKETS
-  WebSocketThread ws_thread;
-  ws_thread.start();
-#endif
 
   int res = 0;
 
@@ -112,10 +108,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
   }
 #else
   res = run_app(instance);
-#endif
-
-#if WITH_WEBSOCKETS
-  ws_thread.stop();
 #endif
 
   global_close();

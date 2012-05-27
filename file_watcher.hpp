@@ -24,7 +24,7 @@ public:
   // TODO: use a mask to specify what event's we're interested in
   void add_file_watch(const char *filename, void *token, threading::ThreadId thread_id, const CbFileChanged &fn);
   void remove_watch(const CbFileChanged &fn);
-  static void close();
+  static bool close();
 private:
   FileWatcher();
 

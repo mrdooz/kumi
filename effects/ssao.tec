@@ -46,8 +46,8 @@ technique ssao_render {
         file effects/ssao.fx;
         entry_point render_ps_main;
         params [
-            texture2d diffuse_texture system;
-            texture2d diffuse_texture system;
+            texture2d rt_pos system;
+            texture2d rt_normal system;
         ];
     };
    

@@ -70,5 +70,5 @@ float4 render_ps_main(render_ps_input input) : SV_Target
     float4 pos = rt_pos.Sample(ssao_sampler, input.tex);
     float4 normal = rt_normal.Sample(ssao_sampler, input.tex);
 
-    return pos + normal;
+    return 0.001*pos + normal;
 }
