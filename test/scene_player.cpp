@@ -57,7 +57,6 @@ bool ScenePlayer::init() {
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
-
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_render = GRAPHICS.find_technique("ssao_render");
@@ -249,6 +248,8 @@ bool ScenePlayer::render() {
     // set default render target
     RENDERER.submit_command(FROM_HERE, key, nullptr);
     RENDERER.submit_technique(_ssao_render);
+
+    //_scene->submit_meshes(FROM_HERE);
 
   }
 

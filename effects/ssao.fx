@@ -67,8 +67,18 @@ render_ps_input render_vs_main(render_vs_input input)
 
 float4 render_ps_main(render_ps_input input) : SV_Target
 {
-    float4 pos = rt_pos.Sample(ssao_sampler, input.tex);
-    float4 normal = rt_normal.Sample(ssao_sampler, input.tex);
-
-    return 0.001*pos + normal;
+    float3 pos = rt_pos.Sample(ssao_sampler, input.tex).xyz;
+    float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
+    float s = 0;
+    float scale = 0.001;
+    float2 ofs[4] = {float2(scale, scale), float2(scale, -scale), float2(-scale, -scale), float2(-scale, scale)};
+    for (int i = 0; i < 1; ++i) {
+        float3 pos2 = rt_pos.Sample(ssao_sampler, input.tex + ofs[i]).xyz;
+        float3 diff = pos2 - pos;
+        float3 v = normalize(diff);
+        float d = length(diff);
+        //s += max(0, dot(normal, v) * (1.0/(1.0+d)));
+        s = diff;
+    }
+    return s;
 }
