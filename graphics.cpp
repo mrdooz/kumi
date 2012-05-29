@@ -682,6 +682,7 @@ GraphicsObjectHandle Graphics::find_resource(const char *name) {
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
   int idx = _res._techniques.idx_from_token(name);
+  assert(idx != -1);
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 

@@ -16,20 +16,23 @@ public:
   typedef std::pair<Token, std::string> CompoundKey;
 
 #ifdef _DEBUG
-#define TYPE_CHECK(id, type) assert(*((uint32*)&_raw_data[id-4]) == sizeof(type))
+  void type_check(PropertyId id, int size) {
+    int cur_size = *((uint32*)&_raw_data[id-4]);
+    assert(cur_size == size);
+  }
 #else
-#define TYPE_CHECK(id, type)
+  void type_check(PropertyId id, int size) {}
 #endif
 
   template<typename T>
   void set_property(PropertyId id, const T &value) {
-    TYPE_CHECK(id, T);
+    type_check(id, sizeof(T));
     *(T*)&_raw_data[id] = value;
   }
 
   template<typename T>
   T get_property(PropertyId id) {
-    TYPE_CHECK(id, T);
+    type_check(id, sizeof(T));
     return *(T*)&_raw_data[id];
   }
 
@@ -62,7 +65,7 @@ public:
   PropertyId get_or_create(const char *name) {
     static T t;
     PropertyId id = get_or_create_raw(name, sizeof(T), &t);
-    TYPE_CHECK(id, T);
+    type_check(id, sizeof(T));
     return id;
   }
 
@@ -89,7 +92,7 @@ public:
   PropertyId get_or_create(const char *name, Token token) {
     static T t;
     PropertyId id = get_or_create_raw(name, token, sizeof(T), &t);
-    TYPE_CHECK(id, T);
+    type_check(id, sizeof(T));
     return id;
   }
 

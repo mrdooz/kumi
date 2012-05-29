@@ -50,6 +50,12 @@ private:
   GraphicsObjectHandle _rt_pos;
   GraphicsObjectHandle _rt_normal;
 
+  GraphicsObjectHandle _rt_blur;
+
   GraphicsObjectHandle _ssao_fill;
   GraphicsObjectHandle _ssao_render;
+  GraphicsObjectHandle _ssao_blur;
+
+
+  PropertyManager::PropertyId _kernel_id, _noise_id;
 };

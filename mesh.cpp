@@ -21,13 +21,13 @@ SubMesh::~SubMesh() {
 uint32 SubMesh::find_technique_index(GraphicsObjectHandle technique) {
   for (int i = 0; i < 16; ++i) {
     if (!render_data.technique_data[i].technique.is_valid())
-      return MAKEWORD(0, i);
+      return MAKELONG(0, i);
     if (render_data.technique_data[i].technique == technique) {
-      return MAKEWORD(1, i);
+      return MAKELONG(1, i);
     }
   }
   LOG_ERROR_LN("Max # techniques used for submesh! About to croak!");
-  return MAKEWORD(2, 0);
+  return MAKELONG(2, 0);
 }
 
 void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
@@ -65,7 +65,7 @@ void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
   // bail if at max # techniques, or we've already prepared that techinque
   if (LOWORD(res) > 0)
     return;
-  int idx = HIWORD(idx);
+  int idx = HIWORD(res);
 
   Shader *vs = technique->vertex_shader();
   Shader *ps = technique->pixel_shader();
@@ -150,6 +150,7 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
 void Mesh::prepare_cbuffer() {
 
   _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
+  _world_it_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world_it", this);
 
   // collect all the variables we need to fill our cbuffer.
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i) {

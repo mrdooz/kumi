@@ -3,6 +3,8 @@
 #include "property_manager.hpp"
 #include "graphics_submit.hpp"
 
+struct GraphicsInterface;
+
 namespace PropertySource {
   enum Enum {
     kUnknown,
@@ -15,7 +17,8 @@ namespace PropertySource {
 }
 
 struct ParamBase {
-  ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : name(name), type(type), source(source), used(true) {}
+  ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) 
+    : name(name), type(type), source(source), used(false) {}
   std::string name;
   PropertyType::Enum type;
   PropertySource::Enum source;
@@ -26,11 +29,21 @@ struct CBufferParam : public ParamBase {
   CBufferParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source), cbuffer(-1) {
     // system properties can be connected now, but for mesh and material we have to wait
     if (source == PropertySource::kSystem) {
-      switch (type) {
-      case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create<float>(name.c_str()); break;
-      case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>(name.c_str()); break;
-      case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>(name.c_str()); break;
-      default: assert(!"Unknown type!"); break;
+      int len = HIWORD(type);
+      if (!len) {
+        switch (type) {
+          case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create<float>(name.c_str()); break;
+          case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>(name.c_str()); break;
+          case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>(name.c_str()); break;
+          default: assert(!"Unknown type!"); break;
+        }
+      } else {
+        switch (LOWORD(type)) {
+          case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(float) * len, nullptr); break;
+          case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4) * len, nullptr); break;
+          case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4X4) * len, nullptr); break;
+          default: assert(!"Unknown type!"); break;
+        }
       }
     } else {
       id = -1;
@@ -58,6 +71,7 @@ struct ResourceViewParam : public ParamBase {
   ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
     : ParamBase(name, type, source)
     , friendly_name(friendly_name)
+    , bind_point(INT_MAX)
   {
   }
   std::string friendly_name;
@@ -78,11 +92,7 @@ public:
   CBufferParam *find_cbuffer_param(const char *name) {
     return find_by_name(name, _cbuffer_params);
   }
-/*
-  SamplerParam *find_sampler_param(const char *name) {
-    return find_by_name(name, _sampler_params);
-  }
-*/
+
   ResourceViewParam *find_resource_view_param(const char *name) {
     return find_by_name(name, _resource_view_params);
   }
@@ -115,6 +125,8 @@ public:
   void validate() { _valid = true; } // tihi
 
   std::string id() const;
+
+  void prune_unused_parameters();
 
 private:
 

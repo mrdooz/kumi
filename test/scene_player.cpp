@@ -16,6 +16,9 @@
 using namespace std;
 using namespace std::tr1::placeholders;
 
+static const int KERNEL_SIZE = 32;
+static const int NOISE_SIZE = 16;
+
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
   , _scene(nullptr) 
@@ -53,13 +56,37 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
 
 bool ScenePlayer::init() {
 
+  int w = GRAPHICS.width();
+  int h = GRAPHICS.height();
+  _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_blur");
+
   _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
+
+  // from http://www.john-chapman.net/content.php?id=8
+  XMFLOAT4 kernel[KERNEL_SIZE];
+  for (int i = 0; i < KERNEL_SIZE; ++i) {
+    // generate points on the unit hemisphere, then scale them so the majority are distrubted closer to 0
+    XMFLOAT3 tmp = normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), randf(0.0f, 1.0f)));
+    float scale = (float)i / KERNEL_SIZE;
+    scale = lerp(0.1f, 1.0f, scale * scale);
+    kernel[i] = expand(scale * tmp, 0);
+  }
+
+  // generate random noise vectors rotated around the z-axis
+  XMFLOAT4 noise[NOISE_SIZE];
+  for (int i = 0; i < NOISE_SIZE; ++i) {
+    noise[i] = expand(normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), 0)), 0);
+  }
+
+  _kernel_id = PROPERTY_MANAGER.get_or_create_raw("kernel", sizeof(XMFLOAT4) * KERNEL_SIZE, kernel);
+  _noise_id = PROPERTY_MANAGER.get_or_create_raw("noise", sizeof(XMFLOAT4) * NOISE_SIZE, noise);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_render = GRAPHICS.find_technique("ssao_render");
+  _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
@@ -208,8 +235,8 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 
   for (auto it = begin(_scene->animation_mtx); it != end(_scene->animation_mtx); ++it) {
     if (Mesh *mesh = _scene->find_mesh_by_name(it->first)) {
-      XMFLOAT4X4 mtx = transpose(value_at_time(it->second, time));
-      PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, mtx);
+      XMFLOAT4X4 mtx = value_at_time(it->second, time);
+      PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, transpose(mtx));
     }
   }
 
@@ -224,6 +251,8 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
   PROPERTY_MANAGER.set_property(_view_mtx_id, view);
   PROPERTY_MANAGER.set_property(_proj_mtx_id, proj);
 
+  GRAPHICS.get_technique(_ssao_render)->update_cbuffers();
+
   return true;
 }
 
@@ -233,23 +262,35 @@ bool ScenePlayer::render() {
 
   if (_scene) {
 
-    RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
-    data->render_targets[0] = _rt_pos;
-    data->render_targets[1] = _rt_normal;
-    data->clear_target[0] = true;
-    data->clear_target[1] = true;
+    {
+      RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
+      data->render_targets[0] = _rt_pos;
+      data->render_targets[1] = _rt_normal;
+      data->clear_target[0] = true;
+      data->clear_target[1] = true;
 
-    RenderKey key;
-    key.cmd = RenderKey::kSetRenderTarget;
-    RENDERER.submit_command(FROM_HERE, key, data);
+      RenderKey key;
+      key.cmd = RenderKey::kSetRenderTarget;
+      RENDERER.submit_command(FROM_HERE, key, data);
 
-    _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
+      _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
+    }
 
-    // set default render target
-    RENDERER.submit_command(FROM_HERE, key, nullptr);
-    RENDERER.submit_technique(_ssao_render);
+    {
+      RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
+      data->render_targets[0] = _rt_blur;
+      data->clear_target[0] = true;
 
-    //_scene->submit_meshes(FROM_HERE);
+      RenderKey key;
+      key.cmd = RenderKey::kSetRenderTarget;
+      RENDERER.submit_command(FROM_HERE, key, data);
+      RENDERER.submit_technique(_ssao_render);
+    }
+
+    {
+      RENDERER.submit_command(FROM_HERE, key, nullptr);
+      RENDERER.submit_technique(_ssao_blur);
+    }
 
   }
 

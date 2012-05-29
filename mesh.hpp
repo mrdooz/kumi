@@ -50,4 +50,5 @@ struct Mesh {
   std::vector<SubMesh *> submeshes;
 
   PropertyManager::PropertyId _world_mtx_id;
+  PropertyManager::PropertyId _world_it_mtx_id;
 };

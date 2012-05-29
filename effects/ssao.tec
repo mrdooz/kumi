@@ -46,8 +46,12 @@ technique ssao_render {
         file effects/ssao.fx;
         entry_point render_ps_main;
         params [
+            float4x4 proj system;
             texture2d rt_pos system;
             texture2d rt_normal system;
+            texture2d random_normals system;
+            float4[32] kernel system;
+            float4[16] noise system;
         ];
     };
    
@@ -70,6 +74,63 @@ technique ssao_render {
 	};
 	
 	sampler_desc ssao_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+	};
+	
+	rasterizer_desc {
+		cull_mode = none;
+	};
+	
+	depth_stencil_desc {
+		depth_enable = false;
+	};
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+};
+
+technique ssao_blur {
+    
+    vertex_shader {
+        file effects/ssao.fx;
+        entry_point blur_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/ssao.fx;
+        entry_point blur_ps_main;
+        params [
+            texture2d rt_blur system;
+        ];
+    };
+   
+	// 0,1
+	// 2,3
+	vertices {
+		format pos_tex;
+		data [ 
+			-1 +1 +1 +0 +0; 
+			+1 +1 +1 +1 +0;
+			-1 -1 +1 +0 +1;
+			+1 -1 +1 +1 +1;
+			];
+	};
+	
+	// 0, 1, 2
+	// 2, 1, 3
+	indices {
+		data [0 1 2 2 1 3];
+	};
+	
+	sampler_desc ssao_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
 	};
 	
 	rasterizer_desc {

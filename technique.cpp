@@ -47,7 +47,7 @@ void Technique::add_error_msg(const char *fmt, ...) {
   _valid = false;
 }
 
-bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, set<string> *used_params)
+bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len)
 {
   ID3D11ShaderReflection* reflector = NULL; 
   B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
@@ -114,7 +114,6 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
       D3D11_SHADER_VARIABLE_DESC var_desc;
       v->GetDesc(&var_desc);
       if (var_desc.uFlags & D3D_SVF_USED) {
-        used_params->insert(var_desc.Name);
         CBufferParam *param = shader->find_cbuffer_param(var_desc.Name);
         if (!param) {
           add_error_msg("Shader parameter %s not found", var_desc.Name);
@@ -123,6 +122,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
         param->cbuffer = cb_idx;
         param->start_offset = var_desc.StartOffset;
         param->size = var_desc.Size;
+        param->used = true;
       }
     }
   }
@@ -145,6 +145,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
           return false;
         }
         param->bind_point = input_desc.BindPoint;
+        param->used = true;
         break;
       }
 
@@ -165,6 +166,47 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
     }
   }
   return true;
+}
+
+GraphicsObjectHandle Technique::cbuffer_handle() {
+  return _constant_buffers.empty() ? GraphicsObjectHandle() : _constant_buffers[0].handle;
+}
+
+void Technique::update_cbuffers() {
+  for (auto i = begin(_cbuffer_vars), e = end(_cbuffer_vars); i != e; ++i) {
+    const CBufferVariable &var = *i;
+    PROPERTY_MANAGER.get_property_raw(var.id, &_cbuffer_staged[var.ofs], var.len);
+  }
+}
+
+void Technique::prepare_cbuffers() {
+  int cbuffer_size = 0;
+  auto collect_params = [&, this](const std::vector<CBufferParam> &params) {
+    for (auto i = std::begin(params), e = std::end(params); i != e; ++i) {
+      const CBufferParam &param = *i;
+      int len = PropertyType::len(param.type);;
+      if (param.cbuffer != -1) {
+        CBufferVariable &var = dummy_push_back(&_cbuffer_vars);
+        var.ofs = param.start_offset;
+        var.len = len;
+
+        switch (param.source) {
+          case PropertySource::kSystem:
+            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
+            break;
+          default:
+            LOG_WARNING_LN("Unhandled parameter source");
+            break;
+        }
+
+        cbuffer_size = max(cbuffer_size, var.ofs + var.len);
+      }
+    }
+  };
+
+  collect_params(_vertex_shader->cbuffer_params());
+  collect_params(_pixel_shader->cbuffer_params());
+  _cbuffer_staged.resize(cbuffer_size);
 }
 
 
@@ -203,11 +245,19 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
 
   //fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
   char cmd_line[MAX_PATH];
+#ifdef _DEBUG
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s %s", 
+    profile,
+    shader->entry_point().c_str(),
+    shader->obj_filename().c_str(), 
+    shader->source_filename().c_str());
+#else
   sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s", 
     profile,
     shader->entry_point().c_str(),
     shader->obj_filename().c_str(), 
     shader->source_filename().c_str());
+#endif
 
   DWORD exit_code = 1;
 
@@ -265,23 +315,15 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
       return false;
   }
 
-  set<string> used_params;
   vector<uint8> buf;
   if (!res->load_file(obj, &buf))
     return false;
 
   int len = (int)buf.size();
-  if (!do_reflection(graphics, shader, buf.data(), len, &used_params))
+  if (!do_reflection(graphics, shader, buf.data(), len))
     return false;
 
-  // mark unused parameters
-  vector<CBufferParam> &params = shader->cbuffer_params();
-  auto first_unused = partition(begin(params), end(params), [&](const CBufferParam &p) { return used_params.find(p.name) == used_params.end(); });
-  for (auto i = begin(params); i != first_unused; ++i)
-    i->used = true;
-
-  for (auto i = first_unused; i != end(params); ++i)
-    i->used = false;
+  shader->prune_unused_parameters();
 
   switch (shader->type()) {
     case Shader::kVertexShader: 
@@ -327,16 +369,11 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
     return false;
 
   prepare_textures();
+  prepare_cbuffers();
 
   return true;
 }
-/*
-void Technique::submit() {
-  _key.cmd = RenderKey::kRenderTechnique;
-  _key.seq_nr = GRAPHICS.next_seq_nr();
-  GRAPHICS.submit_command(FROM_HERE, _key, (void *)this);
-}
-*/
+
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
   for (auto it = begin(_sampler_states), e = end(_sampler_states); it != e; ++it) {
     if (it->first == name)

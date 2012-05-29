@@ -125,7 +125,7 @@ public:
     if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
       ID3D11ShaderResourceView *views[MAX_SAMPLERS];
       for (int i = 0; i < num_views; ++i) {
-        GraphicsObjectHandle h = view_handles[i];
+        GraphicsObjectHandle h = view_handles[i+first_view];
         if (h.type() == GraphicsObjectHandle::kResource) {
           Graphics::ResourceData *data = res->_resources.get(h);
           views[i] = data->srv;
@@ -136,7 +136,7 @@ public:
       }
       ctx->PSSetShaderResources(first_view, num_views, views);
 
-      memcpy(prev_views, view_handles, num_views * sizeof(GraphicsObjectHandle));
+      memcpy(prev_views, view_handles+first_view, num_views * sizeof(GraphicsObjectHandle));
     }
   }
 
@@ -147,7 +147,7 @@ public:
     ctx->PSSetShaderResources(first_view, num_views, null_views);
   }
 
-  void set_cbuffer(GraphicsObjectHandle cb, void *data, int len) {
+  void set_cbuffer(GraphicsObjectHandle cb, const void *data, int len) {
     ID3D11Buffer *buffer = res->_constant_buffers.get(cb);
     D3D11_MAPPED_SUBRESOURCE sub;
     ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
@@ -260,7 +260,7 @@ void Renderer::render() {
         MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
         gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
 
-        GraphicsObjectHandle cb = technique->get_cbuffers()[0].handle;
+        GraphicsObjectHandle cb = technique->cbuffer_handle();
         gen.set_cbuffer(cb, d->cbuffer_staged, d->cbuffer_len);
         gen.draw_indexed(render_data->index_count, 0, 0);
 
@@ -288,11 +288,15 @@ void Renderer::render() {
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
         gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
 
+        GraphicsObjectHandle cb = technique->cbuffer_handle();
+        if (cb.is_valid())
+          gen.set_cbuffer(cb, technique->cbuffer().data(), technique->cbuffer().size());
+
         gen.draw_indexed(technique->index_count(), 0, 0);
 
         gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
-
-      }                                  
+        break;
+      }
     }
   }
 #else

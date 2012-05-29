@@ -67,13 +67,28 @@ public:
   const std::string &get_default_sampler_state() const { return _default_sampler_state; }
   const TechniqueRenderData &render_data() const { return _render_data; }
 
+  void update_cbuffers();
+  const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
+  GraphicsObjectHandle cbuffer_handle();
+
 private:
+
+  void prepare_cbuffers();
+
+  struct CBufferVariable {
+    int ofs;
+    int len;
+    PropertyManager::PropertyId id;
+  };
+
   void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
-  bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len, 
-                     std::set<std::string> *used_params);
+  bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len);
+
+  std::vector<CBufferVariable> _cbuffer_vars;
+  std::vector<uint8> _cbuffer_staged;
 
   string _name;
   Shader *_vertex_shader;

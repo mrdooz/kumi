@@ -185,3 +185,18 @@ typename Cont::value_type &dummy_push_back(Cont *cont) {
 }
 
 #define RANGE(x) begin(x), end(x)
+
+template<class Cont, class Pred>
+void erase_remove_if(Cont *cont, const Pred &pred) {
+  cont->erase(remove_if(begin(*cont), end(*cont), pred), end(*cont));
+}
+
+template <typename T>
+T randf(T a, T b) {
+  return a + (b-a) * rand() / RAND_MAX;
+}
+
+template <typename T>
+T lerp(T a, T b, float v) {
+  return (T)(a + (b-a) * v);
+}

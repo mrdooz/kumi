@@ -574,6 +574,12 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
   Symbol sym_type = _symbol_trie->find_symbol(param[0]);
   PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
 
+  // check if the property is an array
+  const char *open_bracket = strchr(param[0].c_str(), '[');
+  const char *close_bracket = open_bracket ? strchr(open_bracket+1, ']') : nullptr;
+  int len = open_bracket && close_bracket ? atoi(open_bracket + 1) : 0;
+  type = (PropertyType::Enum)MAKELONG(type, len);
+
   string name = param[1];
   string friendly_name = param.size() == 4 ? param[2] : "";
   int src_pos = friendly_name.empty() ? 2 : 3;
