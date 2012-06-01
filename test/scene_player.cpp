@@ -169,9 +169,9 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
     if (_keystate['D'])
       _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.right;
     if (_keystate['Q'])
-      _freefly_camera.theta -= (float)delta;
+      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.up;
     if (_keystate['E'])
-      _freefly_camera.theta += (float)delta;
+      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.up;
 
     if (_mouse_lbutton) {
       float dx = _mouse_horiz / 200.0f;

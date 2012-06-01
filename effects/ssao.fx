@@ -27,7 +27,7 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     float4x4 world_view = mul(world, view);
     output.pos = mul(input.pos, mul(world_view, proj));
     output.vs_pos = mul(input.pos, world_view);
-    output.vs_normal = mul(float4(input.normal,0), world_view);
+    output.vs_normal = normalize(mul(float4(input.normal,0), world_view));
     return output;
 }
 
@@ -73,6 +73,8 @@ float4 render_ps_main(render_ps_input input) : SV_Target
 {
     float3 origin = rt_pos.Sample(ssao_sampler, input.tex).xyz;
     float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
+
+    // tile the noise in a 4x4 grid
     int x = (int)(960.0 * input.tex.x);
     int y = (int)(600.0 * input.tex.y);
     int idx = (y%4)*4 + (x%4);
@@ -88,7 +90,7 @@ float4 render_ps_main(render_ps_input input) : SV_Target
         normal.x, normal.y, normal.z);
         
     float occlusion = 0.0;
-    float radius = 5;
+    float radius = 25;
     int KERNEL_SIZE = 32;
     for (int i = 0; i < KERNEL_SIZE; ++i) {
         // get sample position
@@ -103,7 +105,8 @@ float4 render_ps_main(render_ps_input input) : SV_Target
         offset.y = 1 - offset.y;
         
         float sample_depth = rt_pos.Sample(ssao_sampler, offset.xy).z;
-        
+
+        // check for big discontinuities in z
         float range_check = abs(origin.z - sample_depth) < radius ? 1.0 : 0.0;
         occlusion += (sample_depth <= sample.z ? 1.0 : 0.0) * range_check;
     }
