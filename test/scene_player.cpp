@@ -59,14 +59,13 @@ bool ScenePlayer::init() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
   _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_blur");
-
-  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
-  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
+  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
+  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
 
   // from http://www.john-chapman.net/content.php?id=8
   XMFLOAT4 kernel[KERNEL_SIZE];
   for (int i = 0; i < KERNEL_SIZE; ++i) {
-    // generate points on the unit hemisphere, then scale them so the majority are distrubted closer to 0
+    // generate points on the unit hemisphere, then scale them so the majority are distributed closer to 0
     XMFLOAT3 tmp = normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), randf(0.05f, 1.0f)));
     float scale = (float)i / KERNEL_SIZE;
     scale = lerp(0.1f, 1.0f, scale * scale);
