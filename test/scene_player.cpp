@@ -67,7 +67,7 @@ bool ScenePlayer::init() {
   XMFLOAT4 kernel[KERNEL_SIZE];
   for (int i = 0; i < KERNEL_SIZE; ++i) {
     // generate points on the unit hemisphere, then scale them so the majority are distrubted closer to 0
-    XMFLOAT3 tmp = normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), randf(0.0f, 1.0f)));
+    XMFLOAT3 tmp = normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), randf(0.05f, 1.0f)));
     float scale = (float)i / KERNEL_SIZE;
     scale = lerp(0.1f, 1.0f, scale * scale);
     kernel[i] = expand(scale * tmp, 0);

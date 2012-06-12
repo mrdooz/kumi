@@ -88,8 +88,8 @@ bool App::init(HINSTANCE hinstance)
     break_on_error(true);
 
   _hinstance = hinstance;
-  _width = GetSystemMetrics(SM_CXSCREEN) / 2;
-  _height = GetSystemMetrics(SM_CYSCREEN) / 2;
+  _width = 3 * GetSystemMetrics(SM_CXSCREEN) / 4;
+  _height = 3 * GetSystemMetrics(SM_CYSCREEN) / 4;
 
   B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());

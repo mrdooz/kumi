@@ -27,7 +27,7 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     float4x4 world_view = mul(world, view);
     output.pos = mul(input.pos, mul(world_view, proj));
     output.vs_pos = mul(input.pos, world_view);
-    output.vs_normal = normalize(mul(float4(input.normal,0), world_view));
+    output.vs_normal = mul(float4(input.normal,0), world_view);
     return output;
 }
 
@@ -35,7 +35,12 @@ fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt0 = input.vs_pos;
-    output.rt1 = input.vs_normal;
+    output.rt1 = normalize(input.vs_normal);
+    
+    float n = 1;
+    float f = 2500;
+    output.rt0.w = (output.rt0.z - n) / (f - n);
+
     return output;
 }
 
@@ -73,7 +78,7 @@ float4 render_ps_main(render_ps_input input) : SV_Target
 {
     float3 origin = rt_pos.Sample(ssao_sampler, input.tex).xyz;
     float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
-
+    
     // tile the noise in a 4x4 grid
     int x = (int)(960.0 * input.tex.x);
     int y = (int)(600.0 * input.tex.y);
@@ -90,7 +95,7 @@ float4 render_ps_main(render_ps_input input) : SV_Target
         normal.x, normal.y, normal.z);
         
     float occlusion = 0.0;
-    float radius = 25;
+    float radius = 27;
     int KERNEL_SIZE = 32;
     for (int i = 0; i < KERNEL_SIZE; ++i) {
         // get sample position
