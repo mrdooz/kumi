@@ -61,6 +61,7 @@ bool ScenePlayer::init() {
   _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_blur");
   _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
+  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
 
   // from http://www.john-chapman.net/content.php?id=8
   XMFLOAT4 kernel[KERNEL_SIZE];
@@ -90,7 +91,7 @@ bool ScenePlayer::init() {
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
   KumiLoader loader;
-  if (!loader.load(resolved_name.c_str(), nullptr/*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))
+  if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
     return false;
 /*
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
@@ -107,21 +108,21 @@ bool ScenePlayer::init() {
       switch (prop->type) {
         case PropertyType::kFloat: {
           TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat, prop->id);
-          p->add_key(0, prop->value.x);
+          p->add_key(0, prop->_float4[0]);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kColor: {
           TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeColor, prop->id);
-          p->add_key(0, prop->value);
+          p->add_key(0, XMFLOAT4(prop->_float4));
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kFloat4: {
           TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat4, prop->id);
-          p->add_key(0, prop->value);
+          p->add_key(0, XMFLOAT4(prop->_float4));
           mp->add_child(p);
           break;
         }
@@ -180,7 +181,7 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
     }
 
     _freefly_camera.dir = vec3_from_spherical(_freefly_camera.theta, _freefly_camera.rho);
-    _freefly_camera.up = drop(XMFLOAT4(0,1,0,0) * mtx_from_axis_angle(_freefly_camera.dir, _freefly_camera.roll));
+    //_freefly_camera.up = drop(XMFLOAT4(0,1,0,0) * mtx_from_axis_angle(_freefly_camera.dir, _freefly_camera.roll));
     _freefly_camera.right = cross(_freefly_camera.up, _freefly_camera.dir);
     _freefly_camera.up = cross(_freefly_camera.dir, _freefly_camera.right);
 
@@ -265,8 +266,10 @@ bool ScenePlayer::render() {
       RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
       data->render_targets[1] = _rt_normal;
+      data->render_targets[2] = _rt_diffuse;
       data->clear_target[0] = true;
       data->clear_target[1] = true;
+      data->clear_target[2] = true;
 
       RenderKey key;
       key.cmd = RenderKey::kSetRenderTarget;
@@ -338,7 +341,7 @@ void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
             value.w = (float)first_value->get("a")->to_number();
             PROPERTY_MANAGER.set_property(prop->id, value);
           }
-          prop->value = value;
+          memcpy(&prop->_float4, &value, sizeof(value));
         } else {
           LOG_WARNING_LN("Trying to set unknown property: %s (material: %s)", 
             param_name.c_str(), cur_material->name().c_str());

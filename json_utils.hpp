@@ -48,6 +48,8 @@ public:
   virtual JsonValuePtr get(const std::string &key) const { return (*this)[key]; }
   virtual bool has_key(const std::string &key) const { assert(!"Not an object"); return false; }
 
+  bool is_null() const { return _type == JS_NULL; }
+
   static JsonValuePtr emptyValue();
 
 protected:

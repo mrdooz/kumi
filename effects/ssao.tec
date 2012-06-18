@@ -14,12 +14,17 @@ technique ssao_fill {
         file effects/ssao.fx;
         entry_point fill_ps_main;
         params [
+            int HasDiffuseMap material;
+            texture2d DiffuseTexture material;
             float4 Diffuse material;
             float4 LightPos system;
             float4 LightColor system;
         ];
     };
-   
+
+	sampler_desc DiffuseSampler default {
+	};
+    
     rasterizer_desc {
         cull_mode = back;
     };

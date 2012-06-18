@@ -1,5 +1,13 @@
 matrix proj, view, world;
 float4 Diffuse, LightColor, LightPos;
+int HasDiffuseMap;
+
+static const float ScreenWidth = 1440;
+static const float ScreenHeight = 900;
+
+Texture2D DiffuseTexture : register(t0);
+sampler DiffuseSampler : register(s0);
+
 
 ///////////////////////////////////
 // g-buffer fill
@@ -12,13 +20,15 @@ struct fill_vs_input {
 
 struct fill_ps_input {
     float4 pos : SV_POSITION;
-    float4 vs_pos : TEXCOORD0;
-    float4 vs_normal : TEXCOORD1;
+    float2 tex : TEXCOORD0;
+    float4 vs_pos : TEXCOORD1;
+    float4 vs_normal : TEXCOORD2;
 };
 
 struct fill_ps_output {
-    float4 rt0 : COLOR1;
-    float4 rt1 : COLOR2;
+    float4 rt_pos : COLOR1;
+    float4 rt_normal : COLOR2;
+    float4 rt_diffuse : COLOR3;
 };
 
 fill_ps_input fill_vs_main(fill_vs_input input)
@@ -26,6 +36,7 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     fill_ps_input output = (fill_ps_input)0;
     float4x4 world_view = mul(world, view);
     output.pos = mul(input.pos, mul(world_view, proj));
+    output.tex = input.tex;
     output.vs_pos = mul(input.pos, world_view);
     output.vs_normal = mul(float4(input.normal,0), world_view);
     return output;
@@ -34,13 +45,13 @@ fill_ps_input fill_vs_main(fill_vs_input input)
 fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
 {
     fill_ps_output output = (fill_ps_output)0;
-    output.rt0 = input.vs_pos;
-    output.rt1 = normalize(input.vs_normal);
-    
-    float n = 1;
-    float f = 2500;
-    output.rt0.w = (output.rt0.z - n) / (f - n);
-
+    output.rt_pos = input.vs_pos;
+    output.rt_normal = normalize(input.vs_normal);
+    if (HasDiffuseMap) {
+        output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
+    } else {
+        output.rt_diffuse = Diffuse;
+    }
     return output;
 }
 
@@ -78,10 +89,10 @@ float4 render_ps_main(render_ps_input input) : SV_Target
 {
     float3 origin = rt_pos.Sample(ssao_sampler, input.tex).xyz;
     float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
-    
+   
     // tile the noise in a 4x4 grid
-    int x = (int)(960.0 * input.tex.x);
-    int y = (int)(600.0 * input.tex.y);
+    int x = (int)(ScreenWidth * input.tex.x);
+    int y = (int)(ScreenHeight * input.tex.y);
     int idx = (y%4)*4 + (x%4);
     float3 rvec = noise[idx].xyz;
     
@@ -148,7 +159,7 @@ float4 blur_ps_main(blur_ps_input input) : SV_Target
     float res = 0.0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            float2 ofs = float2(1/960.0 * j, 1/600.0*i);
+            float2 ofs = float2(1/ScreenWidth * j, 1/ScreenHeight*i);
             res += rt_blur.Sample(ssao_sampler, input.tex + ofs).r;
         }
     }

@@ -8,15 +8,21 @@ public:
   struct Property {
 
     Property(const std::string &name, PropertyType::Enum type, float value, PropertyManager::PropertyId id)
-      : name(name), type(type), id(id) { this->value.x = value; }
+      : name(name), type(type), id(id) { _float4[0] = value; }
+
+    Property(const std::string &name, PropertyType::Enum type, int value, PropertyManager::PropertyId id)
+      : name(name), type(type), id(id) { _int = value; }
 
     Property(const std::string &name, PropertyType::Enum type, const XMFLOAT4 &value, PropertyManager::PropertyId id)
-      : name(name), type(type), value(value), id(id) {}
+      : name(name), type(type), id(id) { memcpy(&_float4, &value, sizeof(value)); }
 
     std::string name;
     std::string filename;
     PropertyType::Enum type;
-    XMFLOAT4 value;
+    union {
+      float _float4[4];
+      int _int;
+    };
     PropertyManager::PropertyId id;
   };
 

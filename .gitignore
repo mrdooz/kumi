@@ -31,4 +31,5 @@ ipch/
 *.pso
 *.filters
 _win32/My Inspector XE Results - kumi/*
+_win32/My Amplifier XE Results - kumi/*
 kumi_browser/.idea/

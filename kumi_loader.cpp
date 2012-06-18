@@ -206,6 +206,11 @@ bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
         if (!texture.is_valid())
           LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());
       }
+
+      if (!strcmp(name, "Diffuse")) {
+        material->add_property("HasDiffuseMap", PropertyType::kInt, filename.empty() ? 0 : 1);
+      }
+
       PropertyType::Enum type = read_and_step<PropertyType::Enum>(&buf);
 
       switch (type) {
@@ -230,7 +235,7 @@ bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
           break;
 
         default:
-          LOG_ERROR_LN("Unknown material type");
+          LOG_ERROR_LN("Unknown property type");
           break;
       }
     }
@@ -265,22 +270,23 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
         auto &cur = materials->get(i);
         auto &name = cur->get("name")->to_string();
         auto &properties = cur->get("properties");
-        for (int j = 0; j < properties->count(); ++j) {
-          auto &property = properties->get(j);
-          auto &name = property->get("name")->to_string();
-          auto &type = property->get("type")->to_string();
-          auto &value = property->get("value");
-          XMFLOAT4 v;
-          if (type == "float") {
-            v.x = (float)value->get("x")->to_number();
-          } else if (type == "color") {
-            v.x = (float)value->get("r")->to_number();
-            v.y = (float)value->get("g")->to_number();
-            v.z = (float)value->get("b")->to_number();
-            v.w = (float)value->get("a")->to_number();
+        if (!properties->is_null()) {
+          for (int j = 0; j < properties->count(); ++j) {
+            auto &property = properties->get(j);
+            auto &name = property->get("name")->to_string();
+            auto &type = property->get("type")->to_string();
+            auto &value = property->get("value");
+            XMFLOAT4 v;
+            if (type == "float") {
+              v.x = (float)value->get("x")->to_number();
+            } else if (type == "color") {
+              v.x = (float)value->get("r")->to_number();
+              v.y = (float)value->get("g")->to_number();
+              v.z = (float)value->get("b")->to_number();
+              v.w = (float)value->get("a")->to_number();
+            }
           }
         }
-
       }
     }
   }

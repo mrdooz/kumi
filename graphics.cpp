@@ -154,23 +154,6 @@ bool Graphics::create_render_target(
   return true;
 }
 
-GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name) {
-  TextureData *data = new TextureData;
-  if (!create_texture(loc, desc, data)) {
-    delete exch_null(data);
-    return GraphicsObjectHandle();
-  }
-
-  int idx = name ? _res._textures.idx_from_token(name) : -1;
-  if (idx != -1 || (idx = _res._textures.find_free_index()) != -1) {
-    if (_res._textures[idx])
-      _res._textures[idx]->reset();
-    _res._textures.set_pair(idx, make_pair(name, data));
-    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
-  }
-  return GraphicsObjectHandle();
-}
-
 bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits) {
 
   HRESULT hr;
@@ -243,6 +226,27 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
   return GraphicsObjectHandle();
 }
 
+GraphicsObjectHandle Graphics::insert_texture(TextureData *data, const char *friendly_name) {
+
+  int idx = friendly_name ? _res._textures.idx_from_token(friendly_name) : -1;
+  if (idx != -1 || (idx = _res._textures.find_free_index()) != -1) {
+    if (_res._textures[idx])
+      _res._textures[idx]->reset();
+    _res._textures.set_pair(idx, make_pair(friendly_name, data));
+    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
+  }
+  return GraphicsObjectHandle();
+}
+
+GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name) {
+  TextureData *data = new TextureData;
+  if (!create_texture(loc, desc, data)) {
+    delete exch_null(data);
+    return GraphicsObjectHandle();
+  }
+  return insert_texture(data, name);
+}
+
 bool Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out)
 {
   out->reset();
@@ -263,7 +267,19 @@ bool Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_
   return true;
 }
 
-bool Graphics::create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out)
+GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, 
+                                              void *data_bits, int data_width, int data_height, int data_pitch, const char *friendly_name) {
+  TextureData *data = new TextureData;
+  if (!create_texture(loc, width, height, fmt, data_bits, data_width, data_height, data_pitch, data)) {
+    delete exch_null(data);
+    return GraphicsObjectHandle();
+  }
+  return insert_texture(data, friendly_name);
+}
+
+bool Graphics::create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, 
+                              void *data, int data_width, int data_height, int data_pitch, 
+                              TextureData *out)
 {
   if (!create_texture(loc, CD3D11_TEXTURE2D_DESC(fmt, width, height, 1, 1, D3D11_BIND_SHADER_RESOURCE, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), out))
     return false;
@@ -400,6 +416,10 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   set_private_data(FROM_HERE, _default_depth_stencil_state.p);
   set_private_data(FROM_HERE, _default_rasterizer_state.p);
   set_private_data(FROM_HERE, _default_blend_state.p);
+
+  // Create a dummy texture
+  DWORD black = 0;
+  _dummy_texture = create_texture(FROM_HERE, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, &black, 1, 1, 1, "dummy_texture");
 
   for (int i = 0; i < 4; ++i)
     _default_blend_factors[i] = 1.0f;
@@ -672,8 +692,15 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 }
 
 GraphicsObjectHandle Graphics::find_resource(const char *name) {
-  // first check resources, then check render targets
-  int idx = _res._resources.idx_from_token(name);
+
+  if (!name || *name == '\0')
+    return _dummy_texture;
+
+  // check textures, then resources, then render targets
+  int idx = _res._textures.idx_from_token(name);
+  if (idx != -1)
+    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
+  idx = _res._resources.idx_from_token(name);
   if (idx != -1)
     return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
   idx = _res._render_targets.idx_from_token(name);

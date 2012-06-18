@@ -124,19 +124,26 @@ public:
     bool force = true;
     if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
       ID3D11ShaderResourceView *views[MAX_SAMPLERS];
+      bool valid_views = true;
       for (int i = 0; i < num_views; ++i) {
         GraphicsObjectHandle h = view_handles[i+first_view];
-        if (h.type() == GraphicsObjectHandle::kResource) {
+        if (h.type() == GraphicsObjectHandle::kTexture) {
+          Graphics::TextureData *data = res->_textures.get(h);
+          views[i] = data->srv;
+        } else if (h.type() == GraphicsObjectHandle::kResource) {
           Graphics::ResourceData *data = res->_resources.get(h);
           views[i] = data->srv;
         } else if (h.type() == GraphicsObjectHandle::kRenderTarget) {
           Graphics::RenderTargetData *data = res->_render_targets.get(h);
           views[i] = data->srv;
+        } else {
+          valid_views = false;
         }
       }
-      ctx->PSSetShaderResources(first_view, num_views, views);
-
-      memcpy(prev_views, view_handles+first_view, num_views * sizeof(GraphicsObjectHandle));
+      if (valid_views) {
+        ctx->PSSetShaderResources(first_view, num_views, views);
+        memcpy(prev_views, view_handles+first_view, num_views * sizeof(GraphicsObjectHandle));
+      }
     }
   }
 

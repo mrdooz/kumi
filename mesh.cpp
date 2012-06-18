@@ -57,6 +57,9 @@ void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
 
 void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
 
+  // Collect the parameters that are used by the shaders for the given technique
+  // Save the id's, length and offsets of where the parameters fit in the cbuffer
+
   Technique *technique = GRAPHICS.get_technique(technique_handle);
   if (!technique)
     return;

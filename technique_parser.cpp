@@ -236,13 +236,14 @@ struct {
 };
 
 static auto valid_property_types = map_list_of
-	(kSymFloat, PropertyType::kFloat)
-	(kSymFloat2, PropertyType::kFloat2)
-	(kSymFloat3, PropertyType::kFloat3)
-	(kSymFloat4, PropertyType::kFloat4)
-	(kSymFloat4x4, PropertyType::kFloat4x4)
-	(kSymTexture2d, PropertyType::kTexture2d)
-	(kSymSampler, PropertyType::kSampler);
+  (kSymInt, PropertyType::kInt)
+  (kSymFloat, PropertyType::kFloat)
+  (kSymFloat2, PropertyType::kFloat2)
+  (kSymFloat3, PropertyType::kFloat3)
+  (kSymFloat4, PropertyType::kFloat4)
+  (kSymFloat4x4, PropertyType::kFloat4x4)
+  (kSymTexture2d, PropertyType::kTexture2d)
+  (kSymSampler, PropertyType::kSampler);
 
 class Trie {
 public:

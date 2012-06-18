@@ -195,6 +195,7 @@ public:
 
   // Create a texture, and fill it with data
   bool create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
+  GraphicsObjectHandle create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, const char *friendly_name);
 
   ID3D11RasterizerState *default_rasterizer_state() const { return _default_rasterizer_state; }
   ID3D11DepthStencilState *default_depth_stencil_state() const { return _default_depth_stencil_state; }
@@ -241,6 +242,9 @@ private:
   bool technique_file_changed(const char *filename, void *token);
   bool shader_file_changed(const char *filename, void *token);
 
+  // given texture data and a name, insert it into the GOH chain
+  GraphicsObjectHandle insert_texture(TextureData *data, const char *friendly_name);
+
   static Graphics* _instance;
 
   int _width;
@@ -252,6 +256,7 @@ private:
   CComPtr<IDXGISwapChain> _swap_chain;
 
   GraphicsObjectHandle _default_render_target;
+  GraphicsObjectHandle _dummy_texture;
 
 #ifdef _DEBUG
   CComPtr<ID3D11Debug> _d3d_debug;
