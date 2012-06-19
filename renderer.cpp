@@ -3,7 +3,11 @@
 #include "graphics.hpp"
 #include "technique.hpp"
 #include "material_manager.hpp"
+#include "mesh.hpp"
+#include "effect.hpp"
+#if WITH_GWEN
 #include "FW1FontWrapper.h"
+#endif
 
 using namespace std;
 
@@ -154,14 +158,39 @@ public:
     ctx->PSSetShaderResources(first_view, num_views, null_views);
   }
 
-  void set_cbuffer(GraphicsObjectHandle cb, const void *data, int len) {
-    ID3D11Buffer *buffer = res->_constant_buffers.get(cb);
-    D3D11_MAPPED_SUBRESOURCE sub;
-    ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    memcpy(sub.pData, data, len);
-    ctx->Unmap(buffer, 0);
-    ctx->VSSetConstantBuffers(0, 1, &buffer);
-    ctx->PSSetConstantBuffers(0, 1, &buffer);
+  void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
+
+    ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
+    ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
+
+    // Copy the vs cbuffers
+    for (size_t i = 0; i < vs.size(); ++i) {
+      auto &cur = vs[i];
+      ID3D11Buffer *buffer = res->_constant_buffers.get(cur.handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+      ctx->Unmap(buffer, 0);
+      vs_cb[i] = buffer;
+    }
+
+    // Copy the ps cbuffers
+    for (size_t i = 0; i < ps.size(); ++i) {
+      auto &cur = ps[i];
+      ID3D11Buffer *buffer = res->_constant_buffers.get(cur.handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+      ctx->Unmap(buffer, 0);
+      ps_cb[i] = buffer;
+    }
+
+    if (!vs.empty())
+      ctx->VSSetConstantBuffers(0, vs.size(), vs_cb);
+
+    if (!ps.empty())
+      ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
+
   }
 
   void draw_indexed(int count, int start_index, int base_vertex) {
@@ -264,11 +293,33 @@ void Renderer::render() {
         gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
 
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
+
+        Mesh *mesh = render_data->mesh;
+        Material *material = render_data->material;
+
+        auto &vs_cbuffers = technique->get_cbuffer_vs();
+        auto &ps_cbuffers = technique->get_cbuffer_ps();
+
+        for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
+          mesh->fill_cbuffer(&vs_cbuffers[i]);
+          material->fill_cbuffer(&vs_cbuffers[i]);
+          technique->fill_cbuffer(&vs_cbuffers[i]);
+        }
+
+        for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
+          mesh->fill_cbuffer(&ps_cbuffers[i]);
+          material->fill_cbuffer(&ps_cbuffers[i]);
+          technique->fill_cbuffer(&ps_cbuffers[i]);
+        }
+
+
         MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
         gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
-
+/*
         GraphicsObjectHandle cb = technique->cbuffer_handle();
         gen.set_cbuffer(cb, d->cbuffer_staged, d->cbuffer_len);
+*/
+        gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
         gen.draw_indexed(render_data->index_count, 0, 0);
 
         gen.unset_shader_resource(d->first_texture, d->num_textures);
@@ -276,6 +327,7 @@ void Renderer::render() {
       }
 
       case RenderKey::kRenderTechnique: {
+/*
         Technique *technique = res->_techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
 
@@ -302,6 +354,7 @@ void Renderer::render() {
         gen.draw_indexed(technique->index_count(), 0, 0);
 
         gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
+*/
         break;
       }
     }

@@ -1,5 +1,9 @@
 matrix proj, view, world;
-float4 Diffuse, LightColor, LightPos;
+float4 LightColor, LightPos;
+
+cbuffer TestCb {
+    float4 Diffuse;
+};
 
 ///////////////////////////////////
 // diffuse
@@ -32,7 +36,7 @@ float4 diffuse_ps_main(diffuse_ps_input input) : SV_Target
 {
     float3 dir = float3(LightPos.x - input.pos_ws.x, LightPos.y - input.pos_ws.y, LightPos.z - input.pos_ws.z);
     dir = normalize(dir);
-    return dot(dir, normalize(input.normal)) * Diffuse;
+    return 0.5 + dot(dir, normalize(input.normal)) * Diffuse;
 }
 
 ///////////////////////////////////

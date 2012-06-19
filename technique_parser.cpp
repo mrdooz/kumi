@@ -560,7 +560,7 @@ Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
 	return it->second;
 }
 
-void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
+void TechniqueParser::parse_param(const vector<string> &param, Technique *technique, Shader *shader) {
 
   auto valid_sources = map_list_of
     ("material", PropertySource::kMaterial)
@@ -587,15 +587,16 @@ void TechniqueParser::parse_param(const vector<string> &param, Shader *shader) {
   PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[src_pos], valid_sources);
 
   bool cbuffer_param = false;
-/*
-  if (type == PropertyType::kSampler) {
-    shader->sampler_params().push_back(SamplerParam(name, type, source));
-  } else 
-*/
   if (type == PropertyType::kTexture2d) {
     shader->resource_view_params().push_back(ResourceViewParam(name, type, source, friendly_name));
   } else {
-    shader->cbuffer_params().push_back(CBufferParam(name, type, source));
+    if (shader->type() == Shader::kVertexShader) {
+      technique->_vs_cbuffer_params.push_back(CBufferParam(name, type, source));
+    } else if (shader->type() == Shader::kPixelShader) {
+      technique->_ps_cbuffer_params.push_back(CBufferParam(name, type, source));
+    } else {
+      // todo
+    }
     cbuffer_param = true;
   }
 
@@ -666,7 +667,7 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
   }
 }
 
-void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
+void TechniqueParser::parse_shader(Scope *scope, Technique *technique, Shader *shader) {
 
 	auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams);
 	const string &ext = shader->type() == Shader::kVertexShader ? ".vso" : ".pso";
@@ -698,7 +699,7 @@ void TechniqueParser::parse_shader(Scope *scope, Shader *shader) {
 				vector<vector<string>> params;
 				parse_list(&inner, &params);
 				for (auto it = begin(params); it != end(params); ++it)
-					parse_param(*it, shader);
+					parse_param(*it, technique, shader);
 				scope->advance(inner).munch(kSymSemicolon);
 				break;
 			}
@@ -1053,7 +1054,7 @@ void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope,
 				else 
 					shader.set(new PixelShader());
 				scope->munch(kSymBlockOpen);
-				parse_shader(scope, shader.get());
+				parse_shader(scope, technique, shader.get());
 				*(vs ? &technique->_vertex_shader : &technique->_pixel_shader) = shader.commit();
 				scope->munch(kSymBlockClose).munch(kSymSemicolon);
 				break;

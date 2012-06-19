@@ -24,7 +24,7 @@ struct SubMesh {
   struct CBufferVariable {
     int ofs;
     int len;
-    PropertyManager::PropertyId id;
+    PropertyId id;
   };
 
   std::vector<CBufferVariable> cbuffer_vars;
@@ -45,10 +45,13 @@ struct Mesh {
   void prepare_cbuffer();
   void update();
 
+  void fill_cbuffer(CBuffer *cbuffer);
+
   std::string name;
   XMFLOAT4X4 obj_to_world;
   std::vector<SubMesh *> submeshes;
 
-  PropertyManager::PropertyId _world_mtx_id;
-  PropertyManager::PropertyId _world_it_mtx_id;
+  PropertyId _world_mtx_class;
+  PropertyId _world_mtx_id;
+  PropertyId _world_it_mtx_id;
 };

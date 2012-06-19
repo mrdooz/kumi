@@ -47,6 +47,46 @@ void Technique::add_error_msg(const char *fmt, ...) {
   _valid = false;
 }
 
+bool Technique::parse_input_layout(GraphicsInterface *graphics, ID3D11ShaderReflection* reflector, 
+                                                   const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len) {
+  auto mapping = map_list_of
+    ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+    ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+    ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
+    ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
+    ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
+
+  // ShaderInputs inputs;
+  vector<D3D11_INPUT_ELEMENT_DESC> inputs;
+  for (UINT i = 0; i < shader_desc.InputParameters; ++i) {
+    D3D11_SIGNATURE_PARAMETER_DESC input;
+    reflector->GetInputParameterDesc(i, &input);
+
+    DXGI_FORMAT fmt;
+    if (!lookup<string, DXGI_FORMAT>(input.SemanticName, mapping, &fmt)) {
+      add_error_msg("Invalid input semantic found: %s", input.SemanticName);
+      return false;
+    }
+
+    inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
+  }
+
+  _input_layout = graphics->create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
+  if (!_input_layout.is_valid())
+    add_error_msg("Invalid input layout");
+
+  return _input_layout.is_valid();
+}
+
+CBufferParam *Technique::find_cbuffer_param(const std::string &name, Shader::Type type) {
+  vector<CBufferParam> *params = type == Shader::kVertexShader ? &_vs_cbuffer_params : &_ps_cbuffer_params;
+  for (auto it = begin(*params); it != end(*params); ++it) {
+    if (it->name == name)
+      return &(*it);
+  }
+  return nullptr;
+}
+
 bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len)
 {
   ID3D11ShaderReflection* reflector = NULL; 
@@ -54,77 +94,58 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
   D3D11_SHADER_DESC shader_desc;
   reflector->GetDesc(&shader_desc);
 
-  // input mappings are only relevant for vertex shaders
-  if (shader->type() == Shader::kVertexShader) {
-    auto mapping = map_list_of
-      ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
-      ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
-      ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
-      ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
-      ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
+  // Parse input layout for vertex shaders
+  if (shader->type() == Shader::kVertexShader && !parse_input_layout(graphics, reflector, shader_desc, buf, len))
+    return false;
 
-    // ShaderInputs inputs;
-    vector<D3D11_INPUT_ELEMENT_DESC> inputs;
-    for (UINT i = 0; i < shader_desc.InputParameters; ++i) {
-      D3D11_SIGNATURE_PARAMETER_DESC input;
-      reflector->GetInputParameterDesc(i, &input);
-
-      DXGI_FORMAT fmt;
-      if (!lookup<string, DXGI_FORMAT>(input.SemanticName, mapping, &fmt)) {
-        add_error_msg("Invalid input semantic found: %s", input.SemanticName);
-        return false;
-      }
-
-      inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
-    }
-
-    _input_layout = graphics->create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
-    if (!_input_layout.is_valid()) {
-      add_error_msg("Invalid input layout");
-      return false;
-    }
-  }
-
-  // constant buffers are stored per technique as they are shared between the
-  // vertex and pixel shaders (at least the global cbuffer is)
-
+  // The technique contains both vs and ps cbuffers
   for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
     ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
     D3D11_SHADER_BUFFER_DESC cb_desc;
     cb->GetDesc(&cb_desc);
 
-    // see if a cbuffer with the current name already exists..
-    int cb_idx = -1;
-    bool found = false;
-    for (size_t j = 0; j < _constant_buffers.size(); ++j) {
-      if (_constant_buffers[j].name == cb_desc.Name) {
-        cb_idx = j;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      cb_idx = _constant_buffers.size();
-      _constant_buffers.push_back(CBuffer(cb_desc.Name, cb_desc.Size, graphics->create_constant_buffer(FROM_HERE, cb_desc.Size, true)));
-    }
+    CBuffer cbuffer;
+    int size = 0;
 
-    // extract all the used variable's cbuffer, starting offset and size
     for (UINT j = 0; j < cb_desc.Variables; ++j) {
       ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
       D3D11_SHADER_VARIABLE_DESC var_desc;
       v->GetDesc(&var_desc);
       if (var_desc.uFlags & D3D_SVF_USED) {
-        CBufferParam *param = shader->find_cbuffer_param(var_desc.Name);
+        // Get the parameter from the shader (as specified in the .tec file)
+        CBufferParam *param = find_cbuffer_param(var_desc.Name, shader->type());
         if (!param) {
           add_error_msg("Shader parameter %s not found", var_desc.Name);
           return false;
         }
-        param->cbuffer = cb_idx;
-        param->start_offset = var_desc.StartOffset;
-        param->size = var_desc.Size;
+
+        CBufferVariable var;
+        var.ofs = var_desc.StartOffset;
+        var.len = var_desc.Size;
+        size = max(size, var.ofs + var .len);
+        // The id is either a classifer (for mesh/material), or a real id in the system case
+        string id = PropertySource::to_string(param->source) + "::" + var_desc.Name;
+        int var_size = param->source == PropertySource::kMesh ? sizeof(int) : var_desc.Size;
+        var.id = PROPERTY_MANAGER.get_or_create_raw(id.c_str(), var_size, nullptr);
+#ifdef _DEBUG
+        var.name = id;
+#endif
+        switch (param->source) {
+          case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
+          case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
+          case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
+          default: LOG_WARNING_LN("Unsupported property source for %s", var_desc.Name);
+        }
         param->used = true;
       }
     }
+
+    cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
+    cbuffer.staging.resize(size);
+    if (shader->type() == Shader::kVertexShader)
+      _vs_cbuffers.emplace_back(cbuffer);
+    else
+      _ps_cbuffers.emplace_back(cbuffer);
   }
 
   // get bound resources (textures and buffers)
@@ -180,6 +201,8 @@ void Technique::update_cbuffers() {
 }
 
 void Technique::prepare_cbuffers() {
+  // TODO
+/*
   int cbuffer_size = 0;
   auto collect_params = [&, this](const std::vector<CBufferParam> &params) {
     for (auto i = std::begin(params), e = std::end(params); i != e; ++i) {
@@ -207,6 +230,7 @@ void Technique::prepare_cbuffers() {
   collect_params(_vertex_shader->cbuffer_params());
   collect_params(_pixel_shader->cbuffer_params());
   _cbuffer_staged.resize(cbuffer_size);
+*/
 }
 
 
@@ -409,5 +433,12 @@ void Technique::prepare_textures() {
     _render_data.textures[bind_point] = GRAPHICS.find_resource(friendly_name.empty() ? name.c_str() : friendly_name.c_str());
     _render_data.first_texture = min(_render_data.first_texture, bind_point);
     _render_data.num_textures = max(_render_data.num_textures, bind_point - _render_data.first_texture + 1);
+  }
+}
+
+void Technique::fill_cbuffer(CBuffer *cbuffer) {
+  for (size_t i = 0; i < cbuffer->system_vars.size(); ++i) {
+    auto &cur = cbuffer->system_vars[i];
+    PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }

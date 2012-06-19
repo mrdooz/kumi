@@ -7,6 +7,7 @@ static const int MAX_TEXTURES = 8;
 
 struct Mesh;
 struct SubMesh;
+class Material;
 
 struct MeshRenderData {
   MeshRenderData() 
@@ -30,10 +31,10 @@ struct MeshRenderData {
     int num_textures;
   } technique_data[MAX_TECHNIQUES];
   TechniqueData *cur_technique_data;
-#if _DEBUG
+
   Mesh *mesh;
   SubMesh *submesh;
-#endif
+  Material *material;
 };
 
 struct TechniqueRenderData {

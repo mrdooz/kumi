@@ -50,7 +50,7 @@ TweakableParam::TweakableParam(const std::string &name, Type type, Animation ani
     }
 }
 
-TweakableParam::TweakableParam(const std::string &name, Type type, PropertyManager::PropertyId id)
+TweakableParam::TweakableParam(const std::string &name, Type type, PropertyId id)
   : _name(name)
   , _type(type)
   , _animation(kAnimStatic)

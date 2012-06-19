@@ -65,19 +65,25 @@ Graphics::~Graphics()
 {
 }
 
+static uint32 multiple_of_16(uint32 a) {
+  return (a + 15) & ~0xf;
+}
+
 HRESULT Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer) 
 {
-  return create_buffer_inner(loc, _device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+  return create_buffer_inner(loc, _device, 
+    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
 }
 
 HRESULT Graphics::create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer) {
-  return create_buffer_inner(loc, _device, CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
+  return create_buffer_inner(loc, _device, 
+    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
 }
 
 HRESULT Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer)
 {
   return create_buffer_inner(loc, _device, 
-    CD3D11_BUFFER_DESC(buffer_size, D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
+    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
     NULL, vertex_buffer);
 }
 
@@ -474,7 +480,7 @@ void Graphics::resize(const int width, const int height)
 }
 
 GraphicsObjectHandle Graphics::create_constant_buffer(const TrackedLocation &loc, int buffer_size, bool dynamic) {
-  CD3D11_BUFFER_DESC desc(buffer_size, D3D11_BIND_CONSTANT_BUFFER, 
+  CD3D11_BUFFER_DESC desc(multiple_of_16(buffer_size), D3D11_BIND_CONSTANT_BUFFER, 
     dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, 
     dynamic ? D3D11_CPU_ACCESS_WRITE : 0);
 

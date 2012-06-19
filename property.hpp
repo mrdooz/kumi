@@ -1,4 +1,20 @@
 #pragma once
+#include "graphics_object_handle.hpp"
+
+typedef uint32 PropertyId;
+
+namespace PropertySource {
+  enum Enum {
+    kUnknown,
+    kMaterial,
+    kSystem,
+    kUser,
+    kMesh,
+    kTechnique,
+  };
+
+  std::string to_string(Enum e);
+}
 
 namespace PropertyType {
   // LOWORD is type, HIWORD is length of array
@@ -15,18 +31,22 @@ namespace PropertyType {
     kInt,
   };
 
-  inline int len(Enum type) {
-    int num_elems = max(1, HIWORD(type));
-
-    switch (LOWORD(type)) {
-      case kFloat: return num_elems * sizeof(float);
-      case kFloat2: return num_elems * sizeof(XMFLOAT2);
-      case kFloat3: return num_elems * sizeof(XMFLOAT3);
-      case kFloat4: return num_elems * sizeof(XMFLOAT4);
-      case kFloat4x4: return num_elems * sizeof(XMFLOAT4X4);
-      case kInt: return num_elems * sizeof(int);
-    default:
-      return 0;
-    }
-  }
+  int len(Enum type);
 }
+
+struct CBufferVariable {
+  int ofs;
+  int len;
+  PropertyId id;
+#ifdef _DEBUG
+  std::string name;
+#endif
+};
+
+struct CBuffer {
+  GraphicsObjectHandle handle;
+  std::vector<CBufferVariable> mesh_vars;
+  std::vector<CBufferVariable> material_vars;
+  std::vector<CBufferVariable> system_vars;
+  std::vector<uint8> staging;
+};

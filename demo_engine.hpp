@@ -48,7 +48,7 @@ private:
   int64 _running_time;
   uint32 _duration_ms;
 
-  PropertyManager::PropertyId _time_id;
+  PropertyId _time_id;
 
   bool _paused;
 };

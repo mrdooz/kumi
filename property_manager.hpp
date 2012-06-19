@@ -1,4 +1,5 @@
 #pragma once
+#include "property.hpp"
 
 // this is really just a fancy wrapper around a big old slab of memory :)
 class PropertyManager {
@@ -11,7 +12,6 @@ public:
   PropertyManager();
 
   typedef void *Token;
-  typedef uint32 PropertyId;
 
   typedef std::pair<Token, std::string> CompoundKey;
 

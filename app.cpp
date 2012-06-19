@@ -119,7 +119,9 @@ bool App::init(HINSTANCE hinstance)
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
 
+#if WITH_GWEN
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/gwen.tec", true));
+#endif
 /*
   if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
     // log error

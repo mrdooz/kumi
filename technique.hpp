@@ -36,13 +36,14 @@ public:
   Technique();
   ~Technique();
 
+
   const string &name() const { return _name; }
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
   Shader *vertex_shader() { return _vertex_shader; }
   Shader *pixel_shader() { return _pixel_shader; }
 
-  vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
+  //vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
   void get_render_objects(RenderObjects *obj);
 
@@ -67,25 +68,32 @@ public:
   const std::string &get_default_sampler_state() const { return _default_sampler_state; }
   const TechniqueRenderData &render_data() const { return _render_data; }
 
+  void fill_cbuffer(CBuffer *cbuffer);
   void update_cbuffers();
   const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
   GraphicsObjectHandle cbuffer_handle();
+
+  std::vector<CBuffer> &get_cbuffer_vs() { return _vs_cbuffers; }
+  std::vector<CBuffer> &get_cbuffer_ps() { return _ps_cbuffers; }
 
 private:
 
   void prepare_cbuffers();
 
-  struct CBufferVariable {
-    int ofs;
-    int len;
-    PropertyManager::PropertyId id;
-  };
+  CBufferParam *find_cbuffer_param(const std::string &name, Shader::Type type);
+
+  std::vector<CBuffer> _vs_cbuffers;
+  std::vector<CBuffer> _ps_cbuffers;
+
+  std::vector<CBufferParam> _vs_cbuffer_params;
+  std::vector<CBufferParam> _ps_cbuffer_params;
 
   void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
   bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len);
+  bool parse_input_layout(GraphicsInterface *graphics, ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len);
 
   std::vector<CBufferVariable> _cbuffer_vars;
   std::vector<uint8> _cbuffer_staged;

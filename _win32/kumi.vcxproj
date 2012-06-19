@@ -160,6 +160,7 @@
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\mesh.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
+    <ClCompile Include="..\property.cpp" />
     <ClCompile Include="..\property_manager.cpp" />
     <ClCompile Include="..\renderer.cpp" />
     <ClCompile Include="..\resource_manager.cpp" />

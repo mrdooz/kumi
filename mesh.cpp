@@ -9,10 +9,8 @@
 SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
 {
   render_key.cmd = RenderKey::kRenderMesh;
-#if _DEBUG
   render_data.mesh = mesh;
   render_data.submesh = this;
-#endif
 }
 
 SubMesh::~SubMesh() {
@@ -59,7 +57,7 @@ void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
 
   // Collect the parameters that are used by the shaders for the given technique
   // Save the id's, length and offsets of where the parameters fit in the cbuffer
-
+/*
   Technique *technique = GRAPHICS.get_technique(technique_handle);
   if (!technique)
     return;
@@ -104,6 +102,7 @@ void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
   collect_params(vs->cbuffer_params());
   collect_params(ps->cbuffer_params());
   cbuffer_staged.resize(cbuffer_size);
+*/
 }
 
 void SubMesh::update() {
@@ -152,6 +151,7 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
 
 void Mesh::prepare_cbuffer() {
 
+  _world_mtx_class = PROPERTY_MANAGER.get_or_create<int>("Mesh::world");
   _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
   _world_it_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world_it", this);
 
@@ -170,4 +170,12 @@ void Mesh::prepare_cbuffer() {
 void Mesh::update() {
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)
     (*i)->update();
+}
+
+void Mesh::fill_cbuffer(CBuffer *cbuffer) {
+  for (size_t i = 0; i < cbuffer->mesh_vars.size(); ++i) {
+    auto &cur = cbuffer->mesh_vars[i];
+    if (cur.id == _world_mtx_class)
+      PROPERTY_MANAGER.get_property_raw(_world_mtx_id, &cbuffer->staging[cur.ofs], cur.len);
+  }
 }

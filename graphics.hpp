@@ -285,7 +285,7 @@ private:
   CComPtr<IFW1Factory> _fw1_factory;
 #endif
 
-  PropertyManager::PropertyId _screen_size_id;
+  PropertyId _screen_size_id;
 };
 
 #define GRAPHICS Graphics::instance()

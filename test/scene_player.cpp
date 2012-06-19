@@ -24,8 +24,8 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
   , _scene(nullptr) 
   , _light_pos_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightPos"))
   , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightColor"))
-  , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("view"))
-  , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("proj"))
+  , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
+  , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _use_freefly_camera(true)
   , _mouse_horiz(0)
   , _mouse_vert(0)
@@ -261,7 +261,7 @@ bool ScenePlayer::render() {
   RenderKey key;
 
   if (_scene) {
-
+    /*
     {
       RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
@@ -293,6 +293,9 @@ bool ScenePlayer::render() {
       RENDERER.submit_command(FROM_HERE, key, nullptr);
       RENDERER.submit_technique(_ssao_blur);
     }
+*/
+
+    _scene->submit_meshes(FROM_HERE);
 
   }
 

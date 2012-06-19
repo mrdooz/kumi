@@ -33,8 +33,8 @@ private:
 
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
-  PropertyManager::PropertyId _light_pos_id, _light_color_id;
-  PropertyManager::PropertyId _view_mtx_id, _proj_mtx_id;
+  PropertyId _light_pos_id, _light_color_id;
+  PropertyId _view_mtx_id, _proj_mtx_id;
 
   Scene *_scene;
 
@@ -58,5 +58,5 @@ private:
   GraphicsObjectHandle _ssao_blur;
 
 
-  PropertyManager::PropertyId _kernel_id, _noise_id;
+  PropertyId _kernel_id, _noise_id;
 };
