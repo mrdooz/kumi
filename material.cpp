@@ -18,7 +18,10 @@ Material::Property *Material::property_by_name(const std::string &name) {
 }
 
 void Material::fill_cbuffer(CBuffer *cbuffer) {
-  for (size_t i = 0; i < cbuffer->mesh_vars.size(); ++i) {
-    auto &cur = cbuffer->mesh_vars[i];
+  for (size_t i = 0; i < cbuffer->material_vars.size(); ++i) {
+    auto &cur = cbuffer->material_vars[i];
+    auto prop = _properties_by_id[cur.id];
+    if (prop)
+      PROPERTY_MANAGER.get_property_raw(prop->id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }

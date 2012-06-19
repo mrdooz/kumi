@@ -143,6 +143,8 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
     idx = s->find_technique_index(technique);
     s->render_data.cur_technique_data = &s->render_data.technique_data[idx];
     s->render_data.technique_data[idx].technique = technique;
+    s->render_data.material = MATERIAL_MANAGER.get_material(s->material_id);
+
     p = &s->render_data;
     RENDERER.submit_command(location, s->render_key, p);
   }

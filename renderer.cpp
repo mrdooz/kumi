@@ -312,7 +312,6 @@ void Renderer::render() {
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
 
-
         MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
         gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
 /*
@@ -327,7 +326,6 @@ void Renderer::render() {
       }
 
       case RenderKey::kRenderTechnique: {
-/*
         Technique *technique = res->_techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
 
@@ -347,14 +345,32 @@ void Renderer::render() {
         gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
         gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
 
+        //Mesh *mesh = render_data->mesh;
+        //Material *material = render_data->material;
+
+        auto &vs_cbuffers = technique->get_cbuffer_vs();
+        auto &ps_cbuffers = technique->get_cbuffer_ps();
+
+        for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
+          //mesh->fill_cbuffer(&vs_cbuffers[i]);
+          //material->fill_cbuffer(&vs_cbuffers[i]);
+          technique->fill_cbuffer(&vs_cbuffers[i]);
+        }
+
+        for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
+          //mesh->fill_cbuffer(&ps_cbuffers[i]);
+          //material->fill_cbuffer(&ps_cbuffers[i]);
+          technique->fill_cbuffer(&ps_cbuffers[i]);
+        }
+
+/*
         GraphicsObjectHandle cb = technique->cbuffer_handle();
         if (cb.is_valid())
           gen.set_cbuffer(cb, technique->cbuffer().data(), technique->cbuffer().size());
-
+*/
         gen.draw_indexed(technique->index_count(), 0, 0);
 
         gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
-*/
         break;
       }
     }
