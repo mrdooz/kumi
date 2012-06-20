@@ -368,6 +368,7 @@ void Renderer::render() {
         if (cb.is_valid())
           gen.set_cbuffer(cb, technique->cbuffer().data(), technique->cbuffer().size());
 */
+        gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
         gen.draw_indexed(technique->index_count(), 0, 0);
 
         gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);

@@ -124,11 +124,11 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
         var.len = var_desc.Size;
         size = max(size, var.ofs + var .len);
         // The id is either a classifer (for mesh/material), or a real id in the system case
-        string id = PropertySource::to_string(param->source) + "::" + var_desc.Name;
+        string class_id = PropertySource::to_string(param->source) + "::" + var_desc.Name;
         int var_size = param->source == PropertySource::kMesh ? sizeof(int) : var_desc.Size;
-        var.id = PROPERTY_MANAGER.get_or_create_raw(id.c_str(), var_size, nullptr);
+        var.id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
 #ifdef _DEBUG
-        var.name = id;
+        var.name = class_id;
 #endif
         switch (param->source) {
           case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;

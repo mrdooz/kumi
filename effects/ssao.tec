@@ -22,8 +22,8 @@ technique ssao_fill {
         ];
     };
 
-	sampler_desc DiffuseSampler default {
-	};
+    sampler_desc DiffuseSampler default {
+    };
     
     rasterizer_desc {
         cull_mode = back;
@@ -111,6 +111,7 @@ technique ssao_blur {
         entry_point blur_ps_main;
         params [
             texture2d rt_blur system;
+            texture2d rt_diffuse system;
         ];
     };
    

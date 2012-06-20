@@ -79,8 +79,8 @@ bool ScenePlayer::init() {
     noise[i] = expand(normalize(XMFLOAT3(randf(-1.0f, 1.0f), randf(-1.0f, 1.0f), 0)), 0);
   }
 
-  _kernel_id = PROPERTY_MANAGER.get_or_create_raw("kernel", sizeof(XMFLOAT4) * KERNEL_SIZE, kernel);
-  _noise_id = PROPERTY_MANAGER.get_or_create_raw("noise", sizeof(XMFLOAT4) * NOISE_SIZE, noise);
+  _kernel_id = PROPERTY_MANAGER.get_or_create_raw("System::kernel", sizeof(XMFLOAT4) * KERNEL_SIZE, kernel);
+  _noise_id = PROPERTY_MANAGER.get_or_create_raw("System::noise", sizeof(XMFLOAT4) * NOISE_SIZE, noise);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));

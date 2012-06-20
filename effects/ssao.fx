@@ -47,11 +47,11 @@ fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
     output.rt_normal = normalize(input.vs_normal);
-    if (HasDiffuseMap) {
-        output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
-    } else {
+    //if (HasDiffuseMap) {
+        //output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
+    //} else {
         output.rt_diffuse = Diffuse;
-    }
+    //}
     return output;
 }
 
@@ -61,7 +61,6 @@ fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
 
 Texture2D rt_pos : register(t0);
 Texture2D rt_normal : register(t1);
-Texture2D random_normals : register(t2);
 sampler ssao_sampler : register(s0);
 
 float4 kernel[32];
@@ -135,6 +134,7 @@ float4 render_ps_main(render_ps_input input) : SV_Target
 ///////////////////////////////////
 
 Texture2D rt_blur : register(t0);
+Texture2D rt_diffuse : register(t1);
 
 struct blur_vs_input {
     float4 pos : SV_POSITION;
@@ -163,5 +163,6 @@ float4 blur_ps_main(blur_ps_input input) : SV_Target
             res += rt_blur.Sample(ssao_sampler, input.tex + ofs).r;
         }
     }
-    return res / 16.0;
+    float occ = res / 16.0;
+    return occ * rt_diffuse.Sample(ssao_sampler, input.tex);
 }
