@@ -1,6 +1,6 @@
 matrix proj, view, world;
 float4 Diffuse, LightColor, LightPos;
-int HasDiffuseMap;
+int HasDiffuseMap = 0;
 
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;
@@ -42,16 +42,72 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     return output;
 }
 
+interface iDiffuseMaterial 
+{
+    float3 getColor(float2 texCoord);
+};
+
+interface iDiffuseMaterial2
+{
+    float3 getColor(float2 texCoord);
+};
+
+interface iDiffuseMaterial3
+{
+    float3 getColor(float2 texCoord);
+};
+
+class cDiffuseColor : iDiffuseMaterial
+{
+    float3 getColor(float2 texCoord)
+    {
+        return Diffuse.rgb;
+    }
+};
+
+class cDiffuseColor2 : iDiffuseMaterial2
+{
+    float3 getColor(float2 texCoord)
+    {
+        return Diffuse.rgb;
+    }
+};
+
+class cDiffuseColor3 : iDiffuseMaterial3
+{
+    float3 getColor(float2 texCoord)
+    {
+        return Diffuse.rgb;
+    }
+};
+
+class cDiffuseTexture : iDiffuseMaterial
+{
+    float3 getColor(float2 texCoord)
+    {
+        return DiffuseTexture.Sample(DiffuseSampler, texCoord).rgb;
+    }
+};
+
+iDiffuseMaterial g_abstractDiffuse;
+iDiffuseMaterial g_abstractDiffuse2;
+iDiffuseMaterial2 g_abstractDiffuse3;
+iDiffuseMaterial3 g_abstractDiffuse4;
+
+cbuffer OOP4Lyfe : register(b0) {
+    cDiffuseColor g_DiffuseColor;
+    cDiffuseColor2 g_DiffuseColor2;
+    cDiffuseColor3 g_DiffuseColor3;
+    cDiffuseTexture g_DiffuseTexture;
+};
+
 fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
     output.rt_normal = normalize(input.vs_normal);
-    //if (HasDiffuseMap) {
-        //output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
-    //} else {
-        output.rt_diffuse = Diffuse;
-    //}
+    output.rt_diffuse.rgb = g_abstractDiffuse.getColor(input.tex) * g_abstractDiffuse4.getColor(input.tex).r * g_abstractDiffuse2.getColor(input.tex).r * g_abstractDiffuse3.getColor(input.tex).r;
+    output.rt_diffuse.a = 1;
     return output;
 }
 

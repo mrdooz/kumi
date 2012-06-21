@@ -228,6 +228,8 @@ public:
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
   void unbind_resource_views(int resource_bitmask);
 
+  ID3D11ClassLinkage *get_class_linkage();
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
@@ -272,6 +274,8 @@ private:
   int32_t _frame_count;
   float _fps;
   CComPtr<ID3D11DeviceContext> _immediate_context;
+
+  CComPtr<ID3D11ClassLinkage> _class_linkage;
 
   ResourceInterface *_ri;
   BackedResources _res;

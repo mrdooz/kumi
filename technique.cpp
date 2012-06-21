@@ -7,6 +7,8 @@
 #include "path_utils.hpp"
 #include "graphics.hpp"
 
+#pragma comment(lib, "d3dcompiler.lib")
+
 using namespace boost::assign;
 using namespace std;
 
@@ -98,11 +100,54 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
   if (shader->type() == Shader::kVertexShader && !parse_input_layout(graphics, reflector, shader_desc, buf, len))
     return false;
 
+  // Parse shader interfaces
+  if (int num_interfaces = reflector->GetNumInterfaceSlots()) {
+
+    // Get the variable names from the constant buffers
+    vector<string> interfaces;
+    for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
+      ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
+      D3D11_SHADER_BUFFER_DESC cb_desc;
+      cb->GetDesc(&cb_desc);
+      // skip if not an interface ptr cbuffer
+      if (cb_desc.Type != D3D11_CT_INTERFACE_POINTERS)
+        continue;
+      for (UINT j = 0; j < cb_desc.Variables; ++j) {
+        ID3D11ShaderReflectionVariable* v = cb->GetVariableByIndex(j);
+        D3D11_SHADER_VARIABLE_DESC var_desc;
+        v->GetDesc(&var_desc);
+        if (var_desc.uFlags & (D3D_SVF_USED | D3D_SVF_INTERFACE_POINTER)) {
+          int ofs = v->GetInterfaceSlot(0);
+          interfaces.push_back(var_desc.Name);
+
+          CComPtr<ID3D11ClassInstance> inst;
+          GRAPHICS.get_class_linkage()->GetClassInstance("g_DiffuseColor", 0, &inst.p);
+
+          D3D11_CLASS_INSTANCE_DESC instance_desc;
+          inst->GetDesc(&instance_desc);
+          TCHAR instance_name[256];
+          TCHAR type_name[256];
+          SIZE_T instance_name_len, type_name_len;
+          inst->GetInstanceName(instance_name, &instance_name_len);
+          inst->GetTypeName(type_name, &type_name_len);
+          int x = 10;
+        }
+      }
+      int a = 10;
+    }
+
+    ID3D11ClassInstance **linkage_array = (ID3D11ClassInstance **)_alloca(sizeof(ID3D11ClassInstance *) * num_interfaces);
+  }
+
   // The technique contains both vs and ps cbuffers
   for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
     ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
     D3D11_SHADER_BUFFER_DESC cb_desc;
     cb->GetDesc(&cb_desc);
+
+    // skip if not a "true" cbuffer
+    if (cb_desc.Type != D3D11_CT_CBUFFER)
+      continue;
 
     CBuffer cbuffer;
     int size = 0;
@@ -193,47 +238,6 @@ GraphicsObjectHandle Technique::cbuffer_handle() {
   return _constant_buffers.empty() ? GraphicsObjectHandle() : _constant_buffers[0].handle;
 }
 
-void Technique::update_cbuffers() {
-  for (auto i = begin(_cbuffer_vars), e = end(_cbuffer_vars); i != e; ++i) {
-    const CBufferVariable &var = *i;
-    PROPERTY_MANAGER.get_property_raw(var.id, &_cbuffer_staged[var.ofs], var.len);
-  }
-}
-
-void Technique::prepare_cbuffers() {
-  // TODO
-/*
-  int cbuffer_size = 0;
-  auto collect_params = [&, this](const std::vector<CBufferParam> &params) {
-    for (auto i = std::begin(params), e = std::end(params); i != e; ++i) {
-      const CBufferParam &param = *i;
-      int len = PropertyType::len(param.type);;
-      if (param.cbuffer != -1) {
-        CBufferVariable &var = dummy_push_back(&_cbuffer_vars);
-        var.ofs = param.start_offset;
-        var.len = len;
-
-        switch (param.source) {
-          case PropertySource::kSystem:
-            var.id = PROPERTY_MANAGER.get_or_create_raw(param.name.c_str(), var.len, nullptr);
-            break;
-          default:
-            LOG_WARNING_LN("Unhandled parameter source");
-            break;
-        }
-
-        cbuffer_size = max(cbuffer_size, var.ofs + var.len);
-      }
-    }
-  };
-
-  collect_params(_vertex_shader->cbuffer_params());
-  collect_params(_pixel_shader->cbuffer_params());
-  _cbuffer_staged.resize(cbuffer_size);
-*/
-}
-
-
 bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
 
   STARTUPINFOA startup_info;
@@ -269,11 +273,13 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
 
   //fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
   char cmd_line[MAX_PATH];
+
 #ifdef _DEBUG
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s -Fh %s %s", 
     profile,
     shader->entry_point().c_str(),
-    shader->obj_filename().c_str(), 
+    shader->obj_filename().c_str(),
+    Path::replace_extension(shader->obj_filename(), "h").c_str(),
     shader->source_filename().c_str());
 #else
   sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s", 
@@ -393,7 +399,6 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
     return false;
 
   prepare_textures();
-  prepare_cbuffers();
 
   return true;
 }

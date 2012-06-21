@@ -251,8 +251,6 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
   PROPERTY_MANAGER.set_property(_view_mtx_id, view);
   PROPERTY_MANAGER.set_property(_proj_mtx_id, proj);
 
-  GRAPHICS.get_technique(_ssao_render)->update_cbuffers();
-
   return true;
 }
 

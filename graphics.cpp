@@ -53,8 +53,8 @@ Graphics::Graphics(ResourceInterface *ri)
   , _start_fps_time(0xffffffff)
   , _frame_count(0)
   , _fps(0)
-  , _vs_profile("vs_4_0")
-  , _ps_profile("ps_4_0")
+  , _vs_profile("vs_5_0")
+  , _ps_profile("ps_5_0")
   , _ri(ri)
   , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_screen_size"))
 {
@@ -422,6 +422,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   set_private_data(FROM_HERE, _default_depth_stencil_state.p);
   set_private_data(FROM_HERE, _default_rasterizer_state.p);
   set_private_data(FROM_HERE, _default_blend_state.p);
+
+  _device->CreateClassLinkage(&_class_linkage.p);
 
   // Create a dummy texture
   DWORD black = 0;
@@ -857,3 +859,8 @@ void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src)
 Technique *Graphics::get_technique(GraphicsObjectHandle h) {
   return _res._techniques.get(h);
 }
+
+ID3D11ClassLinkage *Graphics::get_class_linkage() {
+  return _class_linkage.p;
+}
+

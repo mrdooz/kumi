@@ -2,7 +2,6 @@
 #include "app.hpp"
 #include "graphics.hpp"
 #include "logger.hpp"
-#include "effect_wrapper.hpp"
 #include "file_utils.hpp"
 #include "string_utils.hpp"
 #include "demo_engine.hpp"

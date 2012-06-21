@@ -69,7 +69,6 @@ public:
   const TechniqueRenderData &render_data() const { return _render_data; }
 
   void fill_cbuffer(CBuffer *cbuffer);
-  void update_cbuffers();
   const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
   GraphicsObjectHandle cbuffer_handle();
 
