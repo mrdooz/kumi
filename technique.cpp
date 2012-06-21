@@ -89,6 +89,187 @@ CBufferParam *Technique::find_cbuffer_param(const std::string &name, Shader::Typ
   return nullptr;
 }
 
+const char *skip_line(const char *start, const char *end) {
+  while (start < end && *start != '\r' && *start != '\n')
+    ++start;
+
+  while (start < end && *start == '\r' || *start == '\n')
+    ++start;
+
+  return start;
+}
+
+vector<string> split(const char *start, const char *end) {
+  vector<string> res;
+
+  while (start < end) {
+    const char *tmp = start;
+    while (!isspace((int)*tmp))
+      ++tmp;
+
+    res.emplace_back(string(start, tmp));
+
+    while (tmp < end && isspace((int)*tmp))
+      ++tmp;
+
+    start = tmp;
+  }
+
+  return res;
+}
+
+bool Technique::do_text_reflection(const char *start, const char *end, 
+                                   GraphicsInterface *graphics, Shader *shader, void *buf, size_t len) {
+
+  // extract the relevant text
+  vector<vector<string>> input;
+  if (strstr(start, "#if 0"))
+    start = skip_line(start, end);
+
+  while (start < end) {
+    // skip leading comments and whitespace
+    if (*start != '/')
+      break;
+    while (*start == '/' || *start == ' ')
+      ++start;
+
+    // read until "\r\n" found
+    const char *tmp = start;
+    while (*tmp != '\r')
+      ++tmp;
+    if (tmp - start > 0)
+      input.emplace_back(split(start, tmp));
+    while (*tmp == '\r' || *tmp == '\n')
+      ++tmp;
+    start = tmp;
+  }
+
+  // parse it!
+  for (size_t i = 0; i < input.size(); ++i) {
+    auto &cur_line = input[i];
+
+    if (cur_line[0] == "cbuffer") {
+      // Parse cbuffer
+      CBuffer cbuffer;
+      int size = 0;
+
+      for (i += 2; i < input.size(); ++i) {
+        auto &row = input[i];
+        if (row[0] == "}")
+          break;
+        if (row.size() == 7 || row.size() == 8) {
+          bool unused = row.size() == 8 && row[7] == "[unused]";
+          if (!unused) {
+            string name = string(row[1].c_str(), row[1].size() - 1); // skip trailing ';'
+            CBufferParam *param = find_cbuffer_param(name, shader->type());
+            if (!param) {
+              add_error_msg("Shader parameter %s not found", name.c_str());
+              return false;
+            }
+
+            CBufferVariable var;
+            var.ofs = atoi(row[4].c_str());
+            var.len = atoi(row[6].c_str());
+            size = max(size, var.ofs + var .len);
+            // The id is either a classifer (for mesh/material), or a real id in the system case
+            string class_id = PropertySource::to_string(param->source) + "::" + name;
+            int var_size = param->source == PropertySource::kMesh ? sizeof(int) : var.len;
+            var.id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
+#ifdef _DEBUG
+            var.name = class_id;
+#endif
+            switch (param->source) {
+            case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
+            case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
+            case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
+            default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
+            }
+            param->used = true;
+          }
+        }
+
+        cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
+        cbuffer.staging.resize(size);
+        if (shader->type() == Shader::kVertexShader)
+          _vs_cbuffers.emplace_back(cbuffer);
+        else
+          _ps_cbuffers.emplace_back(cbuffer);
+
+
+      }
+    } else if (cur_line[0] == "Input" && cur_line[1] == "signature:") {
+
+      // Parse input layout
+      auto mapping = map_list_of
+        ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+        ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+        ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
+        ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
+        ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
+
+      // ShaderInputs inputs;
+      i += 3;
+      vector<D3D11_INPUT_ELEMENT_DESC> inputs;
+      for (i += 3; i < input.size(); ++i) {
+        auto &row = input[i];
+        if (row.size() != 7)
+          break;
+
+        DXGI_FORMAT fmt;
+        if (!lookup<string, DXGI_FORMAT>(row[0], mapping, &fmt)) {
+          add_error_msg("Invalid input semantic found: %s", row[0].c_str());
+          return false;
+        }
+
+        inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, atoi(row[3].c_str())));
+      }
+
+      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
+      if (!_input_layout.is_valid()) {
+        add_error_msg("Invalid input layout");
+        return false;
+      }
+    } else if (cur_line[0] == "Resource" && cur_line[1] == "Bindings:") {
+
+      for (i += 3; i < input.size(); ++i) {
+        auto &row = input[i];
+        if (row.size() != 6)
+          break;
+
+        const string &name = row[0];
+        const string &type = row[1];
+        int bind_point = atoi(row[4].c_str());
+
+        if (type == "texture") {
+          ResourceViewParam *param = shader->find_resource_view_param(name.c_str());
+          if (!param) {
+            add_error_msg("Resource view %s not found", name.c_str());
+            return false;
+          }
+          param->bind_point = bind_point;
+          param->used = true;
+
+        } else if (type == "sampler") {
+          _first_sampler = min(_first_sampler, bind_point);
+          _num_valid_samplers = max(bind_point - _first_sampler + 1, _num_valid_samplers);
+          // find out where this sampler goes..
+          for (auto i = std::begin(_sampler_states), e = std::end(_sampler_states); i != e; ++i) {
+            if (i->first == name) {
+              _ordered_sampler_states[bind_point] = i->second;
+              goto FOUND_SAMPLER;
+            }
+          }
+          add_error_msg("Sampler %s not found", name.c_str());
+FOUND_SAMPLER:;
+        }
+
+      }
+    }
+  }
+
+  return true;
+}
+
 bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len)
 {
   ID3D11ShaderReflection* reflector = NULL; 
@@ -99,7 +280,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
   // Parse input layout for vertex shaders
   if (shader->type() == Shader::kVertexShader && !parse_input_layout(graphics, reflector, shader_desc, buf, len))
     return false;
-
+/*
   // Parse shader interfaces
   if (int num_interfaces = reflector->GetNumInterfaceSlots()) {
 
@@ -138,7 +319,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
 
     ID3D11ClassInstance **linkage_array = (ID3D11ClassInstance **)_alloca(sizeof(ID3D11ClassInstance *) * num_interfaces);
   }
-
+*/
   // The technique contains both vs and ps cbuffers
   for (UINT i = 0; i < shader_desc.ConstantBuffers; ++i) {
     ID3D11ShaderReflectionConstantBuffer* cb = reflector->GetConstantBufferByIndex(i);
@@ -345,14 +526,22 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
       return false;
   }
 
+  // load compiled shaders
   vector<uint8> buf;
   if (!res->load_file(obj, &buf))
     return false;
 
   int len = (int)buf.size();
+
+  // load corresponding .h file
+  vector<uint8> text;
+  if (!res->load_file(Path::replace_extension(obj, "h").c_str(), &text))
+    return false;
+  do_text_reflection((const char *)text.data(), (const char *)text.data() + text.size(), graphics, shader, buf.data(), len);
+/*
   if (!do_reflection(graphics, shader, buf.data(), len))
     return false;
-
+*/
   shader->prune_unused_parameters();
 
   switch (shader->type()) {

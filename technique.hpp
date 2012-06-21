@@ -92,6 +92,8 @@ private:
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(GraphicsInterface *graphics, Shader *shader);
   bool do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len);
+  bool do_text_reflection(const char *start, const char *end, GraphicsInterface *graphics, Shader *shader, void *buf, size_t len);
+
   bool parse_input_layout(GraphicsInterface *graphics, ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len);
 
   std::vector<CBufferVariable> _cbuffer_vars;
