@@ -4,11 +4,9 @@
 #include "utils.hpp"
 #include "id_buffer.hpp"
 #include "graphics_object_handle.hpp"
-#include "graphics_interface.hpp"
 #include "technique.hpp"
 #include "property_manager.hpp"
-#include <D3DX11tex.h>
-#include <functional>
+#include "tracked_location.hpp"
 
 struct Io;
 class Shader;
@@ -26,7 +24,7 @@ struct IFW1Factory;
 struct IFW1FontWrapper;
 #endif
 
-class Graphics : public GraphicsInterface {
+class Graphics {
 public:
 
   struct RenderTargetData {
@@ -149,25 +147,25 @@ public:
   void	present();
   void	resize(const int width, const int height);
 
-  virtual const char *vs_profile() const { return _vs_profile.c_str(); }
-  virtual const char *ps_profile() const { return _ps_profile.c_str(); }
+  const char *vs_profile() const { return _vs_profile.c_str(); }
+  const char *ps_profile() const { return _ps_profile.c_str(); }
 
-  virtual GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
-  virtual GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
-  virtual GraphicsObjectHandle create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
-  virtual GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
-  virtual GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);
+  GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
+  GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
+  GraphicsObjectHandle create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
+  GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
+  GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);
 
-  virtual GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
-  virtual GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
+  GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
+  GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id);
 
-  virtual GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
-  virtual GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
-  virtual GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
-  virtual GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc);
+  GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
+  GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
+  GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
+  GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc);
 
 #if WITH_GWEN
-  virtual GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
+  GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
   bool measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect);
 #endif
 

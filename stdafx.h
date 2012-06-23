@@ -87,9 +87,11 @@ typedef uint64_t uint64;
 
 #include <d3d11.h>
 #include <D3D11Shader.h>
+#include <D3DX11tex.h>
 #include <D3Dcompiler.h>
 #include <DxErr.h>
 #include <xnamath.h>
+
 
 #if WITH_CEF
 #include <cef.h>
@@ -102,3 +104,4 @@ typedef uint64_t uint64;
 #endif
 
 typedef std::basic_string<TCHAR> ustring;
+

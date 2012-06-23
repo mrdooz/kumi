@@ -230,9 +230,6 @@
     <ClInclude Include="..\bitmap_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\graphics_interface.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\resource_interface.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

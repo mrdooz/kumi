@@ -3,8 +3,6 @@
 #include "property_manager.hpp"
 #include "graphics_submit.hpp"
 
-struct GraphicsInterface;
-
 struct ParamBase {
   ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) 
     : name(name), type(type), source(source), used(false) {}

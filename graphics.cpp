@@ -618,7 +618,7 @@ bool Graphics::shader_file_changed(const char *filename, void *token) {
   Technique *t = (Technique *)token;
   for (int i = 0; i < t->vertex_shader_count(); ++i) {
     if (Shader *shader = t->vertex_shader(i)) {
-      if (!t->init_shader(this, _ri, shader)) {
+      if (!t->init_shader(_ri, shader)) {
         LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
         return false;
       }
@@ -627,7 +627,7 @@ bool Graphics::shader_file_changed(const char *filename, void *token) {
 
   for (int i = 0; i < t->pixel_shader_count(); ++i) {
     if (Shader *shader = t->pixel_shader(i)) {
-      if (!t->init_shader(this, _ri, shader)) {
+      if (!t->init_shader(_ri, shader)) {
         LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
         return false;
       }
@@ -651,14 +651,14 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 
   TechniqueParser parser;
   vector<Technique *> tmp;
-  B_ERR_BOOL(parser.parse(&GRAPHICS, (const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
+  B_ERR_BOOL(parser.parse((const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
       MATERIAL_MANAGER.add_material(*it, true);
   }
 
-  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(this, _ri); });
+  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(_ri); });
   // delete all the techniques that fail to initialize
   if (fails != end(tmp)) {
     for (auto i = fails; i != end(tmp); ++i) {

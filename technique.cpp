@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "technique.hpp"
 #include "dx_utils.hpp"
-#include "graphics_interface.hpp"
 #include "resource_interface.hpp"
 #include "tracked_location.hpp"
 #include "path_utils.hpp"
@@ -51,8 +50,7 @@ void Technique::add_error_msg(const char *fmt, ...) {
   _valid = false;
 }
 
-bool Technique::parse_input_layout(GraphicsInterface *graphics, ID3D11ShaderReflection* reflector, 
-                                                   const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len) {
+bool Technique::parse_input_layout(ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len) {
   auto mapping = map_list_of
     ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
     ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
@@ -75,7 +73,7 @@ bool Technique::parse_input_layout(GraphicsInterface *graphics, ID3D11ShaderRefl
     inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(input.SemanticName, input.SemanticIndex, fmt, input.Stream));
   }
 
-  _input_layout = graphics->create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
+  _input_layout = GRAPHICS.create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
   if (!_input_layout.is_valid())
     add_error_msg("Invalid input layout");
 
@@ -145,7 +143,7 @@ void trim_input(const char *start, const char *end, vector<vector<string>> *res)
 }
 
 bool Technique::do_text_reflection(const char *text_start, const char *text_end,
-                                   GraphicsInterface *graphics, Shader *shader, void *buf, size_t len) {
+                                   Shader *shader, void *buf, size_t len) {
 
   // extract the relevant text
   vector<vector<string>> input;
@@ -274,7 +272,7 @@ FOUND_SAMPLER:;
   return true;
 }
 
-bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void *buf, size_t len)
+bool Technique::do_reflection(Shader *shader, void *buf, size_t len)
 {
   ID3D11ShaderReflection* reflector = NULL; 
   B_ERR_HR(D3DReflect(buf, len, IID_ID3D11ShaderReflection, (void**)&reflector));
@@ -282,7 +280,7 @@ bool Technique::do_reflection(GraphicsInterface *graphics, Shader *shader, void 
   reflector->GetDesc(&shader_desc);
 
   // Parse input layout for vertex shaders
-  if (shader->type() == Shader::kVertexShader && !parse_input_layout(graphics, reflector, shader_desc, buf, len))
+  if (shader->type() == Shader::kVertexShader && !parse_input_layout(reflector, shader_desc, buf, len))
     return false;
 /*
   // Parse shader interfaces
@@ -423,7 +421,7 @@ GraphicsObjectHandle Technique::cbuffer_handle() {
   return _constant_buffers.empty() ? GraphicsObjectHandle() : _constant_buffers[0].handle;
 }
 
-bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
+bool Technique::compile_shader(Shader *shader) {
 
   STARTUPINFOA startup_info;
   ZeroMemory(&startup_info, sizeof(startup_info));
@@ -454,7 +452,7 @@ bool Technique::compile_shader(GraphicsInterface *res, Shader *shader) {
   PROCESS_INFORMATION process_info;
   ZeroMemory(&process_info, sizeof(process_info));
 
-  const char *profile = shader->type() == Shader::kVertexShader ? res->vs_profile() : res->ps_profile();
+  const char *profile = shader->type() == Shader::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
 
   //fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
   char cmd_line[MAX_PATH];
@@ -514,7 +512,7 @@ bool Technique::reload_shaders() {
   return true;
 }
 
-bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res, Shader *shader) {
+bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
 
   bool force = true;
 
@@ -523,7 +521,7 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   const char *src = shader->source_filename().c_str();
   // compile the shader if the source is newer, or the object file doesn't exist
   if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
-    if (!compile_shader(graphics, shader))
+    if (!compile_shader(shader))
       return false;
   } else {
     if (!res->file_exists(obj))
@@ -541,7 +539,7 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   vector<uint8> text;
   if (!res->load_file(Path::replace_extension(obj, "h").c_str(), &text))
     return false;
-  do_text_reflection((const char *)text.data(), (const char *)text.data() + text.size(), graphics, shader, buf.data(), len);
+  do_text_reflection((const char *)text.data(), (const char *)text.data() + text.size(), shader, buf.data(), len);
 /*
   if (!do_reflection(graphics, shader, buf.data(), len))
     return false;
@@ -550,10 +548,10 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
 
   switch (shader->type()) {
     case Shader::kVertexShader: 
-      shader->set_handle(graphics->create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
+      shader->set_handle(GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
       break;
     case Shader::kPixelShader: 
-      shader->set_handle(graphics->create_pixel_shader(FROM_HERE, buf.data(), len, shader->id()));
+      shader->set_handle(GRAPHICS.create_pixel_shader(FROM_HERE, buf.data(), len, shader->id()));
       break;
     case Shader::kGeometryShader: break;
   }
@@ -574,24 +572,24 @@ bool Technique::init_shader(GraphicsInterface *graphics, ResourceInterface *res,
   return true;
 }
 
-bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
+bool Technique::init(ResourceInterface *res) {
 
-  _rasterizer_state = graphics->create_rasterizer_state(FROM_HERE, _rasterizer_desc);
-  _blend_state = graphics->create_blend_state(FROM_HERE, _blend_desc);
-  _depth_stencil_state = graphics->create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
+  _rasterizer_state = GRAPHICS.create_rasterizer_state(FROM_HERE, _rasterizer_desc);
+  _blend_state = GRAPHICS.create_blend_state(FROM_HERE, _blend_desc);
+  _depth_stencil_state = GRAPHICS.create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
 
   // create all the sampler states from the descs
   for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
-    _sampler_states.push_back(make_pair(i->first, graphics->create_sampler_state(FROM_HERE, i->second)));
+    _sampler_states.push_back(make_pair(i->first, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
   }
 
   for (size_t i = 0; i < _vertex_shaders.size(); ++i) {
-    if (!init_shader(graphics, res, _vertex_shaders[i]))
+    if (!init_shader(res, _vertex_shaders[i]))
       return false;
   }
 
   for (size_t i = 0; i < _pixel_shaders.size(); ++i) {
-    if (!init_shader(graphics, res, _pixel_shaders[i]))
+    if (!init_shader(res, _pixel_shaders[i]))
       return false;
   }
 

@@ -5,10 +5,10 @@
 #include "file_utils.hpp"
 #include "property.hpp"
 #include "material.hpp"
-#include "graphics_interface.hpp"
 #include "logger.hpp"
 #include "tracked_location.hpp"
 #include "path_utils.hpp"
+#include "graphics.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -1063,7 +1063,7 @@ void TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC 
   THROW_ON_FALSE(false);
 }
 
-void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 
   auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
   auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
@@ -1092,10 +1092,10 @@ void TechniqueParser::parse_vertices(GraphicsInterface *graphics, Scope *scope, 
     }
   }
   THROW_ON_FALSE(technique->_vertex_size != -1);
-  technique->_vb = graphics->create_static_vertex_buffer(FROM_HERE, technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
+  technique->_vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
 }
 
-void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 
   auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
   auto index_fmts = map_list_of("index16", DXGI_FORMAT_R16_UINT)("index32", DXGI_FORMAT_R32_UINT);
@@ -1143,13 +1143,13 @@ void TechniqueParser::parse_indices(GraphicsInterface *graphics, Scope *scope, T
     // create a local copy of the indices
     vector<uint16> v;
     copy(technique->_indices.begin(), technique->_indices.end(), back_inserter(v));
-    technique->_ib = graphics->create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * v.size(), &v[0]);
+    technique->_ib = GRAPHICS.create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * v.size(), &v[0]);
   } else {
-    technique->_ib = graphics->create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+    technique->_ib = GRAPHICS.create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
   }
 }
 
-void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope, Technique *technique) {
+void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
   auto valid = list_of
     (kSymVertexShader)(kSymPixelShader)
@@ -1230,20 +1230,20 @@ void TechniqueParser::parse_technique(GraphicsInterface *graphics, Scope *scope,
 
       case kSymVertices:
         scope->munch(kSymBlockOpen);
-        parse_vertices(graphics, scope, technique);
+        parse_vertices(scope, technique);
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
         break;
 
       case kSymIndices:
         scope->munch(kSymBlockOpen);
-        parse_indices(graphics, scope, technique);
+        parse_indices(scope, technique);
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
         break;
     }
   }
 }
 
-bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials) {
+bool TechniqueParser::parse(const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials) {
 
   try {
     Scope scope(this, start, end-1);
@@ -1255,7 +1255,7 @@ bool TechniqueParser::parse(GraphicsInterface *graphics, const char *start, cons
         case kSymTechnique: {
           unique_ptr<Technique> t(new Technique);
           scope.next_identifier(&t.get()->_name).munch(kSymBlockOpen);
-          parse_technique(graphics, &scope, t.get());
+          parse_technique(&scope, t.get());
           scope.munch(kSymBlockClose).munch(kSymSemicolon);
           techniques->push_back(t.release());
           break;
