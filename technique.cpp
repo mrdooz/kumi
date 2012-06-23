@@ -13,9 +13,7 @@ using namespace boost::assign;
 using namespace std;
 
 Technique::Technique()
-  : _vertex_shader(nullptr)
-  , _pixel_shader(nullptr)
-  , _rasterizer_desc(CD3D11_DEFAULT())
+  : _rasterizer_desc(CD3D11_DEFAULT())
   , _blend_desc(CD3D11_DEFAULT())
   , _depth_stencil_desc(CD3D11_DEFAULT())
   , _vertex_size(-1)
@@ -23,12 +21,16 @@ Technique::Technique()
   , _valid(false)
   , _first_sampler(MAX_SAMPLERS)
   , _num_valid_samplers(0)
+  , _vs_shader_template(nullptr)
+  , _ps_shader_template(nullptr)
 {
 }
 
 Technique::~Technique() {
-  SAFE_DELETE(_vertex_shader);
-  SAFE_DELETE(_pixel_shader);
+  delete exch_null(_vs_shader_template);
+  delete exch_null(_ps_shader_template);
+  seq_delete(&_vertex_shaders);
+  seq_delete(&_pixel_shaders);
 }
 
 void Technique::add_error_msg(const char *fmt, ...) {
@@ -118,11 +120,8 @@ vector<string> split(const char *start, const char *end) {
   return res;
 }
 
-bool Technique::do_text_reflection(const char *start, const char *end, 
-                                   GraphicsInterface *graphics, Shader *shader, void *buf, size_t len) {
-
+void trim_input(const char *start, const char *end, vector<vector<string>> *res) {
   // extract the relevant text
-  vector<vector<string>> input;
   if (strstr(start, "#if 0"))
     start = skip_line(start, end);
 
@@ -138,11 +137,19 @@ bool Technique::do_text_reflection(const char *start, const char *end,
     while (*tmp != '\r')
       ++tmp;
     if (tmp - start > 0)
-      input.emplace_back(split(start, tmp));
+      res->emplace_back(split(start, tmp));
     while (*tmp == '\r' || *tmp == '\n')
       ++tmp;
     start = tmp;
   }
+}
+
+bool Technique::do_text_reflection(const char *text_start, const char *text_end,
+                                   GraphicsInterface *graphics, Shader *shader, void *buf, size_t len) {
+
+  // extract the relevant text
+  vector<vector<string>> input;
+  trim_input(text_start, text_end, &input);
 
   // parse it!
   for (size_t i = 0; i < input.size(); ++i) {
@@ -187,17 +194,15 @@ bool Technique::do_text_reflection(const char *start, const char *end,
             param->used = true;
           }
         }
-
-        cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
-        cbuffer.staging.resize(size);
-        if (shader->type() == Shader::kVertexShader)
-          _vs_cbuffers.emplace_back(cbuffer);
-        else
-          _ps_cbuffers.emplace_back(cbuffer);
-
-
       }
-    } else if (cur_line[0] == "Input" && cur_line[1] == "signature:") {
+      cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
+      cbuffer.staging.resize(size);
+      if (shader->type() == Shader::kVertexShader)
+        _vs_cbuffers.emplace_back(cbuffer);
+      else
+        _ps_cbuffers.emplace_back(cbuffer);
+
+    } else if (shader->type() == Shader::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
       // Parse input layout
       auto mapping = map_list_of
@@ -207,7 +212,6 @@ bool Technique::do_text_reflection(const char *start, const char *end,
         ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
         ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
-      // ShaderInputs inputs;
       i += 3;
       vector<D3D11_INPUT_ELEMENT_DESC> inputs;
       for (i += 3; i < input.size(); ++i) {
@@ -253,7 +257,7 @@ bool Technique::do_text_reflection(const char *start, const char *end,
           _first_sampler = min(_first_sampler, bind_point);
           _num_valid_samplers = max(bind_point - _first_sampler + 1, _num_valid_samplers);
           // find out where this sampler goes..
-          for (auto i = std::begin(_sampler_states), e = std::end(_sampler_states); i != e; ++i) {
+          for (auto i = begin(_sampler_states), e = end(_sampler_states); i != e; ++i) {
             if (i->first == name) {
               _ordered_sampler_states[bind_point] = i->second;
               goto FOUND_SAMPLER;
@@ -581,11 +585,15 @@ bool Technique::init(GraphicsInterface *graphics, ResourceInterface *res) {
     _sampler_states.push_back(make_pair(i->first, graphics->create_sampler_state(FROM_HERE, i->second)));
   }
 
-  if (_vertex_shader && !init_shader(graphics, res, _vertex_shader))
-    return false;
+  for (size_t i = 0; i < _vertex_shaders.size(); ++i) {
+    if (!init_shader(graphics, res, _vertex_shaders[i]))
+      return false;
+  }
 
-  if (_pixel_shader && !init_shader(graphics, res, _pixel_shader))
-    return false;
+  for (size_t i = 0; i < _pixel_shaders.size(); ++i) {
+    if (!init_shader(graphics, res, _pixel_shaders[i]))
+      return false;
+  }
 
   prepare_textures();
 
@@ -600,10 +608,10 @@ GraphicsObjectHandle Technique::sampler_state(const char *name) const {
   return GraphicsObjectHandle();
 }
 
-void Technique::get_render_objects(RenderObjects *obj) {
-  obj->vs = _vertex_shader->handle();
+void Technique::get_render_objects(RenderObjects *obj, int vs_flags, int ps_flags) {
+  obj->vs = _vertex_shaders[vs_flags]->handle();
   obj->gs = GraphicsObjectHandle();
-  obj->ps = _pixel_shader->handle();
+  obj->ps = _pixel_shaders[ps_flags]->handle();
   obj->layout = _input_layout;
   obj->rs = _rasterizer_state;
   obj->dss = _depth_stencil_state;
@@ -618,7 +626,8 @@ void Technique::get_render_objects(RenderObjects *obj) {
 
 
 void Technique::prepare_textures() {
-
+  // TODO
+/*
   auto &params = _pixel_shader->resource_view_params();
   for (auto it = begin(params), e = end(params); it != e; ++it) {
     auto &name = it->name;
@@ -628,6 +637,7 @@ void Technique::prepare_textures() {
     _render_data.first_texture = min(_render_data.first_texture, bind_point);
     _render_data.num_textures = max(_render_data.num_textures, bind_point - _render_data.first_texture + 1);
   }
+*/
 }
 
 void Technique::fill_cbuffer(CBuffer *cbuffer) {

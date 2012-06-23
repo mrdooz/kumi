@@ -213,7 +213,7 @@ public:
   Technique *get_technique(GraphicsObjectHandle h);
   GraphicsObjectHandle find_technique(const char *name);
   void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
-  GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name);
+  GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name, int flags);
   GraphicsObjectHandle get_input_layout(const char *technique_name);
   GraphicsObjectHandle find_resource(const char *name);
 

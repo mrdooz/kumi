@@ -44,8 +44,6 @@ struct CBufferParam : public ParamBase {
     float _float[16];
   };
 
-  int start_offset;  // offset in cbuffer
-  int size;
   PropertyId id;
   DefaultValue default_value;
 };
@@ -67,6 +65,7 @@ struct ResourceViewParam : public ParamBase {
 };
 
 class Shader {
+  friend class TechniqueParser;
 public:
   enum Type {
     kVertexShader,
@@ -123,6 +122,7 @@ private:
   std::string _entry_point;
   //std::vector<CBufferParam> _cbuffer_params;
   std::vector<ResourceViewParam> _resource_view_params;
+  std::vector<std::string> _flags;
   GraphicsObjectHandle _handle;
 };
 

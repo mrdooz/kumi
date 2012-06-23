@@ -117,3 +117,26 @@ string Path::get_path(const string& p)
 	Path a(p);
 	return a.get_path();
 }
+
+string replace_extension(const std::string &org, const std::string &new_ext) {
+  return strip_extension(org) + "." + new_ext;
+}
+
+string strip_extension(const std::string &str) {
+  int idx = str.rfind('.');
+  if (idx == string::npos)
+    return str;
+  return string(str.c_str(), idx);
+}
+
+void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext) {
+  char drive_buf[_MAX_DRIVE];
+  char dir_buf[_MAX_DIR];
+  char fname_buf[_MAX_FNAME];
+  char ext_buf[_MAX_EXT];
+  _splitpath(path, drive_buf, dir_buf, fname_buf, ext_buf);
+  if (drive) *drive = drive_buf;
+  if (dir) *dir = dir_buf;
+  if (fname) *fname = fname_buf;
+  if (ext) *ext = ext_buf;
+}

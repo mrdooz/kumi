@@ -616,19 +616,24 @@ bool Graphics::shader_file_changed(const char *filename, void *token) {
   LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   Technique *t = (Technique *)token;
-  if (Shader *shader = t->vertex_shader()) {
-    if (!t->init_shader(this, _ri, shader)) {
-      LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
-      return false;
+  for (int i = 0; i < t->vertex_shader_count(); ++i) {
+    if (Shader *shader = t->vertex_shader(i)) {
+      if (!t->init_shader(this, _ri, shader)) {
+        LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
+        return false;
+      }
     }
   }
 
-  if (Shader *shader = t->pixel_shader()) {
-    if (!t->init_shader(this, _ri, shader)) {
-      LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
-      return false;
+  for (int i = 0; i < t->pixel_shader_count(); ++i) {
+    if (Shader *shader = t->pixel_shader(i)) {
+      if (!t->init_shader(this, _ri, shader)) {
+        LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
+        return false;
+      }
     }
   }
+
   return true;
 }
 
@@ -674,10 +679,10 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 
     if (_ri->supports_file_watch()) {
       auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
-      if (Shader *vs = t->vertex_shader()) {
+      if (Shader *vs = t->vertex_shader(0)) {
         _ri->add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
       }
-      if (Shader *ps = t->pixel_shader()) {
+      if (Shader *ps = t->pixel_shader(0)) {
         _ri->add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
       }
     }
@@ -736,12 +741,12 @@ GraphicsObjectHandle Graphics::get_sampler_state(const char *name, const char *s
   return GraphicsObjectHandle();
 }
 */
-GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_id) {
+GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_id, int flags) {
   if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL)) {
-    if (technique->vertex_shader()->id() == shader_id) {
+    if (technique->vertex_shader(flags)->id() == shader_id) {
       int idx = _res._vertex_shaders.idx_from_token(shader_id);
       return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx) : GraphicsObjectHandle();
-    } else if (technique->pixel_shader()->id() == shader_id) {
+    } else if (technique->pixel_shader(flags)->id() == shader_id) {
       int idx = _res._pixel_shaders.idx_from_token(shader_id);
       return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx) : GraphicsObjectHandle();
     }

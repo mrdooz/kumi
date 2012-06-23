@@ -30,6 +30,35 @@ struct RenderObjects {
 };
 #pragma pack(pop)
 
+struct ShaderTemplate {
+  friend TechniqueParser;
+  enum Type {
+    kVertexShader,
+    kPixelShader,
+    kGeometryShader,
+  };
+
+  ShaderTemplate(Type type) : _type(type) {}
+
+  template<class T>
+  T* find_by_name(const char *name, std::vector<T> &v) {
+    for (size_t i = 0; i < v.size(); ++i) {
+      if (v[i].name == name)
+        return &v[i];
+    }
+    return NULL;
+  }
+
+private:
+  Type _type;
+  std::string _source_filename;
+  std::string _obj_filename;
+  std::string _entry_point;
+  std::vector<CBufferParam> _cbuffer_params;
+  std::vector<ResourceViewParam> _resource_view_params;
+  std::vector<std::string> _flags;
+};
+
 class Technique {
   friend class TechniqueParser;
 public:
@@ -40,12 +69,14 @@ public:
   const string &name() const { return _name; }
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
-  Shader *vertex_shader() { return _vertex_shader; }
-  Shader *pixel_shader() { return _pixel_shader; }
+  int vertex_shader_count() const { return (int)_vertex_shaders.size(); }
+  int pixel_shader_count() const { return (int)_pixel_shaders.size(); }
+  Shader *vertex_shader(int flags) { return _vertex_shaders[flags]; }
+  Shader *pixel_shader(int flags) { return _pixel_shaders[flags]; }
 
   //vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
-  void get_render_objects(RenderObjects *obj);
+  void get_render_objects(RenderObjects *obj, int vs_flags, int ps_flags);
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }
@@ -100,8 +131,13 @@ private:
   std::vector<uint8> _cbuffer_staged;
 
   string _name;
-  Shader *_vertex_shader;
-  Shader *_pixel_shader;
+  // we have multiple version of the shaders, one for each permutation of the compilation flags
+  std::vector<Shader *> _vertex_shaders;
+  std::vector<Shader *> _pixel_shaders;
+  Shader *_vertex_shader_base;
+  Shader *_pixel_shader_base;
+  //Shader *_vertex_shader;
+  //Shader *_pixel_shader;
 
   GraphicsObjectHandle _input_layout;
 
@@ -129,6 +165,9 @@ private:
   std::vector<std::pair<std::string, CD3D11_SAMPLER_DESC>> _sampler_descs;
   CD3D11_BLEND_DESC _blend_desc;
   CD3D11_DEPTH_STENCIL_DESC _depth_stencil_desc;
+
+  ShaderTemplate *_vs_shader_template;
+  ShaderTemplate *_ps_shader_template;
 
   vector<Material *> _materials;
 

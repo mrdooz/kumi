@@ -29,6 +29,8 @@ uint32 SubMesh::find_technique_index(GraphicsObjectHandle technique) {
 }
 
 void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
+  // TODO
+/*
   // get the pixel shader, check what textures he's using, and what slots to place them in
   // then we look these guys up in the current material
   Technique *technique = GRAPHICS.get_technique(technique_handle);
@@ -51,6 +53,7 @@ void SubMesh::prepare_textures(GraphicsObjectHandle technique_handle) {
     data->first_texture = min(data->first_texture, bind_point);
     data->num_textures = max(data->num_textures, bind_point - data->first_texture + 1);
   }
+*/
 }
 
 void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {

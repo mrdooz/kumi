@@ -101,7 +101,7 @@ cbuffer OOP4Lyfe : register(b0) {
     cDiffuseTexture g_DiffuseTexture;
 };
 
-fill_ps_output fill_ps_main(fill_ps_input input) : SV_Target
+fill_ps_output fill_ps_main(fill_ps_input input)
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;

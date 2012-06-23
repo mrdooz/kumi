@@ -277,7 +277,7 @@ void Renderer::render() {
         MeshRenderData *render_data = (MeshRenderData *)data;
         Technique *technique = res->_techniques.get(render_data->cur_technique);
         if (technique != prev_technique) {
-          technique->get_render_objects(&objects);
+          technique->get_render_objects(&objects, 0, 0);
           prev_technique = technique;
         }
         gen.set_vs(objects.vs);
@@ -329,7 +329,7 @@ void Renderer::render() {
         Technique *technique = res->_techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
 
-        technique->get_render_objects(&objects);
+        technique->get_render_objects(&objects, 0, 0);
         gen.set_vs(objects.vs);
         gen.set_ps(objects.ps);
 
@@ -576,9 +576,9 @@ void Renderer::validate_command(RenderKey key, const void *data) {
       MeshRenderData *render_data = (MeshRenderData *)data;
       Technique *technique = res->_techniques.get(render_data->cur_technique);
       assert(technique);
-      Shader *vertex_shader = technique->vertex_shader();
+      Shader *vertex_shader = technique->vertex_shader(0);
       assert(vertex_shader);
-      Shader *pixel_shader = technique->pixel_shader();
+      Shader *pixel_shader = technique->pixel_shader(0);
       assert(pixel_shader);
       break;
     }

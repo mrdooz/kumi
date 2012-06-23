@@ -25,4 +25,8 @@ private:
   int _ext_ofs;			// points to the '.'
 };
 
+std::string replace_extension(const std::string &org, const std::string &new_ext);
+std::string strip_extension(const std::string &str);
+void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext);
+
 #endif
