@@ -87,6 +87,7 @@ bool ScenePlayer::init() {
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_render = GRAPHICS.find_technique("ssao_render");
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
+  _default_shader = GRAPHICS.find_technique("default_shader");
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
@@ -259,6 +260,7 @@ bool ScenePlayer::render() {
   RenderKey key;
 
   if (_scene) {
+/*
     {
       RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
@@ -290,6 +292,10 @@ bool ScenePlayer::render() {
       RENDERER.submit_command(FROM_HERE, key, nullptr);
       RENDERER.submit_technique(_ssao_blur);
     }
+  }
+*/
+
+    _scene->submit_meshes(FROM_HERE, -1, _default_shader);
   }
 
   return true;

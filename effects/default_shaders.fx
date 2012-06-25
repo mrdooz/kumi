@@ -1,8 +1,10 @@
 matrix proj, view, world;
 float4 Diffuse, LightColor, LightPos;
 
+#if TEXTURE
 Texture2D diffuse_texture : register(t0);
 sampler diffuse_sampler : register(s0);
+#endif
 
 struct diffuse_vs_input {
     float4 pos : POSITION;

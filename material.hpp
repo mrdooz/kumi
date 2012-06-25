@@ -47,7 +47,8 @@ public:
 
   Property *property_by_name(const std::string &name);
 
-  void fill_cbuffer(CBuffer *cbuffer);
+  void fill_cbuffer(CBuffer *cbuffer) const;
+  int flags() const;
 
 private:
   std::string _name;

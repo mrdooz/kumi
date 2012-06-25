@@ -36,7 +36,7 @@ public:
     return *(T*)&_raw_data[id];
   }
 
-  void get_property_raw(PropertyId id, uint8 *out, int len) {
+  void get_property_raw(PropertyId id, char *out, int len) {
 #if _DEBUG
     assert(*((uint32*)&_raw_data[id-4]) == len);
 #endif

@@ -31,16 +31,19 @@ struct RenderObjects {
 
 struct ShaderTemplate {
   friend TechniqueParser;
-  enum Type {
-    kVertexShader,
-    kPixelShader,
-    kGeometryShader,
-  };
 
-  ShaderTemplate(Type type) : _type(type) {}
+  ShaderTemplate(ShaderType::Enum type) : _type(type) {}
+
+  CBufferParam *find_cbuffer_param(const std::string &name) {
+    return find_by_name(name, _cbuffer_params);
+  }
+
+  ResourceViewParam *find_resource_view(const std::string &name) {
+    return find_by_name(name, _resource_view_params);
+  }
 
   template<class T>
-  T* find_by_name(const char *name, std::vector<T> &v) {
+  T* find_by_name(const std::string &name, std::vector<T> &v) {
     for (size_t i = 0; i < v.size(); ++i) {
       if (v[i].name == name)
         return &v[i];
@@ -48,8 +51,7 @@ struct ShaderTemplate {
     return NULL;
   }
 
-private:
-  Type _type;
+  ShaderType::Enum _type;
   std::string _source_filename;
   std::string _obj_filename;
   std::string _entry_point;
@@ -70,8 +72,8 @@ public:
   GraphicsObjectHandle input_layout() const { return _input_layout; }
   int vertex_shader_count() const { return (int)_vertex_shaders.size(); }
   int pixel_shader_count() const { return (int)_pixel_shaders.size(); }
-  Shader *vertex_shader(int flags) { return _vertex_shaders[flags]; }
-  Shader *pixel_shader(int flags) { return _pixel_shaders[flags]; }
+  Shader *vertex_shader(int flags) const { return _vertex_shaders[flags]; }
+  Shader *pixel_shader(int flags) const { return _pixel_shaders[flags]; }
 
   //vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
@@ -90,7 +92,7 @@ public:
 
   bool init(ResourceInterface *res);
   bool reload_shaders();
-  bool init_shader(ResourceInterface *res, Shader *shader);
+  bool create_shaders(ResourceInterface *res, ShaderTemplate *shader_template);
 
   bool is_valid() const { return _valid; }
   const std::string &error_msg() const { return _error_msg; }
@@ -102,27 +104,27 @@ public:
   const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
   GraphicsObjectHandle cbuffer_handle();
 
-  std::vector<CBuffer> &get_cbuffer_vs() { return _vs_cbuffers; }
-  std::vector<CBuffer> &get_cbuffer_ps() { return _ps_cbuffers; }
+  //std::vector<CBuffer> &get_cbuffer_vs() { return _vs_cbuffers; }
+  //std::vector<CBuffer> &get_cbuffer_ps() { return _ps_cbuffers; }
 
 private:
 
   void prepare_cbuffers();
 
-  CBufferParam *find_cbuffer_param(const std::string &name, Shader::Type type);
+  //CBufferParam *find_cbuffer_param(const std::string &name, ShaderType::Enum type);
 
-  std::vector<CBuffer> _vs_cbuffers;
-  std::vector<CBuffer> _ps_cbuffers;
+  //std::vector<CBuffer> _vs_cbuffers;
+  //std::vector<CBuffer> _ps_cbuffers;
 
-  std::vector<CBufferParam> _vs_cbuffer_params;
-  std::vector<CBufferParam> _ps_cbuffer_params;
+  //std::vector<CBufferParam> _vs_cbuffer_params;
+  //std::vector<CBufferParam> _ps_cbuffer_params;
 
   void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
-  bool compile_shader(Shader *shader);
-  bool do_reflection(Shader *shader, void *buf, size_t len);
-  bool do_text_reflection(const char *start, const char *end, Shader *shader, void *buf, size_t len);
+  bool compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const std::vector<std::string> &flags);
+  //bool do_reflection(Shader *shader, void *buf, size_t len);
+  bool do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const std::vector<char> &obj);
 
   bool parse_input_layout(ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len);
 
@@ -133,10 +135,6 @@ private:
   // we have multiple version of the shaders, one for each permutation of the compilation flags
   std::vector<Shader *> _vertex_shaders;
   std::vector<Shader *> _pixel_shaders;
-  Shader *_vertex_shader_base;
-  Shader *_pixel_shader_base;
-  //Shader *_vertex_shader;
-  //Shader *_pixel_shader;
 
   GraphicsObjectHandle _input_layout;
 

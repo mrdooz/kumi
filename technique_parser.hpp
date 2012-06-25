@@ -24,11 +24,9 @@ public:
 private:
 	friend struct Scope;
 	void parse_technique(Scope *scope, Technique *technique);
-  void parse_shader(Scope *scope, Technique *technique, Shader *shader);
   void parse_shader_template(Scope *scope, Technique *technique, ShaderTemplate *shader);
 	void parse_params(const vector<vector<string>> &items, Technique *technique, Shader *shader);
-  void parse_param(const vector<string> &param, Technique *technique, Shader *shader);
-  void parse_param2(const vector<string> &param, Technique *technique, ShaderTemplate *shader);
+  void parse_param(const vector<string> &param, Technique *technique, ShaderTemplate *shader);
 	void parse_material(Scope *scope, Material *material);
 	void parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc);
 	void parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc);

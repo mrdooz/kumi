@@ -17,11 +17,16 @@ Material::Property *Material::property_by_name(const std::string &name) {
   return it == end(_properties_by_name) ? nullptr : it->second;
 }
 
-void Material::fill_cbuffer(CBuffer *cbuffer) {
+void Material::fill_cbuffer(CBuffer *cbuffer) const {
   for (size_t i = 0; i < cbuffer->material_vars.size(); ++i) {
     auto &cur = cbuffer->material_vars[i];
-    auto prop = _properties_by_id[cur.id];
-    if (prop)
-      PROPERTY_MANAGER.get_property_raw(prop->id, &cbuffer->staging[cur.ofs], cur.len);
+    auto it = _properties_by_id.find(cur.id);
+    if (it != _properties_by_id.end()) {
+      PROPERTY_MANAGER.get_property_raw(it->second->id, &cbuffer->staging[cur.ofs], cur.len);
+    }
   }
+}
+
+int Material::flags() const {
+  return 0;
 }

@@ -74,7 +74,7 @@ void read_and_step(const U **buf, T *val) {
   *buf += sizeof(T);
 }
 
-bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
+bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
@@ -97,31 +97,31 @@ bool KumiLoader::load_meshes(const uint8 *buf, Scene *scene) {
         auto &technique = it->second.first;
         auto &material = it->second.second;
         submesh->material_id = _material_ids[material];
-        submesh->render_data.cur_technique = GRAPHICS.find_technique(technique.c_str());
+        //submesh->render_data.cur_technique = GRAPHICS.find_technique(technique.c_str());
       } else {
         // set the default technique for the material
         submesh->material_id = _material_ids[material_name];
-        submesh->render_data.cur_technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
+        //submesh->render_data.cur_technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
       }
 
       const int vb_flags = read_and_step<int>(&buf);
-      submesh->render_data.vertex_size = read_and_step<int>(&buf);
-      submesh->render_data.index_format = index_size_to_format(read_and_step<int>(&buf));
+      submesh->geometry.vertex_size = read_and_step<int>(&buf);
+      submesh->geometry.index_format = index_size_to_format(read_and_step<int>(&buf));
       const int *vb = read_and_step<const int*>(&buf);
       const int vb_size = *vb;
-      submesh->render_data.vertex_count = vb_size / submesh->render_data.vertex_size;
-      submesh->render_data.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
+      submesh->geometry.vertex_count = vb_size / submesh->geometry.vertex_size;
+      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
       const int *ib = read_and_step<const int*>(&buf);
       const int ib_size = *ib;
-      submesh->render_data.index_count = ib_size / index_format_to_size(submesh->render_data.index_format);
-      submesh->render_data.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
+      submesh->geometry.index_count = ib_size / index_format_to_size(submesh->geometry.index_format);
+      submesh->geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
     }
   }
 
   return true;
 }
 
-bool KumiLoader::load_lights(const uint8 *buf, Scene *scene) {
+bool KumiLoader::load_lights(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
@@ -136,7 +136,7 @@ bool KumiLoader::load_lights(const uint8 *buf, Scene *scene) {
   return true;
 }
 
-bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
+bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
@@ -158,7 +158,7 @@ bool KumiLoader::load_cameras(const uint8 *buf, Scene *scene) {
 }
 
 template<class T>
-void load_animation_inner(const uint8 **buf, map<string, vector<KeyFrame<T>>> *out) {
+void load_animation_inner(const char **buf, map<string, vector<KeyFrame<T>>> *out) {
   const int count = read_and_step<int>(&(*buf));
   for (int i = 0; i < count; ++i) {
     const char *node_name = read_and_step<const char *>(&(*buf));
@@ -169,7 +169,7 @@ void load_animation_inner(const uint8 **buf, map<string, vector<KeyFrame<T>>> *o
   }
 }
 
-bool KumiLoader::load_animation(const uint8 *buf, Scene *scene) {
+bool KumiLoader::load_animation(const char *buf, Scene *scene) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
@@ -182,7 +182,7 @@ bool KumiLoader::load_animation(const uint8 *buf, Scene *scene) {
 }
 
 
-bool KumiLoader::load_materials(const uint8 *buf, Scene *scene) {
+bool KumiLoader::load_materials(const char *buf, Scene *scene) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
@@ -300,11 +300,11 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
   }
 
   const int scene_data_size = header.binary_ofs;
-  vector<uint8> scene_data;
+  vector<char> scene_data;
   B_ERR_BOOL(resource->load_partial(filename, 0, scene_data_size, &scene_data));
 
   const int buffer_data_size = header.total_size - header.binary_ofs;
-  vector<uint8> buffer_data;
+  vector<char> buffer_data;
   B_ERR_BOOL(resource->load_partial(filename, header.binary_ofs, buffer_data_size, &buffer_data));
 
   // apply the binary fixup

@@ -222,7 +222,7 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     function sendTimeInfo() {
-        sendJson("time", { is_playing : (is_playing ? true : false), cur_time : cur_time} );
+        sendJson("time", { is_playing : !!is_playing, cur_time : cur_time} );
     }
 
     function sendDemoInfo() {

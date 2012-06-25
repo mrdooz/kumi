@@ -563,60 +563,7 @@ Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
   return it->second;
 }
 
-void TechniqueParser::parse_param(const vector<string> &param, Technique *technique, Shader *shader) {
-
-  auto valid_sources = map_list_of
-    ("material", PropertySource::kMaterial)
-    ("system", PropertySource::kSystem)
-    ("user", PropertySource::kUser)
-    ("mesh", PropertySource::kMesh);
-  //("technique", PropertySource::kTechnique);
-
-  THROW_ON_FALSE(param.size() >= 3);
-
-  // type, name and source are required. the default value is optional
-  Symbol sym_type = _symbol_trie->find_symbol(param[0]);
-  PropertyType::Enum type = lookup_throw<Symbol, PropertyType::Enum>(sym_type, valid_property_types);
-
-  // check if the property is an array
-  const char *open_bracket = strchr(param[0].c_str(), '[');
-  const char *close_bracket = open_bracket ? strchr(open_bracket+1, ']') : nullptr;
-  int len = open_bracket && close_bracket ? atoi(open_bracket + 1) : 0;
-  type = (PropertyType::Enum)MAKELONG(type, len);
-
-  string name = param[1];
-  string friendly_name = param.size() == 4 ? param[2] : "";
-  int src_pos = friendly_name.empty() ? 2 : 3;
-  PropertySource::Enum source = lookup_throw<string, PropertySource::Enum>(param[src_pos], valid_sources);
-
-  bool cbuffer_param = false;
-  if (type == PropertyType::kTexture2d) {
-    shader->resource_view_params().push_back(ResourceViewParam(name, type, source, friendly_name));
-  } else {
-    if (shader->type() == Shader::kVertexShader) {
-      technique->_vs_cbuffer_params.push_back(CBufferParam(name, type, source));
-    } else if (shader->type() == Shader::kPixelShader) {
-      technique->_ps_cbuffer_params.push_back(CBufferParam(name, type, source));
-    } else {
-      // todo
-    }
-    cbuffer_param = true;
-  }
-
-    // TODO: add defaults again
-    /*
-    EXPECT(scope, kSymSemicolon);
-
-    // check for default value
-    if (cbuffer_param && scope->consume_if(kSymDefault)) {
-    string value = scope->string_until(';');
-    EXPECT(scope, kSymSemicolon);
-    parse_value(value, shader->cbuffer_params.back().type, &shader->cbuffer_params.back().default_value._float[0]);
-    }
-    */
-}
-
-void TechniqueParser::parse_param2(const vector<string> &param, Technique *technique, ShaderTemplate *shader) {
+void TechniqueParser::parse_param(const vector<string> &param, Technique *technique, ShaderTemplate *shader) {
 
   auto valid_sources = map_list_of
     ("material", PropertySource::kMaterial)
@@ -717,60 +664,12 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
   }
 }
 
-void TechniqueParser::parse_shader(Scope *scope, Technique *technique, Shader *shader) {
-
-  auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams)(kSymFlags);
-  const string &ext = shader->type() == Shader::kVertexShader ? ".vso" : ".pso";
-  string entry_point = shader->type() == Shader::kVertexShader ? "vs_main" : "ps_main";
-  Symbol symbol;
-
-  while (scope->consume_in(tmp, &symbol)) {
-
-    switch (symbol) {
-
-      case kSymFile: {
-        shader->set_source_filename(scope->string_until(';'));
-        // Use the default entry point name until we get a real tag
-        shader->set_obj_filename(strip_extension(shader->source_filename().c_str()) + "_" + entry_point + ext);
-        scope->munch(kSymSemicolon);
-        break;
-      }
-
-      case kSymEntryPoint:
-         shader->set_entry_point(entry_point = scope->string_until(';'));
-        // update the obj filename
-        if (!shader->source_filename().empty())
-          shader->set_obj_filename(strip_extension(shader->source_filename().c_str()) + "_" + entry_point + ext);
-        scope->munch(kSymSemicolon);
-        break;
-
-      case kSymParams : {
-        Scope inner = scope->create_delimited_scope('[', ']');
-        vector<vector<string>> params;
-        parse_list(&inner, &params);
-        for (auto it = begin(params); it != end(params); ++it)
-          parse_param(*it, technique, shader);
-        scope->advance(inner).munch(kSymSemicolon);
-        break;
-      }
-
-      case kSymFlags: {
-        Scope inner = scope->create_delimited_scope('[', ']');
-        vector<vector<string>> flags;
-        parse_list(&inner, &flags);
-        for (size_t i = 0; i < flags.size(); ++i)
-          shader->_flags.push_back(flags[i][0]);
-        break;
-      }
-    }
-  }
-}
 
 void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, ShaderTemplate *shader) {
 
   auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams)(kSymFlags);
   string ext, entry_point;
-  if (shader->_type == ShaderTemplate::kVertexShader) {
+  if (shader->_type == ShaderType::kVertexShader) {
     ext = ".vso";
     entry_point = "vs_main";
   } else {
@@ -806,7 +705,7 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
         vector<vector<string>> params;
         parse_list(&inner, &params);
         for (auto it = begin(params); it != end(params); ++it)
-          parse_param2(*it, technique, shader);
+          parse_param(*it, technique, shader);
         scope->advance(inner).munch(kSymSemicolon);
         break;
       }
@@ -817,6 +716,7 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
         parse_list(&inner, &flags);
         for (size_t i = 0; i < flags.size(); ++i)
           shader->_flags.push_back(flags[i][0]);
+        scope->advance(inner).munch(kSymSemicolon);
         break;
       }
     }
@@ -1163,20 +1063,12 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
       case kSymVertexShader:
       case kSymPixelShader: {
-/*
-        bool vs = symbol == kSymVertexShader;
-        unique_ptr<Shader> shader(vs ? (Shader *)new VertexShader() : (Shader *)new PixelShader());
-        scope->munch(kSymBlockOpen);
-        parse_shader(scope, technique, shader.get());
-        *(vs ? &technique->_vertex_shader : &technique->_pixel_shader) = shader.release();
-        scope->munch(kSymBlockClose).munch(kSymSemicolon);
-*/
         bool vs = symbol == kSymVertexShader;
         ShaderTemplate *st = nullptr;
         if (vs) {
-          technique->_vs_shader_template = st = new ShaderTemplate(ShaderTemplate::kVertexShader);
+          technique->_vs_shader_template = st = new ShaderTemplate(ShaderType::kVertexShader);
         } else {
-          technique->_ps_shader_template = st = new ShaderTemplate(ShaderTemplate::kPixelShader);
+          technique->_ps_shader_template = st = new ShaderTemplate(ShaderType::kPixelShader);
         }
         scope->munch(kSymBlockOpen);
         parse_shader_template(scope, technique, st);
@@ -1272,7 +1164,7 @@ bool TechniqueParser::parse(const char *start, const char *end, vector<Technique
   if (materials) {
     materials->clear();
     for (auto it = std::begin(*techniques); it != std::end(*techniques); ++it)
-    copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
+      copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
   }
 
   return true;

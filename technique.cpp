@@ -79,16 +79,16 @@ bool Technique::parse_input_layout(ID3D11ShaderReflection* reflector, const D3D1
 
   return _input_layout.is_valid();
 }
-
-CBufferParam *Technique::find_cbuffer_param(const std::string &name, Shader::Type type) {
-  vector<CBufferParam> *params = type == Shader::kVertexShader ? &_vs_cbuffer_params : &_ps_cbuffer_params;
+/*
+CBufferParam *Technique::find_cbuffer_param(const std::string &name, ShaderType::Enum type) {
+  vector<CBufferParam> *params = type == ShaderType::kVertexShader ? &_vs_cbuffer_params : &_ps_cbuffer_params;
   for (auto it = begin(*params); it != end(*params); ++it) {
     if (it->name == name)
       return &(*it);
   }
   return nullptr;
 }
-
+*/
 const char *skip_line(const char *start, const char *end) {
   while (start < end && *start != '\r' && *start != '\n')
     ++start;
@@ -118,7 +118,9 @@ vector<string> split(const char *start, const char *end) {
   return res;
 }
 
-void trim_input(const char *start, const char *end, vector<vector<string>> *res) {
+void trim_input(const vector<char> &input, vector<vector<string>> *res) {
+  const char *start = input.data();
+  const char *end = start + input.size();
   // extract the relevant text
   if (strstr(start, "#if 0"))
     start = skip_line(start, end);
@@ -142,12 +144,11 @@ void trim_input(const char *start, const char *end, vector<vector<string>> *res)
   }
 }
 
-bool Technique::do_text_reflection(const char *text_start, const char *text_end,
-                                   Shader *shader, void *buf, size_t len) {
+bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const vector<char> &obj) {
 
   // extract the relevant text
   vector<vector<string>> input;
-  trim_input(text_start, text_end, &input);
+  trim_input(text, &input);
 
   // parse it!
   for (size_t i = 0; i < input.size(); ++i) {
@@ -155,7 +156,7 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
 
     if (cur_line[0] == "cbuffer") {
       // Parse cbuffer
-      CBuffer cbuffer;
+      CBuffer &cbuffer = dummy_push_back(&shader->_cbuffers);
       int size = 0;
 
       for (i += 2; i < input.size(); ++i) {
@@ -166,7 +167,13 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
           bool unused = row.size() == 8 && row[7] == "[unused]";
           if (!unused) {
             string name = string(row[1].c_str(), row[1].size() - 1); // skip trailing ';'
-            CBufferParam *param = find_cbuffer_param(name, shader->type());
+            // strip any []
+            int bracket = name.find('[');
+            if (bracket != name.npos) {
+              name = string(name.c_str(), bracket);
+            }
+            // Find the parameter in the template, so we can get the source
+            CBufferParam *param = shader_template->find_cbuffer_param(name);
             if (!param) {
               add_error_msg("Shader parameter %s not found", name.c_str());
               return false;
@@ -184,10 +191,10 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
             var.name = class_id;
 #endif
             switch (param->source) {
-            case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
-            case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
-            case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
-            default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
+              case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
+              case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
+              case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
+              default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
             }
             param->used = true;
           }
@@ -195,12 +202,8 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
       }
       cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
       cbuffer.staging.resize(size);
-      if (shader->type() == Shader::kVertexShader)
-        _vs_cbuffers.emplace_back(cbuffer);
-      else
-        _ps_cbuffers.emplace_back(cbuffer);
 
-    } else if (shader->type() == Shader::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
+    } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
       // Parse input layout
       auto mapping = map_list_of
@@ -210,12 +213,13 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
         ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
         ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
-      i += 3;
       vector<D3D11_INPUT_ELEMENT_DESC> inputs;
       for (i += 3; i < input.size(); ++i) {
         auto &row = input[i];
-        if (row.size() != 7)
+        if (row.size() != 7) {
+          --i;  // rewind to the previous row
           break;
+        }
 
         DXGI_FORMAT fmt;
         if (!lookup<string, DXGI_FORMAT>(row[0], mapping, &fmt)) {
@@ -223,10 +227,10 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
           return false;
         }
 
-        inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, atoi(row[3].c_str())));
+        inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, 0));
       }
 
-      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, &inputs[0], inputs.size(), buf, len);
+      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, &inputs[0], inputs.size(), obj.data(), obj.size());
       if (!_input_layout.is_valid()) {
         add_error_msg("Invalid input layout");
         return false;
@@ -235,15 +239,17 @@ bool Technique::do_text_reflection(const char *text_start, const char *text_end,
 
       for (i += 3; i < input.size(); ++i) {
         auto &row = input[i];
-        if (row.size() != 6)
+        if (row.size() != 6) {
+          --i;  // rewind to the previous row
           break;
+        }
 
         const string &name = row[0];
         const string &type = row[1];
         int bind_point = atoi(row[4].c_str());
 
         if (type == "texture") {
-          ResourceViewParam *param = shader->find_resource_view_param(name.c_str());
+          ResourceViewParam *param = shader_template->find_resource_view(name.c_str());
           if (!param) {
             add_error_msg("Resource view %s not found", name.c_str());
             return false;
@@ -272,6 +278,7 @@ FOUND_SAMPLER:;
   return true;
 }
 
+#if 0
 bool Technique::do_reflection(Shader *shader, void *buf, size_t len)
 {
   ID3D11ShaderReflection* reflector = NULL; 
@@ -280,7 +287,7 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len)
   reflector->GetDesc(&shader_desc);
 
   // Parse input layout for vertex shaders
-  if (shader->type() == Shader::kVertexShader && !parse_input_layout(reflector, shader_desc, buf, len))
+  if (shader->type() == ShaderType::kVertexShader && !parse_input_layout(reflector, shader_desc, buf, len))
     return false;
 /*
   // Parse shader interfaces
@@ -370,7 +377,7 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len)
 
     cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
     cbuffer.staging.resize(size);
-    if (shader->type() == Shader::kVertexShader)
+    if (shader->type() == ShaderType::kVertexShader)
       _vs_cbuffers.emplace_back(cbuffer);
     else
       _ps_cbuffers.emplace_back(cbuffer);
@@ -416,12 +423,12 @@ bool Technique::do_reflection(Shader *shader, void *buf, size_t len)
   }
   return true;
 }
-
+#endif
 GraphicsObjectHandle Technique::cbuffer_handle() {
   return _constant_buffers.empty() ? GraphicsObjectHandle() : _constant_buffers[0].handle;
 }
 
-bool Technique::compile_shader(Shader *shader) {
+bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const vector<string> &flags) {
 
   STARTUPINFOA startup_info;
   ZeroMemory(&startup_info, sizeof(startup_info));
@@ -443,33 +450,36 @@ bool Technique::compile_shader(Shader *shader) {
   startup_info.dwFlags = STARTF_USESTDHANDLES;
   startup_info.hStdError = startup_info.hStdOutput = stdout_write;
 
-  // redirect the child's output handles to the log manager's
-  // TODO
-  /*
-  startup_info.dwFlags = STARTF_USESTDHANDLES;
-  startup_info.hStdOutput = startup_info.hStdError = LOGGER.handle();
-  */
   PROCESS_INFORMATION process_info;
   ZeroMemory(&process_info, sizeof(process_info));
 
-  const char *profile = shader->type() == Shader::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
+  const char *profile = type == ShaderType::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
 
-  //fxc -nologo -T$(PROFILE) -E$(ENTRY_POINT) -Vi -O3 -Fo $(OBJECT_FILE) $(SOURCE_FILE)
   char cmd_line[MAX_PATH];
 
+  // create the defines for the current flags
+  string defines;
+  for (size_t i = 0; i < flags.size(); ++i) {
+    defines.append("/D" + flags[i] + "=1");
+    if (i != flags.size() - 1)
+      defines.append(" ");
+  }
+
 #ifdef _DEBUG
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s -Fh %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s -Fh %s %s %s", 
     profile,
-    shader->entry_point().c_str(),
-    shader->obj_filename().c_str(),
-    Path::replace_extension(shader->obj_filename(), "h").c_str(),
-    shader->source_filename().c_str());
+    entry_point,
+    obj,
+    Path::replace_extension(obj, "h").c_str(),
+    defines.c_str(),
+    src);
 #else
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s %s", 
     profile,
-    shader->entry_point().c_str(),
-    shader->obj_filename().c_str(), 
-    shader->source_filename().c_str());
+    entry_point.c_str(),
+    obj.c_str(), 
+    defines.c_str(),
+    src.c_str());
 #endif
 
   DWORD exit_code = 1;
@@ -487,20 +497,13 @@ bool Technique::compile_shader(Shader *shader) {
 
   if (exit_code) {
     // read the pipe
-    string err_msg;
-    char buf[4096+1];
-    while (true) {
-      DWORD bytes_read;
-      BOOL res = ReadFile(stdout_read, buf, sizeof(buf)-1, &bytes_read, NULL);
-      if (!res || bytes_read == 0)
-        break;
-      buf[bytes_read] = 0;
-      err_msg += buf;
-      if (bytes_read < sizeof(buf)-1)
-        break;
-    }
-    add_error_msg(err_msg.c_str());
-    LOG_WARNING_LN(err_msg.c_str());
+    int len = GetFileSize(stdout_read, NULL);
+    char *buf = (char *)_alloca(len + 1);
+    buf[len] = 0;
+    DWORD bytes_read;
+    ReadFile(stdout_read, buf, len, &bytes_read, NULL);
+    add_error_msg(buf);
+    LOG_WARNING_LN(buf);
   }
   CloseHandle(stdout_read);
   CloseHandle(stdout_write);
@@ -512,11 +515,143 @@ bool Technique::reload_shaders() {
   return true;
 }
 
-bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
+struct ShaderInstance {
+  ShaderInstance(const string &obj) : obj(obj) {}
+  ShaderInstance(const string &obj, const vector<string> &flags) : obj(obj), flags(flags) {}
+  string obj;
+  vector<string> flags;
+};
+
+bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_template) {
 
   bool force = true;
-
   bool ok = true;
+
+  const char *src = shader_template->_source_filename.c_str();
+  const char *ep = shader_template->_entry_point.c_str();
+  string output_base = strip_extension(shader_template->_obj_filename);
+  string output_ext = get_extension(shader_template->_obj_filename);
+  ShaderType::Enum type = shader_template->_type;
+
+  vector<ShaderInstance> shaders;
+
+  // Create all the shader permutations
+  if (shader_template->_flags.empty()) {
+    shaders.push_back(ShaderInstance(shader_template->_obj_filename));
+  } else {
+    size_t num_flags = shader_template->_flags.size();
+    // generate flags combinations
+    for (int i = 0; i < (1 << num_flags); ++i) {
+      vector<string> flags;
+      string filename_suffix;
+      for (size_t j = 0; j < num_flags; ++j) {
+        if (i & (1 << j)) {
+          flags.push_back(shader_template->_flags[j]);
+          filename_suffix.append("1");
+        } else {
+          filename_suffix.append("0");
+        }
+      }
+
+      string obj = output_base + "_" + filename_suffix + "." + output_ext;
+      shaders.push_back(ShaderInstance(obj, flags));
+    }
+  }
+
+  // Compile all the shaders
+  for (size_t i = 0; i < shaders.size(); ++i) {
+
+    auto &cur = shaders[i];
+    const char *obj = cur.obj.c_str();
+    // compile the shader if the source is newer, or the object file doesn't exist
+    if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
+      if (!compile_shader(type, ep, src, obj, cur.flags))
+        return false;
+    } else {
+      if (!res->file_exists(obj))
+        return false;
+    }
+
+    vector<char> buf;
+    if (!res->load_file(obj, &buf))
+      return false;
+
+    int len = (int)buf.size();
+
+    Shader *shader = new Shader(type);
+#if _DEBUG
+    shader->_entry_point = ep;
+    shader->_source_filename = src;
+    shader->_obj_filename = obj;
+    shader->_flags = cur.flags;
+#endif
+
+    // load corresponding .h file
+    vector<char> text;
+    if (!res->load_file(Path::replace_extension(obj, "h").c_str(), &text))
+      return false;
+
+    if (!do_reflection(text, shader, shader_template, buf))
+      return false;
+    /*
+    if (!do_reflection(graphics, shader, buf.data(), len))
+    return false;
+    */
+    shader->prepare_cbuffers();
+
+    switch (shader->type()) {
+      case ShaderType::kVertexShader: 
+        shader->set_handle(GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
+        _vertex_shaders.push_back(shader);
+        break;
+      case ShaderType::kPixelShader: 
+        shader->set_handle(GRAPHICS.create_pixel_shader(FROM_HERE, buf.data(), len, shader->id()));
+        _pixel_shaders.push_back(shader);
+        break;
+      case ShaderType::kGeometryShader: break;
+    }
+  }
+#if 0
+/*
+    const char *obj = shader->_obj_filename.c_str();
+    // compile the shader if the source is newer, or the object file doesn't exist
+    if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
+      if (!compile_shader(shader->_type, shader->_entry_point.c_str(), src, shader->_obj_filename.c_str(), vector<string>()))
+        return false;
+    } else {
+      if (!res->file_exists(obj))
+        return false;
+    }
+
+  } else {
+    size_t num_flags = shader->_flags.size();
+    // generate flags combinations
+    for (int i = 0; i < (1 << num_flags); ++i) {
+      vector<string> flags;
+      string filename_suffix;
+      for (size_t j = 0; j < num_flags; ++j) {
+        if (i & (1 << j)) {
+          flags.push_back(shader->_flags[j]);
+          filename_suffix.append("1");
+        } else {
+          filename_suffix.append("0");
+        }
+      }
+
+      string obj = output_base + filename_suffix + "." + ext;
+      // compile the shader if the source is newer, or the object file doesn't exist
+      if (force || res->file_exists(src) && (!res->file_exists(obj.c_str()) || res->mdate(src) > res->mdate(obj.c_str()))) {
+        if (!compile_shader(shader->_type, shader->_entry_point.c_str(), src, obj.c_str(), flags))
+          return false;
+      } else {
+        if (!res->file_exists(obj.c_str()))
+          return false;
+      }
+
+    }
+  }
+*/
+/*
   const char *obj = shader->obj_filename().c_str();
   const char *src = shader->source_filename().c_str();
   // compile the shader if the source is newer, or the object file doesn't exist
@@ -527,7 +662,8 @@ bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
     if (!res->file_exists(obj))
       return false;
   }
-
+*/
+/*
   // load compiled shaders
   vector<uint8> buf;
   if (!res->load_file(obj, &buf))
@@ -539,7 +675,7 @@ bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
   vector<uint8> text;
   if (!res->load_file(Path::replace_extension(obj, "h").c_str(), &text))
     return false;
-  do_text_reflection((const char *)text.data(), (const char *)text.data() + text.size(), shader, buf.data(), len);
+  do_reflection((const char *)text.data(), (const char *)text.data() + text.size(), shader, buf.data(), len);
 /*
   if (!do_reflection(graphics, shader, buf.data(), len))
     return false;
@@ -547,7 +683,7 @@ bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
   shader->prune_unused_parameters();
 
   switch (shader->type()) {
-    case Shader::kVertexShader: 
+    case ShaderType::kVertexShader: 
       shader->set_handle(GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
       break;
     case Shader::kPixelShader: 
@@ -557,7 +693,7 @@ bool Technique::init_shader(ResourceInterface *res, Shader *shader) {
   }
 
   shader->validate();
-
+#endif
   // check that our samplers are sequential
   if (_ordered_sampler_states[_first_sampler].is_valid()) {
     bool prev_valid = true;
@@ -583,13 +719,14 @@ bool Technique::init(ResourceInterface *res) {
     _sampler_states.push_back(make_pair(i->first, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
   }
 
-  for (size_t i = 0; i < _vertex_shaders.size(); ++i) {
-    if (!init_shader(res, _vertex_shaders[i]))
+  // create the shaders from the templates
+  if (_vs_shader_template) {
+    if (!create_shaders(res, _vs_shader_template))
       return false;
   }
 
-  for (size_t i = 0; i < _pixel_shaders.size(); ++i) {
-    if (!init_shader(res, _pixel_shaders[i]))
+  if (_ps_shader_template) {
+    if (!create_shaders(res, _ps_shader_template))
       return false;
   }
 

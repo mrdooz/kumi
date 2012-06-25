@@ -53,6 +53,7 @@ private:
 
   GraphicsObjectHandle _rt_blur;
 
+  GraphicsObjectHandle _default_shader;
   GraphicsObjectHandle _ssao_fill;
   GraphicsObjectHandle _ssao_render;
   GraphicsObjectHandle _ssao_blur;

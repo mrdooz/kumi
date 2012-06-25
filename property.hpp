@@ -48,5 +48,5 @@ struct CBuffer {
   std::vector<CBufferVariable> mesh_vars;
   std::vector<CBufferVariable> material_vars;
   std::vector<CBufferVariable> system_vars;
-  std::vector<uint8> staging;
+  std::vector<char> staging;
 };

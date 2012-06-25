@@ -20,8 +20,8 @@ public:
 
   bool file_exists(const char *filename);
   __time64_t mdate(const char *filename);
-  virtual bool load_file(const char *filename, std::vector<uint8> *buf);
-  virtual bool load_partial(const char *filename, size_t ofs, size_t len, std::vector<uint8> *buf);
+  virtual bool load_file(const char *filename, std::vector<char> *buf);
+  virtual bool load_partial(const char *filename, size_t ofs, size_t len, std::vector<char> *buf);
   virtual bool load_inplace(const char *filename, size_t ofs, size_t len, void *buf);
 
   virtual bool supports_file_watch() const;

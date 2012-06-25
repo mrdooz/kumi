@@ -3,6 +3,14 @@
 #include "property_manager.hpp"
 #include "graphics_submit.hpp"
 
+namespace ShaderType {
+  enum Enum {
+    kVertexShader,
+    kPixelShader,
+    kGeometryShader,
+  };
+}
+
 struct ParamBase {
   ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) 
     : name(name), type(type), source(source), used(false) {}
@@ -45,12 +53,7 @@ struct CBufferParam : public ParamBase {
   PropertyId id;
   DefaultValue default_value;
 };
-/*
-struct SamplerParam : public ParamBase {
-  SamplerParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source) {}
-  int bind_point;
-};
-*/
+
 struct ResourceViewParam : public ParamBase {
   ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
     : ParamBase(name, type, source)
@@ -64,35 +67,13 @@ struct ResourceViewParam : public ParamBase {
 
 class Shader {
   friend class TechniqueParser;
+  friend class Technique;
 public:
-  enum Type {
-    kVertexShader,
-    kPixelShader,
-    kGeometryShader,
-  };
 
-  Shader(const std::string &entry_point) : _entry_point(entry_point), _valid(false) {}
+  Shader(ShaderType::Enum type) : _type(type), _valid(false) {}
   virtual ~Shader() {}
-/*
-  CBufferParam *find_cbuffer_param(const char *name) {
-    return find_by_name(name, _cbuffer_params);
-  }
-*/
-  ResourceViewParam *find_resource_view_param(const char *name) {
-    return find_by_name(name, _resource_view_params);
-  }
 
-  template<class T>
-  T* find_by_name(const char *name, std::vector<T> &v) {
-    for (size_t i = 0; i < v.size(); ++i) {
-      if (v[i].name == name)
-        return &v[i];
-    }
-    return NULL;
-  }
-
-  virtual void set_buffers() = 0;
-  virtual Type type() const = 0;
+  ShaderType::Enum type() const { return _type; }
   bool is_valid() const { return _valid; }
   void set_source_filename(const std::string &filename) { _source_filename = filename; }
   const std::string &source_filename() const { return _source_filename; }
@@ -102,28 +83,34 @@ public:
   const std::string &obj_filename() const { return _obj_filename; }
 
   //std::vector<CBufferParam> &cbuffer_params() { return _cbuffer_params; }
-  std::vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
+  //std::vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
 
   void set_handle(GraphicsObjectHandle handle) { _handle = handle; }
   GraphicsObjectHandle handle() const { return _handle; }
-  void validate() { _valid = true; } // tihi
 
   std::string id() const;
 
-  void prune_unused_parameters();
+  void prepare_cbuffers();
+
+  std::vector<CBuffer> &get_cbuffers() { return _cbuffers; }
 
 private:
+  void prune_unused_parameters();
 
+  std::vector<CBuffer> _cbuffers;
   bool _valid;
+#if _DEBUG
   std::string _source_filename;
   std::string _obj_filename;
   std::string _entry_point;
+  std::vector<std::string> _flags;
+#endif
   //std::vector<CBufferParam> _cbuffer_params;
   std::vector<ResourceViewParam> _resource_view_params;
-  std::vector<std::string> _flags;
   GraphicsObjectHandle _handle;
+  ShaderType::Enum _type;
 };
-
+/*
 struct VertexShader : public Shader{
   VertexShader() : Shader("vs_main") {}
   virtual void set_buffers() {
@@ -137,7 +124,7 @@ struct PixelShader : public Shader {
   }
   virtual Type type() const { return kPixelShader; }
 };
-
+*/
 /*
 struct CBuffer {
   CBuffer(const std::string &name, int size, GraphicsObjectHandle handle) 

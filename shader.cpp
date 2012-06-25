@@ -12,7 +12,11 @@ string Shader::id() const {
 }
 
 void Shader::prune_unused_parameters() {
-  auto r = [&](const ParamBase &param) { return !param.used; };
+  auto not_used = [&](const ParamBase &param) { return !param.used; };
   //erase_remove_if(&_cbuffer_params, r);
-  erase_remove_if(&_resource_view_params, r);
+  //erase_remove_if(&_resource_view_params, r);
+}
+
+void Shader::prepare_cbuffers() {
+  prune_unused_parameters();
 }

@@ -66,7 +66,7 @@ void ResourceManager::add_path(const char *path) {
   _paths.push_back(normalize_path(path, true));
 }
 
-bool ResourceManager::load_file(const char *filename, std::vector<uint8> *buf) {
+bool ResourceManager::load_file(const char *filename, std::vector<char> *buf) {
   const string &full_path = resolve_filename(filename);
   if (full_path.empty()) return false;
 
@@ -80,7 +80,7 @@ bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
   return ::load_file(full_path.c_str(), buf, len);
 }
 */
-bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, std::vector<uint8> *buf) {
+bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, std::vector<char> *buf) {
   buf->resize(len);
   return load_inplace(filename, ofs, len, buf->data());
 }

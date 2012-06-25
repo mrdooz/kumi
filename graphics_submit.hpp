@@ -9,6 +9,26 @@ struct Mesh;
 struct SubMesh;
 class Material;
 
+struct MeshGeometry {
+  MeshGeometry() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
+  GraphicsObjectHandle vb, ib;
+  DXGI_FORMAT index_format;
+  int index_count;
+  int vertex_size;
+  int vertex_count;
+  D3D_PRIMITIVE_TOPOLOGY topology;
+};
+
+struct MeshRenderData2 {
+  const MeshGeometry *geometry;
+  GraphicsObjectHandle technique;
+  GraphicsObjectHandle material;
+  const Mesh *mesh;
+#if _DEBUG
+  const SubMesh *submesh;
+#endif
+};
+#if 0
 struct MeshRenderData {
   MeshRenderData() 
     : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST)
@@ -36,7 +56,7 @@ struct MeshRenderData {
   SubMesh *submesh;
   Material *material;
 };
-
+#endif
 struct TechniqueRenderData {
   TechniqueRenderData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
   void *cbuffer_staged;

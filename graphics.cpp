@@ -514,7 +514,7 @@ GraphicsObjectHandle Graphics::create_static_index_buffer(const TrackedLocation 
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len) {
+GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, const void *shader_bytecode, int len) {
   const int idx = _res._input_layouts.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_res._input_layouts[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
@@ -613,12 +613,14 @@ bool Graphics::technique_file_changed(const char *filename, void *token) {
 }
 
 bool Graphics::shader_file_changed(const char *filename, void *token) {
+  // TODO
+/*
   LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   Technique *t = (Technique *)token;
   for (int i = 0; i < t->vertex_shader_count(); ++i) {
     if (Shader *shader = t->vertex_shader(i)) {
-      if (!t->init_shader(_ri, shader)) {
+      if (!t->create_shaders(_ri, shader)) {
         LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
         return false;
       }
@@ -633,7 +635,7 @@ bool Graphics::shader_file_changed(const char *filename, void *token) {
       }
     }
   }
-
+*/
   return true;
 }
 
@@ -645,7 +647,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   vector<Material *> materials;
 
   vector<Technique *> loaded_techniques;
-  vector<uint8> buf;
+  vector<char> buf;
   B_ERR_BOOL(_ri->load_file(filename, &buf));
   //LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
 
@@ -658,18 +660,17 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
       MATERIAL_MANAGER.add_material(*it, true);
   }
 
-  auto fails = stable_partition(begin(tmp), end(tmp), [&](Technique *t) { return t->init(_ri); });
-  // delete all the techniques that fail to initialize
-  if (fails != end(tmp)) {
-    for (auto i = fails; i != end(tmp); ++i) {
-      Technique *t = *i;
+  // Init the techniques
+  for (auto it = begin(tmp); it != end(tmp); ) {
+    Technique *t = *it;
+    if (!t->init(_ri)) {
       LOG_WARNING_LN("init failed for technique: %s. Error msg: %s", t->name().c_str(), t->error_msg().c_str());
-      delete exch_null(*i);
+      delete exch_null(t);
+      it = tmp.erase(it);
+    } else {
+      ++it;
     }
-    tmp.erase(fails, end(tmp));
   }
-
-  //LOG_VERBOSE_LN("adding watches..");
 
   auto &v = _techniques_by_file[filename];
   v.clear();
@@ -790,6 +791,8 @@ void Graphics::unbind_resource_views(int resource_bitmask) {
 
 void Graphics::set_resource_views(Technique *technique, Shader *shader, int *resources_set) {
 
+  // TODO
+/*
   ID3D11DeviceContext *ctx = _immediate_context;
 
   const int num_views = (int)shader->resource_view_params().size();
@@ -818,7 +821,7 @@ void Graphics::set_resource_views(Technique *technique, Shader *shader, int *res
   *resources_set = 0;
   for (int i = 0; i < num_views; ++i) 
     *resources_set |= (1 << i) * (views[i] != nullptr);
-
+*/
 }
 
 bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {

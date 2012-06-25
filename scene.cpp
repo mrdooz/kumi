@@ -38,7 +38,7 @@ Mesh *Scene::find_mesh_by_name(const std::string &name) {
 bool Scene::on_loaded() {
   for (auto it = begin(meshes), e = end(meshes); it != e; ++it) {
     Mesh *mesh = *it;
-    mesh->prepare_cbuffer();
+    mesh->on_loaded();
     _meshes_by_name[mesh->name] = mesh;
   }
 

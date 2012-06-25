@@ -26,9 +26,9 @@ struct fill_ps_input {
 };
 
 struct fill_ps_output {
-    float4 rt_pos : COLOR1;
-    float4 rt_normal : COLOR2;
-    float4 rt_diffuse : COLOR3;
+    float4 rt_pos : SV_TARGET0;
+    float4 rt_normal : SV_TARGET1;
+    float4 rt_diffuse : SV_TARGET2;
 };
 
 fill_ps_input fill_vs_main(fill_vs_input input)
@@ -42,71 +42,12 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     return output;
 }
 
-interface iDiffuseMaterial 
-{
-    float3 getColor(float2 texCoord);
-};
-
-interface iDiffuseMaterial2
-{
-    float3 getColor(float2 texCoord);
-};
-
-interface iDiffuseMaterial3
-{
-    float3 getColor(float2 texCoord);
-};
-
-class cDiffuseColor : iDiffuseMaterial
-{
-    float3 getColor(float2 texCoord)
-    {
-        return Diffuse.rgb;
-    }
-};
-
-class cDiffuseColor2 : iDiffuseMaterial2
-{
-    float3 getColor(float2 texCoord)
-    {
-        return Diffuse.rgb;
-    }
-};
-
-class cDiffuseColor3 : iDiffuseMaterial3
-{
-    float3 getColor(float2 texCoord)
-    {
-        return Diffuse.rgb;
-    }
-};
-
-class cDiffuseTexture : iDiffuseMaterial
-{
-    float3 getColor(float2 texCoord)
-    {
-        return DiffuseTexture.Sample(DiffuseSampler, texCoord).rgb;
-    }
-};
-
-iDiffuseMaterial g_abstractDiffuse;
-iDiffuseMaterial g_abstractDiffuse2;
-iDiffuseMaterial2 g_abstractDiffuse3;
-iDiffuseMaterial3 g_abstractDiffuse4;
-
-cbuffer OOP4Lyfe : register(b0) {
-    cDiffuseColor g_DiffuseColor;
-    cDiffuseColor2 g_DiffuseColor2;
-    cDiffuseColor3 g_DiffuseColor3;
-    cDiffuseTexture g_DiffuseTexture;
-};
-
 fill_ps_output fill_ps_main(fill_ps_input input)
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
     output.rt_normal = normalize(input.vs_normal);
-    output.rt_diffuse.rgb = g_abstractDiffuse.getColor(input.tex) * g_abstractDiffuse4.getColor(input.tex).r * g_abstractDiffuse2.getColor(input.tex).r * g_abstractDiffuse3.getColor(input.tex).r;
+    output.rt_diffuse.rgb = float3(1,1,1);
     output.rt_diffuse.a = 1;
     return output;
 }

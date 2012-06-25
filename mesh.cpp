@@ -6,16 +6,17 @@
 #include "material_manager.hpp"
 #include "logger.hpp"
 
-SubMesh::SubMesh(Mesh *mesh) : mesh(mesh)
+SubMesh::SubMesh(Mesh *mesh) 
+  : mesh(mesh)
 {
   render_key.cmd = RenderKey::kRenderMesh;
-  render_data.mesh = mesh;
-  render_data.submesh = this;
+  //render_data.mesh = mesh;
+  //render_data.submesh = this;
 }
 
 SubMesh::~SubMesh() {
 }
-
+#if 0
 uint32 SubMesh::find_technique_index(GraphicsObjectHandle technique) {
   for (int i = 0; i < 16; ++i) {
     if (!render_data.technique_data[i].technique.is_valid())
@@ -107,18 +108,38 @@ void SubMesh::prepare_cbuffers(GraphicsObjectHandle technique_handle) {
   cbuffer_staged.resize(cbuffer_size);
 */
 }
-
+#endif
 void SubMesh::update() {
   if (!cbuffer_vars.empty()) {
     for (auto i = begin(cbuffer_vars), e = end(cbuffer_vars); i != e; ++i) {
       const CBufferVariable &var = *i;
       PROPERTY_MANAGER.get_property_raw(var.id, &cbuffer_staged[var.ofs], var.len);
     }
-    render_data.cur_technique_data->cbuffer_staged = &cbuffer_staged[0];
-    render_data.cur_technique_data->cbuffer_len = cbuffer_staged.size();
   }
 }
 
+void Mesh::on_loaded() {
+  _world_mtx_class = PROPERTY_MANAGER.get_or_create<int>("Mesh::world");
+  _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
+  _world_it_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world_it", this);
+}
+
+void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
+
+  for (size_t i = 0; i < submeshes.size(); ++i) {
+    const SubMesh *submesh = submeshes[i];
+    MeshRenderData2 *render_data = RENDERER.alloc_command_data<MeshRenderData2>();
+    render_data->geometry = &submesh->geometry;
+    render_data->technique = technique;
+    render_data->material = submesh->material_id;
+    render_data->mesh = submesh->mesh;
+#if _DEBUG
+    render_data->submesh = submesh;
+#endif
+    RENDERER.submit_command(location, submesh->render_key, render_data);
+  }
+}
+#if 0
 void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
   for (size_t i = 0; i < submeshes.size(); ++i) {
     SubMesh *s = submeshes[i];
@@ -172,12 +193,14 @@ void Mesh::prepare_cbuffer() {
 }
 
 
+#endif
+
 void Mesh::update() {
   for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)
     (*i)->update();
 }
 
-void Mesh::fill_cbuffer(CBuffer *cbuffer) {
+void Mesh::fill_cbuffer(CBuffer *cbuffer) const {
   for (size_t i = 0; i < cbuffer->mesh_vars.size(); ++i) {
     auto &cur = cbuffer->mesh_vars[i];
     if (cur.id == _world_mtx_class)

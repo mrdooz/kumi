@@ -129,6 +129,13 @@ string strip_extension(const std::string &str) {
   return string(str.c_str(), idx);
 }
 
+std::string get_extension(const std::string &str) {
+  int idx = str.rfind('.');
+  if (idx == string::npos)
+    return "";
+  return string(str.c_str() + idx, str.size() - idx);
+}
+
 void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext) {
   char drive_buf[_MAX_DRIVE];
   char dir_buf[_MAX_DIR];

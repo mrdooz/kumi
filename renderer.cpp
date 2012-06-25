@@ -223,7 +223,7 @@ void Renderer::render() {
 //    [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
 #if 1
   CmdGen gen(res, ctx);
-  RenderObjects objects;
+  //RenderObjects objects;
   Technique *prev_technique = nullptr;
 
   for (auto it = begin(_render_commands), e = end(_render_commands); it != e; ++it) {
@@ -274,31 +274,36 @@ void Renderer::render() {
       }
 
       case RenderKey::kRenderMesh: {
-        MeshRenderData *render_data = (MeshRenderData *)data;
-        Technique *technique = res->_techniques.get(render_data->cur_technique);
-        if (technique != prev_technique) {
-          technique->get_render_objects(&objects, 0, 0);
-          prev_technique = technique;
-        }
-        gen.set_vs(objects.vs);
-        gen.set_ps(objects.ps);
+        const MeshRenderData2 *render_data = (MeshRenderData2 *)data;
+        const MeshGeometry *geometry = render_data->geometry;
+        Technique *technique = res->_techniques.get(render_data->technique);
+        const Material *material = MATERIAL_MANAGER.get_material(render_data->material);
+        const Mesh *mesh = render_data->mesh;
 
-        gen.set_vb(render_data->vb, render_data->vertex_size);
-        gen.set_layout(objects.layout);
-        gen.set_ib(render_data->ib, render_data->index_format);
+        // get the shader for the current technique, based on the flags used by the material
+        int flags = material->flags();
+        Shader *vs = technique->vertex_shader(flags);
+        Shader *ps = technique->pixel_shader(flags);
 
-        gen.set_topology(render_data->topology);
-        gen.set_rs(objects.rs);
-        gen.set_dss(objects.dss, objects.stencil_ref);
-        gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
+        gen.set_vs(vs->handle());
+        gen.set_ps(ps->handle());
 
-        gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
+        gen.set_vb(geometry->vb, geometry->vertex_size);
+        gen.set_ib(geometry->ib, geometry->index_format);
+        gen.set_topology(geometry->topology);
 
-        Mesh *mesh = render_data->mesh;
-        Material *material = render_data->material;
+        gen.set_layout(technique->input_layout());
+        gen.set_rs(technique->rasterizer_state());
+        gen.set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+        gen.set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-        auto &vs_cbuffers = technique->get_cbuffer_vs();
-        auto &ps_cbuffers = technique->get_cbuffer_ps();
+        //gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
+
+        //auto &vs_cbuffers = technique->get_cbuffer_vs();
+        //auto &ps_cbuffers = technique->get_cbuffer_ps();
+
+        auto &vs_cbuffers = vs->get_cbuffers();
+        auto &ps_cbuffers = ps->get_cbuffers();
 
         for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&vs_cbuffers[i]);
@@ -312,20 +317,21 @@ void Renderer::render() {
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
 
-        MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
-        gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
+        //MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
+        //gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
 /*
         GraphicsObjectHandle cb = technique->cbuffer_handle();
         gen.set_cbuffer(cb, d->cbuffer_staged, d->cbuffer_len);
 */
         gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
-        gen.draw_indexed(render_data->index_count, 0, 0);
+        gen.draw_indexed(geometry->index_count, 0, 0);
 
-        gen.unset_shader_resource(d->first_texture, d->num_textures);
+        //gen.unset_shader_resource(d->first_texture, d->num_textures);
         break;
       }
 
       case RenderKey::kRenderTechnique: {
+#if 0
         Technique *technique = res->_techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
 
@@ -372,6 +378,7 @@ void Renderer::render() {
         gen.draw_indexed(technique->index_count(), 0, 0);
 
         gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
+#endif
         break;
       }
     }
@@ -573,6 +580,8 @@ void Renderer::validate_command(RenderKey key, const void *data) {
       break;
 
     case RenderKey::kRenderMesh: {
+      // TODO
+/*
       MeshRenderData *render_data = (MeshRenderData *)data;
       Technique *technique = res->_techniques.get(render_data->cur_technique);
       assert(technique);
@@ -580,6 +589,7 @@ void Renderer::validate_command(RenderKey key, const void *data) {
       assert(vertex_shader);
       Shader *pixel_shader = technique->pixel_shader(0);
       assert(pixel_shader);
+*/
       break;
     }
 

@@ -151,7 +151,7 @@ public:
   const char *ps_profile() const { return _ps_profile.c_str(); }
 
   GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
-  GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, void *shader_bytecode, int len);
+  GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, const void *shader_bytecode, int len);
   GraphicsObjectHandle create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
   GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
   GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);

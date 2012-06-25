@@ -11,12 +11,13 @@ technique default_shader {
     };
     
     pixel_shader {
-        file effects/default_shaders.fx;
         entry_point diffuse_ps_main;
+        file effects/default_shaders.fx;
         params [
             float4 Diffuse material;
             float4 LightPos system;
             float4 LightColor system;
+            texture2d diffuse_texture Diffuse material;
         ];
         flags [ TEXTURE; TEST; ];
     };
@@ -41,49 +42,3 @@ technique default_shader {
         address_v = clamp;
     };
 };
-
-technique texture {
-    
-    vertex_shader {
-        file effects/default_shaders.fx;
-        entry_point texture_vs_main;
-        params [
-            float4x4 view system;
-            float4x4 proj system;
-            float4x4 world mesh;
-        ];
-    };
-    
-    pixel_shader {
-        file effects/default_shaders.fx;
-        entry_point texture_ps_main;
-        params [
-            float4 Diffuse material;
-            float4 LightPos system;
-            float4 LightColor system;
-            texture2d diffuse_texture Diffuse material;
-        ];
-    };
-    
-    rasterizer_desc {
-        cull_mode = back;
-    };
-    
-    depth_stencil_desc {
-        depth_enable = true;
-    };
-    
-    blend_desc {
-        render_target[0] = {
-            blend_enable = false;
-        };
-    };
-    
-    sampler_desc diffuse_sampler {
-        filter = min_mag_linear_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-    };
-
-};
-
