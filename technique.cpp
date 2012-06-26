@@ -610,11 +610,11 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
 
     switch (shader->type()) {
       case ShaderType::kVertexShader: 
-        shader->set_handle(GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, shader->id()));
+        shader->set_handle(GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, obj));
         _vertex_shaders.push_back(shader);
         break;
       case ShaderType::kPixelShader: 
-        shader->set_handle(GRAPHICS.create_pixel_shader(FROM_HERE, buf.data(), len, shader->id()));
+        shader->set_handle(GRAPHICS.create_pixel_shader(FROM_HERE, buf.data(), len, obj));
         _pixel_shaders.push_back(shader);
         break;
       case ShaderType::kGeometryShader: break;

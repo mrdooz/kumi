@@ -261,7 +261,7 @@ bool ScenePlayer::render() {
   RenderKey key;
 
   if (_scene) {
-/*
+    //_scene->submit_meshes(FROM_HERE, -1, _default_shader);
     {
       RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
@@ -294,10 +294,7 @@ bool ScenePlayer::render() {
       RENDERER.submit_technique(_ssao_blur);
     }
   }
-*/
 
-    _scene->submit_meshes(FROM_HERE, -1, _default_shader);
-  }
 
   return true;
 }

@@ -297,14 +297,10 @@ void Renderer::render() {
         gen.set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
         gen.set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-        //gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
-
-        //auto &vs_cbuffers = technique->get_cbuffer_vs();
-        //auto &ps_cbuffers = technique->get_cbuffer_ps();
-
         auto &vs_cbuffers = vs->get_cbuffers();
         auto &ps_cbuffers = ps->get_cbuffers();
 
+        // set cbuffers
         for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&vs_cbuffers[i]);
           material->fill_cbuffer(&vs_cbuffers[i]);
@@ -317,6 +313,7 @@ void Renderer::render() {
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
 
+        // set samplers
         auto &samplers = ps->samplers();
         if (samplers.count > 0) {
           vector<GraphicsObjectHandle> ss;
@@ -324,6 +321,7 @@ void Renderer::render() {
           gen.set_samplers(&ss[0], samplers.first, samplers.count);
         }
 
+        // set resource views
         auto &rv = ps->resource_views();
         if (rv.count > 0) {
           vector<GraphicsObjectHandle> rr;
