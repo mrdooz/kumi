@@ -2,6 +2,7 @@
 
 #include "property.hpp"
 #include "property_manager.hpp"
+#include "shader.hpp"
 
 class Material {
 public:
@@ -23,6 +24,7 @@ public:
       float _float4[4];
       int _int;
     };
+    GraphicsObjectHandle resource;
     PropertyId id;
     PropertyId class_id;
   };
@@ -31,15 +33,16 @@ public:
   ~Material();
 
   template<typename T>
-  void add_property(const std::string &name, PropertyType::Enum type, const T &value) {
+  Property *add_property(const std::string &name, PropertyType::Enum type, const T &value) {
     auto id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), this, sizeof(T), &value);
     std::string class_name = "Material::" + name;
-    auto class_id = PROPERTY_MANAGER.get_or_create_raw(class_name.c_str(), sizeof(int), nullptr);
+    auto class_id = PROPERTY_MANAGER.get_or_create_placeholder(class_name.c_str());
     Property *prop = new Property(name, type, value, id);
     prop->class_id = class_id;
     _properties.push_back(prop);
     _properties_by_name[name] = prop;
     _properties_by_id[class_id] = prop;
+    return prop;
   }
 
   const std::string &name() const { return _name; }
@@ -47,10 +50,13 @@ public:
 
   Property *property_by_name(const std::string &name);
 
+  void fill_resource_views(const SparseProperty &props, std::vector<GraphicsObjectHandle> *out) const;
   void fill_cbuffer(CBuffer *cbuffer) const;
   int flags() const;
+  void add_flag(int flag);
 
 private:
+  int _flags;
   std::string _name;
   std::vector<Property *> _properties;
   std::map<std::string, Property *> _properties_by_name;

@@ -88,6 +88,7 @@ bool ScenePlayer::init() {
   _ssao_render = GRAPHICS.find_technique("ssao_render");
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   _default_shader = GRAPHICS.find_technique("default_shader");
+
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 

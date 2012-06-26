@@ -72,17 +72,17 @@ public:
   GraphicsObjectHandle input_layout() const { return _input_layout; }
   int vertex_shader_count() const { return (int)_vertex_shaders.size(); }
   int pixel_shader_count() const { return (int)_pixel_shaders.size(); }
-  Shader *vertex_shader(int flags) const { return _vertex_shaders[flags]; }
-  Shader *pixel_shader(int flags) const { return _pixel_shaders[flags]; }
+  Shader *vertex_shader(int flags) const { return _vertex_shaders[flags & _vs_flag_mask]; }
+  Shader *pixel_shader(int flags) const { return _pixel_shaders[flags & _ps_flag_mask]; }
 
   //vector<CBuffer> &get_cbuffers() { return _constant_buffers; }
 
-  void get_render_objects(RenderObjects *obj, int vs_flags, int ps_flags);
+  //void get_render_objects(RenderObjects *obj, int vs_flags, int ps_flags);
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }
   GraphicsObjectHandle depth_stencil_state() const { return _depth_stencil_state; }
-  GraphicsObjectHandle sampler_state(const char *name) const;
+  //GraphicsObjectHandle sampler_state(const char *name) const;
 
   GraphicsObjectHandle vb() const { return _vb; }
   GraphicsObjectHandle ib() const { return _ib; }
@@ -100,33 +100,21 @@ public:
   const std::string &get_default_sampler_state() const { return _default_sampler_state; }
   const TechniqueRenderData &render_data() const { return _render_data; }
 
+  void fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out);
   void fill_cbuffer(CBuffer *cbuffer);
   const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
   GraphicsObjectHandle cbuffer_handle();
 
-  //std::vector<CBuffer> &get_cbuffer_vs() { return _vs_cbuffers; }
-  //std::vector<CBuffer> &get_cbuffer_ps() { return _ps_cbuffers; }
-
 private:
 
   void prepare_cbuffers();
-
-  //CBufferParam *find_cbuffer_param(const std::string &name, ShaderType::Enum type);
-
-  //std::vector<CBuffer> _vs_cbuffers;
-  //std::vector<CBuffer> _ps_cbuffers;
-
-  //std::vector<CBufferParam> _vs_cbuffer_params;
-  //std::vector<CBufferParam> _ps_cbuffer_params;
-
   void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const std::vector<std::string> &flags);
-  //bool do_reflection(Shader *shader, void *buf, size_t len);
   bool do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const std::vector<char> &obj);
 
-  bool parse_input_layout(ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len);
+  //bool parse_input_layout(ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len);
 
   std::vector<CBufferVariable> _cbuffer_vars;
   std::vector<uint8> _cbuffer_staged;
@@ -149,13 +137,13 @@ private:
 
   string _default_sampler_state;
   GraphicsObjectHandle _rasterizer_state;
-  std::vector<std::pair<std::string, GraphicsObjectHandle> > _sampler_states;
+  std::vector<std::pair<PropertyId, GraphicsObjectHandle> > _sampler_states;
   GraphicsObjectHandle _blend_state;
   GraphicsObjectHandle _depth_stencil_state;
 
-  GraphicsObjectHandle _ordered_sampler_states[MAX_SAMPLERS];
-  int _first_sampler;
-  int _num_valid_samplers;
+  //GraphicsObjectHandle _ordered_sampler_states[MAX_SAMPLERS];
+  //int _first_sampler;
+  //int _num_valid_samplers;
 
 
   CD3D11_RASTERIZER_DESC _rasterizer_desc;
@@ -163,6 +151,8 @@ private:
   CD3D11_BLEND_DESC _blend_desc;
   CD3D11_DEPTH_STENCIL_DESC _depth_stencil_desc;
 
+  int _vs_flag_mask;
+  int _ps_flag_mask;
   ShaderTemplate *_vs_shader_template;
   ShaderTemplate *_ps_shader_template;
 

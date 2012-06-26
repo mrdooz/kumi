@@ -60,7 +60,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
         data->vertex_size = _vb_pos_col.stride;
         data->vs = GRAPHICS.find_shader("gwen_color", "gwen::vs_color_main");
         data->ps = GRAPHICS.find_shader("gwen_color", "gwen::ps_color_main");
-        data->layout = GRAPHICS.get_input_layout("gwen_color");
+        data->layout = GRAPHICS.find_input_layout("gwen_color");
         data->vertex_count = pos_col_count;
         GRAPHICS.get_technique_states("gwen_color", &data->rs, &data->bs, &data->dss);
         RenderKey render_key;
@@ -88,7 +88,7 @@ struct KumiGwenRenderer : public Gwen::Renderer::Base
         data->vertex_size = _vb_pos_tex.stride;
         data->vs = GRAPHICS.find_shader("gwen_texture", "gwen::vs_texture_main");
         data->ps = GRAPHICS.find_shader("gwen_texture", "gwen::ps_texture_main");
-        data->layout = GRAPHICS.get_input_layout("gwen_texture");
+        data->layout = GRAPHICS.find_input_layout("gwen_texture");
         GRAPHICS.get_technique_states("gwen_texture", &data->rs, &data->bs, &data->dss);
         data->samplers[0] = GRAPHICS.get_sampler_state("gwen_texture", "diffuse_sampler");
         data->textures[0] = r.texture;

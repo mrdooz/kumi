@@ -5,6 +5,7 @@
 #include "tracked_location.hpp"
 #include "path_utils.hpp"
 #include "graphics.hpp"
+#include "string_utils.hpp"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -18,10 +19,12 @@ Technique::Technique()
   , _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
   , _valid(false)
-  , _first_sampler(MAX_SAMPLERS)
-  , _num_valid_samplers(0)
+  //, _first_sampler(MAX_SAMPLERS)
+  //, _num_valid_samplers(0)
   , _vs_shader_template(nullptr)
   , _ps_shader_template(nullptr)
+  , _vs_flag_mask(0)
+  , _ps_flag_mask(0)
 {
 }
 
@@ -50,6 +53,7 @@ void Technique::add_error_msg(const char *fmt, ...) {
   _valid = false;
 }
 
+#if 0
 bool Technique::parse_input_layout(ID3D11ShaderReflection* reflector, const D3D11_SHADER_DESC &shader_desc, void *buf, size_t len) {
   auto mapping = map_list_of
     ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
@@ -79,6 +83,7 @@ bool Technique::parse_input_layout(ID3D11ShaderReflection* reflector, const D3D1
 
   return _input_layout.is_valid();
 }
+#endif
 /*
 CBufferParam *Technique::find_cbuffer_param(const std::string &name, ShaderType::Enum type) {
   vector<CBufferParam> *params = type == ShaderType::kVertexShader ? &_vs_cbuffer_params : &_ps_cbuffer_params;
@@ -89,7 +94,7 @@ CBufferParam *Technique::find_cbuffer_param(const std::string &name, ShaderType:
   return nullptr;
 }
 */
-const char *skip_line(const char *start, const char *end) {
+static const char *skip_line(const char *start, const char *end) {
   while (start < end && *start != '\r' && *start != '\n')
     ++start;
 
@@ -99,7 +104,7 @@ const char *skip_line(const char *start, const char *end) {
   return start;
 }
 
-vector<string> split(const char *start, const char *end) {
+static vector<string> split(const char *start, const char *end) {
   vector<string> res;
 
   while (start < end) {
@@ -118,7 +123,7 @@ vector<string> split(const char *start, const char *end) {
   return res;
 }
 
-void trim_input(const vector<char> &input, vector<vector<string>> *res) {
+static void trim_input(const vector<char> &input, vector<vector<string>> *res) {
   const char *start = input.data();
   const char *end = start + input.size();
   // extract the relevant text
@@ -256,8 +261,15 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           }
           param->bind_point = bind_point;
           param->used = true;
+          string qualified_name = PropertySource::to_string(param->source) + "::" + 
+            (param->friendly_name.empty() ? param->name : param->friendly_name);
+          shader->_resource_view_names.resize(max((int)shader->_resource_view_names.size(), bind_point+1));
+          shader->_resource_view_names[bind_point] = qualified_name;
 
         } else if (type == "sampler") {
+          shader->_sampler_names.resize(max((int)shader->_sampler_names.size(), bind_point+1));
+          shader->_sampler_names[bind_point] = name;
+/*
           _first_sampler = min(_first_sampler, bind_point);
           _num_valid_samplers = max(bind_point - _first_sampler + 1, _num_valid_samplers);
           // find out where this sampler goes..
@@ -269,6 +281,9 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           }
           add_error_msg("Sampler %s not found", name.c_str());
 FOUND_SAMPLER:;
+          shader->_sampler_names.resize(max((int)shader->_sampler_names.size(), bind_point+1));
+          shader->_sampler_names[bind_point] = name;
+*/
         }
 
       }
@@ -460,13 +475,13 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
   // create the defines for the current flags
   string defines;
   for (size_t i = 0; i < flags.size(); ++i) {
-    defines.append("/D" + flags[i] + "=1");
+    defines.append("-D" + flags[i]);
     if (i != flags.size() - 1)
       defines.append(" ");
   }
 
 #ifdef _DEBUG
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s -Fh %s %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O1 -Zi -Fo %s -Fh %s %s %s", 
     profile,
     entry_point,
     obj,
@@ -545,12 +560,9 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
       vector<string> flags;
       string filename_suffix;
       for (size_t j = 0; j < num_flags; ++j) {
-        if (i & (1 << j)) {
-          flags.push_back(shader_template->_flags[j]);
-          filename_suffix.append("1");
-        } else {
-          filename_suffix.append("0");
-        }
+        bool flag_set = !!(i & (1 << j));
+        flags.push_back(to_string("%s=%d", shader_template->_flags[j].c_str(), flag_set ? 1 : 0));
+        filename_suffix.append(flag_set ? "1" : "0");
       }
 
       string obj = output_base + "_" + filename_suffix + "." + output_ext;
@@ -593,10 +605,7 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
 
     if (!do_reflection(text, shader, shader_template, buf))
       return false;
-    /*
-    if (!do_reflection(graphics, shader, buf.data(), len))
-    return false;
-    */
+
     shader->prepare_cbuffers();
 
     switch (shader->type()) {
@@ -693,7 +702,6 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
   }
 
   shader->validate();
-#endif
   // check that our samplers are sequential
   if (_ordered_sampler_states[_first_sampler].is_valid()) {
     bool prev_valid = true;
@@ -705,6 +713,7 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
       prev_valid = cur_valid;
     }
   }
+#endif
   return true;
 }
 
@@ -716,7 +725,8 @@ bool Technique::init(ResourceInterface *res) {
 
   // create all the sampler states from the descs
   for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
-    _sampler_states.push_back(make_pair(i->first, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
+    PropertyId id = PROPERTY_MANAGER.get_or_create_placeholder(i->first);
+    _sampler_states.push_back(make_pair(id, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
   }
 
   // create the shaders from the templates
@@ -730,11 +740,21 @@ bool Technique::init(ResourceInterface *res) {
       return false;
   }
 
+  for (size_t i = 0; i < _vertex_shaders.size(); ++i) {
+    if (!_vertex_shaders[i]->on_loaded())
+      return false;
+  }
+
+  for (size_t i = 0; i<  _pixel_shaders.size(); ++i) {
+    if (!_pixel_shaders[i]->on_loaded())
+      return false;
+  }
+
   prepare_textures();
 
   return true;
 }
-
+/*
 GraphicsObjectHandle Technique::sampler_state(const char *name) const {
   for (auto it = begin(_sampler_states), e = end(_sampler_states); it != e; ++it) {
     if (it->first == name)
@@ -742,7 +762,8 @@ GraphicsObjectHandle Technique::sampler_state(const char *name) const {
   }
   return GraphicsObjectHandle();
 }
-
+*/
+/*
 void Technique::get_render_objects(RenderObjects *obj, int vs_flags, int ps_flags) {
   obj->vs = _vertex_shaders[vs_flags]->handle();
   obj->gs = GraphicsObjectHandle();
@@ -758,7 +779,7 @@ void Technique::get_render_objects(RenderObjects *obj, int vs_flags, int ps_flag
   obj->num_valid_samplers = _num_valid_samplers;
   obj->sample_mask = GRAPHICS.default_sample_mask();
 }
-
+*/
 
 void Technique::prepare_textures() {
   // TODO
@@ -779,5 +800,16 @@ void Technique::fill_cbuffer(CBuffer *cbuffer) {
   for (size_t i = 0; i < cbuffer->system_vars.size(); ++i) {
     auto &cur = cbuffer->system_vars[i];
     PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
+  }
+}
+
+void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) {
+  out->resize(input.res.size());
+  for (size_t i = 0; i < input.res.size(); ++i) {
+    for (size_t j = 0; j < _sampler_states.size(); ++j) {
+      if (input.res[i] == _sampler_states[j].first) {
+        (*out)[i] = _sampler_states[j].second;
+      }
+    }
   }
 }

@@ -4,6 +4,7 @@
 
 Material::Material(const std::string &name)
   : _name(name) 
+  , _flags(0)
 {
 }
 
@@ -28,5 +29,21 @@ void Material::fill_cbuffer(CBuffer *cbuffer) const {
 }
 
 int Material::flags() const {
-  return 0;
+  return _flags;
+}
+
+void Material::add_flag(int flag) {
+  _flags |= flag;
+}
+
+void Material::fill_resource_views(const SparseProperty &props, std::vector<GraphicsObjectHandle> *out) const {
+  
+  out->resize(props.res.size());
+
+  for (size_t i = 0; i < props.res.size(); ++i) {
+    auto it = _properties_by_id.find(props.res[i]);
+    if (it != _properties_by_id.end()) {
+      (*out)[i] = it->second->resource;
+    }
+  }
 }

@@ -65,6 +65,16 @@ struct ResourceViewParam : public ParamBase {
   int bind_point;
 };
 
+template<typename T>
+struct SparseResource {
+  SparseResource() : first(INT_MAX), count(0) {}
+  int first;
+  int count;
+  std::vector<T> res;
+};
+
+typedef SparseResource<PropertyId> SparseProperty;
+
 class Shader {
   friend class TechniqueParser;
   friend class Technique;
@@ -82,9 +92,6 @@ public:
   void set_obj_filename(const std::string &filename) { _obj_filename = filename; }
   const std::string &obj_filename() const { return _obj_filename; }
 
-  //std::vector<CBufferParam> &cbuffer_params() { return _cbuffer_params; }
-  //std::vector<ResourceViewParam> &resource_view_params() { return _resource_view_params; }
-
   void set_handle(GraphicsObjectHandle handle) { _handle = handle; }
   GraphicsObjectHandle handle() const { return _handle; }
 
@@ -93,6 +100,11 @@ public:
   void prepare_cbuffers();
 
   std::vector<CBuffer> &get_cbuffers() { return _cbuffers; }
+
+  bool on_loaded();
+
+  const SparseProperty &samplers() const;
+  const SparseProperty &resource_views() const;
 
 private:
   void prune_unused_parameters();
@@ -109,6 +121,12 @@ private:
   std::vector<ResourceViewParam> _resource_view_params;
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;
+
+  std::vector<std::string> _resource_view_names;
+  std::vector<std::string> _sampler_names;
+
+  SparseProperty _resource_views;
+  SparseProperty _sampler_states;
 };
 /*
 struct VertexShader : public Shader{

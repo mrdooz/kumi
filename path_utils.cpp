@@ -133,7 +133,7 @@ std::string get_extension(const std::string &str) {
   int idx = str.rfind('.');
   if (idx == string::npos)
     return "";
-  return string(str.c_str() + idx, str.size() - idx);
+  return string(str.c_str() + idx + 1, str.size() - idx);
 }
 
 void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext) {

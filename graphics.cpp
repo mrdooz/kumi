@@ -197,9 +197,7 @@ bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint3
 
 GraphicsObjectHandle Graphics::get_texture(const char *filename) {
   int idx = _res._resources.idx_from_token(filename);
-  if (idx == -1)
-    return GraphicsObjectHandle();
-  return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
+  return make_goh(GraphicsObjectHandle::kResource, idx);
 }
 
 GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info) {
@@ -227,9 +225,8 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
     if (_res._resources[idx])
       _res._resources[idx]->reset();
     _res._resources.set_pair(idx, make_pair(friendly_name, data));
-    return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
   }
-  return GraphicsObjectHandle();
+  return make_goh(GraphicsObjectHandle::kResource, idx);
 }
 
 GraphicsObjectHandle Graphics::insert_texture(TextureData *data, const char *friendly_name) {
@@ -239,9 +236,8 @@ GraphicsObjectHandle Graphics::insert_texture(TextureData *data, const char *fri
     if (_res._textures[idx])
       _res._textures[idx]->reset();
     _res._textures.set_pair(idx, make_pair(friendly_name, data));
-    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
   }
-  return GraphicsObjectHandle();
+  return make_goh(GraphicsObjectHandle::kTexture, idx);
 }
 
 GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name) {
@@ -705,9 +701,9 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   return res;
 }
 
-GraphicsObjectHandle Graphics::find_resource(const char *name) {
+GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
 
-  if (!name || *name == '\0')
+  if (name.empty())
     return _dummy_texture;
 
   // check textures, then resources, then render targets
@@ -755,7 +751,12 @@ GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const cha
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::get_input_layout(const char *technique_name) {
+GraphicsObjectHandle Graphics::find_sampler_state(const std::string &name) {
+  int idx = _res._sampler_states.idx_from_token(name);
+  return make_goh(GraphicsObjectHandle::kSamplerState, idx);
+}
+
+GraphicsObjectHandle Graphics::find_input_layout(const std::string &technique_name) {
   if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL))
     return technique->input_layout();
   return GraphicsObjectHandle();
@@ -872,3 +873,18 @@ ID3D11ClassLinkage *Graphics::get_class_linkage() {
   return _class_linkage.p;
 }
 
+void Graphics::add_shader_flag(const std::string &flag) {
+  auto it = _shader_flags.find(flag);
+  if (it == _shader_flags.end()) {
+    _shader_flags[flag] = 1 << _shader_flags.size();
+  }
+}
+
+int Graphics::get_shader_flag(const std::string &flag) {
+  auto it = _shader_flags.find(flag);
+  return it == _shader_flags.end() ? 0 : it->second;
+}
+
+GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx) {
+  return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : GraphicsObjectHandle();
+}

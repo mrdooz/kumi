@@ -19,7 +19,7 @@ technique default_shader {
             float4 LightColor system;
             texture2d diffuse_texture Diffuse material;
         ];
-        flags [ TEXTURE; TEST; ];
+        flags [ DIFFUSE_TEXTURE ];
     };
     
     rasterizer_desc {

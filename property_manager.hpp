@@ -43,7 +43,11 @@ public:
     memcpy(out, &_raw_data[id], len);
   }
 
-  PropertyId get_or_create_raw(const char *name, int size, const void *default_value) {
+  PropertyId get_or_create_placeholder(const std::string &name) {
+    return get_or_create_raw(name, sizeof(int), nullptr);
+  }
+
+  PropertyId get_or_create_raw(const std::string &name, int size, const void *default_value) {
     auto it = _ids.find(name);
     PropertyId id;
     if (it == _ids.end()) {
@@ -62,15 +66,15 @@ public:
   }
 
   template<typename T>
-  PropertyId get_or_create(const char *name) {
+  PropertyId get_or_create(const std::string &name) {
     static T t;
     PropertyId id = get_or_create_raw(name, sizeof(T), &t);
     type_check(id, sizeof(T));
     return id;
   }
 
-  PropertyId get_or_create_raw(const char *name, Token token, int size, const void *default_value) {
-    auto key = std::make_pair(token, std::string(name));
+  PropertyId get_or_create_raw(const std::string &name, Token token, int size, const void *default_value) {
+    auto key = std::make_pair(token, name);
     auto it = _compound_ids.find(key);
     PropertyId id;
     if (it == _compound_ids.end()) {

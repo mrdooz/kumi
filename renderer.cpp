@@ -317,16 +317,25 @@ void Renderer::render() {
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
 
-        //MeshRenderData::TechniqueData *d = render_data->cur_technique_data;
-        //gen.set_shader_resources(d->textures, d->first_texture, d->num_textures);
-/*
-        GraphicsObjectHandle cb = technique->cbuffer_handle();
-        gen.set_cbuffer(cb, d->cbuffer_staged, d->cbuffer_len);
-*/
+        auto &samplers = ps->samplers();
+        if (samplers.count > 0) {
+          vector<GraphicsObjectHandle> ss;
+          technique->fill_samplers(samplers, &ss);
+          gen.set_samplers(&ss[0], samplers.first, samplers.count);
+        }
+
+        auto &rv = ps->resource_views();
+        if (rv.count > 0) {
+          vector<GraphicsObjectHandle> rr;
+          material->fill_resource_views(rv, &rr);
+          gen.set_shader_resources(&rr[0], rv.first, rv.count);
+        }
+
         gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
         gen.draw_indexed(geometry->index_count, 0, 0);
 
-        //gen.unset_shader_resource(d->first_texture, d->num_textures);
+        if (rv.count > 0)
+          gen.unset_shader_resource(rv.first, rv.count);
         break;
       }
 

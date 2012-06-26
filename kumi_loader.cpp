@@ -56,20 +56,20 @@ static void apply_fixup(int *data, const void *ptr_base, const void *data_base) 
 }
 
 template <class T, class U>
-const T& read_and_step(const U **buf) {
+const T& read_and_advance(const U **buf) {
   const T &tmp = *(const T *)*buf;
   *buf += sizeof(T);
   return tmp;
 }
 
 template <class U>
-void read_and_step_raw(const U **buf, void *dst, int len) {
+void read_and_advance_raw(const U **buf, void *dst, int len) {
   memcpy(dst, (const void *)*buf, len);
   *buf += len;
 }
 
 template <class T, class U>
-void read_and_step(const U **buf, T *val) {
+void read_and_advance(const U **buf, T *val) {
   *val = *(const T *)*buf;
   *buf += sizeof(T);
 }
@@ -78,40 +78,40 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
-  const int mesh_count = read_and_step<int>(&buf);
+  const int mesh_count = read_and_advance<int>(&buf);
   for (int i = 0; i < mesh_count; ++i) {
 
-    Mesh *mesh = new Mesh(read_and_step<const char *>(&buf));
-    mesh->obj_to_world = read_and_step<XMFLOAT4X4>(&buf);
+    Mesh *mesh = new Mesh(read_and_advance<const char *>(&buf));
+    mesh->obj_to_world = read_and_advance<XMFLOAT4X4>(&buf);
     scene->meshes.push_back(mesh);
-    const int sub_meshes = read_and_step<int>(&buf);
+    const int sub_meshes = read_and_advance<int>(&buf);
 
     for (int j = 0; j < sub_meshes; ++j) {
       SubMesh *submesh = new SubMesh(mesh);
-      submesh->name = read_and_step<const char *>(&buf);
-      const char *material_name = read_and_step<const char *>(&buf);
+      submesh->name = read_and_advance<const char *>(&buf);
+      const char *material_name = read_and_advance<const char *>(&buf);
       mesh->submeshes.push_back(submesh);
       // check if we have a material/technique override
       auto it = _material_overrides.find(submesh->name);
       if (it != end(_material_overrides)) {
         auto &technique = it->second.first;
         auto &material = it->second.second;
-        submesh->material_id = _material_ids[material];
+        submesh->material_id = _material_name_to_id[material];
         //submesh->render_data.cur_technique = GRAPHICS.find_technique(technique.c_str());
       } else {
         // set the default technique for the material
-        submesh->material_id = _material_ids[material_name];
+        submesh->material_id = _material_name_to_id[material_name];
         //submesh->render_data.cur_technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
       }
 
-      const int vb_flags = read_and_step<int>(&buf);
-      submesh->geometry.vertex_size = read_and_step<int>(&buf);
-      submesh->geometry.index_format = index_size_to_format(read_and_step<int>(&buf));
-      const int *vb = read_and_step<const int*>(&buf);
+      const int vb_flags = read_and_advance<int>(&buf);
+      submesh->geometry.vertex_size = read_and_advance<int>(&buf);
+      submesh->geometry.index_format = index_size_to_format(read_and_advance<int>(&buf));
+      const int *vb = read_and_advance<const int*>(&buf);
       const int vb_size = *vb;
       submesh->geometry.vertex_count = vb_size / submesh->geometry.vertex_size;
       submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
-      const int *ib = read_and_step<const int*>(&buf);
+      const int *ib = read_and_advance<const int*>(&buf);
       const int ib_size = *ib;
       submesh->geometry.index_count = ib_size / index_format_to_size(submesh->geometry.index_format);
       submesh->geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
@@ -125,13 +125,13 @@ bool KumiLoader::load_lights(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
-  const int count = read_and_step<int>(&buf);
+  const int count = read_and_advance<int>(&buf);
   for (int i = 0; i < count; ++i) {
-    Light *light = new Light(read_and_step<const char *>(&buf));
+    Light *light = new Light(read_and_advance<const char *>(&buf));
     scene->lights.push_back(light);
-    light->pos = expand_float3(read_and_step<XMFLOAT3>(&buf), 0);
-    light->color = expand_float3(read_and_step<XMFLOAT3>(&buf), 1);
-    light->intensity = read_and_step<float>(&buf);
+    light->pos = expand_float3(read_and_advance<XMFLOAT3>(&buf), 0);
+    light->color = expand_float3(read_and_advance<XMFLOAT3>(&buf), 1);
+    light->intensity = read_and_advance<float>(&buf);
   }
   return true;
 }
@@ -140,32 +140,32 @@ bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
-  const int count = read_and_step<int>(&buf);
+  const int count = read_and_advance<int>(&buf);
   for (int i = 0; i < count; ++i) {
-    Camera *camera = new Camera(read_and_step<const char *>(&buf));
+    Camera *camera = new Camera(read_and_advance<const char *>(&buf));
     scene->cameras.push_back(camera);
-    camera->pos = read_and_step<XMFLOAT3>(&buf);
-    camera->target = read_and_step<XMFLOAT3>(&buf);
-    camera->up = read_and_step<XMFLOAT3>(&buf);
-    camera->roll = read_and_step<float>(&buf);
-    camera->aspect_ratio = read_and_step<float>(&buf);
-    camera->fov_x = XMConvertToRadians(read_and_step<float>(&buf));
-    camera->fov_y = XMConvertToRadians(read_and_step<float>(&buf));
-    camera->near_plane = read_and_step<float>(&buf);
-    camera->far_plane = read_and_step<float>(&buf);
+    camera->pos = read_and_advance<XMFLOAT3>(&buf);
+    camera->target = read_and_advance<XMFLOAT3>(&buf);
+    camera->up = read_and_advance<XMFLOAT3>(&buf);
+    camera->roll = read_and_advance<float>(&buf);
+    camera->aspect_ratio = read_and_advance<float>(&buf);
+    camera->fov_x = XMConvertToRadians(read_and_advance<float>(&buf));
+    camera->fov_y = XMConvertToRadians(read_and_advance<float>(&buf));
+    camera->near_plane = read_and_advance<float>(&buf);
+    camera->far_plane = read_and_advance<float>(&buf);
   }
   return true;
 }
 
 template<class T>
 void load_animation_inner(const char **buf, map<string, vector<KeyFrame<T>>> *out) {
-  const int count = read_and_step<int>(&(*buf));
+  const int count = read_and_advance<int>(&(*buf));
   for (int i = 0; i < count; ++i) {
-    const char *node_name = read_and_step<const char *>(&(*buf));
+    const char *node_name = read_and_advance<const char *>(&(*buf));
     auto &keys = (*out)[node_name];
-    const int num_frames = read_and_step<int>(&(*buf));
+    const int num_frames = read_and_advance<int>(&(*buf));
     keys.resize(num_frames);
-    read_and_step_raw(&(*buf), &keys[0], num_frames * sizeof(KeyFrame<T>));
+    read_and_advance_raw(&(*buf), &keys[0], num_frames * sizeof(KeyFrame<T>));
   }
 }
 
@@ -187,23 +187,24 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
 
-  int count = read_and_step<int>(&buf);
-  for (int i = 0; i < count; ++i) {
-    string name, technique;
-    name = read_and_step<const char *>(&buf);
-    technique = read_and_step<const char *>(&buf);
+  int num_materials = read_and_advance<int>(&buf);
+  for (int i = 0; i < num_materials; ++i) {
+    string name = read_and_advance<const char *>(&buf);
+    string technique = read_and_advance<const char *>(&buf);
     _technique_for_material[name] = technique;
     Material *material = new Material(name);
-    _material_ids[material->name()] = MATERIAL_MANAGER.add_material(material, true);
+    _material_name_to_id[material->name()] = MATERIAL_MANAGER.add_material(material, true);
 
-    int props = read_and_step<int>(&buf);
-    for (int j = 0; j < props; ++j) {
-      const char *name = read_and_step<const char *>(&buf);
-      string filename(read_and_step<const char *>(&buf));
+    int num_props = read_and_advance<int>(&buf);
+    for (int j = 0; j < num_props; ++j) {
+      const char *name = read_and_advance<const char *>(&buf);
+      string filename(read_and_advance<const char *>(&buf));
+      GraphicsObjectHandle resource;
       if (!filename.empty()) {
         D3DX11_IMAGE_INFO info;
-        GraphicsObjectHandle texture = GRAPHICS.load_texture(filename.c_str(), name, &info);
-        if (!texture.is_valid())
+        resource = GRAPHICS.load_texture(filename.c_str(), name, &info);
+        material->add_flag(GRAPHICS.get_shader_flag("DIFFUSE_TEXTURE"));
+        if (!resource.is_valid())
           LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());
       }
 
@@ -211,33 +212,36 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
         material->add_property("HasDiffuseMap", PropertyType::kInt, filename.empty() ? 0 : 1);
       }
 
-      PropertyType::Enum type = read_and_step<PropertyType::Enum>(&buf);
+      PropertyType::Enum type = read_and_advance<PropertyType::Enum>(&buf);
+      Material::Property *property = nullptr;
 
       switch (type) {
 /*
         case PropertyType::kInt:
-          material->properties.push_back(MaterialProperty(name, read_and_step<int>(&buf)));
+          material->properties.push_back(MaterialProperty(name, read_and_advance<int>(&buf)));
           break;
 */
         case PropertyType::kFloat:
-          material->add_property(name, type, read_and_step<float>(&buf));
+          property = material->add_property(name, type, read_and_advance<float>(&buf));
           break;
 
         case PropertyType::kFloat3: {
-          XMFLOAT3 tmp = read_and_step<XMFLOAT3>(&buf);
-          material->add_property(name, type, XMFLOAT4(tmp.x, tmp.y, tmp.z, 0));
+          XMFLOAT3 tmp = read_and_advance<XMFLOAT3>(&buf);
+          property = material->add_property(name, type, XMFLOAT4(tmp.x, tmp.y, tmp.z, 0));
           break;
         }
 
         case PropertyType::kFloat4:
         case PropertyType::kColor:
-          material->add_property(name, type, read_and_step<XMFLOAT4>(&buf));
+          property = material->add_property(name, type, read_and_advance<XMFLOAT4>(&buf));
           break;
 
         default:
           LOG_ERROR_LN("Unknown property type");
           break;
       }
+      if (property)
+        property->resource = resource;
     }
     scene->materials.push_back(material);
   }

@@ -52,12 +52,15 @@ GraphicsObjectHandle MaterialManager::find_material(const string &name) {
   return idx == -1 ? GraphicsObjectHandle() : GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
 }
 
-GraphicsObjectHandle MaterialManager::add_material(Material *material, bool delete_existing) {
+GraphicsObjectHandle MaterialManager::add_material(Material *material, bool replace_existing) {
 
-  const std::string &key = material->name();
-  int idx = _materials.idx_from_token(key);
-  if (idx != -1 || (idx = _materials.find_free_index()) != -1) {
-    _materials.set_pair(idx, make_pair(key, material));
+  const std::string &name = material->name();
+  int old_idx = _materials.idx_from_token(name);
+  int new_idx = _materials.find_free_index();
+
+  if (old_idx != -1 && replace_existing || old_idx == -1 && new_idx != -1) {
+    int idx = old_idx != -1 ? old_idx : new_idx;      
+    _materials.set_pair(idx, make_pair(name, material));
     return GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
   }
   return GraphicsObjectHandle();

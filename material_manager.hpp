@@ -10,7 +10,7 @@ public:
   static bool close();
 
   GraphicsObjectHandle find_material(const std::string &name);
-  GraphicsObjectHandle add_material(Material *material, bool delete_existing);
+  GraphicsObjectHandle add_material(Material *material, bool replace_existing);
   void remove_material(const std::string &name);
   Material *get_material(GraphicsObjectHandle id);
 

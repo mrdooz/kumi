@@ -625,16 +625,18 @@ void parse_list(Scope *scope, vector<vector<T> > *items, function<T(const string
       items->push_back(cur);
       cur.clear();
       item_start = scope->skip_whitespace()._start;
-    } else if (isspace((uint8_t)ch)) {
+    } else if (isspace((int)ch)) {
       cur.push_back(xform(string(item_start, scope->_start - item_start - 1)));
       item_start = scope->skip_whitespace()._start;
     }
   }
 
-  if (item_start < scope->_end) {
+  if (item_start < scope->_end)
     cur.push_back(xform(string(item_start, scope->_start - item_start)));
+
+  if (!cur.empty())
     items->push_back(cur);
-  }
+
 }
 
 void TechniqueParser::parse_material(Scope *scope, Material *material) {
@@ -714,8 +716,17 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
         Scope inner = scope->create_delimited_scope('[', ']');
         vector<vector<string>> flags;
         parse_list(&inner, &flags);
-        for (size_t i = 0; i < flags.size(); ++i)
-          shader->_flags.push_back(flags[i][0]);
+        for (size_t i = 0; i < flags.size(); ++i) {
+          const std::string &flag = flags[i][0];
+          GRAPHICS.add_shader_flag(flag);
+          shader->_flags.push_back(flag);
+          // update the shader flag mask
+          int flag_value = GRAPHICS.get_shader_flag(flag);
+          if (shader->_type == ShaderType::kVertexShader)
+            technique->_vs_flag_mask |= flag_value;
+          else
+            technique->_ps_flag_mask |= flag_value;
+        }
         scope->advance(inner).munch(kSymSemicolon);
         break;
       }

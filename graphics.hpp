@@ -123,8 +123,8 @@ public:
     IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
     IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
     IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
-    IdBuffer<ID3D11SamplerState *, IdCount> _sampler_states;
     IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
+    SearchableIdBuffer<string, ID3D11SamplerState *, IdCount> _sampler_states;
     SearchableIdBuffer<string, TextureData *, IdCount> _textures;
     SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
     SearchableIdBuffer<string, ResourceData *, IdCount> _resources;
@@ -212,8 +212,9 @@ public:
   GraphicsObjectHandle find_technique(const char *name);
   void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
   GraphicsObjectHandle find_shader(const char *technique_name, const char *shader_name, int flags);
-  GraphicsObjectHandle get_input_layout(const char *technique_name);
-  GraphicsObjectHandle find_resource(const char *name);
+  GraphicsObjectHandle find_input_layout(const std::string &technique_name);
+  GraphicsObjectHandle find_resource(const std::string &name);
+  GraphicsObjectHandle find_sampler_state(const std::string &name);
 
   HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
   HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
@@ -228,11 +229,16 @@ public:
 
   ID3D11ClassLinkage *get_class_linkage();
 
+  void add_shader_flag(const std::string &flag);
+  int get_shader_flag(const std::string &flag);
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
   Graphics(ResourceInterface *ri);
   ~Graphics();
+
+  GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
 
   bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, RenderTargetData *out);
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
@@ -288,6 +294,7 @@ private:
 #endif
 
   PropertyId _screen_size_id;
+  std::map<std::string, int> _shader_flags;
 };
 
 #define GRAPHICS Graphics::instance()
