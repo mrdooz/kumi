@@ -11,19 +11,19 @@ string Shader::id() const {
   Path p(_source_filename);
   return p.get_filename_without_ext() + "::" + _entry_point;
 }
-
+/*
 void Shader::prune_unused_parameters() {
   auto not_used = [&](const ParamBase &param) { return !param.used; };
   //erase_remove_if(&_cbuffer_params, r);
   //erase_remove_if(&_resource_view_params, r);
 }
+*/
 
 void Shader::prepare_cbuffers() {
-  prune_unused_parameters();
 }
 
 bool Shader::on_loaded() {
-
+/*
   _resource_views.res.resize(_resource_view_names.size());
   for (int i = 0; i < (int)_resource_view_names.size(); ++i) {
     auto &cur = _resource_view_names[i];
@@ -43,7 +43,7 @@ bool Shader::on_loaded() {
       _sampler_states.res[i] = PROPERTY_MANAGER.get_or_create_placeholder(cur);
     }
   }
-
+*/
   return true;
 }
 
@@ -51,6 +51,6 @@ const SparseProperty &Shader::samplers() const {
   return _sampler_states;
 }
 
-const SparseProperty &Shader::resource_views() const {
+const SparseUnknown &Shader::resource_views() const {
   return _resource_views;
 }

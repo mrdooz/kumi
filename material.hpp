@@ -50,7 +50,7 @@ public:
 
   Property *property_by_name(const std::string &name);
 
-  void fill_resource_views(const SparseProperty &props, std::vector<GraphicsObjectHandle> *out) const;
+  void fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const;
   void fill_cbuffer(CBuffer *cbuffer) const;
   int flags() const;
   void add_flag(int flag);

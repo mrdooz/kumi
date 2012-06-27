@@ -714,7 +714,7 @@ GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
   if (idx != -1)
     return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
   idx = _res._render_targets.idx_from_token(name);
-  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx) : GraphicsObjectHandle();
+  return make_goh(GraphicsObjectHandle::kRenderTarget, idx);
 }
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {

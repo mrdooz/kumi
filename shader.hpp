@@ -11,60 +11,7 @@ namespace ShaderType {
   };
 }
 
-struct ParamBase {
-  ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) 
-    : name(name), type(type), source(source), used(false) {}
-  std::string name;
-  PropertyType::Enum type;
-  PropertySource::Enum source;
-  bool used;
-};
-
-struct CBufferParam : public ParamBase {
-  CBufferParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source){
-    // system properties can be connected now, but for mesh and material we have to wait
-    if (source == PropertySource::kSystem) {
-      int len = HIWORD(type);
-      if (!len) {
-        switch (type) {
-          case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create<float>(name.c_str()); break;
-          case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>(name.c_str()); break;
-          case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>(name.c_str()); break;
-          default: assert(!"Unknown type!"); break;
-        }
-      } else {
-        switch (LOWORD(type)) {
-          case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(float) * len, nullptr); break;
-          case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4) * len, nullptr); break;
-          case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4X4) * len, nullptr); break;
-          default: assert(!"Unknown type!"); break;
-        }
-      }
-    } else {
-      id = -1;
-    }
-  }
-
-  union DefaultValue {
-    int _int;
-    float _float[16];
-  };
-
-  PropertyId id;
-  DefaultValue default_value;
-};
-
-struct ResourceViewParam : public ParamBase {
-  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
-    : ParamBase(name, type, source)
-    , friendly_name(friendly_name)
-    , bind_point(INT_MAX)
-  {
-  }
-  std::string friendly_name;
-  int bind_point;
-};
-
+// worse names evar!
 template<typename T>
 struct SparseResource {
   SparseResource() : first(INT_MAX), count(0) {}
@@ -73,7 +20,17 @@ struct SparseResource {
   std::vector<T> res;
 };
 
+struct UnknownResource {
+  PropertySource::Enum source;
+  char data[max(sizeof(GraphicsObjectHandle), sizeof(PropertyId))];
+  const GraphicsObjectHandle *goh() const { return (GraphicsObjectHandle *)&data; }
+  GraphicsObjectHandle *goh() { return (GraphicsObjectHandle *)&data; }
+  const PropertyId *pid() const { return (PropertyId *)&data; }
+  PropertyId *pid() { return (PropertyId *)&data; }
+};
+
 typedef SparseResource<PropertyId> SparseProperty;
+typedef SparseResource<UnknownResource> SparseUnknown;
 
 class Shader {
   friend class TechniqueParser;
@@ -104,10 +61,10 @@ public:
   bool on_loaded();
 
   const SparseProperty &samplers() const;
-  const SparseProperty &resource_views() const;
+  const SparseUnknown &resource_views() const;
 
 private:
-  void prune_unused_parameters();
+  //void prune_unused_parameters();
 
   std::vector<CBuffer> _cbuffers;
   bool _valid;
@@ -118,14 +75,14 @@ private:
   std::vector<std::string> _flags;
 #endif
   //std::vector<CBufferParam> _cbuffer_params;
-  std::vector<ResourceViewParam> _resource_view_params;
+  //std::vector<ResourceViewParam> _resource_view_params;
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;
 
-  std::vector<std::string> _resource_view_names;
-  std::vector<std::string> _sampler_names;
+  //std::vector<std::string> _resource_view_names;
+  //std::vector<std::string> _sampler_names;
 
-  SparseProperty _resource_views;
+  SparseUnknown _resource_views;
   SparseProperty _sampler_states;
 };
 /*

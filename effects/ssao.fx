@@ -1,12 +1,13 @@
 matrix proj, view, world;
 float4 Diffuse, LightColor, LightPos;
-int HasDiffuseMap = 0;
 
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;
 
+#if DIFFUSE_TEXTURE
 Texture2D DiffuseTexture : register(t0);
 sampler DiffuseSampler : register(s0);
+#endif
 
 
 ///////////////////////////////////
@@ -47,8 +48,11 @@ fill_ps_output fill_ps_main(fill_ps_input input)
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
     output.rt_normal = normalize(input.vs_normal);
-    output.rt_diffuse.rgb = float3(1,1,1);
-    output.rt_diffuse.a = 1;
+  #if DIFFUSE_TEXTURE
+    output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
+  #else
+    output.rt_diffuse = Diffuse;
+  #endif
     return output;
 }
 

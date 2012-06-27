@@ -201,7 +201,6 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
               case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
               default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
             }
-            param->used = true;
           }
         }
       }
@@ -259,16 +258,30 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
             add_error_msg("Resource view %s not found", name.c_str());
             return false;
           }
-          param->bind_point = bind_point;
-          param->used = true;
-          string qualified_name = PropertySource::to_string(param->source) + "::" + 
-            (param->friendly_name.empty() ? param->name : param->friendly_name);
-          shader->_resource_view_names.resize(max((int)shader->_resource_view_names.size(), bind_point+1));
-          shader->_resource_view_names[bind_point] = qualified_name;
+
+          SparseUnknown &res = shader->_resource_views;
+          res.first = min(bind_point, res.first);
+          res.count = max(res.count, bind_point - res.first + 1);
+          res.res.resize(res.count);
+          res.res[bind_point].source = param->source;
+
+          // the system resource has already been created, so we can grab it's handle right now
+          if (param->source == PropertySource::kSystem) {
+            *res.res[bind_point].goh() = GRAPHICS.find_resource(name);
+          } else {
+            string qualified_name = PropertySource::to_string(param->source) + "::" + 
+              (param->friendly_name.empty() ? param->name : param->friendly_name);
+            *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+          }
 
         } else if (type == "sampler") {
-          shader->_sampler_names.resize(max((int)shader->_sampler_names.size(), bind_point+1));
-          shader->_sampler_names[bind_point] = name;
+
+          auto &samplers = shader->_sampler_states;
+          samplers.first = min(bind_point, samplers.first);
+          samplers.count = max(samplers.count, bind_point - samplers.first + 1);
+          samplers.res.resize(samplers.count);
+          samplers.res[bind_point] = PROPERTY_MANAGER.get_or_create_placeholder(name);
+
 /*
           _first_sampler = min(_first_sampler, bind_point);
           _num_valid_samplers = max(bind_point - _first_sampler + 1, _num_valid_samplers);
@@ -796,20 +809,31 @@ void Technique::prepare_textures() {
 */
 }
 
-void Technique::fill_cbuffer(CBuffer *cbuffer) {
+void Technique::fill_cbuffer(CBuffer *cbuffer) const {
   for (size_t i = 0; i < cbuffer->system_vars.size(); ++i) {
     auto &cur = cbuffer->system_vars[i];
     PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }
 
-void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) {
+void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) const {
   out->resize(input.res.size());
   for (size_t i = 0; i < input.res.size(); ++i) {
     for (size_t j = 0; j < _sampler_states.size(); ++j) {
       if (input.res[i] == _sampler_states[j].first) {
         (*out)[i] = _sampler_states[j].second;
       }
+    }
+  }
+}
+
+void Technique::fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const {
+
+  out->resize(props.res.size());
+
+  for (size_t i = 0; i < props.res.size(); ++i) {
+    if (props.res[i].source == PropertySource::kSystem) {
+      (*out)[i] = *props.res[i].goh();
     }
   }
 }

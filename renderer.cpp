@@ -297,21 +297,21 @@ void Renderer::render() {
         gen.set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
         gen.set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-        auto &vs_cbuffers = vs->get_cbuffers();
-        auto &ps_cbuffers = ps->get_cbuffers();
-
         // set cbuffers
+        auto &vs_cbuffers = vs->get_cbuffers();
         for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&vs_cbuffers[i]);
           material->fill_cbuffer(&vs_cbuffers[i]);
           technique->fill_cbuffer(&vs_cbuffers[i]);
         }
 
+        auto &ps_cbuffers = ps->get_cbuffers();
         for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&ps_cbuffers[i]);
           material->fill_cbuffer(&ps_cbuffers[i]);
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
+        gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
 
         // set samplers
         auto &samplers = ps->samplers();
@@ -326,10 +326,10 @@ void Renderer::render() {
         if (rv.count > 0) {
           vector<GraphicsObjectHandle> rr;
           material->fill_resource_views(rv, &rr);
+          technique->fill_resource_views(rv, &rr);
           gen.set_shader_resources(&rr[0], rv.first, rv.count);
         }
 
-        gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
         gen.draw_indexed(geometry->index_count, 0, 0);
 
         if (rv.count > 0)
@@ -338,54 +338,55 @@ void Renderer::render() {
       }
 
       case RenderKey::kRenderTechnique: {
-#if 0
         Technique *technique = res->_techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
 
-        technique->get_render_objects(&objects, 0, 0);
-        gen.set_vs(objects.vs);
-        gen.set_ps(objects.ps);
+        Shader *vs = technique->vertex_shader(0);
+        Shader *ps = technique->pixel_shader(0);
+        gen.set_vs(vs->handle());
+        gen.set_ps(ps->handle());
 
         gen.set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         gen.set_vb(technique->vb(), technique->vertex_size());
         gen.set_layout(technique->input_layout());
         gen.set_ib(technique->ib(), technique->index_format());
 
-        gen.set_rs(objects.rs);
-        gen.set_dss(objects.dss, objects.stencil_ref);
-        gen.set_bs(objects.bs, objects.blend_factors, objects.sample_mask);
+        gen.set_rs(technique->rasterizer_state());
+        gen.set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+        gen.set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-        gen.set_samplers(objects.samplers, objects.first_sampler, objects.num_valid_samplers);
-        gen.set_shader_resources(render_data->textures, render_data->first_texture, render_data->num_textures);
-
-        //Mesh *mesh = render_data->mesh;
-        //Material *material = render_data->material;
-
-        auto &vs_cbuffers = technique->get_cbuffer_vs();
-        auto &ps_cbuffers = technique->get_cbuffer_ps();
-
+        // set cbuffers
+        auto &vs_cbuffers = vs->get_cbuffers();
         for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-          //mesh->fill_cbuffer(&vs_cbuffers[i]);
-          //material->fill_cbuffer(&vs_cbuffers[i]);
           technique->fill_cbuffer(&vs_cbuffers[i]);
         }
 
+        auto &ps_cbuffers = ps->get_cbuffers();
         for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
-          //mesh->fill_cbuffer(&ps_cbuffers[i]);
-          //material->fill_cbuffer(&ps_cbuffers[i]);
           technique->fill_cbuffer(&ps_cbuffers[i]);
         }
-
-/*
-        GraphicsObjectHandle cb = technique->cbuffer_handle();
-        if (cb.is_valid())
-          gen.set_cbuffer(cb, technique->cbuffer().data(), technique->cbuffer().size());
-*/
         gen.set_cbuffer(vs_cbuffers, ps_cbuffers);
+
+        // set samplers
+        auto &samplers = ps->samplers();
+        if (samplers.count > 0) {
+          vector<GraphicsObjectHandle> ss;
+          technique->fill_samplers(samplers, &ss);
+          gen.set_samplers(&ss[0], samplers.first, samplers.count);
+        }
+
+        // set resource views
+        auto &rv = ps->resource_views();
+        if (rv.count > 0) {
+          vector<GraphicsObjectHandle> rr;
+          technique->fill_resource_views(rv, &rr);
+          gen.set_shader_resources(&rr[0], rv.first, rv.count);
+        }
+
         gen.draw_indexed(technique->index_count(), 0, 0);
 
-        gen.unset_shader_resource(render_data->first_texture, render_data->num_textures);
-#endif
+        if (rv.count > 0)
+          gen.unset_shader_resource(rv.first, rv.count);
         break;
       }
     }

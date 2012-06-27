@@ -29,6 +29,58 @@ struct RenderObjects {
 };
 #pragma pack(pop)
 
+struct ParamBase {
+  ParamBase(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) 
+    : name(name), type(type), source(source) {}
+  std::string name;
+  PropertyType::Enum type;
+  PropertySource::Enum source;
+};
+
+struct CBufferParam : public ParamBase {
+  CBufferParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source){
+    // system properties can be connected now, but for mesh and material we have to wait
+    if (source == PropertySource::kSystem) {
+      int len = HIWORD(type);
+      if (!len) {
+        switch (type) {
+        case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create<float>(name.c_str()); break;
+        case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>(name.c_str()); break;
+        case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>(name.c_str()); break;
+        default: assert(!"Unknown type!"); break;
+        }
+      } else {
+        switch (LOWORD(type)) {
+        case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(float) * len, nullptr); break;
+        case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4) * len, nullptr); break;
+        case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4X4) * len, nullptr); break;
+        default: assert(!"Unknown type!"); break;
+        }
+      }
+    } else {
+      id = -1;
+    }
+  }
+
+  union DefaultValue {
+    int _int;
+    float _float[16];
+  };
+
+  PropertyId id;
+  DefaultValue default_value;
+};
+
+struct ResourceViewParam : public ParamBase {
+  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
+    : ParamBase(name, type, source)
+    , friendly_name(friendly_name)
+  {
+  }
+  std::string friendly_name;
+};
+
+
 struct ShaderTemplate {
   friend TechniqueParser;
 
@@ -100,8 +152,10 @@ public:
   const std::string &get_default_sampler_state() const { return _default_sampler_state; }
   const TechniqueRenderData &render_data() const { return _render_data; }
 
-  void fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out);
-  void fill_cbuffer(CBuffer *cbuffer);
+  void fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) const;
+  void fill_cbuffer(CBuffer *cbuffer) const;
+  void fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const;
+
   const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
   GraphicsObjectHandle cbuffer_handle();
 
