@@ -670,13 +670,13 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
 void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, ShaderTemplate *shader) {
 
   auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams)(kSymFlags);
-  string ext, entry_point;
+  string ext;
   if (shader->_type == ShaderType::kVertexShader) {
     ext = ".vso";
-    entry_point = "vs_main";
+    shader->_entry_point = "vs_main";
   } else {
     ext = ".pso";
-    entry_point = "ps_main";
+    shader->_entry_point = "ps_main";
   }
 
   Symbol symbol;
@@ -688,16 +688,16 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
       case kSymFile: {
         shader->_source_filename = scope->string_until(';');
         // Use the default entry point name until we get a real tag
-        shader->_obj_filename = strip_extension(shader->_source_filename) + "_" + entry_point + ext;
+        shader->_obj_filename = strip_extension(shader->_source_filename) + "_" + shader->_entry_point + ext;
         scope->munch(kSymSemicolon);
         break;
       }
 
       case kSymEntryPoint: {
-        shader->_entry_point = entry_point = scope->string_until(';');
+        shader->_entry_point = scope->string_until(';');
         // update the obj filename
         if (!shader->_source_filename.empty())
-          shader->_obj_filename = strip_extension(shader->_source_filename) + "_" + entry_point + ext;
+          shader->_obj_filename = strip_extension(shader->_source_filename) + "_" + shader->_entry_point + ext;
         scope->munch(kSymSemicolon);
         break;
       }

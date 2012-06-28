@@ -8,11 +8,11 @@ bool Ps3BackgroundEffect::init() {
   LOG_VERBOSE_LN(__FUNCTION__);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ps3background.tec", true));
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/bloom.tec", true));
+  //B_ERR_BOOL(GRAPHICS.load_techniques("effects/bloom.tec", true));
 
   _background_technique = GRAPHICS.find_technique("ps3background");
-  _bloom_technique = GRAPHICS.find_technique("bloom");
-  _bloom_rt = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, "bloom_rt");
+  //_bloom_technique = GRAPHICS.find_technique("bloom");
+  //_bloom_rt = GRAPHICS.create_render_target(FROM_HERE, GRAPHICS.width(), GRAPHICS.height(), true, "bloom_rt");
   return true;
 }
 

@@ -21,7 +21,7 @@ DemoEngine::DemoEngine()
   , _running_time(0)
   , _cur_effect(0)
   , _duration_ms(3 * 60 * 1000)
-  , _time_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_time"))
+  , _time_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_time"))
 {
   QueryPerformanceFrequency((LARGE_INTEGER *)&_frequency);
 }

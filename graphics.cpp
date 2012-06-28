@@ -56,7 +56,7 @@ Graphics::Graphics(ResourceInterface *ri)
   , _vs_profile("vs_4_0")
   , _ps_profile("ps_4_0")
   , _ri(ri)
-  , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("g_screen_size"))
+  , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size"))
 {
   assert(!_instance);
 }
