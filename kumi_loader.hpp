@@ -1,6 +1,7 @@
 #pragma once
 
 #include "graphics_object_handle.hpp"
+#include "path_utils.hpp"
 
 struct Scene;
 struct ResourceInterface;
@@ -18,4 +19,5 @@ private:
   std::unordered_map<std::string, std::string> _technique_for_material;
 
   std::map<std::string, std::pair<std::string, std::string> > _material_overrides;
+  string _filename;
 };

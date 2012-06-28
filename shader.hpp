@@ -45,7 +45,6 @@ public:
 
   const std::string &source_filename() const { return _source_filename; }
   GraphicsObjectHandle handle() const { return _handle; }
-  std::string id() const;
 
   void prepare_cbuffers();
 
@@ -60,10 +59,10 @@ private:
 
   std::vector<CBuffer> _cbuffers;
   bool _valid;
-#if _DEBUG
   std::string _source_filename;
-  std::string _obj_filename;
+#if _DEBUG
   std::string _entry_point;
+  std::string _obj_filename;
   std::vector<std::string> _flags;
 #endif
   GraphicsObjectHandle _handle;

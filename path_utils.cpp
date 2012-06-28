@@ -1,121 +1,97 @@
 #include "stdafx.h"
 #include "path_utils.hpp"
 
+using std::string;
 
-string Path::make_canonical(const string& str)
-{
+string Path::make_canonical(const string &str) {
   // convert back slashes to forward
-
-  string res;
-  for (int i = 0, e = str.size(); i < e; ++i) {
-    const char ch = str[i];
-    if (ch == '\\') {
-      res += '/';
-    } else {
-      res += ch;
-    }
-  }
+  string res(str);
+  boost::replace_all(res, "\\", "/");
   return res;
 }
 
-
-Path::Path(const string& str) 
-  : _str(make_canonical(str)) 
-  , _ext_ofs(-1)
-  , _file_ofs(-1)
-{
-  for (int i = _str.size() - 1; i >= 0; --i) {
-		char ch = _str[i];
-    if (ch == '.') {
-			_ext_ofs = i;
-		} else if (ch == '/') {
-			// last slash
-			_file_ofs = i;
-			break;
-		}
-  }
+Path::Path()
+  : _ext_ofs(string::npos)
+  , _filename_ofs(string::npos) {
 }
 
-Path Path::replace_extension(const string& ext)
-{
-  if (_ext_ofs == -1) {
-    return Path(_str + "." + ext);
-  }
-
-  return Path(string(_str, _ext_ofs) + "." + ext);
+Path::Path(const string& str) {
+  init(str);
 }
 
-const string& Path::str() const
-{
+void Path::init(const string &str) {
+  _str = make_canonical(str);
+  _ext_ofs = _str.rfind(".");
+  _filename_ofs = str.rfind("/");
+}
+
+
+Path Path::replace_extension(const string& ext) {
+  return _ext_ofs == string::npos ? Path(_str + "." + ext) : Path(string(_str, _ext_ofs) + "." + ext);
+}
+
+const string& Path::str() const {
   return _str;
 }
 
-string Path::get_path() const
-{
-	string res;
-	if (_file_ofs != -1)
-		res = _str.substr(0, _file_ofs + 1);
-	return res;
+string Path::get_path() const {
+  return _filename_ofs == string::npos ? string() : _str.substr(0, _filename_ofs + 1);
 }
 
-string Path::get_ext() const
-{
-	string res;
-	if (_ext_ofs != -1)
-		res.assign(&_str[_ext_ofs+1]);
-	return res;
+string Path::get_ext() const {
+  return _ext_ofs == string::npos ? string() : string(&_str[_ext_ofs+1]);
 }
 
-string Path::get_filename() const
-{
-	string res;
-	if (_file_ofs != -1)
-		res.assign(&_str[_file_ofs+1]);
-	return res;
+string Path::get_filename() const {
+  return _filename_ofs == string::npos ? string() : string(&_str[_filename_ofs+1]);
 }
 
-string Path::get_filename_without_ext() const
-{
-	string res;
-	if (_file_ofs != -1) {
-		// 0123456
-		// /tjong.ext
-		// ^     ^--- _ext_ofs
-		// +--------- _file_ofs
-		int end = _ext_ofs == -1 ? _str.size() : _ext_ofs;
-		res = _str.substr(_file_ofs + 1, end - _file_ofs - 1);
-	}
+string Path::get_filename_without_ext() const {
+  string res;
+  if (_filename_ofs != string::npos) {
+    // 0123456
+    // /tjong.ext
+    // ^     ^--- _ext_ofs
+    // +--------- _filename_ofs
+    int end = _ext_ofs == string::npos ? _str.size() : _ext_ofs;
+    res = _str.substr(_filename_ofs + 1, end - _filename_ofs - 1);
+  }
   return res;
 }
 
-string Path::get_full_path_name(const string& p)
-{
-	char buf[MAX_PATH];
-	GetFullPathNameA(p.c_str(), MAX_PATH, buf, NULL);
-	return buf;
+string Path::get_full_path_name(const string& p) {
+  char buf[MAX_PATH];
+  GetFullPathNameA(p.c_str(), MAX_PATH, buf, NULL);
+  return buf;
 }
 
 string Path::replace_extension(const string& path, const string& ext)
 {
-	string res;
-	if (!path.empty() && !ext.empty()) {
-		const char *dot = path.c_str();
-		while (*dot && *dot++ != '.')
-			;
+  string res;
+  if (!path.empty() && !ext.empty()) {
+    const char *dot = path.c_str();
+    while (*dot && *dot++ != '.')
+      ;
 
-		if (*dot)
-			res = string(path.c_str(), dot - path.c_str()) + ext;
-		else
-			res = path + (dot[-1] == '.' ? "" : ".") + ext;
-	}
+    if (*dot)
+      res = string(path.c_str(), dot - path.c_str()) + ext;
+    else
+      res = path + (dot[-1] == '.' ? "" : ".") + ext;
+  }
 
   return res;
 }
 
-string Path::get_path(const string& p)
-{
-	Path a(p);
-	return a.get_path();
+string Path::get_path(const string& p) {
+  Path a(p);
+  return a.get_path();
+}
+
+bool Path::is_absolute(const std::string &path) {
+  size_t len = path.size();
+  return 
+    len >= 1 && path[0] == '/' || 
+    len >= 3 && path[1] == ':' && path[2] == '/';
 }
 
 string replace_extension(const std::string &org, const std::string &new_ext) {
@@ -147,3 +123,4 @@ void split_path(const char *path, std::string *drive, std::string *dir, std::str
   if (fname) *fname = fname_buf;
   if (ext) *ext = ext_buf;
 }
+

@@ -738,18 +738,6 @@ GraphicsObjectHandle Graphics::get_sampler_state(const char *name, const char *s
   return GraphicsObjectHandle();
 }
 */
-GraphicsObjectHandle Graphics::find_shader(const char *technique_name, const char *shader_id, int flags) {
-  if (Technique *technique = _res._techniques.find(technique_name, (Technique *)NULL)) {
-    if (technique->vertex_shader(flags)->id() == shader_id) {
-      int idx = _res._vertex_shaders.idx_from_token(shader_id);
-      return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx) : GraphicsObjectHandle();
-    } else if (technique->pixel_shader(flags)->id() == shader_id) {
-      int idx = _res._pixel_shaders.idx_from_token(shader_id);
-      return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx) : GraphicsObjectHandle();
-    }
-  }
-  return GraphicsObjectHandle();
-}
 
 GraphicsObjectHandle Graphics::find_sampler_state(const std::string &name) {
   int idx = _res._sampler_states.idx_from_token(name);

@@ -6,7 +6,9 @@ using std::string;
 class Path
 {
 public:
+  Path();
   Path(const string& str);
+  void init(const string &str);
   Path replace_extension(const string& ext);
   const string& str() const;
   string get_path() const;
@@ -14,15 +16,17 @@ public:
   string get_filename() const;
   string get_filename_without_ext() const;
 
-	static string make_canonical(const string& str);
-	static string get_full_path_name(const string& p);
+  static string make_canonical(const string &str);
+  static string get_full_path_name(const string& p);
   static string replace_extension(const string& path, const string& ext);
-	static string get_path(const string& p);
+  static string get_path(const string& p);
+
+  static bool is_absolute(const std::string &path);
 
 private:
   string _str;
-  int _file_ofs;		// points to the last '/'
-  int _ext_ofs;			// points to the '.'
+  int _filename_ofs;    // points to the last '/'
+  int _ext_ofs;         // points to the '.'
 };
 
 std::string replace_extension(const std::string &org, const std::string &new_ext);

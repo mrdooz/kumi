@@ -68,6 +68,7 @@ typedef uint64_t uint64;
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/assign/list_of.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <vector>
 #include <string>

@@ -51,7 +51,7 @@ static void apply_fixup(int *data, const void *ptr_base, const void *data_base) 
   const int count = *data++;
   for (int i = 0; i < count; ++i) {
     int ofs = *data++;
-    *(int *)(p + ofs) += (int)b;
+    *(int *)(p + ofs) += b;
   }
 }
 
@@ -62,17 +62,17 @@ const T& read_and_advance(const U **buf) {
   return tmp;
 }
 
+template <class T, class U>
+void read_and_advance(const U **buf, T *val) {
+  *val = read_and_advance(buf);
+}
+
 template <class U>
 void read_and_advance_raw(const U **buf, void *dst, int len) {
   memcpy(dst, (const void *)*buf, len);
   *buf += len;
 }
 
-template <class T, class U>
-void read_and_advance(const U **buf, T *val) {
-  *val = *(const T *)*buf;
-  *buf += sizeof(T);
-}
 
 bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
@@ -202,6 +202,10 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
       GraphicsObjectHandle resource;
       if (!filename.empty()) {
         D3DX11_IMAGE_INFO info;
+        // if the path isn't absolute, append the path of the file we're loading
+        if (!Path::is_absolute(filename)) {
+          filename = Path::get_path(_filename) + filename;
+        }
         resource = GRAPHICS.load_texture(filename.c_str(), name, &info);
         material->add_flag(GRAPHICS.get_shader_flag("DIFFUSE_TEXTURE"));
         if (!resource.is_valid())
@@ -250,7 +254,8 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
 }
 
 bool KumiLoader::load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene) {
-  LOG_CONTEXT("%s loading %s", __FUNCTION__, resource->resolve_filename(filename).c_str());
+  _filename = resource->resolve_filename(filename);
+  LOG_CONTEXT("%s loading %s", __FUNCTION__, _filename.c_str());
 
   if (material_override) {
     vector<char> buf;

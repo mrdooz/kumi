@@ -298,10 +298,10 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
 #else
   sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s %s", 
     profile,
-    entry_point.c_str(),
-    obj.c_str(), 
+    entry_point,
+    obj,
     defines.c_str(),
-    src.c_str());
+    src);
 #endif
 
   DWORD exit_code = 1;
