@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "ps3_background.hpp"
 #include "../logger.hpp"
-#include "../renderer.hpp"
 #include "../graphics.hpp"
 
 bool Ps3BackgroundEffect::init() {
@@ -27,7 +26,7 @@ bool Ps3BackgroundEffect::render() {
   key.handle = _bloom_rt;
   RENDERER.submit_command(FROM_HERE, key, nullptr);
 */
-  RENDERER.submit_technique(_background_technique);
+  GRAPHICS.submit_technique(_background_technique);
 /*
   key.handle = GRAPHICS.default_render_target();
   RENDERER.submit_command(FROM_HERE, key, nullptr);

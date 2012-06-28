@@ -344,7 +344,7 @@ struct ShaderInstance {
   vector<string> flags;
 };
 
-bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_template) {
+bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
   bool force = true;
   bool ok = true;
@@ -383,16 +383,16 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
     auto &cur = shaders[i];
     const char *obj = cur.obj.c_str();
     // compile the shader if the source is newer, or the object file doesn't exist
-    if (force || res->file_exists(src) && (!res->file_exists(obj) || res->mdate(src) > res->mdate(obj))) {
+    if (force || RESOURCE_MANAGER.file_exists(src) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src) > RESOURCE_MANAGER.mdate(obj))) {
       if (!compile_shader(type, ep, src, obj, cur.flags))
         return false;
     } else {
-      if (!res->file_exists(obj))
+      if (!RESOURCE_MANAGER.file_exists(obj))
         return false;
     }
 
     vector<char> buf;
-    if (!res->load_file(obj, &buf))
+    if (!RESOURCE_MANAGER.load_file(obj, &buf))
       return false;
 
     int len = (int)buf.size();
@@ -407,7 +407,7 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
 
     // load corresponding .h file
     vector<char> text;
-    if (!res->load_file(Path::replace_extension(obj, "h").c_str(), &text))
+    if (!RESOURCE_MANAGER.load_file(Path::replace_extension(obj, "h").c_str(), &text))
       return false;
 
     if (!do_reflection(text, shader, shader_template, buf))
@@ -430,7 +430,7 @@ bool Technique::create_shaders(ResourceInterface *res, ShaderTemplate *shader_te
   return true;
 }
 
-bool Technique::init(ResourceInterface *res) {
+bool Technique::init() {
 
   _rasterizer_state = GRAPHICS.create_rasterizer_state(FROM_HERE, _rasterizer_desc);
   _blend_state = GRAPHICS.create_blend_state(FROM_HERE, _blend_desc);
@@ -444,12 +444,12 @@ bool Technique::init(ResourceInterface *res) {
 
   // create the shaders from the templates
   if (_vs_shader_template) {
-    if (!create_shaders(res, _vs_shader_template))
+    if (!create_shaders(_vs_shader_template))
       return false;
   }
 
   if (_ps_shader_template) {
-    if (!create_shaders(res, _ps_shader_template))
+    if (!create_shaders(_ps_shader_template))
       return false;
   }
 

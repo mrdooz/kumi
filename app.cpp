@@ -11,7 +11,6 @@
 #include "property_manager.hpp"
 #include "resource_manager.hpp"
 #include "material_manager.hpp"
-#include "renderer.hpp"
 #include "threading.hpp"
 #include "kumi.hpp"
 
@@ -92,8 +91,7 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());
-  B_ERR_BOOL(Graphics::create(&RESOURCE_MANAGER));
-  B_ERR_BOOL(Renderer::create());
+  B_ERR_BOOL(Graphics::create());
   B_ERR_BOOL(MaterialManager::create());
   B_ERR_BOOL(DemoEngine::create());
 #if WITH_WEBSOCKETS
@@ -142,7 +140,6 @@ bool App::close() {
 #endif
   B_ERR_BOOL(FileWatcher::close());
   B_ERR_BOOL(DemoEngine::close());
-  B_ERR_BOOL(Renderer::close());
   B_ERR_BOOL(Graphics::close());
   B_ERR_BOOL(MaterialManager::close());
   B_ERR_BOOL(ResourceManager::close());
@@ -237,7 +234,7 @@ UINT App::run(void *userdata) {
       _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
       _gwen_canvas->RenderCanvas();
 #endif
-      RENDERER.render();
+      GRAPHICS.render();
       GRAPHICS.present();
 
       QueryPerformanceCounter(&end);

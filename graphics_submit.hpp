@@ -19,7 +19,7 @@ struct MeshGeometry {
   D3D_PRIMITIVE_TOPOLOGY topology;
 };
 
-struct MeshRenderData2 {
+struct MeshRenderData {
   const MeshGeometry *geometry;
   GraphicsObjectHandle technique;
   GraphicsObjectHandle material;
@@ -28,35 +28,7 @@ struct MeshRenderData2 {
   const SubMesh *submesh;
 #endif
 };
-#if 0
-struct MeshRenderData {
-  MeshRenderData() 
-    : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST)
-    , cur_technique_data(nullptr) {}
-  GraphicsObjectHandle vb, ib;
-  DXGI_FORMAT index_format;
-  int index_count;
-  int vertex_size;
-  int vertex_count;
-  D3D_PRIMITIVE_TOPOLOGY topology;
-  GraphicsObjectHandle cur_technique;
-  static const int MAX_TECHNIQUES = 16;
-  struct TechniqueData {
-    TechniqueData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
-    GraphicsObjectHandle technique;
-    void *cbuffer_staged;
-    int cbuffer_len;
-    GraphicsObjectHandle textures[MAX_SAMPLERS];
-    int first_texture;
-    int num_textures;
-  } technique_data[MAX_TECHNIQUES];
-  TechniqueData *cur_technique_data;
 
-  Mesh *mesh;
-  SubMesh *submesh;
-  Material *material;
-};
-#endif
 struct TechniqueRenderData {
   TechniqueRenderData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
   void *cbuffer_staged;
@@ -64,11 +36,6 @@ struct TechniqueRenderData {
   GraphicsObjectHandle textures[MAX_SAMPLERS];
   int first_texture;
   int num_textures;
-/*
-  uint16 material_id;
-  GraphicsObjectHandle textures[MAX_TEXTURES];
-  GraphicsObjectHandle render_targets[MAX_TEXTURES];
-*/
 };
 
 struct BufferRenderData {

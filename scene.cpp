@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include "scene.hpp"
 #include "graphics.hpp"
-#include "renderer.hpp"
 #include "mesh.hpp"
 
 Scene::~Scene() {

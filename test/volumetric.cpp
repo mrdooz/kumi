@@ -7,7 +7,6 @@
 #include "../resource_manager.hpp"
 #include "../technique.hpp"
 #include "../material.hpp"
-#include "../renderer.hpp"
 #include "../logger.hpp"
 #include "../mesh.hpp"
 
@@ -142,7 +141,7 @@ bool VolumetricEffect::render() {
     // render scene as usual to default render target
     key.cmd = RenderKey::kSetRenderTarget;
     key.handle = GRAPHICS.default_render_target();
-    RENDERER.submit_command(FROM_HERE, key, NULL);
+    GRAPHICS.submit_command(FROM_HERE, key, NULL);
 
     _scene->submit_meshes(FROM_HERE);
 

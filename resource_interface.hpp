@@ -1,8 +1,13 @@
 #pragma once
 
 struct ResourceInterface {
+  static bool create();
+  static bool close();
+  static ResourceInterface &instance();
 
   typedef std::function<bool (const char *, void *)> cbFileChanged;
+
+  virtual void add_path(const std::string &path) = 0;
 
   virtual bool file_exists(const char *filename) = 0;
   virtual __time64_t mdate(const char *filename) = 0;
@@ -15,3 +20,5 @@ struct ResourceInterface {
   virtual void remove_file_watch(const cbFileChanged &cb) = 0;
   virtual std::string resolve_filename(const char *filename) = 0;
 };
+
+#define RESOURCE_MANAGER ResourceInterface::instance()

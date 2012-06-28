@@ -9,8 +9,6 @@
 using namespace std::tr1::placeholders;
 using namespace std;
 
-ResourceManager *ResourceManager::_instance = nullptr;
-
 static bool file_exists(const char *filename)
 {
   if (_access(filename, 0) != 0)
@@ -23,13 +21,9 @@ static bool file_exists(const char *filename)
   return !!(status.st_mode & _S_IFREG);
 }
 
-static string normalize_path(const char *path, bool add_trailing_slash) {
+static string normalize_path(const std::string &path, bool add_trailing_slash) {
   string res(path);
-  for (size_t i = 0; i < res.size(); ++i) {
-    if (res[i] == '\\')
-      res[i] = '/';
-  }
-
+  boost::replace_all(res, "\\", "/");
   if (add_trailing_slash) {
     if (!res.empty() && res.back() != '/')
       res.push_back('/');
@@ -38,31 +32,13 @@ static string normalize_path(const char *path, bool add_trailing_slash) {
   return res;
 }
 
-
 ResourceManager::ResourceManager() 
   : _copy_on_load(false)
 {
   _paths.push_back("./");
 }
 
-ResourceManager &ResourceManager::instance() {
-  assert(_instance);
-  return *_instance;
-}
-
-bool ResourceManager::create() {
-  assert(!_instance);
-  _instance = new ResourceManager();
-  return true;
-}
-
-bool ResourceManager::close() {
-  assert(_instance);
-  SAFE_DELETE(_instance);
-  return true;
-}
-
-void ResourceManager::add_path(const char *path) {
+void ResourceManager::add_path(const std::string &path) {
   _paths.push_back(normalize_path(path, true));
 }
 

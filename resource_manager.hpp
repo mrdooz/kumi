@@ -14,10 +14,6 @@ class ResourceManager : public ResourceInterface {
 public:
   ResourceManager();
 
-  static bool create();
-  static bool close();
-  static ResourceManager &instance();
-
   bool file_exists(const char *filename);
   __time64_t mdate(const char *filename);
   virtual bool load_file(const char *filename, std::vector<char> *buf);
@@ -29,7 +25,7 @@ public:
   virtual void remove_file_watch(const cbFileChanged &cb);
 
   void copy_on_load(bool enable, const char *dest);
-  void add_path(const char *path);
+  void add_path(const std::string &path);
 
   std::string resolve_filename(const char *filename);
 
@@ -48,4 +44,3 @@ private:
   std::map<std::string, int> _file_change_ref_count;
 };
 
-#define RESOURCE_MANAGER ResourceManager::instance()

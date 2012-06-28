@@ -137,9 +137,9 @@ public:
   DXGI_FORMAT index_format() const { return _index_format; }
   int index_count() const { return (int)_indices.size(); }
 
-  bool init(ResourceInterface *res);
+  bool init();
   bool reload_shaders();
-  bool create_shaders(ResourceInterface *res, ShaderTemplate *shader_template);
+  bool create_shaders(ShaderTemplate *shader_template);
 
   bool is_valid() const { return _valid; }
   const std::string &error_msg() const { return _error_msg; }

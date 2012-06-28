@@ -27,64 +27,53 @@ struct IFW1FontWrapper;
 class Graphics {
 public:
 
-  struct RenderTargetData {
-    RenderTargetData() {
+  template<class Resource, class Desc>
+  struct ResourceAndDesc {
+    void release() {
+      resource.Release();
+    }
+    CComPtr<Resource> resource;
+    Desc desc;
+  };
+
+  struct RenderTargetResource {
+    RenderTargetResource() {
       reset();
     }
 
     void reset() {
-      texture = NULL;
-      depth_stencil = NULL;
-      rtv = NULL;
-      dsv = NULL;
-      srv = NULL;
+      texture.release();
+      depth_stencil.release();
+      rtv.release();
+      dsv.release();
+      srv.release();
     }
 
-    operator bool() { return texture || depth_stencil || rtv || dsv || srv; }
-
-    D3D11_TEXTURE2D_DESC texture_desc;
-    D3D11_TEXTURE2D_DESC depth_stencil_desc;
-    D3D11_RENDER_TARGET_VIEW_DESC rtv_desc;
-    D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-    CComPtr<ID3D11Texture2D> texture;
-    CComPtr<ID3D11Texture2D> depth_stencil;
-    CComPtr<ID3D11RenderTargetView> rtv;
-    CComPtr<ID3D11DepthStencilView> dsv;
-    CComPtr<ID3D11ShaderResourceView> srv;
+    ResourceAndDesc<ID3D11Texture2D, D3D11_TEXTURE2D_DESC> texture;
+    ResourceAndDesc<ID3D11Texture2D, D3D11_TEXTURE2D_DESC> depth_stencil;
+    ResourceAndDesc<ID3D11RenderTargetView, D3D11_RENDER_TARGET_VIEW_DESC> rtv;
+    ResourceAndDesc<ID3D11DepthStencilView, D3D11_DEPTH_STENCIL_VIEW_DESC> dsv;
+    ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> srv;
   };
 
-  struct TextureData {
-    ~TextureData() {
-      reset();
-    }
-
+  struct TextureResource {
     void reset() {
-      texture.Release();
-      srv.Release();
+      texture.release();
+      view.release();
     }
-    operator bool() { return texture || srv; }
-    D3D11_TEXTURE2D_DESC texture_desc;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
-    CComPtr<ID3D11Texture2D> texture;
-    CComPtr<ID3D11ShaderResourceView> srv;
+    ResourceAndDesc<ID3D11Texture2D, D3D11_TEXTURE2D_DESC> texture;
+    ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> view;
   };
 
-  struct ResourceData {
-    ~ResourceData() {
-      reset();
-    }
-
+  struct SimpleResource {
     void reset() {
       resource.Release();
-      srv.Release();
+      view.release();
     }
-    operator bool() { return resource || srv; }
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc;
     CComPtr<ID3D11Resource> resource;
-    CComPtr<ID3D11ShaderResourceView> srv;
+    ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> view;
   };
-
+#if 0
   struct BackedResources {
     ~BackedResources() {
 
@@ -102,9 +91,9 @@ public:
       , _rasterizer_states(release_obj<ID3D11RasterizerState *>)
       , _sampler_states(release_obj<ID3D11SamplerState *>)
       , _shader_resource_views(release_obj<ID3D11ShaderResourceView *>)
-      , _textures(delete_obj<TextureData *>)
-      , _render_targets(delete_obj<RenderTargetData *>)
-      , _resources(delete_obj<ResourceData *>)
+      , _textures(delete_obj<TextureResource *>)
+      , _render_targets(delete_obj<RenderTargetResource *>)
+      , _resources(delete_obj<SimpleResource *>)
 #if WITH_GWEN
       , _font_wrappers(release_obj<IFW1FontWrapper *>)
 #endif
@@ -125,15 +114,15 @@ public:
     IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
     IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
     SearchableIdBuffer<string, ID3D11SamplerState *, IdCount> _sampler_states;
-    SearchableIdBuffer<string, TextureData *, IdCount> _textures;
-    SearchableIdBuffer<string, RenderTargetData *, IdCount> _render_targets;
-    SearchableIdBuffer<string, ResourceData *, IdCount> _resources;
+    SearchableIdBuffer<string, TextureResource *, IdCount> _textures;
+    SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
+    SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
 #if WITH_GWEN
     SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
 #endif
   };
-
-  static bool create(ResourceInterface *ri);
+#endif
+  static bool create();
   inline static Graphics& instance() {
     assert(_instance);
     return *_instance;
@@ -178,7 +167,7 @@ public:
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
-  BackedResources *get_backed_resources() { return &_res; }
+  //BackedResources *get_backed_resources() { return &_res; }
 
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name);
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, const char *name);
@@ -192,7 +181,7 @@ public:
   void copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src);
 
   // Create a texture, and fill it with data
-  bool create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureData *out);
+  bool create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, TextureResource *out);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, int width, int height, DXGI_FORMAT fmt, void *data, int data_width, int data_height, int data_pitch, const char *friendly_name);
 
   ID3D11RasterizerState *default_rasterizer_state() const { return _default_rasterizer_state; }
@@ -218,7 +207,7 @@ public:
   HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
   HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
   HRESULT create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
-  void set_vb(ID3D11DeviceContext *context, ID3D11Buffer *buf, uint32_t stride);
+  void set_vb(ID3D11Buffer *buf, uint32_t stride);
 
   GraphicsObjectHandle default_render_target() const { return _default_render_target; }
 
@@ -231,16 +220,29 @@ public:
   void add_shader_flag(const std::string &flag);
   int get_shader_flag(const std::string &flag);
 
+  // Rendering related
+  template <typename T>
+  T *alloc_command_data() {
+    void *t = raw_alloc(sizeof(T));
+    T *tt = new (t)T();
+    return tt;
+  }
+  void *raw_alloc(size_t size);
+  void submit_command(const TrackedLocation &location, RenderKey key, void *data);
+  void submit_technique(GraphicsObjectHandle technique);
+  void render();
+
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
-  Graphics(ResourceInterface *ri);
+  Graphics();
   ~Graphics();
 
   GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
 
-  bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, RenderTargetData *out);
-  bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureData *out);
+  bool create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, RenderTargetResource *out);
+  bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureResource *out);
 
   bool create_back_buffers(int width, int height);
 
@@ -248,7 +250,67 @@ private:
   bool shader_file_changed(const char *filename, void *token);
 
   // given texture data and a name, insert it into the GOH chain
-  GraphicsObjectHandle insert_texture(TextureData *data, const char *friendly_name);
+  GraphicsObjectHandle insert_texture(TextureResource *data, const char *friendly_name);
+
+  void validate_command(RenderKey key, const void *data);
+
+  // Renderer related
+  void set_vs(GraphicsObjectHandle vs);
+  void set_ps(GraphicsObjectHandle ps);
+  void set_layout(GraphicsObjectHandle layout);
+  void set_vb(GraphicsObjectHandle vb, int vertex_size);
+  void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format);
+  void set_topology(D3D11_PRIMITIVE_TOPOLOGY top);
+  void set_rs(GraphicsObjectHandle rs);
+  void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
+  void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
+  void set_samplers(const GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers);
+  void set_shader_resources(const GraphicsObjectHandle *view_handles, int first_view, int num_views);
+  void unset_shader_resource(int first_view, int num_views);
+  void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps);
+  void draw_indexed(int count, int start_index, int base_vertex);
+
+  GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
+  GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
+  GraphicsObjectHandle prev_ib, prev_vb;
+  GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
+  GraphicsObjectHandle prev_views[MAX_SAMPLERS];
+  D3D11_PRIMITIVE_TOPOLOGY prev_topology;
+
+
+  struct RenderCmd {
+    RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
+    TrackedLocation location;
+    RenderKey key;
+    void *data;
+  };
+
+  std::vector<RenderCmd > _render_commands;
+
+  std::vector<uint8> _effect_data;
+  int _effect_data_ofs;
+
+  // resources
+  enum { IdCount = 1 << GraphicsObjectHandle::cIdBits };
+  SearchableIdBuffer<string, ID3D11VertexShader *, IdCount> _vertex_shaders;
+  SearchableIdBuffer<string, ID3D11PixelShader *, IdCount> _pixel_shaders;
+  IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
+  IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
+  IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
+  SearchableIdBuffer<string, Technique *, IdCount> _techniques;
+  IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
+
+  IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
+  IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
+  IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
+  IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
+  SearchableIdBuffer<string, ID3D11SamplerState *, IdCount> _sampler_states;
+  SearchableIdBuffer<string, TextureResource *, IdCount> _textures;
+  SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
+  SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
+#if WITH_GWEN
+  SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
+#endif
 
   static Graphics* _instance;
 
@@ -279,9 +341,6 @@ private:
   CComPtr<ID3D11DeviceContext> _immediate_context;
 
   CComPtr<ID3D11ClassLinkage> _class_linkage;
-
-  ResourceInterface *_ri;
-  BackedResources _res;
 
   std::map<string, vector<string> > _techniques_by_file;
 

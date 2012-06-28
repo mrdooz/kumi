@@ -161,7 +161,7 @@
     <ClCompile Include="..\path_utils.cpp" />
     <ClCompile Include="..\property.cpp" />
     <ClCompile Include="..\property_manager.cpp" />
-    <ClCompile Include="..\renderer.cpp" />
+    <ClCompile Include="..\resource_interface.cpp" />
     <ClCompile Include="..\resource_manager.cpp" />
     <ClCompile Include="..\scene.cpp" />
     <ClCompile Include="..\shader.cpp" />
@@ -215,7 +215,6 @@
     <ClInclude Include="..\path_utils.hpp" />
     <ClInclude Include="..\property.hpp" />
     <ClInclude Include="..\property_manager.hpp" />
-    <ClInclude Include="..\renderer.hpp" />
     <ClInclude Include="..\resource_interface.hpp" />
     <ClInclude Include="..\resource_manager.hpp" />
     <ClInclude Include="..\scene.hpp" />

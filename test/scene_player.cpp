@@ -4,7 +4,6 @@
 #include "../kumi_loader.hpp"
 #include "../resource_manager.hpp"
 #include "../scene.hpp"
-#include "../renderer.hpp"
 #include "../threading.hpp"
 #include "../mesh.hpp"
 #include "../tweakable_param.hpp"
@@ -263,7 +262,7 @@ bool ScenePlayer::render() {
   if (_scene) {
     //_scene->submit_meshes(FROM_HERE, -1, _default_shader);
     {
-      RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
+      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
       data->render_targets[1] = _rt_normal;
       data->render_targets[2] = _rt_diffuse;
@@ -273,25 +272,25 @@ bool ScenePlayer::render() {
 
       RenderKey key;
       key.cmd = RenderKey::kSetRenderTarget;
-      RENDERER.submit_command(FROM_HERE, key, data);
+      GRAPHICS.submit_command(FROM_HERE, key, data);
 
       _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
     }
 
     {
-      RenderTargetData *data = RENDERER.alloc_command_data<RenderTargetData>();
+      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_blur;
       data->clear_target[0] = true;
 
       RenderKey key;
       key.cmd = RenderKey::kSetRenderTarget;
-      RENDERER.submit_command(FROM_HERE, key, data);
-      RENDERER.submit_technique(_ssao_render);
+      GRAPHICS.submit_command(FROM_HERE, key, data);
+      GRAPHICS.submit_technique(_ssao_render);
     }
 
     {
-      RENDERER.submit_command(FROM_HERE, key, nullptr);
-      RENDERER.submit_technique(_ssao_blur);
+      GRAPHICS.submit_command(FROM_HERE, key, nullptr);
+      GRAPHICS.submit_technique(_ssao_blur);
     }
   }
 
