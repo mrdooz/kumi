@@ -21,8 +21,10 @@ static const int NOISE_SIZE = 16;
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
   , _scene(nullptr) 
-  , _light_pos_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::LightPos"))
-  , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::LightColor"))
+  , _light_pos_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::LightPos"))
+  , _light_color_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::LightColor"))
+  , _light_att_start_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::AttenuationStart"))
+  , _light_att_end_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::AttenuationEnd"))
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
   , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _use_freefly_camera(true)
@@ -87,6 +89,7 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_ambient = GRAPHICS.find_technique("ssao_ambient");
+  _ssao_light = GRAPHICS.find_technique("ssao_light");
   _ssao_compute = GRAPHICS.find_technique("ssao_compute");
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   _default_shader = GRAPHICS.find_technique("default_shader");
@@ -243,16 +246,10 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
     }
   }
 
-  XMFLOAT4X4 view, proj;
-  calc_camera_matrices(time, (double)delta / 1000000.0, &view, &proj);
+  calc_camera_matrices(time, (double)delta / 1000000.0, &_view, &_proj);
 
-  if (!_scene->lights.empty()) {
-    PROPERTY_MANAGER.set_property(_light_pos_id, _scene->lights[0]->pos);
-    PROPERTY_MANAGER.set_property(_light_color_id, _scene->lights[0]->color);
-  }
-
-  PROPERTY_MANAGER.set_property(_view_mtx_id, view);
-  PROPERTY_MANAGER.set_property(_proj_mtx_id, proj);
+  PROPERTY_MANAGER.set_property(_view_mtx_id, _view);
+  PROPERTY_MANAGER.set_property(_proj_mtx_id, _proj);
 
   return true;
 }
@@ -281,7 +278,7 @@ bool ScenePlayer::render() {
       data->clear_target[0] = true;
 
       GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
-      GRAPHICS.submit_technique(_ssao_compute);
+      GRAPHICS.submit_technique(_ssao_compute, nullptr);
     }
 
     {
@@ -290,21 +287,78 @@ bool ScenePlayer::render() {
       data->render_targets[0] = _rt_occlusion;
       data->clear_target[0] = true;
       GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
-      GRAPHICS.submit_technique(_ssao_blur);
+      GRAPHICS.submit_technique(_ssao_blur, nullptr);
     }
 
     {
       // Render Ambient * occlusion
       GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), nullptr);
-      GRAPHICS.submit_technique(_ssao_ambient);
+      GRAPHICS.submit_technique(_ssao_ambient, nullptr);
     }
 
     {
       // Add the lighting
+      int num_lights = (int)_scene->lights.size();
+      int pos_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
+      int color_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
+      int as_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
+      int ae_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
+      int data_size = pos_size + color_size + as_size + ae_size;
+      void *data = GRAPHICS.alloc_command_data_raw(sizeof(TechniqueRenderData2) + data_size);
+      TechniqueRenderData2 *rd = (TechniqueRenderData2 *)data;
+      rd->num_instances = num_lights;
+      rd->num_instance_variables = 4;
+
+      struct LightBase {
+        PropertyId id;
+        int len;
+      };
+
+      struct LightPos : public LightBase {
+#pragma warning(suppress: 4200)
+        XMFLOAT4 pos[];
+      } *lightpos = (LightPos *)&rd->payload[0];
+
+      struct LightColor : public LightBase {
+#pragma warning(suppress: 4200)
+        XMFLOAT4 color[];
+      } *lightcolor = (LightColor *)&rd->payload[pos_size];
+
+      struct LightAttenuationStart : public LightBase {
+#pragma warning(suppress: 4200)
+        float start[];
+      } *lightattstart = (LightAttenuationStart *)&rd->payload[pos_size + color_size];
+
+      struct LightAttenuationEnd : public LightBase {
+#pragma warning(suppress: 4200)
+        float end[];
+      } *lightattend = (LightAttenuationEnd *)&rd->payload[pos_size + color_size + as_size];
+
+      lightpos->id = _light_pos_id;
+      lightpos->len = sizeof(XMFLOAT4);
+
+      lightcolor->id = _light_color_id;
+      lightcolor->len = sizeof(XMFLOAT4);
+
+      lightattstart->id = _light_att_start_id;
+      lightattstart->len = sizeof(float);
+
+      lightattend->id = _light_att_end_id;
+      lightattend->len = sizeof(float);
+
       for (size_t i = 0; i < _scene->lights.size(); ++i) {
-        Light *light = _scene->lights[i];
+        // transform pos to camera space
+        XMVECTOR v = XMLoadFloat4(&_scene->lights[i]->pos);
+        XMMATRIX m = XMLoadFloat4x4(&transpose(_view));
+        XMVECTOR v2 = XMVector3Transform(v, m);
+        XMStoreFloat4(&lightpos->pos[i], v2);
+        //lightpos->pos[i] = _scene->lights[i]->pos;
+        lightcolor->color[i] = _scene->lights[i]->color;
+        lightattstart->start[i] = _scene->lights[i]->far_attenuation_start;
+        lightattend->end[i] = _scene->lights[i]->far_attenuation_end;
       }
 
+      GRAPHICS.submit_technique(_ssao_light, data);
     }
   }
 

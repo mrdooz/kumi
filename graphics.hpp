@@ -223,13 +223,13 @@ public:
   // Rendering related
   template <typename T>
   T *alloc_command_data() {
-    void *t = raw_alloc(sizeof(T));
+    void *t = alloc_command_data_raw(sizeof(T));
     T *tt = new (t)T();
     return tt;
   }
-  void *raw_alloc(size_t size);
+  void *alloc_command_data_raw(size_t size);
   void submit_command(const TrackedLocation &location, RenderKey key, void *data);
-  void submit_technique(GraphicsObjectHandle technique);
+  void submit_technique(GraphicsObjectHandle technique, void *data);
   void render();
 
 

@@ -62,6 +62,7 @@ fill_ps_output fill_ps_main(fill_ps_input input)
 
 Texture2D rt_pos : register(t0);
 Texture2D rt_normal : register(t1);
+Texture2D rt_diffuse : register(t2);
 sampler ssao_sampler : register(s0);
 
 float4 kernel[32];
@@ -201,7 +202,6 @@ float4 ambient_ps_main(ambient_ps_input input) : SV_Target
 // Add light
 ///////////////////////////////////
 float4 LightColor, LightPos;
-int UseAttenuation;
 float AttenuationStart, AttenuationEnd;
 
 struct light_vs_input {
@@ -224,5 +224,21 @@ light_ps_input light_vs_main(light_vs_input input)
 
 float4 light_ps_main(light_ps_input input) : SV_Target
 {
-  return Ambient * rt_occlusion.Sample(ssao_sampler, input.tex).r;
+    float3 pos = rt_pos.Sample(ssao_sampler, input.tex).xyz;
+    float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
+    float4 diffuse = rt_diffuse.Sample(ssao_sampler, input.tex);
+    float3 lp = LightPos.xyz;
+    float3 v = normalize(lp - pos);
+    float dist = length(lp - pos);
+    float scale;
+
+    if (dist < AttenuationStart) {
+      scale = 1.0;
+    } else if (dist > AttenuationEnd) {
+      scale = 0.0;
+    } else {
+      scale = 1 - lerp(0, 1, (dist - AttenuationStart) / (AttenuationEnd - AttenuationStart));
+    }
+
+    return saturate(dot(v, normal)) * scale * diffuse * LightColor;
 }

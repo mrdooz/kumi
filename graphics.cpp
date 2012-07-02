@@ -681,7 +681,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   for (auto it = begin(tmp); it != end(tmp); ) {
     Technique *t = *it;
     if (!t->init()) {
-      LOG_WARNING_LN("init failed for technique: %s. Error msg: %s", t->name().c_str(), t->error_msg().c_str());
+      LOG_ERROR_LN("init failed for technique: %s. Error msg: %s", t->name().c_str(), t->error_msg().c_str());
       delete exch_null(t);
       it = tmp.erase(it);
     } else {
@@ -965,6 +965,7 @@ void Graphics::render() {
       case RenderKey::kRenderTechnique: {
         Technique *technique = _techniques.get(key.handle);
         const TechniqueRenderData *render_data = &technique->render_data();
+        const TechniqueRenderData2 *rd2 = (const TechniqueRenderData2 *)data;
 
         Shader *vs = technique->vertex_shader(0);
         Shader *ps = technique->pixel_shader(0);
@@ -979,18 +980,6 @@ void Graphics::render() {
         set_rs(technique->rasterizer_state());
         set_dss(technique->depth_stencil_state(), default_stencil_ref());
         set_bs(technique->blend_state(), default_blend_factors(), default_sample_mask());
-
-        // set cbuffers
-        auto &vs_cbuffers = vs->get_cbuffers();
-        for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-          technique->fill_cbuffer(&vs_cbuffers[i]);
-        }
-
-        auto &ps_cbuffers = ps->get_cbuffers();
-        for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
-          technique->fill_cbuffer(&ps_cbuffers[i]);
-        }
-        set_cbuffer(vs_cbuffers, ps_cbuffers);
 
         // set samplers
         auto &samplers = ps->samplers();
@@ -1008,7 +997,57 @@ void Graphics::render() {
           set_shader_resources(&rr[0], rv.first, rv.count);
         }
 
-        draw_indexed(technique->index_count(), 0, 0);
+        // Check if we're drawing instanced
+        if (rd2) {
+          for (int ii = 0; ii < rd2->num_instances; ++ii) {
+
+            // set cbuffers
+            auto &vs_cbuffers = vs->get_cbuffers();
+            for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
+              technique->fill_cbuffer(&vs_cbuffers[i]);
+            }
+
+            auto &ps_cbuffers = ps->get_cbuffers();
+            for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
+              technique->fill_cbuffer(&ps_cbuffers[i]);
+
+              for (size_t j = 0; j < ps_cbuffers[i].instance_vars.size(); ++j) {
+                auto &var = ps_cbuffers[i].instance_vars[j];
+
+                int ofs = 0;
+                for (int k = 0; k < rd2->num_instance_variables; ++k) {
+                  PropertyId id = *(PropertyId *)&rd2->payload[ofs + 0];
+                  int len = *(int *)&rd2->payload[ofs + 4];
+                  const void *data = &rd2->payload[ofs + 8 + ii * len];
+                  if (id == var.id) {
+                    memcpy(&ps_cbuffers[i].staging[var.ofs], data, var.len);
+                    break;
+                  }
+                  ofs += sizeof(PropertyId) + sizeof(int) + len * rd2->num_instances;
+                }
+              }
+            }
+            set_cbuffer(vs_cbuffers, ps_cbuffers);
+            draw_indexed(technique->index_count(), 0, 0);
+          }
+
+        } else {
+          // set cbuffers
+          auto &vs_cbuffers = vs->get_cbuffers();
+          for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
+            technique->fill_cbuffer(&vs_cbuffers[i]);
+          }
+
+          auto &ps_cbuffers = ps->get_cbuffers();
+          for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
+            technique->fill_cbuffer(&ps_cbuffers[i]);
+          }
+          set_cbuffer(vs_cbuffers, ps_cbuffers);
+
+          draw_indexed(technique->index_count(), 0, 0);
+
+        }
+
 
         if (rv.count > 0)
           unset_shader_resource(rv.first, rv.count);
@@ -1021,7 +1060,7 @@ void Graphics::render() {
   _effect_data_ofs = 0;
 }
 
-void *Graphics::raw_alloc(size_t size) {
+void *Graphics::alloc_command_data_raw(size_t size) {
   if (size + _effect_data_ofs >= cEffectDataSize)
     return nullptr;
 
@@ -1064,11 +1103,11 @@ void Graphics::submit_command(const TrackedLocation &location, RenderKey key, vo
   _render_commands.push_back(RenderCmd(location, key, data));
 }
 
-void Graphics::submit_technique(GraphicsObjectHandle technique) {
+void Graphics::submit_technique(GraphicsObjectHandle technique, void *data) {
   RenderKey key;
   key.cmd = RenderKey::kRenderTechnique;
   key.handle = technique;
-  submit_command(FROM_HERE, key, nullptr);
+  submit_command(FROM_HERE, key, data);
 }
 
 void Graphics::set_vs(GraphicsObjectHandle vs) {

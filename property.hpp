@@ -8,6 +8,7 @@ namespace PropertySource {
     kUnknown,
     kMaterial,
     kSystem,
+    kInstance,
     kUser,
     kMesh,
     kTechnique,
@@ -49,5 +50,6 @@ struct CBuffer {
   std::vector<CBufferVariable> mesh_vars;
   std::vector<CBufferVariable> material_vars;
   std::vector<CBufferVariable> system_vars;
+  std::vector<CBufferVariable> instance_vars;
   std::vector<char> staging;
 };

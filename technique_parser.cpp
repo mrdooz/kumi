@@ -568,6 +568,7 @@ void TechniqueParser::parse_param(const vector<string> &param, Technique *techni
   auto valid_sources = map_list_of
     ("material", PropertySource::kMaterial)
     ("system", PropertySource::kSystem)
+    ("instance", PropertySource::kInstance)
     ("user", PropertySource::kUser)
     ("mesh", PropertySource::kMesh);
   //("technique", PropertySource::kTechnique);
@@ -838,11 +839,11 @@ void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc)
 
 void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEND_DESC *desc) {
 
-  auto valid = list_of
+  auto valid_lhs = list_of
     (kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)
     (kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
 
-  auto valid_blend = map_list_of
+  auto valid_blend_settings = map_list_of
     ("zero", D3D11_BLEND_ZERO)
     ("one", D3D11_BLEND_ONE)
     ("src_color", D3D11_BLEND_SRC_COLOR)
@@ -869,33 +870,36 @@ void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
     ("max", D3D11_BLEND_OP_MAX);
 
   Symbol symbol;
-  while (!scope->end() && scope->consume_in(valid, &symbol)) {
+  while (!scope->end() && scope->consume_in(valid_lhs, &symbol)) {
     string value;
     scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
 
     switch (symbol) {
-    case kSymBlendEnable:
-      desc->BlendEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
-      break;
-    case kSymSrcBlend:
-    case kSymDestBlend:
-    case kSymSrcBlendAlpha:
-    case kSymDestBlendAlpha:
-      lookup<string, D3D11_BLEND>(value, valid_blend,
-        symbol == kSymSrcBlend ? &desc->SrcBlend : 
-        symbol == kSymDestBlend ? &desc->DestBlend :
-        symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
-        &desc->DestBlendAlpha);
-      break;
-    case kSymBlendOp:
-    case kSymBlendOpAlpha:
-      lookup<string, D3D11_BLEND_OP>(value, valid_blend_op,
-        symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
-      break;
-    case kSymRenderTargetWriteMask:
-      sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
-      break;
-    }
+      case kSymBlendEnable:
+        desc->BlendEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
+        break;
+
+      case kSymSrcBlend:
+      case kSymDestBlend:
+      case kSymSrcBlendAlpha:
+      case kSymDestBlendAlpha:
+        lookup<string, D3D11_BLEND>(value, valid_blend_settings,
+          symbol == kSymSrcBlend ? &desc->SrcBlend : 
+          symbol == kSymDestBlend ? &desc->DestBlend :
+          symbol == kSymSrcBlendAlpha ? &desc->SrcBlendAlpha :
+          &desc->DestBlendAlpha);
+        break;
+
+      case kSymBlendOp:
+      case kSymBlendOpAlpha:
+        lookup<string, D3D11_BLEND_OP>(value, valid_blend_op,
+          symbol == kSymBlendOp ? &desc->BlendOp : &desc->BlendOpAlpha);
+        break;
+
+      case kSymRenderTargetWriteMask:
+        sscanf(value.c_str(), "%ud", &desc->RenderTargetWriteMask);
+        break;
+      }
   }
 }
 

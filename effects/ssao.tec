@@ -179,9 +179,13 @@ technique ssao_light {
         file effects/ssao.fx;
         entry_point light_ps_main;
         params [
-            texture2d rt_occlusion system;
-            float4 LightPos system;
-            float4 LightColor system;
+            texture2d rt_pos system;
+            texture2d rt_normal system;
+            texture2d rt_diffuse system;
+            float4 LightPos instance;
+            float4 LightColor instance;
+            float AttenuationStart instance;
+            float AttenuationEnd instance;
         ];
     };
    
@@ -205,7 +209,9 @@ technique ssao_light {
 	
 	blend_desc {
 		render_target[0] = {
-			blend_enable = false;
+			blend_enable = true;
+      src_blend = one;
+      dest_blend = one;
 		};
 	};
 };

@@ -5,6 +5,7 @@ var KUMI = (function($, KUMI_LIB) {
     var output;
     var smoothie;
     var websocket;
+    var performanceFps = false;
     var fps_series;
     var fps_interval_id;
     var demoInfo = { effects :[] };
@@ -143,8 +144,7 @@ var KUMI = (function($, KUMI_LIB) {
             var res = JSON.parse(e.data);
 
             if (res['system.fps'] !== undefined) {
-                var fps = res['system.fps'];
-                //var fps = 1000 * res['system.ms'];
+                var fps = performanceFps ? res['system.fps'] : 1000 * res['system.ms'];
                 fps_series.append(new Date().getTime(), fps);
                 $('#cur-fps').text(fps.toFixed(2) + ' fps');
             } else if (res.demo) {
@@ -732,6 +732,18 @@ var KUMI = (function($, KUMI_LIB) {
         requestAnimationFrame(drawTimeline);
     }
 
+    function initSmoothie() {
+        smoothie = new window.SmoothieChart();
+        fps_series = new window.TimeSeries();
+        smoothie.streamTo(document.getElementById("fps-canvas"), 0, false);
+        smoothie.addTimeSeries(fps_series);
+    }
+
+    kumi.showFps = function(value) {
+        performanceFps = value;
+        fps_series.resetBounds();
+    };
+
     kumi.onEdited = function(idx, value) {
         // TODO: send deltas
         if (curSelected.type === "float") {
@@ -751,10 +763,7 @@ var KUMI = (function($, KUMI_LIB) {
 
     kumi.kbInit = function() {
         output = document.getElementById("output");
-        smoothie = new window.SmoothieChart();
-        fps_series = new window.TimeSeries();
-        smoothie.streamTo(document.getElementById("fps-canvas"), 0, false);
-        smoothie.addTimeSeries(fps_series);
+        initSmoothie();
         openWebSocket();
 
         timelineInit();

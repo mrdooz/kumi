@@ -156,6 +156,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
               case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
               case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
               case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
+              case PropertySource::kInstance: cbuffer.instance_vars.emplace_back(var); break;
               default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
             }
           }

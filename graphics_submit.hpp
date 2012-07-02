@@ -29,6 +29,17 @@ struct MeshRenderData {
 #endif
 };
 
+struct TechniqueRenderData2 {
+  int num_instances;
+  int num_instance_variables;
+#pragma warning(suppress: 4200)
+  char payload[];
+  // followed by instance variables of the form
+  // PropertyId id;
+  // T t[num_instance_variables]; // value per instance
+};
+
+
 struct TechniqueRenderData {
   TechniqueRenderData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
   void *cbuffer_staged;

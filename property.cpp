@@ -7,6 +7,7 @@ namespace PropertySource {
     case kUnknown: return "Unknown";
     case kMaterial: return "Material";
     case kSystem: return "System";
+    case kInstance: return "Instance";
     case kUser: return "User";
     case kMesh: return "Mesh";
     case kTechnique: return "Technique";
