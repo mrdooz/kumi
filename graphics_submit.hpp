@@ -90,6 +90,9 @@ struct RenderKey {
   static_assert(kNumCommands < (1 << 16), "Too many commands");
 
   RenderKey() : data(0) {}
+  RenderKey(Cmd cmd) : data(0) {
+    this->cmd = cmd;
+  }
 
   union {
     // Written for little endianess

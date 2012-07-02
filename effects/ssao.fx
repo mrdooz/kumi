@@ -1,5 +1,5 @@
 matrix proj, view, world;
-float4 Diffuse, LightColor, LightPos;
+float4 Diffuse;
 
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;
@@ -57,7 +57,7 @@ fill_ps_output fill_ps_main(fill_ps_input input)
 }
 
 ///////////////////////////////////
-// actual render
+// Occlusion compute
 ///////////////////////////////////
 
 Texture2D rt_pos : register(t0);
@@ -85,7 +85,7 @@ render_ps_input render_vs_main(render_vs_input input)
     return output;
 }
 
-float4 render_ps_main(render_ps_input input) : SV_Target
+float render_ps_main(render_ps_input input) : SV_Target
 {
     float3 origin = rt_pos.Sample(ssao_sampler, input.tex).xyz;
     float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
@@ -134,8 +134,7 @@ float4 render_ps_main(render_ps_input input) : SV_Target
 // blur
 ///////////////////////////////////
 
-Texture2D rt_blur : register(t0);
-Texture2D rt_diffuse : register(t1);
+Texture2D rt_occlusion_tmp : register(t0);
 
 struct blur_vs_input {
     float4 pos : SV_POSITION;
@@ -155,15 +154,75 @@ blur_ps_input blur_vs_main(blur_vs_input input)
     return output;
 }
 
-float4 blur_ps_main(blur_ps_input input) : SV_Target
+float blur_ps_main(blur_ps_input input) : SV_Target
 {
     float res = 0.0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             float2 ofs = float2(1/ScreenWidth * j, 1/ScreenHeight*i);
-            res += rt_blur.Sample(ssao_sampler, input.tex + ofs).r;
+            res += rt_occlusion_tmp.Sample(ssao_sampler, input.tex + ofs).r;
         }
     }
     float occ = res / 16.0;
-    return occ * rt_diffuse.Sample(ssao_sampler, input.tex);
+    return occ;
+}
+
+///////////////////////////////////
+// Render ambient * occlusion
+///////////////////////////////////
+
+Texture2D rt_occlusion : register(t0);
+float4 Ambient;
+
+struct ambient_vs_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+struct ambient_ps_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+ambient_ps_input ambient_vs_main(ambient_vs_input input)
+{
+    ambient_ps_input output = (ambient_ps_input)0;
+    output.pos = input.pos;
+    output.tex = input.tex;
+    return output;
+}
+
+float4 ambient_ps_main(ambient_ps_input input) : SV_Target
+{
+  return Ambient * rt_occlusion.Sample(ssao_sampler, input.tex).r;
+}
+
+///////////////////////////////////
+// Add light
+///////////////////////////////////
+float4 LightColor, LightPos;
+int UseAttenuation;
+float AttenuationStart, AttenuationEnd;
+
+struct light_vs_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+struct light_ps_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+light_ps_input light_vs_main(light_vs_input input)
+{
+    light_ps_input output = (light_ps_input)0;
+    output.pos = input.pos;
+    output.tex = input.tex;
+    return output;
+}
+
+float4 light_ps_main(light_ps_input input) : SV_Target
+{
+  return Ambient * rt_occlusion.Sample(ssao_sampler, input.tex).r;
 }

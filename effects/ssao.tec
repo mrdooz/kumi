@@ -16,8 +16,6 @@ technique ssao_fill {
         params [
             texture2d DiffuseTexture Diffuse material;
             float4 Diffuse material;
-            float4 LightPos system;
-            float4 LightColor system;
         ];
         flags [ DIFFUSE_TEXTURE ];
     };
@@ -25,13 +23,9 @@ technique ssao_fill {
     sampler_desc DiffuseSampler default {
     };
     
-    rasterizer_desc {
-        cull_mode = back;
-    };
+    rasterizer_desc { cull_mode = back; };
     
-    depth_stencil_desc {
-        depth_enable = true;
-    };
+    depth_stencil_desc { depth_enable = true; };
     
     blend_desc {
         render_target[0] = {
@@ -40,7 +34,7 @@ technique ssao_fill {
     };
 };
 
-technique ssao_render {
+technique ssao_compute {
     
     vertex_shader {
         file effects/ssao.fx;
@@ -64,12 +58,7 @@ technique ssao_render {
 	// 2,3
 	vertices {
 		format pos_tex;
-		data [ 
-			-1 +1 +1 +0 +0; 
-			+1 +1 +1 +1 +0;
-			-1 -1 +1 +0 +1;
-			+1 -1 +1 +1 +1;
-			];
+		data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
 	};
 	
 	// 0, 1, 2
@@ -84,13 +73,8 @@ technique ssao_render {
         address_v = clamp;
 	};
 	
-	rasterizer_desc {
-		cull_mode = none;
-	};
-	
-	depth_stencil_desc {
-		depth_enable = false;
-	};
+	rasterizer_desc { cull_mode = none; };
+	depth_stencil_desc { depth_enable = false; };
 	
 	blend_desc {
 		render_target[0] = {
@@ -110,8 +94,7 @@ technique ssao_blur {
         file effects/ssao.fx;
         entry_point blur_ps_main;
         params [
-            texture2d rt_blur system;
-            texture2d rt_diffuse system;
+            texture2d rt_occlusion_tmp system;
         ];
     };
    
@@ -119,12 +102,7 @@ technique ssao_blur {
 	// 2,3
 	vertices {
 		format pos_tex;
-		data [ 
-			-1 +1 +1 +0 +0; 
-			+1 +1 +1 +1 +0;
-			-1 -1 +1 +0 +1;
-			+1 -1 +1 +1 +1;
-			];
+		data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
 	};
 	
 	// 0, 1, 2
@@ -139,13 +117,91 @@ technique ssao_blur {
         address_v = clamp;
 	};
 	
-	rasterizer_desc {
-		cull_mode = none;
+	rasterizer_desc { cull_mode = none; };
+	depth_stencil_desc { depth_enable = false; };
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+};
+
+
+technique ssao_ambient {
+    vertex_shader {
+        file effects/ssao.fx;
+        entry_point ambient_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/ssao.fx;
+        entry_point ambient_ps_main;
+        params [
+            texture2d rt_occlusion system;
+            float4 Ambient system;
+        ];
+    };
+   
+	vertices { 
+		format pos_tex;
+		data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
 	};
 	
-	depth_stencil_desc {
-		depth_enable = false;
+	indices {
+		data [0 1 2 2 1 3];
 	};
+	
+	sampler_desc ssao_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+	};
+	
+	rasterizer_desc { cull_mode = none; };
+	depth_stencil_desc { depth_enable = false; };
+	
+	blend_desc {
+		render_target[0] = {
+			blend_enable = false;
+		};
+	};
+};
+
+
+technique ssao_light {
+    vertex_shader {
+        file effects/ssao.fx;
+        entry_point light_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/ssao.fx;
+        entry_point light_ps_main;
+        params [
+            texture2d rt_occlusion system;
+            float4 LightPos system;
+            float4 LightColor system;
+        ];
+    };
+   
+	vertices { 
+		format pos_tex;
+		data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+	};
+	
+	indices {
+		data [0 1 2 2 1 3];
+	};
+	
+	sampler_desc ssao_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+	};
+	
+	rasterizer_desc { cull_mode = none; };
+	depth_stencil_desc { depth_enable = false; };
 	
 	blend_desc {
 		render_target[0] = {

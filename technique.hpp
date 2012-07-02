@@ -41,22 +41,10 @@ struct CBufferParam : public ParamBase {
   CBufferParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source) : ParamBase(name, type, source){
     // system properties can be connected now, but for mesh and material we have to wait
     if (source == PropertySource::kSystem) {
-      int len = HIWORD(type);
-      if (!len) {
-        switch (type) {
-        case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create<float>(name.c_str()); break;
-        case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>(name.c_str()); break;
-        case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>(name.c_str()); break;
-        default: assert(!"Unknown type!"); break;
-        }
-      } else {
-        switch (LOWORD(type)) {
-        case PropertyType::kFloat: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(float) * len, nullptr); break;
-        case PropertyType::kFloat4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4) * len, nullptr); break;
-        case PropertyType::kFloat4x4: id = PROPERTY_MANAGER.get_or_create_raw(name.c_str(), sizeof(XMFLOAT4X4) * len, nullptr); break;
-        default: assert(!"Unknown type!"); break;
-        }
-      }
+      int array_size = max(1, HIWORD(type));
+      std::string qualified_name = PropertySource::qualify_name(name, source);
+      int len = PropertyType::len((PropertyType::Enum)LOWORD(type));
+      id = PROPERTY_MANAGER.get_or_create_raw(qualified_name.c_str(), array_size * len, nullptr);
     } else {
       id = -1;
     }

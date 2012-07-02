@@ -10,6 +10,7 @@ class KumiLoader {
 public:
   bool load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene);
 private:
+  bool load_globals(const char *buf, Scene *scene);
   bool load_meshes(const char *buf, Scene *scene);
   bool load_cameras(const char *buf, Scene *scene);
   bool load_lights(const char *buf, Scene *scene);

@@ -10,11 +10,12 @@
 #include "file_utils.hpp"
 #include "json_utils.hpp"
 
-#define FILE_VERSION 8
+#define FILE_VERSION 9
 
 #pragma pack(push, 1)
 struct MainHeader {
   int version;
+  int global_ofs;
   int material_ofs;
   int mesh_ofs;
   int light_ofs;
@@ -132,6 +133,10 @@ bool KumiLoader::load_lights(const char *buf, Scene *scene) {
     light->pos = expand_float3(read_and_advance<XMFLOAT3>(&buf), 0);
     light->color = expand_float3(read_and_advance<XMFLOAT3>(&buf), 1);
     light->intensity = read_and_advance<float>(&buf);
+
+    light->use_far_attenuation = read_and_advance<bool>(&buf);
+    light->far_attenuation_start = read_and_advance<float>(&buf);
+    light->far_attenuation_end = read_and_advance<float>(&buf);
   }
   return true;
 }
@@ -181,6 +186,12 @@ bool KumiLoader::load_animation(const char *buf, Scene *scene) {
   return true;
 }
 
+bool KumiLoader::load_globals(const char *buf, Scene *scene) {
+  BlockHeader *header = (BlockHeader *)buf;
+  buf += sizeof(BlockHeader);
+  scene->ambient = read_and_advance<XMFLOAT4>(&buf);
+  return true;
+}
 
 bool KumiLoader::load_materials(const char *buf, Scene *scene) {
 
@@ -321,6 +332,7 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
 
   Scene *s = *scene = new Scene;
 
+  B_ERR_BOOL(load_globals(&scene_data[0] + header.global_ofs, s));
   B_ERR_BOOL(load_materials(&scene_data[0] + header.material_ofs, s));
   B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
   B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));

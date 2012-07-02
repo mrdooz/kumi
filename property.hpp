@@ -14,6 +14,7 @@ namespace PropertySource {
   };
 
   std::string to_string(Enum e);
+  std::string qualify_name(const std::string &name, PropertySource::Enum source);
 }
 
 namespace PropertyType {

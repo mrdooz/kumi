@@ -226,8 +226,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           if (param->source == PropertySource::kSystem) {
             *res.res[bind_point].goh() = GRAPHICS.find_resource(name);
           } else {
-            string qualified_name = PropertySource::to_string(param->source) + "::" + 
-              (param->friendly_name.empty() ? param->name : param->friendly_name);
+            string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
             *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
           }
 

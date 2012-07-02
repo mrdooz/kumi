@@ -21,8 +21,8 @@ static const int NOISE_SIZE = 16;
 ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
   : Effect(context, name)
   , _scene(nullptr) 
-  , _light_pos_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightPos"))
-  , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("LightColor"))
+  , _light_pos_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::LightPos"))
+  , _light_color_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::LightColor"))
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
   , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _use_freefly_camera(true)
@@ -60,7 +60,9 @@ bool ScenePlayer::init() {
   _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_blur");
   _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
-  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
+  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_diffuse");
+  _rt_occlusion_tmp = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion_tmp");
+  _rt_occlusion = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion");
 
   // from http://www.john-chapman.net/content.php?id=8
   XMFLOAT4 kernel[KERNEL_SIZE];
@@ -84,7 +86,8 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
-  _ssao_render = GRAPHICS.find_technique("ssao_render");
+  _ssao_ambient = GRAPHICS.find_technique("ssao_ambient");
+  _ssao_compute = GRAPHICS.find_technique("ssao_compute");
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   _default_shader = GRAPHICS.find_technique("default_shader");
 
@@ -94,11 +97,10 @@ bool ScenePlayer::init() {
   KumiLoader loader;
   if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
     return false;
-/*
-  for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-    PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
-  }
-*/
+
+  _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);
+  PROPERTY_MANAGER.set_property_raw(_ambient_id, &_scene->ambient.x, sizeof(XMFLOAT4));
+
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
     Material *mat = *it;
@@ -257,11 +259,9 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 
 bool ScenePlayer::render() {
 
-  RenderKey key;
-
   if (_scene) {
-    //_scene->submit_meshes(FROM_HERE, -1, _default_shader);
     {
+      // Fill the g-buffer
       RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
       data->render_targets[0] = _rt_pos;
       data->render_targets[1] = _rt_normal;
@@ -269,28 +269,42 @@ bool ScenePlayer::render() {
       data->clear_target[0] = true;
       data->clear_target[1] = true;
       data->clear_target[2] = true;
-
-      RenderKey key;
-      key.cmd = RenderKey::kSetRenderTarget;
-      GRAPHICS.submit_command(FROM_HERE, key, data);
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
 
       _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
     }
 
     {
+      // Calc the occlusion
       RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = _rt_blur;
+      data->render_targets[0] = _rt_occlusion_tmp;
       data->clear_target[0] = true;
 
-      RenderKey key;
-      key.cmd = RenderKey::kSetRenderTarget;
-      GRAPHICS.submit_command(FROM_HERE, key, data);
-      GRAPHICS.submit_technique(_ssao_render);
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
+      GRAPHICS.submit_technique(_ssao_compute);
     }
 
     {
-      GRAPHICS.submit_command(FROM_HERE, key, nullptr);
+      // Blur the occlusion
+      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
+      data->render_targets[0] = _rt_occlusion;
+      data->clear_target[0] = true;
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
       GRAPHICS.submit_technique(_ssao_blur);
+    }
+
+    {
+      // Render Ambient * occlusion
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), nullptr);
+      GRAPHICS.submit_technique(_ssao_ambient);
+    }
+
+    {
+      // Add the lighting
+      for (size_t i = 0; i < _scene->lights.size(); ++i) {
+        Light *light = _scene->lights[i];
+      }
+
     }
   }
 

@@ -13,7 +13,9 @@ namespace PropertySource {
     }
     return "INVALID";
   }
-
+  std::string qualify_name(const std::string &name, PropertySource::Enum source) {
+    return PropertySource::to_string(source) + "::" + name;
+  }
 }
 
 namespace PropertyType {

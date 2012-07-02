@@ -30,6 +30,11 @@ public:
     *(T*)&_raw_data[id] = value;
   }
 
+  void set_property_raw(PropertyId id, const void *buf, int len) {
+    type_check(id, len);
+    memcpy(&_raw_data[id], buf, len);
+  }
+
   template<typename T>
   T get_property(PropertyId id) {
     type_check(id, sizeof(T));

@@ -21,6 +21,9 @@ struct Light {
   XMFLOAT4 pos;
   XMFLOAT4 color;
   float intensity;
+  bool use_far_attenuation; 
+  float far_attenuation_start;
+  float far_attenuation_end;
 };
 
 #pragma pack(push, 1)
@@ -51,6 +54,7 @@ struct Scene {
 
   std::unordered_map<std::string, Mesh *> _meshes_by_name;
 
+  XMFLOAT4 ambient;
   std::vector<Mesh *> meshes;
   std::vector<Camera *> cameras;
   std::vector<Light *> lights;
