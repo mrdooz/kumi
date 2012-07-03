@@ -1,5 +1,6 @@
 matrix proj, view, world;
-float4 Diffuse;
+float4 Diffuse, Specular;
+float Shininess;
 
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;
@@ -33,6 +34,7 @@ struct fill_ps_output {
     float4 rt_pos : SV_TARGET0;
     float4 rt_normal : SV_TARGET1;
     float4 rt_diffuse : SV_TARGET2;
+    float4 rt_specular : SV_TARGET3;
 };
 
 fill_ps_input fill_vs_main(fill_vs_input input)
@@ -57,6 +59,8 @@ fill_ps_output fill_ps_main(fill_ps_input input)
   #else
     output.rt_diffuse = Diffuse;
   #endif
+    output.rt_specular.rgb = Specular.rgb;
+    output.rt_specular.a = Shininess;
     return output;
 }
 
@@ -67,6 +71,7 @@ fill_ps_output fill_ps_main(fill_ps_input input)
 Texture2D rt_pos : register(t0);
 Texture2D rt_normal : register(t1);
 Texture2D rt_diffuse : register(t2);
+Texture2D rt_specular : register(t3);
 sampler ssao_sampler : register(s0);
 
 float4 kernel[32];
@@ -229,20 +234,34 @@ light_ps_input light_vs_main(light_vs_input input)
 float4 light_ps_main(light_ps_input input) : SV_Target
 {
     float3 pos = rt_pos.Sample(ssao_sampler, input.tex).xyz;
-    float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
+    float3 normal = normalize(rt_normal.Sample(ssao_sampler, input.tex).xyz);
     float4 diffuse = rt_diffuse.Sample(ssao_sampler, input.tex);
+    float4 st = rt_specular.Sample(ssao_sampler, input.tex);
+    float3 specular = st.rgb;
+    float shininess = st.a;
     float3 lp = LightPos.xyz;
-    float3 v = normalize(lp - pos);
-    float dist = length(lp - pos);
+    float3 ll = lp - pos;
+    float3 v = normalize(ll);
+    float dist = length(ll);
+    
+    float4 dd;
+    float scale;
 
     if (dist < AttenuationStart) {
-      return saturate(dot(v, normal)) * diffuse * LightColor;
+      dd = saturate(dot(v, normal)) * diffuse * LightColor;
+      scale = 1;
     } else if (dist > AttenuationEnd) {
-      return float4(0,0,0,0);
+      dd = float4(0,0,0,0);
+      scale = 0;
     } else {
-      float scale = 1 - lerp(0, 1, (dist - AttenuationStart) / (AttenuationEnd - AttenuationStart));
-      return saturate(dot(v, normal)) * scale * diffuse * LightColor;
+      scale = 1 - lerp(0, 1, (dist - AttenuationStart) / (AttenuationEnd - AttenuationStart));
+      dd = saturate(dot(v, normal)) * diffuse * LightColor;
     }
+    
+    float3 h = normalize(-pos + ll);
+    float ss = specular * pow(saturate(dot(h, normal)), shininess);
+    
+    return scale * (dd + ss);
 }
 
 
@@ -272,5 +291,15 @@ gamma_ps_input gamma_vs_main(gamma_vs_input input)
 
 float4 gamma_ps_main(gamma_ps_input input) : SV_Target
 {
-  return pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
+  //float2 vtc = float2( input.tex - 0.5 );
+  //float vignette = pow( 1 - ( dot( vtc, vtc ) * 1.0 ), 2.0 );
+  float4 g = pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
+ 
+  //float exposure = 2.0;
+  //float4 exposed = 1.0 - pow( 2.71, -( vignette * g * exposure ) );
+  //return exposed;
+  
+  return g;
+  return float4(max(0, g.r - 1), max(0, g.g - 1), max(0, g.b - 1), 1);
+  //return pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
 }

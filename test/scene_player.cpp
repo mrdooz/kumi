@@ -61,10 +61,12 @@ bool ScenePlayer::init() {
   int h = GRAPHICS.height();
   _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
+  //_rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
+  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_diffuse");
+  _rt_specular = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_specular");
 
   _rt_composite = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_composite");
   _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_blur");
-  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
 
   _rt_occlusion = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion");
   _rt_occlusion_tmp = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion_tmp");
@@ -267,9 +269,11 @@ bool ScenePlayer::render() {
       data->render_targets[0] = _rt_pos;
       data->render_targets[1] = _rt_normal;
       data->render_targets[2] = _rt_diffuse;
+      data->render_targets[3] = _rt_specular;
       data->clear_target[0] = true;
       data->clear_target[1] = true;
       data->clear_target[2] = true;
+      data->clear_target[3] = true;
       GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
 
       _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
@@ -361,7 +365,6 @@ bool ScenePlayer::render() {
         XMMATRIX m = XMLoadFloat4x4(&transpose(_view));
         XMVECTOR v2 = XMVector3Transform(v, m);
         XMStoreFloat4(&lightpos->pos[i], v2);
-        //lightpos->pos[i] = _scene->lights[i]->pos;
         lightcolor->color[i] = _scene->lights[i]->color;
         lightattstart->start[i] = _scene->lights[i]->far_attenuation_start;
         lightattend->end[i] = _scene->lights[i]->far_attenuation_end;

@@ -16,6 +16,8 @@ technique ssao_fill {
         params [
             texture2d DiffuseTexture Diffuse material;
             float4 Diffuse material;
+            float4 Specular material;
+            float Shininess material;
         ];
         flags [ DIFFUSE_TEXTURE ];
     };
@@ -182,6 +184,7 @@ technique ssao_light {
             texture2d rt_pos system;
             texture2d rt_normal system;
             texture2d rt_diffuse system;
+            texture2d rt_specular system;
             float4 LightPos instance;
             float4 LightColor instance;
             float AttenuationStart instance;

@@ -50,6 +50,7 @@ private:
   GraphicsObjectHandle _rt_pos;
   GraphicsObjectHandle _rt_normal;
   GraphicsObjectHandle _rt_diffuse;
+  GraphicsObjectHandle _rt_specular;
   GraphicsObjectHandle _rt_occlusion_tmp;
   GraphicsObjectHandle _rt_occlusion;
 
