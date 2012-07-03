@@ -4,6 +4,9 @@ float4 Diffuse;
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;
 
+static const float Gamma = 2.0;
+static const float InvGamma = 1/Gamma;
+
 #if DIFFUSE_TEXTURE
 Texture2D DiffuseTexture : register(t0);
 sampler DiffuseSampler : register(s0);
@@ -49,7 +52,8 @@ fill_ps_output fill_ps_main(fill_ps_input input)
     output.rt_pos = input.vs_pos;
     output.rt_normal = normalize(input.vs_normal);
   #if DIFFUSE_TEXTURE
-    output.rt_diffuse = DiffuseTexture.Sample(DiffuseSampler, input.tex);
+    // convert to linear space
+    output.rt_diffuse = pow(DiffuseTexture.Sample(DiffuseSampler, input.tex), Gamma);
   #else
     output.rt_diffuse = Diffuse;
   #endif
@@ -230,15 +234,43 @@ float4 light_ps_main(light_ps_input input) : SV_Target
     float3 lp = LightPos.xyz;
     float3 v = normalize(lp - pos);
     float dist = length(lp - pos);
-    float scale;
 
     if (dist < AttenuationStart) {
-      scale = 1.0;
+      return saturate(dot(v, normal)) * diffuse * LightColor;
     } else if (dist > AttenuationEnd) {
-      scale = 0.0;
+      return float4(0,0,0,0);
     } else {
-      scale = 1 - lerp(0, 1, (dist - AttenuationStart) / (AttenuationEnd - AttenuationStart));
+      float scale = 1 - lerp(0, 1, (dist - AttenuationStart) / (AttenuationEnd - AttenuationStart));
+      return saturate(dot(v, normal)) * scale * diffuse * LightColor;
     }
+}
 
-    return saturate(dot(v, normal)) * scale * diffuse * LightColor;
+
+///////////////////////////////////
+// Gamma correct
+///////////////////////////////////
+
+Texture2D rt_composite : register(t0);
+
+struct gamma_vs_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+struct gamma_ps_input {
+    float4 pos : SV_POSITION;
+    float2 tex : TEXCOORD;
+};
+
+gamma_ps_input gamma_vs_main(gamma_vs_input input)
+{
+    gamma_ps_input output = (gamma_ps_input)0;
+    output.pos = input.pos;
+    output.tex = input.tex;
+    return output;
+}
+
+float4 gamma_ps_main(gamma_ps_input input) : SV_Target
+{
+  return pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
 }

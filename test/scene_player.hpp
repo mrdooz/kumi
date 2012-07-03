@@ -55,12 +55,15 @@ private:
 
   GraphicsObjectHandle _rt_blur;
 
+  GraphicsObjectHandle _rt_composite;
+
   GraphicsObjectHandle _default_shader;
   GraphicsObjectHandle _ssao_fill;
   GraphicsObjectHandle _ssao_compute;
   GraphicsObjectHandle _ssao_blur;
   GraphicsObjectHandle _ssao_ambient;
   GraphicsObjectHandle _ssao_light;
+  GraphicsObjectHandle _gamma_correct;
 
   PropertyId _kernel_id, _noise_id, _ambient_id;
 

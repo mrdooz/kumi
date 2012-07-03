@@ -172,7 +172,7 @@ public:
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name);
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, const char *name);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
-  GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info);
+  GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
   bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
 

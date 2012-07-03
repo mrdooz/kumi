@@ -217,7 +217,7 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
         if (!Path::is_absolute(filename)) {
           filename = Path::get_path(_filename) + filename;
         }
-        resource = GRAPHICS.load_texture(filename.c_str(), name, &info);
+        resource = GRAPHICS.load_texture(filename.c_str(), name, true, &info);
         material->add_flag(GRAPHICS.get_shader_flag("DIFFUSE_TEXTURE"));
         if (!resource.is_valid())
           LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());

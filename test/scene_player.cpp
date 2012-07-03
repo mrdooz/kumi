@@ -59,12 +59,15 @@ bool ScenePlayer::init() {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
-  _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_blur");
   _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
   _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
-  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_diffuse");
-  _rt_occlusion_tmp = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion_tmp");
+
+  _rt_composite = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_composite");
+  _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_blur");
+  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
+
   _rt_occlusion = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion");
+  _rt_occlusion_tmp = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion_tmp");
 
   // from http://www.john-chapman.net/content.php?id=8
   XMFLOAT4 kernel[KERNEL_SIZE];
@@ -93,6 +96,7 @@ bool ScenePlayer::init() {
   _ssao_compute = GRAPHICS.find_technique("ssao_compute");
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   _default_shader = GRAPHICS.find_technique("default_shader");
+  _gamma_correct = GRAPHICS.find_technique("gamma_correction");
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
@@ -292,11 +296,16 @@ bool ScenePlayer::render() {
 
     {
       // Render Ambient * occlusion
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), nullptr);
+      RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
+      rt->render_targets[0] = _rt_composite;
+      rt->clear_target[0] = true;
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), rt);
+
       GRAPHICS.submit_technique(_ssao_ambient, nullptr);
     }
 
     {
+
       // Add the lighting
       int num_lights = (int)_scene->lights.size();
       int pos_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
@@ -359,6 +368,12 @@ bool ScenePlayer::render() {
       }
 
       GRAPHICS.submit_technique(_ssao_light, data);
+    }
+
+    {
+      // gamma correction
+      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), nullptr);
+      GRAPHICS.submit_technique(_gamma_correct, nullptr);
     }
   }
 

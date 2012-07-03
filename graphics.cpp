@@ -222,7 +222,7 @@ GraphicsObjectHandle Graphics::get_texture(const char *filename) {
   return make_goh(GraphicsObjectHandle::kResource, idx);
 }
 
-GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, D3DX11_IMAGE_INFO *info) {
+GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info) {
 
   if (info) {
     HRESULT hr;
@@ -238,7 +238,9 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
     return GraphicsObjectHandle();
   }
 
-  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, DXGI_FORMAT_R8G8B8A8_UNORM);
+  // TODO: allow for srgb loading
+  auto fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
+  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, fmt);
   if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->view.resource)))
     return GraphicsObjectHandle();
 
