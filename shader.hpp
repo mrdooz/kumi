@@ -29,7 +29,6 @@ struct UnknownResource {
   PropertyId *pid() { return (PropertyId *)&data; }
 };
 
-typedef SparseResource<PropertyId> SparseProperty;
 typedef SparseResource<UnknownResource> SparseUnknown;
 
 class Shader {
@@ -66,6 +65,7 @@ private:
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;
 
+  ResourceViews _resource_views2;
   SparseUnknown _resource_views;
   //SparseProperty _sampler_states;
 

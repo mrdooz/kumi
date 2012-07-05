@@ -2,9 +2,6 @@
 #include "graphics_object_handle.hpp"
 #include "property_manager.hpp"
 
-static const int MAX_SAMPLERS = 8;
-static const int MAX_TEXTURES = 8;
-
 struct Mesh;
 struct SubMesh;
 class Material;

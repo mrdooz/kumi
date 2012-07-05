@@ -217,6 +217,23 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
             return false;
           }
 
+          string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
+
+          if (param->source == PropertySource::kMaterial) {
+            auto pid = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+            shader->_resource_views2.material_views.emplace_back(ResourceId<PropertyId>(pid, bind_point, name));
+
+          } else if (param->source == PropertySource::kSystem) {
+            GraphicsObjectHandle h = GRAPHICS.find_resource(name);
+            shader->_resource_views2.system_views.emplace_back(ResourceId<GraphicsObjectHandle>(h, bind_point, name));
+
+          } else if (param->source == PropertySource::kUser) {
+            shader->_resource_views2.user_views.push_back(bind_point);
+
+          } else {
+            LOG_WARNING_LN("Unsupported property source for texture: %s", name.c_str());
+          }
+
           SparseUnknown &res = shader->_resource_views;
           res.first = min(bind_point, res.first);
           res.count = max(res.count, bind_point - res.first + 1);
@@ -224,7 +241,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           res.res[bind_point].source = param->source;
 
           // the system resource has already been created, so we can grab it's handle right now
-          string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
+          //string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
           if (param->source == PropertySource::kSystem) {
             //GraphicsObjectHandle h = GRAPHICS.find_resource(name);
             //assert(h.is_valid());
@@ -315,13 +332,14 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
 
   if (exit_code) {
     // read the pipe
-    int len = GetFileSize(stdout_read, NULL);
-    char *buf = (char *)_alloca(len + 1);
-    buf[len] = 0;
-    DWORD bytes_read;
-    ReadFile(stdout_read, buf, len, &bytes_read, NULL);
-    add_error_msg(buf);
-    LOG_WARNING_LN(buf);
+    if (int len = GetFileSize(stdout_read, NULL)) {
+      char *buf = (char *)_alloca(len + 1);
+      buf[len] = 0;
+      DWORD bytes_read;
+      ReadFile(stdout_read, buf, len, &bytes_read, NULL);
+      add_error_msg(buf);
+      LOG_WARNING_LN(buf);
+    }
   }
   CloseHandle(stdout_read);
   CloseHandle(stdout_write);

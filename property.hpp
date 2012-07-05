@@ -52,3 +52,27 @@ struct CBuffer {
   std::vector<CBufferVariable> instance_vars;
   std::vector<char> staging;
 };
+
+template<typename T>
+struct ResourceId {
+  ResourceId(T id, int bind_point, const std::string &name)
+    : id(id)
+    , bind_point(bind_point)
+#ifdef _DEBUG
+    , name(name)
+#endif
+  {}
+  T id;
+  int bind_point;
+#ifdef _DEBUG
+  std::string name;
+#endif
+};
+
+struct ResourceViews {
+  ResourceViews() { views.resize(MAX_TEXTURES); }
+  std::vector<ResourceId<PropertyId>> material_views; // ids are class-ids
+  std::vector<ResourceId<GraphicsObjectHandle>> system_views;
+  std::vector<int> user_views;
+  std::vector<GraphicsObjectHandle> views;
+};
