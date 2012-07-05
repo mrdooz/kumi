@@ -23,6 +23,8 @@ public:
 
   static bool is_absolute(const std::string &path);
 
+  static std::string concat(const std::string &prefix, const std::string &suffix);
+
 private:
   string _str;
   int _filename_ofs;    // points to the last '/'

@@ -1,32 +1,23 @@
-sampler_desc linear_sampler {
-      filter = min_mag_linear_mip_point;
-      address_u = clamp;
-      address_v = clamp;
-};
+include common.tec;
 
 technique luminance_map {
-    vertex_shader {
-        file effects/luminance.fx;
-        entry_point quad_vs_main;
-    };
-    
-    pixel_shader {
-        file effects/luminance.fx;
-        entry_point luminance_map_ps_main;
-        params [
-            texture2d rt_composite system;
-        ];
-    };
-    
-    geometry = fs_quad_postex;
-  
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = false;
-    };
+  vertex_shader {
+      file effects/luminance.fx;
+      entry_point quad_vs_main;
   };
+  
+  pixel_shader {
+      file effects/luminance.fx;
+      entry_point luminance_map_ps_main;
+      params [
+          texture2d rt_composite system;
+      ];
+  };
+  
+  geometry = fs_quad_postex;
+  
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
 };
 

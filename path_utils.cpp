@@ -124,3 +124,13 @@ void split_path(const char *path, std::string *drive, std::string *dir, std::str
   if (ext) *ext = ext_buf;
 }
 
+std::string Path::concat(const std::string &prefix, const std::string &suffix) {
+  string res;
+  res.reserve(prefix.size() + 1 + suffix.size());
+  res.append(prefix);
+  if (!prefix.empty() && prefix.back() != '\\' && prefix.back() != '/')
+    res += '/';
+  res.append(suffix);
+  return res;
+
+}

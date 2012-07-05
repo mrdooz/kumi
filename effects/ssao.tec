@@ -1,44 +1,4 @@
-rasterizer_desc BackfaceCulling { 
-  cull_mode = back; 
-};
-
-rasterizer_desc NoCulling { 
-  cull_mode = back; 
-};
-
-depth_stencil_desc DepthEnable { 
-  depth_enable = true; 
-};
-
-depth_stencil_desc DepthDisable { 
-  depth_enable = false; 
-};
-
-blend_desc BlendDisable {
-  render_target[0] = {
-    blend_enable = false;
-  };
-};
-
-blend_desc BlendOneOne {
-  render_target[0] = {
-    blend_enable = true;
-    src_blend = one;
-    dest_blend = one;
-  };
-};
-
-sampler_desc PointSampler {
-  filter = min_mag_mip_point;
-  address_u = clamp;
-  address_v = clamp;
-};
-
-sampler_desc LinearSampler {
-  filter = min_mag_mip_linear;
-  address_u = clamp;
-  address_v = clamp;
-};
+include common.tec;
 
 technique ssao_fill {
     

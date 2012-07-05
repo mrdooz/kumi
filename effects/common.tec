@@ -27,3 +27,15 @@ blend_desc BlendOneOne {
     dest_blend = one;
   };
 };
+
+sampler_desc PointSampler {
+  filter = min_mag_mip_point;
+  address_u = clamp;
+  address_v = clamp;
+};
+
+sampler_desc LinearSampler {
+  filter = min_mag_mip_linear;
+  address_u = clamp;
+  address_v = clamp;
+};

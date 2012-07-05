@@ -26,7 +26,7 @@ struct TechniqueFile {
 
 class TechniqueParser {
 public:
-  TechniqueParser(const char *buf_start, const char *buf_end, TechniqueFile *result);
+  TechniqueParser(const std::string &filename, TechniqueFile *result);
   ~TechniqueParser();
   bool parse();
 private:
@@ -47,7 +47,6 @@ private:
   std::unique_ptr<technique_parser_details::Trie> _symbol_trie;
   std::unordered_map<technique_parser_details::Symbol, std::string > _symbol_to_string;
 
-  const char *_buf_start;
-  const char *_buf_end;
+  std::string _filename;
   TechniqueFile *_result;
 };

@@ -21,7 +21,7 @@ fullscreen_ps_input quad_vs_main(fullscreen_vs_input input)
 ///////////////////////////////////
 
 Texture2D rt_composite : register(t0);
-sampler linear_sampler : register(s0);
+sampler LinearSampler : register(s0);
 
 // Approximates luminance from an RGB value
 float CalcLuminance(float3 color)
@@ -31,7 +31,7 @@ float CalcLuminance(float3 color)
 
 float4 luminance_map_ps_main(fullscreen_ps_input input) : SV_Target
 {
-  float3 color = rt_composite.Sample(linear_sampler, input.tex).rgb;
+  float3 color = rt_composite.Sample(LinearSampler, input.tex).rgb;
   
   // calculate the luminance using a weighted average
   float luminance = log(max(CalcLuminance(color), 0.00001f));

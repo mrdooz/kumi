@@ -9,6 +9,7 @@
 #include "tracked_location.hpp"
 #include "path_utils.hpp"
 #include "graphics.hpp"
+#include "resource_interface.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -344,11 +345,10 @@ static void parse_value(const string &value, PropertyType::Enum type, float *out
 
 using namespace technique_parser_details;
 
-TechniqueParser::TechniqueParser(const char *buf_start, const char *buf_end, TechniqueFile *result) 
+TechniqueParser::TechniqueParser(const std::string &filename, TechniqueFile *result) 
   : _symbol_trie(new Trie()) 
-  , _buf_start(buf_start)
-  , _buf_end(buf_end)
   , _result(result)
+  , _filename(filename)
 {
   for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
     _symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
@@ -1249,15 +1249,30 @@ void parse_standalone_desc(Scope *scope,
 
 bool TechniqueParser::parse() {
 
+  vector<char> buf;
+  B_ERR_BOOL(RESOURCE_MANAGER.load_file(_filename.c_str(), &buf));
+
   try {
-    Scope scope(this, _buf_start, _buf_end - 1);
+    Scope scope(this, buf.data(), buf.data() + buf.size() - 1);
 
     while (!scope.end()) {
 
       switch (scope.next_symbol()) {
 
         case kSymInclude: {
-          string name;
+          string filename = scope.string_until(';');
+          string path;
+          if (Path::is_absolute(_filename)) {
+            path = Path::get_path(_filename);
+          } else {
+            char buf[MAX_PATH+1];
+            string cwd(_getcwd(buf, MAX_PATH));
+            path = Path::concat(cwd, Path::get_path(_filename));
+          }
+          scope.munch(kSymSemicolon);
+          TechniqueParser inner(Path::concat(path, filename), _result);
+          if (!inner.parse())
+            return false;
           break;
         }
 

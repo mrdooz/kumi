@@ -754,11 +754,9 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   bool res = true;
-  vector<char> buf;
-  B_ERR_BOOL(RESOURCE_MANAGER.load_file(filename, &buf));
 
   TechniqueFile result;
-  TechniqueParser parser(buf.data(), buf.data() + buf.size(), &result);
+  TechniqueParser parser(filename, &result);
   B_ERR_BOOL(parser.parse());
 
   vector<Material *> &materials = result.materials;
