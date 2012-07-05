@@ -1,3 +1,34 @@
+rasterizer_desc BackfaceCulling { 
+  cull_mode = back; 
+};
+
+rasterizer_desc NoCulling { 
+  cull_mode = back; 
+};
+
+depth_stencil_desc DepthEnable { 
+  depth_enable = true; 
+};
+
+depth_stencil_desc DepthDisable { 
+  depth_enable = false; 
+};
+
+blend_desc BlendDisable {
+  render_target[0] = {
+    blend_enable = false;
+  };
+};
+
+blend_desc BlendOneOne {
+    render_target[0] = {
+      blend_enable = true;
+      src_blend = one;
+      dest_blend = one;
+    };
+  };
+
+
 technique ssao_fill {
     
     vertex_shader {
@@ -22,18 +53,11 @@ technique ssao_fill {
         flags [ DIFFUSE_TEXTURE ];
     };
 
-    sampler_desc DiffuseSampler default {
-    };
+    sampler_desc DiffuseSampler default {};
     
-    rasterizer_desc { cull_mode = back; };
-    
-    depth_stencil_desc { depth_enable = true; };
-    
-    blend_desc {
-        render_target[0] = {
-            blend_enable = false;
-        };
-    };
+    rasterizer_desc = BackfaceCulling;
+    depth_stencil_desc = DepthEnable;
+    blend_desc = BlendDisable;
 };
 
 technique ssao_compute {
@@ -56,18 +80,7 @@ technique ssao_compute {
         ];
     };
    
-  // 0,1
-  // 2,3
-  vertices {
-    format pos_tex;
-    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
-  };
-  
-  // 0, 1, 2
-  // 2, 1, 3
-  indices {
-    data [0 1 2 2 1 3];
-  };
+  geometry = fs_quad_postex;
   
   sampler_desc ssao_sampler default {
         filter = min_mag_mip_point;
@@ -75,14 +88,9 @@ technique ssao_compute {
         address_v = clamp;
   };
   
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = false;
-    };
-  };
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
 };
 
 technique ssao_blur {
@@ -100,18 +108,7 @@ technique ssao_blur {
         ];
     };
    
-  // 0,1
-  // 2,3
-  vertices {
-    format pos_tex;
-    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
-  };
-  
-  // 0, 1, 2
-  // 2, 1, 3
-  indices {
-    data [0 1 2 2 1 3];
-  };
+  geometry = fs_quad_postex;
   
   sampler_desc ssao_sampler default {
         filter = min_mag_mip_point;
@@ -119,14 +116,9 @@ technique ssao_blur {
         address_v = clamp;
   };
   
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = false;
-    };
-  };
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
 };
 
 
@@ -145,14 +137,7 @@ technique ssao_ambient {
         ];
     };
    
-  vertices { 
-    format pos_tex;
-    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
-  };
-  
-  indices {
-    data [0 1 2 2 1 3];
-  };
+  geometry = fs_quad_postex;
   
   sampler_desc ssao_sampler default {
         filter = min_mag_mip_point;
@@ -160,14 +145,9 @@ technique ssao_ambient {
         address_v = clamp;
   };
   
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = false;
-    };
-  };
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
 };
 
 
@@ -192,14 +172,7 @@ technique ssao_light {
         ];
     };
    
-  vertices { 
-    format pos_tex;
-    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
-  };
-  
-  indices {
-    data [0 1 2 2 1 3];
-  };
+  geometry = fs_quad_postex;
   
   sampler_desc ssao_sampler default {
         filter = min_mag_mip_point;
@@ -207,16 +180,9 @@ technique ssao_light {
         address_v = clamp;
   };
   
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = true;
-      src_blend = one;
-      dest_blend = one;
-    };
-  };
+  rasterizer_desc = NoCulling; 
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendOneOne;
 };
 
 
@@ -235,27 +201,15 @@ technique gamma_correction {
         ];
     };
    
-  vertices { 
-    format pos_tex;
-    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
-  };
-  
-  indices {
-    data [0 1 2 2 1 3];
-  };
-  
+  geometry = fs_quad_postex;
+   
   sampler_desc ssao_sampler default {
         filter = min_mag_mip_point;
         address_u = clamp;
         address_v = clamp;
   };
   
-  rasterizer_desc { cull_mode = none; };
-  depth_stencil_desc { depth_enable = false; };
-  
-  blend_desc {
-    render_target[0] = {
-      blend_enable = false;
-    };
-  };
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
 };

@@ -10,7 +10,6 @@ namespace PropertySource {
     case kInstance: return "Instance";
     case kUser: return "User";
     case kMesh: return "Mesh";
-    case kTechnique: return "Technique";
     }
     return "INVALID";
   }

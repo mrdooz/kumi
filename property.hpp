@@ -11,7 +11,6 @@ namespace PropertySource {
     kInstance,
     kUser,
     kMesh,
-    kTechnique,
   };
 
   std::string to_string(Enum e);

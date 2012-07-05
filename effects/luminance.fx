@@ -38,7 +38,7 @@ float4 luminance_map_ps_main(fullscreen_ps_input input) : SV_Target
   return float4(luminance, 1.0f, 1.0f, 1.0f);
 }
 
-
+/*
 ///////////////////////////////////
 // Remove pixels below the luminance threshold
 ///////////////////////////////////
@@ -60,3 +60,4 @@ float4 scale_ps_main(fullscreen_ps_input input) : SV_Target
   
   return pixel_lum < avg_lum ? float4(0,0,0,1) : float4(color.r - avg_lum, color.g - avg_lum, color.b - avg_lum, 1);
 }
+*/

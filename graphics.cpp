@@ -9,6 +9,7 @@
 #include "string_utils.hpp"
 #include "tracked_location.hpp"
 #include "mesh.hpp"
+#include "vertex_types.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -405,6 +406,29 @@ bool Graphics::create_back_buffers(int width, int height)
   return true;
 }
 
+bool Graphics::create_default_geometry() {
+
+  // fullscreen pos/tex quad
+  {
+    float verts[] = {
+      -1, +1, +1, +0, +0,
+      +1, +1, +1, +1, +0,
+      -1, -1, +1, +0, +1,
+      +1, -1, +1, +1, +1
+    };
+
+    uint16 indices[] = {
+      0, 1, 2,
+      2, 1, 3
+    };
+
+    auto vb = create_static_vertex_buffer(FROM_HERE, sizeof(verts), verts);
+    auto ib = create_static_index_buffer(FROM_HERE, sizeof(indices), indices);
+    _predefined_geometry.insert(make_pair(kGeomFsQuadPosTex, make_pair(vb, ib)));
+  }
+  return true;
+}
+
 bool Graphics::init(const HWND hwnd, const int width, const int height)
 {
   _width = width;
@@ -468,15 +492,13 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   B_ERR_BOOL(create_back_buffers(width, height));
 
-  B_ERR_HR(_device->CreateDepthStencilState(&CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()), &_default_depth_stencil_state.p));
-  B_ERR_HR(_device->CreateRasterizerState(&CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()), &_default_rasterizer_state.p));
-  B_ERR_HR(_device->CreateBlendState(&CD3D11_BLEND_DESC(CD3D11_DEFAULT()), &_default_blend_state.p));
-
-  set_private_data(FROM_HERE, _default_depth_stencil_state.p);
-  set_private_data(FROM_HERE, _default_rasterizer_state.p);
-  set_private_data(FROM_HERE, _default_blend_state.p);
+  _default_depth_stencil_state = create_depth_stencil_state(FROM_HERE, CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()));
+  _default_rasterizer_state = create_rasterizer_state(FROM_HERE, CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()));
+  _default_blend_state = create_blend_state(FROM_HERE, CD3D11_BLEND_DESC(CD3D11_DEFAULT()));
 
   _device->CreateClassLinkage(&_class_linkage.p);
+
+  create_default_geometry();
 
   // Create a dummy texture
   DWORD black = 0;
@@ -697,16 +719,15 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
 
   bool res = true;
-  vector<Material *> materials;
-
-  vector<Technique *> loaded_techniques;
   vector<char> buf;
   B_ERR_BOOL(RESOURCE_MANAGER.load_file(filename, &buf));
-  //LOG_VERBOSE_LN("loaded: %s, %d", filename, buf.size());
 
-  TechniqueParser parser;
-  vector<Technique *> tmp;
-  B_ERR_BOOL(parser.parse((const char *)&buf[0], (const char *)&buf[buf.size()-1] + 1, &tmp, &materials));
+  TechniqueFile result;
+  TechniqueParser parser(buf.data(), buf.data() + buf.size(), &result);
+  B_ERR_BOOL(parser.parse());
+
+  vector<Material *> &materials = result.materials;
+  vector<Technique *> &tmp = result.techniques;
 
   if (add_materials) {
     for (auto it = begin(materials); it != end(materials); ++it)
@@ -1307,4 +1328,19 @@ void Graphics::set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps)
 
 void Graphics::draw_indexed(int count, int start_index, int base_vertex) {
   _immediate_context->DrawIndexed(count, start_index, base_vertex);
+}
+
+void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count) {
+
+  *index_format = DXGI_FORMAT_R16_UINT;
+  assert(_predefined_geometry.find(geom) != _predefined_geometry.end());
+
+  switch (geom) {
+    case kGeomFsQuadPosTex:
+      *vb = _predefined_geometry[kGeomFsQuadPosTex].first;
+      *ib = _predefined_geometry[kGeomFsQuadPosTex].second;
+      *vertex_size = sizeof(PosTex);
+      *index_count = 6;
+      break;
+  }
 }

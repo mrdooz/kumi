@@ -96,6 +96,7 @@ enum Symbol {
     kSymFormat,
     kSymData,
   kSymIndices,
+  kSymGeometry,
 
   kSymMaterial,
 
@@ -177,6 +178,8 @@ struct {
     { kSymFlags, "flags" },
 
   { kSymMaterial, "material" },
+
+  { kSymGeometry, "geometry" },
 
   { kSymVertices, "vertices" },
   { kSymFormat, "format" },
@@ -338,8 +341,11 @@ static void parse_value(const string &value, PropertyType::Enum type, float *out
 
 using namespace technique_parser_details;
 
-TechniqueParser::TechniqueParser() 
+TechniqueParser::TechniqueParser(const char *buf_start, const char *buf_end, TechniqueFile *result) 
   : _symbol_trie(new Trie()) 
+  , _buf_start(buf_start)
+  , _buf_end(buf_end)
+  , _result(result)
 {
   for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
     _symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
@@ -348,6 +354,7 @@ TechniqueParser::TechniqueParser()
 }
 
 TechniqueParser::~TechniqueParser() {
+
 }
 
 struct Scope {
@@ -571,7 +578,6 @@ void TechniqueParser::parse_param(const vector<string> &param, Technique *techni
     ("instance", PropertySource::kInstance)
     ("user", PropertySource::kUser)
     ("mesh", PropertySource::kMesh);
-  //("technique", PropertySource::kTechnique);
 
   THROW_ON_FALSE(param.size() >= 3);
 
@@ -735,7 +741,9 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
   }
 }
 
-void TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL_DESC *desc) {
+void TechniqueParser::parse_depth_stencil_desc(Scope *scope, CD3D11_DEPTH_STENCIL_DESC *desc) {
+
+  *desc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
 
   auto tmp = list_of(kSymDepthEnable);
   Symbol symbol;
@@ -751,7 +759,9 @@ void TechniqueParser::parse_depth_stencil_desc(Scope *scope, D3D11_DEPTH_STENCIL
   }
 }
 
-void TechniqueParser::parse_sampler_desc(Scope *scope, D3D11_SAMPLER_DESC *desc) {
+void TechniqueParser::parse_sampler_desc(Scope *scope, CD3D11_SAMPLER_DESC *desc) {
+
+  *desc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
 
   auto valid = list_of
     (kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)
@@ -903,7 +913,9 @@ void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
   }
 }
 
-void TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
+void TechniqueParser::parse_blend_desc(Scope *scope, CD3D11_BLEND_DESC *desc) {
+
+  *desc = CD3D11_BLEND_DESC(CD3D11_DEFAULT());
 
   auto valid = list_of(kSymAlphaToCoverageEnable)(kSymIndependentBlendEnable)(kSymRenderTarget);
 
@@ -926,7 +938,9 @@ void TechniqueParser::parse_blend_desc(Scope *scope, D3D11_BLEND_DESC *desc) {
   }
 }
 
-void TechniqueParser::parse_rasterizer_desc(Scope *scope, D3D11_RASTERIZER_DESC *desc) {
+void TechniqueParser::parse_rasterizer_desc(Scope *scope, CD3D11_RASTERIZER_DESC *desc) {
+
+  *desc = CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT());
 
   auto valid = list_of
     (kSymFillMode)(kSymCullMode)(kSymFrontCounterClockwise)(kSymDepthBias)(kSymDepthBiasClamp)
@@ -982,6 +996,7 @@ void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 
   auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
   auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
+  vector<float> vertices;
 
   Symbol symbol;
   while (scope->consume_in(valid_tags, &symbol)) {
@@ -999,7 +1014,7 @@ void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
         parse_list<float>(&inner, &verts, [&](const string &x){ return parse_float(x); });
         for (auto it = begin(verts); it != end(verts); ++it) {
           for (auto jt = begin(*it); jt != end(*it); ++jt) {
-            technique->_vertices.push_back(*jt);
+            vertices.push_back(*jt);
           }
         }
         break;
@@ -1007,7 +1022,7 @@ void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
     }
   }
   THROW_ON_FALSE(technique->_vertex_size != -1);
-  technique->_vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, technique->_vertex_size * technique->_vertices.size(), &technique->_vertices[0]);
+  technique->_vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, technique->_vertex_size * vertices.size(), &vertices[0]);
 }
 
 void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
@@ -1017,6 +1032,7 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 
   technique->_index_format = DXGI_FORMAT_UNKNOWN;
   Symbol symbol;
+  vector<int> indices;
 
   while (scope->consume_in(valid_tags, &symbol)) {
 
@@ -1036,13 +1052,13 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
         vector<vector<int>> indices_outer;
         parse_list<int>(&inner, &indices_outer, [&](const string &x){ return parse_int(x); });
         THROW_ON_FALSE(indices_outer.size() == 1);
-        const vector<int> &indices = indices_outer[0];
+        const vector<int> &indices_inner = indices_outer[0];
 
         int max_value = INT_MIN;
-        for (auto it = begin(indices); it != end(indices); ++it) {
+        for (auto it = begin(indices_inner); it != end(indices_inner); ++it) {
           const int v = *it;
           max_value = max(max_value, v);
-          technique->_indices.push_back(v);
+          indices.push_back(v);
         }
 
         if (technique->_index_format == DXGI_FORMAT_UNKNOWN)
@@ -1057,11 +1073,12 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
   if (technique->_index_format == DXGI_FORMAT_R16_UINT) {
     // create a local copy of the indices
     vector<uint16> v;
-    copy(technique->_indices.begin(), technique->_indices.end(), back_inserter(v));
+    copy(RANGE(indices), back_inserter(v));
     technique->_ib = GRAPHICS.create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * v.size(), &v[0]);
   } else {
-    technique->_ib = GRAPHICS.create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * technique->_indices.size(), &technique->_indices[0]);
+    technique->_ib = GRAPHICS.create_static_index_buffer(FROM_HERE, index_format_to_size(technique->_index_format) * indices.size(), &indices[0]);
   }
+  technique->_index_count = indices.size();
 }
 
 void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
@@ -1070,6 +1087,7 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
     (kSymVertexShader)(kSymPixelShader)
     (kSymMaterial)
     (kSymVertices)(kSymIndices)
+    (kSymGeometry)
     (kSymRasterizerDesc)(kSymSamplerDesc)(kSymDepthStencilDesc)(kSymBlendDesc);
 
   Symbol symbol;
@@ -1095,19 +1113,78 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
       case kSymMaterial: {
         string technique_name = technique->name();
         // materials are prefixed by the technique name
-        Rollback2<Material> mat(new Material(technique_name + "::" + scope->next_identifier()));
+        unique_ptr<Material> mat(new Material(technique_name + "::" + scope->next_identifier()));
         scope->munch(kSymBlockOpen);
         parse_material(scope, mat.get());
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
-        technique->_materials.push_back(mat.commit());
+        technique->_materials.push_back(mat.release());
         break;
       }
 
-      case kSymRasterizerDesc:
-        scope->munch(kSymBlockOpen);
-        parse_rasterizer_desc(scope, &technique->_rasterizer_desc);
-        scope->munch(kSymBlockClose).munch(kSymSemicolon);
+      case kSymRasterizerDesc: {
+        Symbol next = scope->peek();
+        if (next == kSymEquals) {
+          // find the rasterizer desc being referenced
+          string name;
+          scope->munch(kSymEquals).next_identifier(&name).munch(kSymSemicolon);
+          auto it = _result->rasterizer_states.find(name);
+          THROW_ON_FALSE(it != _result->rasterizer_states.end());
+          technique->_rasterizer_state = it->second;
+          
+        } else if (next == kSymBlockOpen) {
+          scope->munch(kSymBlockOpen);
+          CD3D11_RASTERIZER_DESC desc;
+          parse_rasterizer_desc(scope, &desc);
+          technique->_rasterizer_state = GRAPHICS.create_rasterizer_state(FROM_HERE, desc);
+          scope->munch(kSymBlockClose).munch(kSymSemicolon);
+        } else {
+          THROW_ON_FALSE(!"Unknown symbol");
+        }
         break;
+      }
+
+      case kSymDepthStencilDesc: {
+        Symbol next = scope->peek();
+        if (next == kSymEquals) {
+          string name;
+          scope->munch(kSymEquals).next_identifier(&name).munch(kSymSemicolon);
+          auto it = _result->depth_stencil_states.find(name);
+          THROW_ON_FALSE(it != _result->depth_stencil_states.end());
+          technique->_depth_stencil_state = it->second;
+
+        } else if (next == kSymBlockOpen) {
+          scope->munch(kSymBlockOpen);
+          CD3D11_DEPTH_STENCIL_DESC desc;
+          parse_depth_stencil_desc(scope, &desc);
+          technique->_depth_stencil_state = GRAPHICS.create_depth_stencil_state(FROM_HERE, desc);
+          scope->munch(kSymBlockClose).munch(kSymSemicolon);
+        } else {
+          THROW_ON_FALSE(!"Unknown symbol");
+        }
+
+        break;
+      }
+
+      case kSymBlendDesc: {
+        Symbol next = scope->peek();
+        if (next == kSymEquals) {
+          string name;
+          scope->munch(kSymEquals).next_identifier(&name).munch(kSymSemicolon);
+          auto it = _result->blend_states.find(name);
+          THROW_ON_FALSE(it != _result->blend_states.end());
+          technique->_blend_state = it->second;
+
+        } else if (next == kSymBlockOpen) {
+          scope->munch(kSymBlockOpen);
+          CD3D11_BLEND_DESC desc;
+          parse_blend_desc(scope, &desc);
+          technique->_blend_state = GRAPHICS.create_blend_state(FROM_HERE, desc);
+          scope->munch(kSymBlockClose).munch(kSymSemicolon);
+        } else {
+          THROW_ON_FALSE(!"Unknown symbol");
+        }
+        break;
+      }
 
       case kSymSamplerDesc: {
         string name = scope->next_identifier();
@@ -1116,24 +1193,13 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         }
         scope->munch(kSymBlockOpen);
 
-        D3D11_SAMPLER_DESC desc = CD3D11_SAMPLER_DESC(CD3D11_DEFAULT());
+        CD3D11_SAMPLER_DESC desc;
         parse_sampler_desc(scope, &desc);
         technique->_sampler_descs.push_back(make_pair(name, desc));
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
         break;
       }
 
-      case kSymDepthStencilDesc:
-        scope->munch(kSymBlockOpen);
-        parse_depth_stencil_desc(scope, &technique->_depth_stencil_desc);
-        scope->munch(kSymBlockClose).munch(kSymSemicolon);
-        break;
-
-      case kSymBlendDesc:
-        scope->munch(kSymBlockOpen);
-        parse_blend_desc(scope, &technique->_blend_desc);
-        scope->munch(kSymBlockClose).munch(kSymSemicolon);
-        break;
 
       case kSymVertices:
         scope->munch(kSymBlockOpen);
@@ -1146,25 +1212,79 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         parse_indices(scope, technique);
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
         break;
+
+      case kSymGeometry: {
+        scope->munch(kSymEquals);
+        string geom_name = scope->string_until(';');
+        Graphics::PredefinedGeometry geom;
+        lookup<string, Graphics::PredefinedGeometry>(geom_name,
+          map_list_of("fs_quad_postex", Graphics::kGeomFsQuadPosTex),
+          &geom);
+        GRAPHICS.get_predefined_geometry(geom, &technique->_vb, &technique->_vertex_size, &technique->_ib, &technique->_index_format, &technique->_index_count);
+        scope->munch(kSymSemicolon);
+        break;
+      }
     }
   }
 }
 
-bool TechniqueParser::parse(const char *start, const char *end, vector<Technique *> *techniques, vector<Material *> *materials) {
+bool TechniqueParser::parse() {
 
   try {
-    Scope scope(this, start, end-1);
+    Scope scope(this, _buf_start, _buf_end - 1);
 
     while (!scope.end()) {
 
       switch (scope.next_symbol()) {
+        
+        case kSymRasterizerDesc: {
+          string name;
+          scope.next_identifier(&name).munch(kSymBlockOpen);
+          auto it = _result->rasterizer_states.find(name);
+          if (_result->rasterizer_states.find(name) != _result->rasterizer_states.end()) {
+            LOG_WARNING_LN("Duplicate rasterizer state found: %s", name.c_str());
+          }
+          CD3D11_RASTERIZER_DESC desc;
+          parse_rasterizer_desc(&scope, &desc);
+          scope.munch(kSymBlockClose).munch(kSymSemicolon);
+          _result->rasterizer_states[name] = GRAPHICS.create_rasterizer_state(FROM_HERE, desc);
+          break;
+        }
+
+        case kSymDepthStencilDesc: {
+          string name;
+          scope.next_identifier(&name).munch(kSymBlockOpen);
+          auto it = _result->depth_stencil_states.find(name);
+          if (_result->depth_stencil_states.find(name) != _result->depth_stencil_states.end()) {
+            LOG_WARNING_LN("Duplicate depth/stencil state found: %s", name.c_str());
+          }
+          CD3D11_DEPTH_STENCIL_DESC desc;
+          parse_depth_stencil_desc(&scope, &desc);
+          scope.munch(kSymBlockClose).munch(kSymSemicolon);
+          _result->depth_stencil_states[name] = GRAPHICS.create_depth_stencil_state(FROM_HERE, desc);
+          break;
+        }
+
+        case kSymBlendDesc: {
+          string name;
+          scope.next_identifier(&name).munch(kSymBlockOpen);
+          auto it = _result->blend_states.find(name);
+          if (_result->blend_states.find(name) != _result->blend_states.end()) {
+            LOG_WARNING_LN("Duplicate blend state found: %s", name.c_str());
+          }
+          CD3D11_BLEND_DESC desc;
+          parse_blend_desc(&scope, &desc);
+          scope.munch(kSymBlockClose).munch(kSymSemicolon);
+          _result->blend_states[name] = GRAPHICS.create_blend_state(FROM_HERE, desc);
+          break;
+        }
 
         case kSymTechnique: {
           unique_ptr<Technique> t(new Technique);
           scope.next_identifier(&t.get()->_name).munch(kSymBlockOpen);
           parse_technique(&scope, t.get());
           scope.munch(kSymBlockClose).munch(kSymSemicolon);
-          techniques->push_back(t.release());
+          _result->techniques.push_back(t.release());
           break;
         }
 
@@ -1176,11 +1296,8 @@ bool TechniqueParser::parse(const char *start, const char *end, vector<Technique
     return false;
   }
 
-  if (materials) {
-    materials->clear();
-    for (auto it = std::begin(*techniques); it != std::end(*techniques); ++it)
-      copy(std::begin((*it)->_materials), std::end((*it)->_materials), back_inserter(*materials));
-  }
+  for (auto it = begin(_result->techniques); it != end(_result->techniques); ++it)
+    copy(RANGE((*it)->_materials), back_inserter(_result->materials));
 
   return true;
 }

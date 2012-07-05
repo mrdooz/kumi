@@ -27,6 +27,10 @@ struct IFW1FontWrapper;
 class Graphics {
 public:
 
+  enum PredefinedGeometry {
+    kGeomFsQuadPosTex,
+  };
+
   template<class Resource, class Desc>
   struct ResourceAndDesc {
     void release() {
@@ -92,6 +96,8 @@ public:
 
   const char *vs_profile() const { return _vs_profile.c_str(); }
   const char *ps_profile() const { return _ps_profile.c_str(); }
+
+  void get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count);
 
   GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
   GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode);
@@ -168,6 +174,13 @@ public:
   void submit_technique(const TrackedLocation &location, GraphicsObjectHandle technique, void *data);
   void render();
 
+  GraphicsObjectHandle default_rasterizer_state() const { return _default_rasterizer_state; }
+  GraphicsObjectHandle default_depth_stencil_state() const { return _default_depth_stencil_state; }
+  uint32_t default_stencil_ref() const { return 0; }
+  GraphicsObjectHandle  default_blend_state() const { return _default_blend_state; }
+  const float *default_blend_factors() const { return _default_blend_factors; }
+  uint32_t default_sample_mask() const { return 0xffffffff; }
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
@@ -175,12 +188,6 @@ private:
   ~Graphics();
 
   void set_default_render_target();
-  ID3D11RasterizerState *default_rasterizer_state() const { return _default_rasterizer_state; }
-  ID3D11DepthStencilState *default_depth_stencil_state() const { return _default_depth_stencil_state; }
-  uint32_t default_stencil_ref() const { return 0; }
-  ID3D11BlendState *default_blend_state() const { return _default_blend_state; }
-  const float *default_blend_factors() const { return _default_blend_factors; }
-  uint32_t default_sample_mask() const { return 0xffffffff; }
 
   void set_vb(ID3D11Buffer *buf, uint32_t stride);
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
@@ -192,6 +199,7 @@ private:
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureResource *out);
 
   bool create_back_buffers(int width, int height);
+  bool create_default_geometry();
 
   bool technique_file_changed(const char *filename, void *token);
   bool shader_file_changed(const char *filename, void *token);
@@ -275,11 +283,12 @@ private:
   CComPtr<ID3D11Debug> _d3d_debug;
 #endif
 
-  CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
-  CComPtr<ID3D11DepthStencilState> _default_depth_stencil_state;
+  GraphicsObjectHandle _default_rasterizer_state;
+  //CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
+  GraphicsObjectHandle _default_depth_stencil_state;
   CComPtr<ID3D11SamplerState> _default_sampler_state;
   float _default_blend_factors[4];
-  CComPtr<ID3D11BlendState> _default_blend_state;
+  GraphicsObjectHandle _default_blend_state;
 
   DWORD _start_fps_time;
   int32_t _frame_count;
@@ -296,6 +305,8 @@ private:
 #if WITH_GWEN
   CComPtr<IFW1Factory> _fw1_factory;
 #endif
+
+  std::map<PredefinedGeometry, std::pair<GraphicsObjectHandle, GraphicsObjectHandle> > _predefined_geometry;
 
   PropertyId _screen_size_id;
   std::map<std::string, int> _shader_flags;

@@ -13,10 +13,10 @@ using namespace boost::assign;
 using namespace std;
 
 Technique::Technique()
-  : _rasterizer_desc(CD3D11_DEFAULT())
-  , _blend_desc(CD3D11_DEFAULT())
-  , _depth_stencil_desc(CD3D11_DEFAULT())
-  , _vertex_size(-1)
+  //: _rasterizer_desc(CD3D11_DEFAULT())
+  //: _blend_desc(CD3D11_DEFAULT())
+  // _depth_stencil_desc(CD3D11_DEFAULT())
+  : _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
   , _valid(false)
   , _vs_shader_template(nullptr)
@@ -433,10 +433,14 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 }
 
 bool Technique::init() {
+  if (!_rasterizer_state.is_valid())
+    _rasterizer_state = GRAPHICS.default_rasterizer_state();
 
-  _rasterizer_state = GRAPHICS.create_rasterizer_state(FROM_HERE, _rasterizer_desc);
-  _blend_state = GRAPHICS.create_blend_state(FROM_HERE, _blend_desc);
-  _depth_stencil_state = GRAPHICS.create_depth_stencil_state(FROM_HERE, _depth_stencil_desc);
+  if (!_blend_state.is_valid())
+    _blend_state = GRAPHICS.default_blend_state();
+
+  if (!_depth_stencil_state.is_valid())
+    _depth_stencil_state = GRAPHICS.default_depth_stencil_state();
 
   // create all the sampler states from the descs
   for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
