@@ -50,8 +50,9 @@ bool VolumetricEffect::init() {
 
   int w, h;
   g.size(&w, &h);
-  _occluder_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_occluder");
-  _shaft_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_shaft");
+  // TODO: these guys want floating point render targets
+  //_occluder_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_occluder");
+  //_shaft_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_shaft");
   B_ERR_BOOL(_occluder_rt.is_valid() && _shaft_rt.is_valid());
 
   return true;

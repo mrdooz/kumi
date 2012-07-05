@@ -145,7 +145,6 @@ public:
 private:
 
   void prepare_cbuffers();
-  void prepare_textures();
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const std::vector<std::string> &flags);

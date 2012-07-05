@@ -105,12 +105,14 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N>
   void set_pair(int idx, const typename Traits::Elem &e) {
     assert(idx >= 0 && idx < N);
     _buffer[idx] = e;
-    _lookup[Traits::get_key(_buffer[idx])] = idx;
+    auto &key = Traits::get_key(_buffer[idx]);
+    _key_to_idx[key] = idx;
+    _idx_to_key[idx] = key;
   }
 
   int idx_from_token(const typename Traits::Key &key) {
-    auto it = _lookup.find(key);
-    return it == end(_lookup) ? -1 : it->second;
+    auto it = _key_to_idx.find(key);
+    return it == end(_key_to_idx) ? -1 : it->second;
   }
 
   template<typename R>
@@ -119,7 +121,8 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N>
     return idx == -1 ? def : Traits::get(_buffer[idx]);
   }
 
-  std::unordered_map<typename Traits::Key, int> _lookup;
+  std::unordered_map<typename Traits::Key, int> _key_to_idx;
+  std::unordered_map<int, typename Traits::Key> _idx_to_key;
 };
 
 template<typename T, int N>

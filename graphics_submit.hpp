@@ -96,6 +96,8 @@ struct RenderKey {
     kRenderBuffers,
     kRenderText,
     kSetScissorRect,
+    kReleaseRenderTarget,
+    kGenerateMips,
     kNumCommands
   };
   static_assert(kNumCommands < (1 << 16), "Too many commands");
@@ -103,6 +105,10 @@ struct RenderKey {
   RenderKey() : data(0) {}
   RenderKey(Cmd cmd) : data(0) {
     this->cmd = cmd;
+  }
+  RenderKey(Cmd cmd, GraphicsObjectHandle h) : data(0) {
+    this->cmd = cmd;
+    this->handle = h;
   }
 
   union {

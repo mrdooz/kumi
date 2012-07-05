@@ -117,39 +117,75 @@ void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
   _immediate_context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-GraphicsObjectHandle Graphics::create_render_target(
-  const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, const char *name) {
+GraphicsObjectHandle Graphics::create_temp_render_target(const TrackedLocation &loc, 
+    int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
 
-    RenderTargetResource *data = new RenderTargetResource;
-    if (!create_render_target(loc, width, height, shader_resource, depth_buffer, format, data)) {
-      delete exch_null(data);
-      return GraphicsObjectHandle();
+  assert(_render_targets._key_to_idx.find(name) == _render_targets._key_to_idx.end());
+
+  // look for a free render target with the wanted properties
+  // TODO: make betterer
+  UINT flags = mip_maps ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+
+  auto cmp_desc = [&](const D3D11_TEXTURE2D_DESC &desc) {
+    return desc.Width == width && desc.Height == height && desc.Format == format && desc.MiscFlags == flags;
+  };
+
+  for (int idx = 0; idx < _render_targets.Size; ++idx) {
+    if (auto rt = _render_targets[idx]) {
+      auto &desc = rt->texture.desc;
+      if (!rt->in_use && cmp_desc(desc) && depth_buffer == !!rt->depth_stencil.resource.p) {
+        rt->in_use = true;
+        _render_targets._key_to_idx[name] = idx;
+        _render_targets._idx_to_key[idx] = name;
+        auto goh = make_goh(GraphicsObjectHandle::kRenderTarget, idx);
+        auto pid = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(name);
+        PROPERTY_MANAGER.set_property(pid, goh);
+        return goh;
+      }
     }
-
-    int idx = name ? _render_targets.idx_from_token(name) : -1;
-    if (idx != -1 || (idx = _render_targets.find_free_index()) != -1) {
-      if (_render_targets[idx])
-        _render_targets[idx]->reset();
-      _render_targets.set_pair(idx, make_pair(name, data));
-      return GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
-    }
-    return GraphicsObjectHandle();
-
+  }
+  // nothing suitable found, so we create a render target
+  return create_render_target(loc, width, height, depth_buffer, format, mip_maps, name);
 }
 
-GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool shader_resource, const char *name) {
-  return create_render_target(loc, width, height, true, true, DXGI_FORMAT_R32G32B32A32_FLOAT, name);
+void Graphics::release_temp_render_target(GraphicsObjectHandle h) {
+  auto rt = _render_targets.get(h);
+  assert(rt->in_use);
+  rt->in_use = false;
+  int idx = h.id();
+  string key = _render_targets._idx_to_key[idx];
+  _render_targets._idx_to_key.erase(idx);
+  _render_targets._key_to_idx.erase(key);
+}
+
+GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
+
+    unique_ptr<RenderTargetResource> data(new RenderTargetResource);
+    if (create_render_target(loc, width, height, depth_buffer, format, mip_maps, data.get())) {
+      int idx = !name.empty() ? _render_targets.idx_from_token(name) : -1;
+      if (idx != -1 || (idx = _render_targets.find_free_index()) != -1) {
+        if (_render_targets[idx])
+          _render_targets[idx]->reset();
+        _render_targets.set_pair(idx, make_pair(name, data.release()));
+        auto goh = make_goh(GraphicsObjectHandle::kRenderTarget, idx);
+        auto pid = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(name);
+        PROPERTY_MANAGER.set_property(pid, goh);
+        return goh;
+      }
+    }
+    return GraphicsObjectHandle();
 }
 
 bool Graphics::create_render_target(
-  const TrackedLocation &loc, int width, int height, bool shader_resource, bool depth_buffer, DXGI_FORMAT format, 
-  RenderTargetResource *out)
+  const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, RenderTargetResource *out)
 {
   out->reset();
 
   // create the render target
-  out->texture.desc = CD3D11_TEXTURE2D_DESC(format, width, height, 1, 1, 
-    D3D11_BIND_RENDER_TARGET | shader_resource * D3D11_BIND_SHADER_RESOURCE);
+  int mip_levels = mip_maps ? 0 : 1;
+  out->texture.desc = CD3D11_TEXTURE2D_DESC(format, width, height, 1, mip_levels,
+    D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
+  out->texture.desc.MiscFlags = mip_maps ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
   B_WRN_HR(_device->CreateTexture2D(&out->texture.desc, NULL, &out->texture.resource.p));
   set_private_data(loc, out->texture.resource.p);
 
@@ -172,12 +208,10 @@ bool Graphics::create_render_target(
     set_private_data(loc, out->dsv.resource.p);
   }
 
-  if (shader_resource) {
-    // create the shader resource view
-    out->srv.desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture.desc.Format);
-    B_WRN_HR(_device->CreateShaderResourceView(out->texture.resource, &out->srv.desc, &out->srv.resource.p));
-    set_private_data(loc, out->srv.resource.p);
-  }
+  // create the shader resource view
+  out->srv.desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture.desc.Format);
+  B_WRN_HR(_device->CreateShaderResourceView(out->texture.resource, &out->srv.desc, &out->srv.resource.p));
+  set_private_data(loc, out->srv.resource.p);
 
   return true;
 }
@@ -195,12 +229,12 @@ bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint3
   loadinfo.Usage = D3D11_USAGE_STAGING;
   loadinfo.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
   CComPtr<ID3D11Resource> resource;
-  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, &loadinfo, NULL, &resource.p, &hr);
+  D3DX11CreateTextureFromFile(_device, filename, &loadinfo, NULL, &resource.p, &hr);
   if (FAILED(hr))
     return false;
 
   D3D11_MAPPED_SUBRESOURCE sub;
-  if (FAILED(GRAPHICS.context()->Map(resource, 0, D3D11_MAP_READ, 0, &sub)))
+  if (FAILED(_immediate_context->Map(resource, 0, D3D11_MAP_READ, 0, &sub)))
     return false;
 
   uint8 *src = (uint8 *)sub.pData;
@@ -212,7 +246,7 @@ bool Graphics::read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint3
     memcpy(&dst[i*sub.RowPitch], &src[i*sub.RowPitch], row_size);
   }
 
-  GRAPHICS.context()->Unmap(resource, 0);
+  _immediate_context->Unmap(resource, 0);
   *pitch = sub.RowPitch;
   return true;
 }
@@ -233,7 +267,7 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
 
   auto *data = new SimpleResource();
   HRESULT hr;
-  D3DX11CreateTextureFromFile(GRAPHICS.device(), filename, NULL, NULL, &data->resource, &hr);
+  D3DX11CreateTextureFromFile(_device, filename, NULL, NULL, &data->resource, &hr);
   if (FAILED(hr)) {
     return GraphicsObjectHandle();
   }
@@ -533,19 +567,19 @@ GraphicsObjectHandle Graphics::create_static_index_buffer(const TrackedLocation 
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const D3D11_INPUT_ELEMENT_DESC *desc, int elems, const void *shader_bytecode, int len) {
+GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode) {
   const int idx = _input_layouts.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(desc, elems, shader_bytecode, len, &_input_layouts[idx])))
+  if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(&desc[0], desc.size(), &shader_bytecode[0], shader_bytecode.size(), &_input_layouts[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id) {
+GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
 
   int idx = _vertex_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _vertex_shaders.find_free_index()) != -1) {
     ID3D11VertexShader *vs = nullptr;
-    if (SUCCEEDED(_device->CreateVertexShader(shader_bytecode, len, NULL, &vs))) {
+    if (SUCCEEDED(_device->CreateVertexShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &vs))) {
       set_private_data(loc, vs);
       SAFE_RELEASE(_vertex_shaders[idx]);
       _vertex_shaders.set_pair(idx, make_pair(id, vs));
@@ -555,12 +589,12 @@ GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, 
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, void *shader_bytecode, int len, const string &id) {
+GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
 
   int idx = _pixel_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _pixel_shaders.find_free_index()) != -1) {
     ID3D11PixelShader *ps = nullptr;
-    if (SUCCEEDED(_device->CreatePixelShader(shader_bytecode, len, NULL, &ps))) {
+    if (SUCCEEDED(_device->CreatePixelShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &ps))) {
       set_private_data(loc, ps);
       SAFE_RELEASE(_pixel_shaders[idx]);
       _pixel_shaders.set_pair(idx, make_pair(id, ps));
@@ -842,9 +876,8 @@ GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx
 
 void Graphics::render() {
 
-  ID3D11DeviceContext *ctx = GRAPHICS.context();
-
-  ctx->RSSetViewports(1, &GRAPHICS.viewport());
+  ID3D11DeviceContext *ctx = _immediate_context;
+  ctx->RSSetViewports(1, &_viewport);
 
   // sort by keys (just using the depth)
   //stable_sort(begin(_render_commands), end(_render_commands), 
@@ -897,6 +930,17 @@ void Graphics::render() {
           num_targets = i;
         }
         ctx->OMSetRenderTargets(num_targets, rts, dsv);
+        break;
+      }
+
+      case RenderKey::kReleaseRenderTarget: {
+        release_temp_render_target(key.handle);
+        break;
+      }
+
+      case RenderKey::kGenerateMips: {
+        RenderTargetResource *rt = _render_targets.get(key.handle);
+        _immediate_context->GenerateMips(rt->srv.resource);
         break;
       }
 
@@ -1105,11 +1149,11 @@ void Graphics::submit_command(const TrackedLocation &location, RenderKey key, vo
   _render_commands.push_back(RenderCmd(location, key, data));
 }
 
-void Graphics::submit_technique(GraphicsObjectHandle technique, void *data) {
+void Graphics::submit_technique(const TrackedLocation &location, GraphicsObjectHandle technique, void *data) {
   RenderKey key;
   key.cmd = RenderKey::kRenderTechnique;
   key.handle = technique;
-  submit_command(FROM_HERE, key, data);
+  submit_command(location, key, data);
 }
 
 void Graphics::set_vs(GraphicsObjectHandle vs) {

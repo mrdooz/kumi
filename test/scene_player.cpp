@@ -59,17 +59,6 @@ bool ScenePlayer::init() {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
-  _rt_pos = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_pos");
-  _rt_normal = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_normal");
-  //_rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_diffuse");
-  _rt_diffuse = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R8G8B8A8_UNORM, "rt_diffuse");
-  _rt_specular = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_specular");
-
-  _rt_composite = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_composite");
-  _rt_blur = GRAPHICS.create_render_target(FROM_HERE, w, h, true, true, DXGI_FORMAT_R16G16B16A16_FLOAT, "rt_blur");
-
-  _rt_occlusion = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion");
-  _rt_occlusion_tmp = GRAPHICS.create_render_target(FROM_HERE, w, h, true, false, DXGI_FORMAT_R16_FLOAT, "rt_occlusion_tmp");
 
   // from http://www.john-chapman.net/content.php?id=8
   XMFLOAT4 kernel[KERNEL_SIZE];
@@ -92,6 +81,7 @@ bool ScenePlayer::init() {
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/luminance.tec", true));
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_ambient = GRAPHICS.find_technique("ssao_ambient");
   _ssao_light = GRAPHICS.find_technique("ssao_light");
@@ -99,6 +89,7 @@ bool ScenePlayer::init() {
   _ssao_blur = GRAPHICS.find_technique("ssao_blur");
   _default_shader = GRAPHICS.find_technique("default_shader");
   _gamma_correct = GRAPHICS.find_technique("gamma_correction");
+  _luminance_map = GRAPHICS.find_technique("luminance_map");
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
@@ -263,18 +254,41 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 bool ScenePlayer::render() {
 
   if (_scene) {
+
+    // allocate the required render targets
+
+    int w = GRAPHICS.width();
+    int h = GRAPHICS.height();
+
+    auto tmp_rt = [&](bool depth, DXGI_FORMAT fmt, bool mip_map, const string& name) {
+      return GRAPHICS.create_temp_render_target(FROM_HERE, w, h, depth, fmt, mip_map, name);
+    };
+
+    GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_pos");
+    GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_normal");
+    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, false, "System::rt_diffuse");
+    GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_specular");
+
+    GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_composite");
+    GraphicsObjectHandle rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_blur");
+
+    GraphicsObjectHandle rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion");
+    GraphicsObjectHandle rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion_tmp");
+
+    GraphicsObjectHandle rt_luminance = GRAPHICS.create_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
+
     {
       // Fill the g-buffer
       RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = _rt_pos;
-      data->render_targets[1] = _rt_normal;
-      data->render_targets[2] = _rt_diffuse;
-      data->render_targets[3] = _rt_specular;
+      data->render_targets[0] = rt_pos;
+      data->render_targets[1] = rt_normal;
+      data->render_targets[2] = rt_diffuse;
+      data->render_targets[3] = rt_specular;
       data->clear_target[0] = true;
       data->clear_target[1] = true;
       data->clear_target[2] = true;
       data->clear_target[3] = true;
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
 
       _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
     }
@@ -282,34 +296,32 @@ bool ScenePlayer::render() {
     {
       // Calc the occlusion
       RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = _rt_occlusion_tmp;
+      data->render_targets[0] = rt_occlusion_tmp;
       data->clear_target[0] = true;
 
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
-      GRAPHICS.submit_technique(_ssao_compute, nullptr);
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
+      GFX_SUBMIT_TECH(_ssao_compute, nullptr);
     }
 
     {
       // Blur the occlusion
       RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = _rt_occlusion;
+      data->render_targets[0] = rt_occlusion;
       data->clear_target[0] = true;
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), data);
-      GRAPHICS.submit_technique(_ssao_blur, nullptr);
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
+      GFX_SUBMIT_TECH(_ssao_blur, nullptr);
     }
 
     {
       // Render Ambient * occlusion
       RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
-      rt->render_targets[0] = _rt_composite;
+      rt->render_targets[0] = rt_composite;
       rt->clear_target[0] = true;
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), rt);
-
-      GRAPHICS.submit_technique(_ssao_ambient, nullptr);
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
+      GFX_SUBMIT_TECH(_ssao_ambient, nullptr);
     }
 
     {
-
       // Add the lighting
       int num_lights = (int)_scene->lights.size();
       int pos_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
@@ -370,16 +382,39 @@ bool ScenePlayer::render() {
         lightattend->end[i] = _scene->lights[i]->far_attenuation_end;
       }
 
-      GRAPHICS.submit_technique(_ssao_light, data);
+      GFX_SUBMIT_TECH(_ssao_light, data);
+    }
+
+    {
+      // calc luminance
+      RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
+      rt->render_targets[0] = rt_luminance;
+      rt->clear_target[0] = true;
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
+      GFX_SUBMIT_TECH(_luminance_map, nullptr);
+
+      // meh, this is getting stupid now.. the whole submit stuff is close to disappearing :P
+      // or, actually, I should move to using DX deferred contexts, because that's what I'm
+      // trying to emulate anyways..
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kGenerateMips, rt_luminance), nullptr);
     }
 
     {
       // gamma correction
-      GRAPHICS.submit_command(FROM_HERE, RenderKey(RenderKey::kSetRenderTarget), nullptr);
-      GRAPHICS.submit_technique(_gamma_correct, nullptr);
+      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), nullptr);
+      GFX_SUBMIT_TECH(_gamma_correct, nullptr);
     }
-  }
 
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_pos), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_normal), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_diffuse), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_specular), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_composite), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_blur), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_occlusion), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_occlusion_tmp), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_luminance), nullptr);
+  }
 
   return true;
 }

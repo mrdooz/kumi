@@ -231,6 +231,7 @@ technique gamma_correction {
         entry_point gamma_ps_main;
         params [
             texture2d rt_composite system;
+            texture2d rt_luminance system;
         ];
     };
    

@@ -192,7 +192,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
         inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, 0));
       }
 
-      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, &inputs[0], inputs.size(), obj.data(), obj.size());
+      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, inputs, obj);
       if (!_input_layout.is_valid()) {
         add_error_msg("Invalid input layout");
         return false;
@@ -220,14 +220,16 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           SparseUnknown &res = shader->_resource_views;
           res.first = min(bind_point, res.first);
           res.count = max(res.count, bind_point - res.first + 1);
-          res.res.resize(res.count);
+          res.res.resize(max(bind_point + 1, (int)res.res.size()));
           res.res[bind_point].source = param->source;
 
           // the system resource has already been created, so we can grab it's handle right now
+          string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
           if (param->source == PropertySource::kSystem) {
-            *res.res[bind_point].goh() = GRAPHICS.find_resource(name);
+            //GraphicsObjectHandle h = GRAPHICS.find_resource(name);
+            //assert(h.is_valid());
+            *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
           } else {
-            string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
             *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
           }
 
@@ -236,7 +238,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           auto &samplers = shader->_sampler_states;
           samplers.first = min(bind_point, samplers.first);
           samplers.count = max(samplers.count, bind_point - samplers.first + 1);
-          samplers.res.resize(samplers.count);
+          samplers.res.resize(max(bind_point+1, (int)samplers.res.size()));
           samplers.res[bind_point] = PROPERTY_MANAGER.get_or_create_placeholder(name);
         }
       }
@@ -417,11 +419,11 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
     switch (shader->type()) {
       case ShaderType::kVertexShader: 
-        shader->_handle = GRAPHICS.create_vertex_shader(FROM_HERE, buf.data(), len, obj);
+        shader->_handle = GRAPHICS.create_vertex_shader(FROM_HERE, buf, obj);
         _vertex_shaders.push_back(shader);
         break;
       case ShaderType::kPixelShader: 
-        shader->_handle = GRAPHICS.create_pixel_shader(FROM_HERE, buf.data(), len, obj);
+        shader->_handle = GRAPHICS.create_pixel_shader(FROM_HERE, buf, obj);
         _pixel_shaders.push_back(shader);
         break;
       case ShaderType::kGeometryShader: break;
@@ -463,24 +465,7 @@ bool Technique::init() {
       return false;
   }
 
-  prepare_textures();
-
   return true;
-}
-
-void Technique::prepare_textures() {
-  // TODO
-/*
-  auto &params = _pixel_shader->resource_view_params();
-  for (auto it = begin(params), e = end(params); it != e; ++it) {
-    auto &name = it->name;
-    auto &friendly_name = it->friendly_name;
-    int bind_point = it->bind_point;
-    _render_data.textures[bind_point] = GRAPHICS.find_resource(friendly_name.empty() ? name.c_str() : friendly_name.c_str());
-    _render_data.first_texture = min(_render_data.first_texture, bind_point);
-    _render_data.num_textures = max(_render_data.num_textures, bind_point - _render_data.first_texture + 1);
-  }
-*/
 }
 
 void Technique::fill_cbuffer(CBuffer *cbuffer) const {
@@ -506,8 +491,10 @@ void Technique::fill_resource_views(const SparseUnknown &props, std::vector<Grap
   out->resize(props.res.size());
 
   for (size_t i = 0; i < props.res.size(); ++i) {
-    if (props.res[i].source == PropertySource::kSystem) {
-      (*out)[i] = *props.res[i].goh();
+    auto &cur = props.res[i];
+    if (cur.source == PropertySource::kSystem) {
+      auto goh = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(*cur.pid());
+      (*out)[i] = goh;
     }
   }
 }

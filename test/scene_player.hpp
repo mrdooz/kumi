@@ -47,17 +47,6 @@ private:
   DWORD _mouse_pos_prev;
   int _keystate[256];
 
-  GraphicsObjectHandle _rt_pos;
-  GraphicsObjectHandle _rt_normal;
-  GraphicsObjectHandle _rt_diffuse;
-  GraphicsObjectHandle _rt_specular;
-  GraphicsObjectHandle _rt_occlusion_tmp;
-  GraphicsObjectHandle _rt_occlusion;
-
-  GraphicsObjectHandle _rt_blur;
-
-  GraphicsObjectHandle _rt_composite;
-
   GraphicsObjectHandle _default_shader;
   GraphicsObjectHandle _ssao_fill;
   GraphicsObjectHandle _ssao_compute;
@@ -65,6 +54,8 @@ private:
   GraphicsObjectHandle _ssao_ambient;
   GraphicsObjectHandle _ssao_light;
   GraphicsObjectHandle _gamma_correct;
+
+  GraphicsObjectHandle _luminance_map;
 
   PropertyId _kernel_id, _noise_id, _ambient_id;
 

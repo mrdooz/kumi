@@ -1,0 +1,220 @@
+technique luminance_map {
+    vertex_shader {
+        file effects/luminance.fx;
+        entry_point quad_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/luminance.fx;
+        entry_point luminance_map_ps_main;
+        params [
+            texture2d rt_composite system;
+        ];
+    };
+   
+  vertices { 
+    format pos_tex;
+    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+  };
+  
+  indices {
+    data [0 1 2 2 1 3];
+  };
+  
+  sampler_desc linear_sampler default {
+        filter = min_mag_linear_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+  
+  rasterizer_desc { cull_mode = none; };
+  depth_stencil_desc { depth_enable = false; };
+  
+  blend_desc {
+    render_target[0] = {
+      blend_enable = false;
+    };
+  };
+};
+
+
+technique threshold {
+    vertex_shader {
+        file effects/luminance.fx;
+        entry_point quad_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/luminance.fx;
+        entry_point threshold_ps_main;
+        params [
+            texture2d rt_luminance system;
+            texture2d rt_composite system;
+        ];
+    };
+   
+  vertices { 
+    format pos_tex;
+    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+  };
+  
+  indices {
+    data [0 1 2 2 1 3];
+  };
+  
+  sampler_desc linear_sampler default {
+        filter = min_mag_linear_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+
+  sampler_desc point_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+  
+  rasterizer_desc { cull_mode = none; };
+  depth_stencil_desc { depth_enable = false; };
+  
+  blend_desc {
+    render_target[0] = {
+      blend_enable = false;
+    };
+  };
+};
+
+technique scale {
+    vertex_shader {
+        file effects/luminance.fx;
+        entry_point quad_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/luminance.fx;
+        entry_point scale_ps_main;
+        params [
+            texture2d rt_luminance system;
+        ];
+    };
+   
+  vertices { 
+    format pos_tex;
+    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+  };
+  
+  indices {
+    data [0 1 2 2 1 3];
+  };
+  
+  sampler_desc linear_sampler default {
+        filter = min_mag_linear_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+
+  sampler_desc point_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+  
+  rasterizer_desc { cull_mode = none; };
+  depth_stencil_desc { depth_enable = false; };
+  
+  blend_desc {
+    render_target[0] = {
+      blend_enable = false;
+    };
+  };
+};
+
+technique blur_h {
+    vertex_shader {
+        file effects/luminance.fx;
+        entry_point quad_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/luminance.fx;
+        entry_point blur_h_ps_main;
+        params [
+            texture2d rt_luminance system;
+        ];
+    };
+   
+  vertices { 
+    format pos_tex;
+    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+  };
+  
+  indices {
+    data [0 1 2 2 1 3];
+  };
+  
+  sampler_desc linear_sampler default {
+        filter = min_mag_linear_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+
+  sampler_desc point_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+  
+  rasterizer_desc { cull_mode = none; };
+  depth_stencil_desc { depth_enable = false; };
+  
+  blend_desc {
+    render_target[0] = {
+      blend_enable = false;
+    };
+  };
+};
+
+technique blur_v {
+    vertex_shader {
+        file effects/luminance.fx;
+        entry_point quad_vs_main;
+    };
+    
+    pixel_shader {
+        file effects/luminance.fx;
+        entry_point blur_v_ps_main;
+        params [
+            texture2d rt_luminance system;
+        ];
+    };
+   
+  vertices { 
+    format pos_tex;
+    data [ -1 +1 +1 +0 +0; +1 +1 +1 +1 +0; -1 -1 +1 +0 +1; +1 -1 +1 +1 +1; ];
+  };
+  
+  indices {
+    data [0 1 2 2 1 3];
+  };
+  
+  sampler_desc linear_sampler default {
+        filter = min_mag_linear_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+
+  sampler_desc point_sampler default {
+        filter = min_mag_mip_point;
+        address_u = clamp;
+        address_v = clamp;
+  };
+  
+  rasterizer_desc { cull_mode = none; };
+  depth_stencil_desc { depth_enable = false; };
+  
+  blend_desc {
+    render_target[0] = {
+      blend_enable = false;
+    };
+  };
+};

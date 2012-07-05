@@ -266,10 +266,11 @@ float4 light_ps_main(light_ps_input input) : SV_Target
 
 
 ///////////////////////////////////
-// Gamma correct
+// Gamma correction
 ///////////////////////////////////
 
 Texture2D rt_composite : register(t0);
+Texture2D rt_luminance : register(t1);
 
 struct gamma_vs_input {
     float4 pos : SV_POSITION;
@@ -291,6 +292,7 @@ gamma_ps_input gamma_vs_main(gamma_vs_input input)
 
 float4 gamma_ps_main(gamma_ps_input input) : SV_Target
 {
+  float ll = exp(rt_luminance.SampleLevel(ssao_sampler, input.tex, 10.0));
   //float2 vtc = float2( input.tex - 0.5 );
   //float vignette = pow( 1 - ( dot( vtc, vtc ) * 1.0 ), 2.0 );
   float4 g = pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
@@ -299,7 +301,7 @@ float4 gamma_ps_main(gamma_ps_input input) : SV_Target
   //float4 exposed = 1.0 - pow( 2.71, -( vignette * g * exposure ) );
   //return exposed;
   
-  return g;
-  return float4(max(0, g.r - 1), max(0, g.g - 1), max(0, g.b - 1), 1);
+  //return g;
+  return float4(max(0, g.r - ll), max(0, g.g - ll), max(0, g.b - ll), 1);
   //return pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
 }
