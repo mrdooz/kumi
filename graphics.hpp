@@ -111,7 +111,7 @@ public:
   GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
   GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
-  GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc);
+  GraphicsObjectHandle create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc);
 
 #if WITH_GWEN
   GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
@@ -146,10 +146,9 @@ public:
   bool load_techniques(const char *filename, bool add_materials);
   Technique *get_technique(GraphicsObjectHandle h);
   GraphicsObjectHandle find_technique(const char *name);
-  void get_technique_states(const char *technique, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss);
   GraphicsObjectHandle find_input_layout(const std::string &technique_name);
   GraphicsObjectHandle find_resource(const std::string &name);
-  GraphicsObjectHandle find_sampler_state(const std::string &name);
+  GraphicsObjectHandle find_sampler(const std::string &name);
 
   HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
   HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
@@ -219,7 +218,7 @@ private:
   void set_rs(GraphicsObjectHandle rs);
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
-  void set_samplers(const GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers);
+  void set_samplers(const std::vector<GraphicsObjectHandle > &samplers);
   void set_shader_resources(const GraphicsObjectHandle *view_handles, int first_view, int num_views);
   void unset_shader_resource(int first_view, int num_views);
   void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps);

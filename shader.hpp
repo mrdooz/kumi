@@ -37,8 +37,7 @@ class Shader {
   friend class Technique;
 public:
 
-  Shader(ShaderType::Enum type) : _type(type), _valid(false) {}
-  virtual ~Shader() {}
+  Shader(ShaderType::Enum type);
 
   ShaderType::Enum type() const { return _type; }
   bool is_valid() const { return _valid; }
@@ -48,12 +47,11 @@ public:
 
   void prepare_cbuffers();
 
-  std::vector<CBuffer> &get_cbuffers() { return _cbuffers; }
+  std::vector<CBuffer> &cbuffers() { return _cbuffers; }
+  const std::vector<GraphicsObjectHandle> &samplers() { return _samplers; }
+  const SparseUnknown &resource_views() const { return _resource_views; }
 
   bool on_loaded();
-
-  const SparseProperty &samplers() const;
-  const SparseUnknown &resource_views() const;
 
 private:
 
@@ -69,5 +67,7 @@ private:
   ShaderType::Enum _type;
 
   SparseUnknown _resource_views;
-  SparseProperty _sampler_states;
+  //SparseProperty _sampler_states;
+
+  std::vector<GraphicsObjectHandle> _samplers;
 };

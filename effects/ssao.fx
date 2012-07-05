@@ -10,7 +10,7 @@ static const float InvGamma = 1/Gamma;
 
 #if DIFFUSE_TEXTURE
 Texture2D DiffuseTexture : register(t0);
-sampler DiffuseSampler : register(s0);
+sampler LinearSampler : register(s0);
 #endif
 
 
@@ -55,7 +55,7 @@ fill_ps_output fill_ps_main(fill_ps_input input)
     output.rt_normal = normalize(input.vs_normal);
   #if DIFFUSE_TEXTURE
     // convert to linear space
-    output.rt_diffuse = pow(DiffuseTexture.Sample(DiffuseSampler, input.tex), Gamma);
+    output.rt_diffuse = pow(DiffuseTexture.Sample(LinearSampler, input.tex), Gamma);
   #else
     output.rt_diffuse = Diffuse;
   #endif
@@ -72,7 +72,7 @@ Texture2D rt_pos : register(t0);
 Texture2D rt_normal : register(t1);
 Texture2D rt_diffuse : register(t2);
 Texture2D rt_specular : register(t3);
-sampler ssao_sampler : register(s0);
+sampler PointSampler : register(s0);
 
 float4 kernel[32];
 float4 noise[16];
@@ -97,8 +97,8 @@ render_ps_input render_vs_main(render_vs_input input)
 
 float render_ps_main(render_ps_input input) : SV_Target
 {
-    float3 origin = rt_pos.Sample(ssao_sampler, input.tex).xyz;
-    float3 normal = rt_normal.Sample(ssao_sampler, input.tex).xyz;
+    float3 origin = rt_pos.Sample(PointSampler, input.tex).xyz;
+    float3 normal = rt_normal.Sample(PointSampler, input.tex).xyz;
    
     // tile the noise in a 4x4 grid
     int x = (int)(ScreenWidth * input.tex.x);
@@ -130,7 +130,7 @@ float render_ps_main(render_ps_input input) : SV_Target
         offset.xy = offset.xy * 0.5 + 0.5; // to texture coords
         offset.y = 1 - offset.y;
         
-        float sample_depth = rt_pos.Sample(ssao_sampler, offset.xy).z;
+        float sample_depth = rt_pos.Sample(PointSampler, offset.xy).z;
 
         // check for big discontinuities in z
         float range_check = abs(origin.z - sample_depth) < radius ? 1.0 : 0.0;
@@ -170,7 +170,7 @@ float blur_ps_main(blur_ps_input input) : SV_Target
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             float2 ofs = float2(1/ScreenWidth * j, 1/ScreenHeight*i);
-            res += rt_occlusion_tmp.Sample(ssao_sampler, input.tex + ofs).r;
+            res += rt_occlusion_tmp.Sample(PointSampler, input.tex + ofs).r;
         }
     }
     float occ = res / 16.0;
@@ -181,7 +181,7 @@ float blur_ps_main(blur_ps_input input) : SV_Target
 // Render ambient * occlusion
 ///////////////////////////////////
 
-Texture2D rt_occlusion : register(t0);
+Texture2D rt_occlusion;
 float4 Ambient;
 
 struct ambient_vs_input {
@@ -204,7 +204,7 @@ ambient_ps_input ambient_vs_main(ambient_vs_input input)
 
 float4 ambient_ps_main(ambient_ps_input input) : SV_Target
 {
-  return Ambient * rt_occlusion.Sample(ssao_sampler, input.tex).r;
+  return Ambient * rt_occlusion.Sample(PointSampler, input.tex).r;
 }
 
 ///////////////////////////////////
@@ -233,10 +233,10 @@ light_ps_input light_vs_main(light_vs_input input)
 
 float4 light_ps_main(light_ps_input input) : SV_Target
 {
-    float3 pos = rt_pos.Sample(ssao_sampler, input.tex).xyz;
-    float3 normal = normalize(rt_normal.Sample(ssao_sampler, input.tex).xyz);
-    float4 diffuse = rt_diffuse.Sample(ssao_sampler, input.tex);
-    float4 st = rt_specular.Sample(ssao_sampler, input.tex);
+    float3 pos = rt_pos.Sample(PointSampler, input.tex).xyz;
+    float3 normal = normalize(rt_normal.Sample(PointSampler, input.tex).xyz);
+    float4 diffuse = rt_diffuse.Sample(PointSampler, input.tex);
+    float4 st = rt_specular.Sample(PointSampler, input.tex);
     float3 specular = st.rgb;
     float shininess = st.a;
     float3 lp = LightPos.xyz;
@@ -269,8 +269,10 @@ float4 light_ps_main(light_ps_input input) : SV_Target
 // Gamma correction
 ///////////////////////////////////
 
-Texture2D rt_composite : register(t0);
-Texture2D rt_luminance : register(t1);
+//Texture2D rt_composite : register(t0);
+//Texture2D rt_luminance : register(t1);
+Texture2D rt_composite;
+Texture2D rt_luminance;
 
 struct gamma_vs_input {
     float4 pos : SV_POSITION;
@@ -292,10 +294,10 @@ gamma_ps_input gamma_vs_main(gamma_vs_input input)
 
 float4 gamma_ps_main(gamma_ps_input input) : SV_Target
 {
-  float ll = exp(rt_luminance.SampleLevel(ssao_sampler, input.tex, 10.0));
+  float ll = exp(rt_luminance.SampleLevel(PointSampler, input.tex, 10.0));
   //float2 vtc = float2( input.tex - 0.5 );
   //float vignette = pow( 1 - ( dot( vtc, vtc ) * 1.0 ), 2.0 );
-  float4 g = pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
+  float4 g = pow(rt_composite.Sample(PointSampler, input.tex), InvGamma);
  
   //float exposure = 2.0;
   //float4 exposed = 1.0 - pow( 2.71, -( vignette * g * exposure ) );
@@ -303,5 +305,5 @@ float4 gamma_ps_main(gamma_ps_input input) : SV_Target
   
   //return g;
   return float4(max(0, g.r - ll), max(0, g.g - ll), max(0, g.b - ll), 1);
-  //return pow(rt_composite.Sample(ssao_sampler, input.tex), InvGamma);
+  //return pow(rt_composite.Sample(PointSampler, input.tex), InvGamma);
 }

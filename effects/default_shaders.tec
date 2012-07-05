@@ -1,3 +1,9 @@
+sampler_desc diffuse_sampler {
+      filter = min_mag_mip_linear;
+      address_u = clamp;
+      address_v = clamp;
+};
+
 technique default_shader {
     
     vertex_shader {
@@ -35,10 +41,5 @@ technique default_shader {
             blend_enable = false;
         };
     };
-    
-    sampler_desc diffuse_sampler {
-        filter = min_mag_mip_linear;
-        address_u = clamp;
-        address_v = clamp;
-    };
+   
 };

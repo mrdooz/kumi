@@ -674,14 +674,19 @@ GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation 
   return GraphicsObjectHandle();
 }
 
-GraphicsObjectHandle Graphics::create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc) {
+GraphicsObjectHandle Graphics::create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc) {
+  // TODO: skip finding duplicates for now, until we've sorted out the whole naming issue..
+/*
   int idx = find_existing(desc, _sampler_states);
   if (idx != -1)
     return make_goh(GraphicsObjectHandle::kSamplerState, idx);
-
-  idx = _sampler_states.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_sampler_states[idx])))
+*/
+  int idx = _sampler_states.find_free_index();
+  ID3D11SamplerState *ss;
+  if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &ss))) {
+    _sampler_states.set_pair(idx, make_pair(name, ss));
     return make_goh(GraphicsObjectHandle::kSamplerState, idx);
+  }
   return GraphicsObjectHandle();
 }
 
@@ -831,15 +836,7 @@ GraphicsObjectHandle Graphics::find_technique(const char *name) {
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::get_technique_states(const char *name, GraphicsObjectHandle *rs, GraphicsObjectHandle *bs, GraphicsObjectHandle *dss) {
-  if (Technique *technique = _techniques.find(name, (Technique *)NULL)) {
-    if (rs) *rs = technique->rasterizer_state();
-    if (bs) *bs = technique->blend_state();
-    if (dss) *dss = technique->depth_stencil_state();
-  }
-}
-
-GraphicsObjectHandle Graphics::find_sampler_state(const std::string &name) {
+GraphicsObjectHandle Graphics::find_sampler(const std::string &name) {
   int idx = _sampler_states.idx_from_token(name);
   return make_goh(GraphicsObjectHandle::kSamplerState, idx);
 }
@@ -934,7 +931,6 @@ void Graphics::render() {
   //stable_sort(begin(_render_commands), end(_render_commands), 
 //    [&](const RenderCmd &a, const RenderCmd &b) { return (a.key.data & 0xffff000000000000) < (b.key.data & 0xffff000000000000); });
 
-  //RenderObjects objects;
   Technique *prev_technique = nullptr;
 
   for (auto it = begin(_render_commands), e = end(_render_commands); it != e; ++it) {
@@ -1020,14 +1016,14 @@ void Graphics::render() {
         set_bs(technique->blend_state(), default_blend_factors(), default_sample_mask());
 
         // set cbuffers
-        auto &vs_cbuffers = vs->get_cbuffers();
+        auto &vs_cbuffers = vs->cbuffers();
         for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&vs_cbuffers[i]);
           material->fill_cbuffer(&vs_cbuffers[i]);
           technique->fill_cbuffer(&vs_cbuffers[i]);
         }
 
-        auto &ps_cbuffers = ps->get_cbuffers();
+        auto &ps_cbuffers = ps->cbuffers();
         for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
           mesh->fill_cbuffer(&ps_cbuffers[i]);
           material->fill_cbuffer(&ps_cbuffers[i]);
@@ -1037,10 +1033,8 @@ void Graphics::render() {
 
         // set samplers
         auto &samplers = ps->samplers();
-        if (samplers.count > 0) {
-          vector<GraphicsObjectHandle> ss;
-          technique->fill_samplers(samplers, &ss);
-          set_samplers(&ss[0], samplers.first, samplers.count);
+        if (!samplers.empty()) {
+          set_samplers(samplers);
         }
 
         // set resource views
@@ -1080,10 +1074,8 @@ void Graphics::render() {
 
         // set samplers
         auto &samplers = ps->samplers();
-        if (samplers.count > 0) {
-          vector<GraphicsObjectHandle> ss;
-          technique->fill_samplers(samplers, &ss);
-          set_samplers(&ss[0], samplers.first, samplers.count);
+        if (!samplers.empty()) {
+          set_samplers(ps->samplers());
         }
 
         // set resource views
@@ -1099,12 +1091,12 @@ void Graphics::render() {
           for (int ii = 0; ii < rd2->num_instances; ++ii) {
 
             // set cbuffers
-            auto &vs_cbuffers = vs->get_cbuffers();
+            auto &vs_cbuffers = vs->cbuffers();
             for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
               technique->fill_cbuffer(&vs_cbuffers[i]);
             }
 
-            auto &ps_cbuffers = ps->get_cbuffers();
+            auto &ps_cbuffers = ps->cbuffers();
             for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
               technique->fill_cbuffer(&ps_cbuffers[i]);
 
@@ -1130,12 +1122,12 @@ void Graphics::render() {
 
         } else {
           // set cbuffers
-          auto &vs_cbuffers = vs->get_cbuffers();
+          auto &vs_cbuffers = vs->cbuffers();
           for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
             technique->fill_cbuffer(&vs_cbuffers[i]);
           }
 
-          auto &ps_cbuffers = ps->get_cbuffers();
+          auto &ps_cbuffers = ps->cbuffers();
           for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
             technique->fill_cbuffer(&ps_cbuffers[i]);
           }
@@ -1270,17 +1262,23 @@ void Graphics::set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT 
   }
 }
 
-void Graphics::set_samplers(const GraphicsObjectHandle *sampler_handles, int first_sampler, int num_samplers) {
-  if (!num_samplers)
-    return;
-  if (memcmp(sampler_handles, prev_samplers, num_samplers * sizeof(GraphicsObjectHandle))) {
-    ID3D11SamplerState *samplers[MAX_SAMPLERS];
-    for (int i = 0; i < num_samplers; ++i) {
-      samplers[i] = _sampler_states.get(sampler_handles[i]);
+void Graphics::set_samplers(const std::vector<GraphicsObjectHandle > &samplers) {
+  int size = samplers.size() * sizeof(GraphicsObjectHandle);
+  if (memcmp(samplers.data(), prev_samplers, size)) {
+    int first_sampler = MAX_SAMPLERS, num_samplers = 0;
+    ID3D11SamplerState *d3dsamplers[MAX_SAMPLERS];
+    for (int i = 0; i < MAX_SAMPLERS; ++i) {
+      if (samplers[i].is_valid()) {
+        d3dsamplers[i] = _sampler_states.get(samplers[i]);
+        first_sampler = min(first_sampler, i);
+        num_samplers = i - first_sampler + 1;
+      }
     }
 
-    _immediate_context->PSSetSamplers(first_sampler, num_samplers, samplers);
-    memcpy(prev_samplers, sampler_handles, num_samplers * sizeof(GraphicsObjectHandle));
+    if (num_samplers) {
+      _immediate_context->PSSetSamplers(first_sampler, num_samplers, d3dsamplers);
+      memcpy(prev_samplers, samplers.data(), size);
+    }
   }
 }
 

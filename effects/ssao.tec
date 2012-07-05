@@ -28,6 +28,18 @@ blend_desc BlendOneOne {
   };
 };
 
+sampler_desc PointSampler {
+  filter = min_mag_mip_point;
+  address_u = clamp;
+  address_v = clamp;
+};
+
+sampler_desc LinearSampler {
+  filter = min_mag_mip_linear;
+  address_u = clamp;
+  address_v = clamp;
+};
+
 technique ssao_fill {
     
     vertex_shader {
@@ -52,8 +64,6 @@ technique ssao_fill {
         flags [ DIFFUSE_TEXTURE ];
     };
 
-    sampler_desc DiffuseSampler default {};
-    
     rasterizer_desc = BackfaceCulling;
     depth_stencil_desc = DepthEnable;
     blend_desc = BlendDisable;
@@ -81,12 +91,6 @@ technique ssao_compute {
    
   geometry = fs_quad_postex;
   
-  sampler_desc ssao_sampler default {
-        filter = min_mag_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-  };
-  
   rasterizer_desc = NoCulling;
   depth_stencil_desc = DepthDisable;
   blend_desc = BlendDisable;
@@ -108,12 +112,6 @@ technique ssao_blur {
     };
    
   geometry = fs_quad_postex;
-  
-  sampler_desc ssao_sampler default {
-        filter = min_mag_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-  };
   
   rasterizer_desc = NoCulling;
   depth_stencil_desc = DepthDisable;
@@ -137,12 +135,6 @@ technique ssao_ambient {
     };
    
   geometry = fs_quad_postex;
-  
-  sampler_desc ssao_sampler default {
-        filter = min_mag_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-  };
   
   rasterizer_desc = NoCulling;
   depth_stencil_desc = DepthDisable;
@@ -173,12 +165,6 @@ technique ssao_light {
    
   geometry = fs_quad_postex;
   
-  sampler_desc ssao_sampler default {
-        filter = min_mag_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-  };
-  
   rasterizer_desc = NoCulling; 
   depth_stencil_desc = DepthDisable;
   blend_desc = BlendOneOne;
@@ -202,12 +188,6 @@ technique gamma_correction {
    
   geometry = fs_quad_postex;
    
-  sampler_desc ssao_sampler default {
-        filter = min_mag_mip_point;
-        address_u = clamp;
-        address_v = clamp;
-  };
-  
   rasterizer_desc = NoCulling;
   depth_stencil_desc = DepthDisable;
   blend_desc = BlendDisable;

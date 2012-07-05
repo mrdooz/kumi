@@ -234,22 +234,16 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           }
 
         } else if (type == "sampler") {
-
-          auto &samplers = shader->_sampler_states;
-          samplers.first = min(bind_point, samplers.first);
-          samplers.count = max(samplers.count, bind_point - samplers.first + 1);
-          samplers.res.resize(max(bind_point+1, (int)samplers.res.size()));
-          samplers.res[bind_point] = PROPERTY_MANAGER.get_or_create_placeholder(name);
+          GraphicsObjectHandle sampler = GRAPHICS.find_sampler(name);
+          assert(sampler.is_valid());
+          shader->_samplers[bind_point] = sampler;
+          //shader->_first_sampler = min(shader->_first_sampler, bind_point);
         }
       }
     }
   }
 
   return true;
-}
-
-GraphicsObjectHandle Technique::cbuffer_handle() {
-  return _constant_buffers.empty() ? GraphicsObjectHandle() : _constant_buffers[0].handle;
 }
 
 bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const vector<string> &flags) {
@@ -443,11 +437,12 @@ bool Technique::init() {
     _depth_stencil_state = GRAPHICS.default_depth_stencil_state();
 
   // create all the sampler states from the descs
+/*
   for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
     PropertyId id = PROPERTY_MANAGER.get_or_create_placeholder(i->first);
     _sampler_states.push_back(make_pair(id, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
   }
-
+*/
   // create the shaders from the templates
   if (_vs_shader_template) {
     if (!create_shaders(_vs_shader_template))
@@ -478,7 +473,7 @@ void Technique::fill_cbuffer(CBuffer *cbuffer) const {
     PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }
-
+/*
 void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) const {
   out->resize(input.res.size());
   for (size_t i = 0; i < input.res.size(); ++i) {
@@ -489,7 +484,7 @@ void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsO
     }
   }
 }
-
+*/
 void Technique::fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const {
 
   out->resize(props.res.size());

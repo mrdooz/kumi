@@ -12,6 +12,7 @@
 
 using namespace std;
 using namespace boost::assign;
+using namespace tr1::placeholders;
 
 struct parser_exception : public exception {
   parser_exception(const string& str) : str(str) {}
@@ -1188,11 +1189,10 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         break;
       }
 
+      // sampler descs don't belong in the technique..
+/*
       case kSymSamplerDesc: {
         string name = scope->next_identifier();
-        if (scope->consume_if(kSymDefault)) {
-          technique->_default_sampler_state = name;
-        }
         scope->munch(kSymBlockOpen);
 
         CD3D11_SAMPLER_DESC desc;
@@ -1201,7 +1201,7 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         scope->munch(kSymBlockClose).munch(kSymSemicolon);
         break;
       }
-
+*/
 
       case kSymVertices:
         scope->munch(kSymBlockOpen);
@@ -1230,6 +1230,23 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
   }
 }
 
+template<typename Desc>
+void parse_standalone_desc(Scope *scope,
+                           function<void(Scope *, Desc *)> parser,
+                           function<GraphicsObjectHandle(Desc)> creator,
+                           map<string, GraphicsObjectHandle> *states) {
+  string name;
+  scope->next_identifier(&name).munch(kSymBlockOpen);
+  auto it = states->find(name);
+  if (states->find(name) != states->end()) {
+    LOG_WARNING_LN("Duplicate state found: %s", name.c_str());
+  }
+  Desc desc;
+  parser(scope, &desc);
+  scope->munch(kSymBlockClose).munch(kSymSemicolon);
+  (*states)[name] = creator(desc);
+}
+
 bool TechniqueParser::parse() {
 
   try {
@@ -1243,46 +1260,43 @@ bool TechniqueParser::parse() {
           string name;
           break;
         }
-        
+
+       
         case kSymRasterizerDesc: {
-          string name;
-          scope.next_identifier(&name).munch(kSymBlockOpen);
-          auto it = _result->rasterizer_states.find(name);
-          if (_result->rasterizer_states.find(name) != _result->rasterizer_states.end()) {
-            LOG_WARNING_LN("Duplicate rasterizer state found: %s", name.c_str());
-          }
-          CD3D11_RASTERIZER_DESC desc;
-          parse_rasterizer_desc(&scope, &desc);
-          scope.munch(kSymBlockClose).munch(kSymSemicolon);
-          _result->rasterizer_states[name] = GRAPHICS.create_rasterizer_state(FROM_HERE, desc);
+          parse_standalone_desc<CD3D11_RASTERIZER_DESC>(&scope,
+            bind(&TechniqueParser::parse_rasterizer_desc, this, _1, _2),
+            bind(&Graphics::create_rasterizer_state, &GRAPHICS, FROM_HERE, _1),
+            &_result->rasterizer_states);
           break;
         }
 
         case kSymDepthStencilDesc: {
-          string name;
-          scope.next_identifier(&name).munch(kSymBlockOpen);
-          auto it = _result->depth_stencil_states.find(name);
-          if (_result->depth_stencil_states.find(name) != _result->depth_stencil_states.end()) {
-            LOG_WARNING_LN("Duplicate depth/stencil state found: %s", name.c_str());
-          }
-          CD3D11_DEPTH_STENCIL_DESC desc;
-          parse_depth_stencil_desc(&scope, &desc);
-          scope.munch(kSymBlockClose).munch(kSymSemicolon);
-          _result->depth_stencil_states[name] = GRAPHICS.create_depth_stencil_state(FROM_HERE, desc);
+          parse_standalone_desc<CD3D11_DEPTH_STENCIL_DESC>(&scope, 
+            bind(&TechniqueParser::parse_depth_stencil_desc, this, _1, _2),
+            bind(&Graphics::create_depth_stencil_state, &GRAPHICS, FROM_HERE, _1),
+            &_result->depth_stencil_states);
           break;
         }
 
         case kSymBlendDesc: {
+          parse_standalone_desc<CD3D11_BLEND_DESC>(&scope, 
+            bind(&TechniqueParser::parse_blend_desc, this, _1, _2),
+            bind(&Graphics::create_blend_state, &GRAPHICS, FROM_HERE, _1),
+            &_result->blend_states);
+          break;
+        }
+
+        case kSymSamplerDesc: {
           string name;
           scope.next_identifier(&name).munch(kSymBlockOpen);
-          auto it = _result->blend_states.find(name);
-          if (_result->blend_states.find(name) != _result->blend_states.end()) {
-            LOG_WARNING_LN("Duplicate blend state found: %s", name.c_str());
+          auto it = _result->sampler_states.find(name);
+          if (_result->sampler_states.find(name) != _result->sampler_states.end()) {
+            LOG_WARNING_LN("Duplicate state found: %s", name.c_str());
           }
-          CD3D11_BLEND_DESC desc;
-          parse_blend_desc(&scope, &desc);
+          CD3D11_SAMPLER_DESC desc;
+          parse_sampler_desc(&scope, &desc);
           scope.munch(kSymBlockClose).munch(kSymSemicolon);
-          _result->blend_states[name] = GRAPHICS.create_blend_state(FROM_HERE, desc);
+          _result->sampler_states[name] = GRAPHICS.create_sampler(FROM_HERE, name, desc);
           break;
         }
 
