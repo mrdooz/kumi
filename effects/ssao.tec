@@ -43,7 +43,6 @@ technique ssao_compute {
             float4x4 proj system;
             texture2d rt_pos system;
             texture2d rt_normal system;
-            texture2d random_normals system;
             float4[32] kernel system;
             float4[16] noise system;
         ];

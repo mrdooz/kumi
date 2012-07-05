@@ -29,7 +29,10 @@ struct MeshRenderData {
 #endif
 };
 
-struct TechniqueRenderData2 {
+struct TechniqueRenderData {
+  TechniqueRenderData() : user_textures(0), num_instances(0), num_instance_variables(0) {}
+  int user_textures;
+  GraphicsObjectHandle textures[MAX_TEXTURES];
   int num_instances;
   int num_instance_variables;
 #pragma warning(suppress: 4200)
@@ -37,16 +40,6 @@ struct TechniqueRenderData2 {
   // followed by instance variables of the form
   // PropertyId id;
   // T t[num_instance_variables]; // value per instance
-};
-
-
-struct TechniqueRenderData {
-  TechniqueRenderData() : cbuffer_staged(nullptr), cbuffer_len(0), first_texture(MAX_TEXTURES), num_textures(0) {}
-  void *cbuffer_staged;
-  int cbuffer_len;
-  GraphicsObjectHandle textures[MAX_SAMPLERS];
-  int first_texture;
-  int num_textures;
 };
 
 struct BufferRenderData {

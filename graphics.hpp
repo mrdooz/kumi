@@ -163,8 +163,8 @@ public:
 
   // Rendering related
   template <typename T>
-  T *alloc_command_data() {
-    void *t = alloc_command_data_raw(sizeof(T));
+  T *alloc_command_data(int payload_size = 0) {
+    void *t = alloc_command_data_raw(sizeof(T) + payload_size);
     T *tt = new (t)T();
     return tt;
   }

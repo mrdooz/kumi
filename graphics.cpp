@@ -1053,8 +1053,7 @@ void Graphics::render() {
 
       case RenderKey::kRenderTechnique: {
         Technique *technique = _techniques.get(key.handle);
-        const TechniqueRenderData *render_data = &technique->render_data();
-        const TechniqueRenderData2 *rd2 = (const TechniqueRenderData2 *)data;
+        const TechniqueRenderData *rd = (const TechniqueRenderData *)data;
 
         Shader *vs = technique->vertex_shader(0);
         Shader *ps = technique->pixel_shader(0);
@@ -1085,8 +1084,8 @@ void Graphics::render() {
         }
 
         // Check if we're drawing instanced
-        if (rd2) {
-          for (int ii = 0; ii < rd2->num_instances; ++ii) {
+        if (rd) {
+          for (int ii = 0; ii < rd->num_instances; ++ii) {
 
             // set cbuffers
             auto &vs_cbuffers = vs->cbuffers();
@@ -1102,15 +1101,15 @@ void Graphics::render() {
                 auto &var = ps_cbuffers[i].instance_vars[j];
 
                 int ofs = 0;
-                for (int k = 0; k < rd2->num_instance_variables; ++k) {
-                  PropertyId id = *(PropertyId *)&rd2->payload[ofs + 0];
-                  int len = *(int *)&rd2->payload[ofs + 4];
-                  const void *data = &rd2->payload[ofs + 8 + ii * len];
+                for (int k = 0; k < rd->num_instance_variables; ++k) {
+                  PropertyId id = *(PropertyId *)&rd->payload[ofs + 0];
+                  int len = *(int *)&rd->payload[ofs + 4];
+                  const void *data = &rd->payload[ofs + 8 + ii * len];
                   if (id == var.id) {
                     memcpy(&ps_cbuffers[i].staging[var.ofs], data, var.len);
                     break;
                   }
-                  ofs += sizeof(PropertyId) + sizeof(int) + len * rd2->num_instances;
+                  ofs += sizeof(PropertyId) + sizeof(int) + len * rd->num_instances;
                 }
               }
             }

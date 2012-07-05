@@ -115,15 +115,8 @@ public:
   bool is_valid() const { return _valid; }
   const std::string &error_msg() const { return _error_msg; }
 
-  //const std::string &get_default_sampler_state() const { return _default_sampler_state; }
-  const TechniqueRenderData &render_data() const { return _render_data; }
-
-  //void fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) const;
   void fill_cbuffer(CBuffer *cbuffer) const;
   void fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const;
-
-  //const std::vector<uint8> &cbuffer() const { return _cbuffer_staged; }
-  //GraphicsObjectHandle cbuffer_handle();
 
 private:
 
@@ -134,7 +127,6 @@ private:
   bool do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const std::vector<char> &obj);
 
   std::vector<CBufferVariable> _cbuffer_vars;
-  //std::vector<uint8> _cbuffer_staged;
 
   std::string _name;
   // we have multiple version of the shaders, one for each permutation of the compilation flags
@@ -143,23 +135,15 @@ private:
 
   GraphicsObjectHandle _input_layout;
 
-  std::vector<CBuffer> _constant_buffers;
-
   int _vertex_size;
-  //vector<float> _vertices;
   DXGI_FORMAT _index_format;
   int _index_count;
-  //vector<int> _indices;
   GraphicsObjectHandle _vb;
   GraphicsObjectHandle _ib;
 
-  //std::string _default_sampler_state;
   GraphicsObjectHandle _rasterizer_state;
-  //std::vector<std::pair<PropertyId, GraphicsObjectHandle> > _sampler_states;
   GraphicsObjectHandle _blend_state;
   GraphicsObjectHandle _depth_stencil_state;
-
-  //std::vector<std::pair<std::string, CD3D11_SAMPLER_DESC>> _sampler_descs;
 
   int _vs_flag_mask;
   int _ps_flag_mask;
@@ -170,6 +154,4 @@ private:
 
   std::string _error_msg;
   bool _valid;
-
-  TechniqueRenderData _render_data;
 };

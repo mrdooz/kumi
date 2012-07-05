@@ -131,6 +131,7 @@ std::string Path::concat(const std::string &prefix, const std::string &suffix) {
   if (!prefix.empty() && prefix.back() != '\\' && prefix.back() != '/')
     res += '/';
   res.append(suffix);
+  boost::replace_all(res, "\\", "/");
   return res;
 
 }

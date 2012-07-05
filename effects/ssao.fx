@@ -1,3 +1,5 @@
+#include "common.fx"
+
 matrix proj, view, world;
 float4 Diffuse, Specular;
 float Shininess;

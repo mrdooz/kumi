@@ -309,7 +309,11 @@ bool ScenePlayer::render() {
       data->render_targets[0] = rt_occlusion;
       data->clear_target[0] = true;
       GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
-      GFX_SUBMIT_TECH(_ssao_blur, nullptr);
+
+      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
+      rd->user_textures = 1;
+      rd->textures[0] = rt_occlusion_tmp;
+      GFX_SUBMIT_TECH(_ssao_blur, rd);
     }
 
     {
@@ -329,8 +333,7 @@ bool ScenePlayer::render() {
       int as_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
       int ae_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
       int data_size = pos_size + color_size + as_size + ae_size;
-      void *data = GRAPHICS.alloc_command_data_raw(sizeof(TechniqueRenderData2) + data_size);
-      TechniqueRenderData2 *rd = (TechniqueRenderData2 *)data;
+      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>(data_size);
       rd->num_instances = num_lights;
       rd->num_instance_variables = 4;
 
@@ -382,7 +385,7 @@ bool ScenePlayer::render() {
         lightattend->end[i] = _scene->lights[i]->far_attenuation_end;
       }
 
-      GFX_SUBMIT_TECH(_ssao_light, data);
+      GFX_SUBMIT_TECH(_ssao_light, rd);
     }
 
     {

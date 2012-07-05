@@ -1275,7 +1275,6 @@ bool TechniqueParser::parse() {
             return false;
           break;
         }
-
        
         case kSymRasterizerDesc: {
           parse_standalone_desc<CD3D11_RASTERIZER_DESC>(&scope,
