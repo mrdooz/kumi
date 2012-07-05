@@ -626,32 +626,62 @@ GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, c
   return GraphicsObjectHandle();
 }
 
+template<typename T, class Cont>
+int find_existing(const T &desc, Cont &c) {
+  // look for an existing state
+  T d2;
+  for (int i = 0; i < c.Size; ++i) {
+    if (!c[i])
+      continue;
+    c[i]->GetDesc(&d2);
+    if (0 == memcmp(&d2, &desc, sizeof(T)))
+      return i;
+  }
+  return -1;
+}
+
 GraphicsObjectHandle Graphics::create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc) {
-  const int idx = _rasterizer_states.find_free_index();
+  int idx = find_existing(desc, _rasterizer_states);
+  if (idx != -1)
+    return make_goh(GraphicsObjectHandle::kRasterizerState, idx);
+
+  idx = _rasterizer_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_rasterizer_states[idx]))) {
-    return GraphicsObjectHandle(GraphicsObjectHandle::kRasterizerState, 0, idx);
+    return make_goh(GraphicsObjectHandle::kRasterizerState, idx);
   }
   return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc) {
-  const int idx = _blend_states.find_free_index();
+  int idx = find_existing(desc, _blend_states);
+  if (idx != -1)
+    return make_goh(GraphicsObjectHandle::kBlendState, idx);
+
+  idx = _blend_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_blend_states[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kBlendState, 0, idx);
+    return make_goh(GraphicsObjectHandle::kBlendState, idx);
   return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc) {
-  const int idx = _depth_stencil_states.find_free_index();
+  int idx = find_existing(desc, _depth_stencil_states);
+  if (idx != -1)
+    return make_goh(GraphicsObjectHandle::kDepthStencilState, idx);
+
+  idx = _depth_stencil_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_depth_stencil_states[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kDepthStencilState, 0, idx);
+    return make_goh(GraphicsObjectHandle::kDepthStencilState, idx);
   return GraphicsObjectHandle();
 }
 
 GraphicsObjectHandle Graphics::create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc) {
-  const int idx = _sampler_states.find_free_index();
+  int idx = find_existing(desc, _sampler_states);
+  if (idx != -1)
+    return make_goh(GraphicsObjectHandle::kSamplerState, idx);
+
+  idx = _sampler_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &_sampler_states[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kSamplerState, 0, idx);
+    return make_goh(GraphicsObjectHandle::kSamplerState, idx);
   return GraphicsObjectHandle();
 }
 

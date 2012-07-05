@@ -51,6 +51,11 @@ public:
     return Traits::get(_buffer[idx]);
   }
 
+  const T &operator[](int idx) const {
+    assert(idx >= 0 && idx < N);
+    return Traits::get(_buffer[idx]);
+  }
+
   void reclaim_index(int idx) {
     _reclaimed_indices.push(idx);
   }
@@ -58,6 +63,11 @@ public:
   T get(GraphicsObjectHandle handle) {
     return Traits::get(_buffer[handle.id()]);
   }
+
+  const T get(GraphicsObjectHandle handle) const {
+    return Traits::get(_buffer[handle.id()]);
+  }
+
 protected:
   Deleter _deleter;
   E _buffer[N];

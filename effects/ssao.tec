@@ -21,13 +21,12 @@ blend_desc BlendDisable {
 };
 
 blend_desc BlendOneOne {
-    render_target[0] = {
-      blend_enable = true;
-      src_blend = one;
-      dest_blend = one;
-    };
+  render_target[0] = {
+    blend_enable = true;
+    src_blend = one;
+    dest_blend = one;
   };
-
+};
 
 technique ssao_fill {
     

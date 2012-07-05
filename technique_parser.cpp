@@ -70,6 +70,7 @@ namespace technique_parser_details {
 enum Symbol {
   kSymInvalid = -1,
   kSymUnknown,
+  kSymInclude,
   kSymSingleLineComment,
   kSymMultiLineCommentStart,
   kSymMultiLineCommentEnd,
@@ -156,6 +157,7 @@ struct {
   Symbol symbol;
   const char *str;
 } g_symbols[] = {
+  { kSymInclude, "include" },
   { kSymSingleLineComment, "//" },
   { kSymMultiLineCommentStart, "/*" },
   { kSymListOpen, "[" },
@@ -1236,6 +1238,11 @@ bool TechniqueParser::parse() {
     while (!scope.end()) {
 
       switch (scope.next_symbol()) {
+
+        case kSymInclude: {
+          string name;
+          break;
+        }
         
         case kSymRasterizerDesc: {
           string name;
