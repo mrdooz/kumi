@@ -427,8 +427,6 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
     if (!do_reflection(text, shader, shader_template, buf))
       return false;
 
-    shader->prepare_cbuffers();
-
     switch (shader->type()) {
       case ShaderType::kVertexShader: 
         shader->_handle = GRAPHICS.create_vertex_shader(FROM_HERE, buf, obj);
@@ -503,15 +501,3 @@ void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsO
   }
 }
 */
-void Technique::fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const {
-
-  out->resize(props.res.size());
-
-  for (size_t i = 0; i < props.res.size(); ++i) {
-    auto &cur = props.res[i];
-    if (cur.source == PropertySource::kSystem) {
-      auto goh = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(*cur.pid());
-      (*out)[i] = goh;
-    }
-  }
-}

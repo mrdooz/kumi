@@ -70,19 +70,20 @@ typedef uint64_t uint64;
 #include <boost/assign/list_of.hpp>
 #include <boost/algorithm/string.hpp>
 
-#include <vector>
-#include <string>
-#include <map>
+#include <array>
 #include <deque>
-#include <tuple>
-#include <unordered_map>
-#include <type_traits>
-#include <stack>
-#include <hash_set>
-#include <set>
-#include <time.h>
 #include <functional>
+#include <hash_set>
+#include <map>
+#include <set>
 #include <sstream>
+#include <stack>
+#include <string>
+#include <time.h>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
+#include <vector>
 
 #include <concurrent_queue.h>
 

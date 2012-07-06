@@ -39,15 +39,12 @@ public:
   Shader(ShaderType::Enum type);
 
   ShaderType::Enum type() const { return _type; }
-  bool is_valid() const { return _valid; }
 
   const std::string &source_filename() const { return _source_filename; }
   GraphicsObjectHandle handle() const { return _handle; }
 
-  void prepare_cbuffers();
-
   std::vector<CBuffer> &cbuffers() { return _cbuffers; }
-  const std::vector<GraphicsObjectHandle> &samplers() { return _samplers; }
+  const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers() { return _samplers; }
   const SparseUnknown &resource_views() const { return _resource_views; }
 
   bool on_loaded();
@@ -55,7 +52,6 @@ public:
 private:
 
   std::vector<CBuffer> _cbuffers;
-  bool _valid;
   std::string _source_filename;
 #if _DEBUG
   std::string _entry_point;
@@ -67,7 +63,6 @@ private:
 
   ResourceViews _resource_views2;
   SparseUnknown _resource_views;
-  //SparseProperty _sampler_states;
 
-  std::vector<GraphicsObjectHandle> _samplers;
+  std::array<GraphicsObjectHandle, MAX_SAMPLERS> _samplers;
 };

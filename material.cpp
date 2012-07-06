@@ -36,10 +36,7 @@ void Material::add_flag(int flag) {
   _flags |= flag;
 }
 
-void Material::fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const {
-  
-  out->resize(props.res.size());
-
+void Material::fill_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
   for (size_t i = 0; i < props.res.size(); ++i) {
     if (props.res[i].source == PropertySource::kMaterial) {
       auto it = _properties_by_id.find(*props.res[i].pid());

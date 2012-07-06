@@ -218,17 +218,19 @@ private:
   void set_rs(GraphicsObjectHandle rs);
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
-  void set_samplers(const std::vector<GraphicsObjectHandle > &samplers);
-  void set_shader_resources(const GraphicsObjectHandle *view_handles, int first_view, int num_views);
+  void set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers);
+  void set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources);
   void unset_shader_resource(int first_view, int num_views);
   void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
+
+  void fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const;
 
   GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
   GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
   GraphicsObjectHandle prev_ib, prev_vb;
   GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
-  GraphicsObjectHandle prev_views[MAX_SAMPLERS];
+  GraphicsObjectHandle prev_resources[MAX_TEXTURES];
   D3D11_PRIMITIVE_TOPOLOGY prev_topology;
 
   struct RenderCmd {

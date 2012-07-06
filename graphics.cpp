@@ -920,6 +920,17 @@ GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx
   return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : GraphicsObjectHandle();
 }
 
+void Graphics::fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
+
+  for (size_t i = 0; i < props.res.size(); ++i) {
+    auto &cur = props.res[i];
+    if (cur.source == PropertySource::kSystem) {
+      auto goh = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(*cur.pid());
+      (*out)[i] = goh;
+    }
+  }
+}
+
 void Graphics::render() {
 
   ID3D11DeviceContext *ctx = _immediate_context;
@@ -1038,10 +1049,10 @@ void Graphics::render() {
         // set resource views
         auto &rv = ps->resource_views();
         if (rv.count > 0) {
-          vector<GraphicsObjectHandle> rr;
+          array<GraphicsObjectHandle, MAX_TEXTURES> rr;
+          fill_system_resource_views(rv, &rr);
           material->fill_resource_views(rv, &rr);
-          technique->fill_resource_views(rv, &rr);
-          set_shader_resources(&rr[0], rv.first, rv.count);
+          set_shader_resources(rr);
         }
 
         draw_indexed(geometry->index_count, 0, 0);
@@ -1078,13 +1089,19 @@ void Graphics::render() {
         // set resource views
         auto &rv = ps->resource_views();
         if (rv.count > 0) {
-          vector<GraphicsObjectHandle> rr;
-          technique->fill_resource_views(rv, &rr);
-          set_shader_resources(&rr[0], rv.first, rv.count);
+          array<GraphicsObjectHandle, 8> rr;
+          fill_system_resource_views(rv, &rr);
+          if (rd && rd->user_textures) {
+            for (int i = 0; i < MAX_TEXTURES; ++i) {
+              if (rd->textures[i].is_valid())
+                rr[i] = rd->textures[i];
+            }
+          }
+          set_shader_resources(rr);
         }
 
         // Check if we're drawing instanced
-        if (rd) {
+        if (rd && rd->num_instances) {
           for (int ii = 0; ii < rd->num_instances; ++ii) {
 
             // set cbuffers
@@ -1129,11 +1146,8 @@ void Graphics::render() {
             technique->fill_cbuffer(&ps_cbuffers[i]);
           }
           set_cbuffer(vs_cbuffers, ps_cbuffers);
-
           draw_indexed(technique->index_count(), 0, 0);
-
         }
-
 
         if (rv.count > 0)
           unset_shader_resource(rv.first, rv.count);
@@ -1259,7 +1273,7 @@ void Graphics::set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT 
   }
 }
 
-void Graphics::set_samplers(const std::vector<GraphicsObjectHandle > &samplers) {
+void Graphics::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
   if (memcmp(samplers.data(), prev_samplers, size)) {
     int first_sampler = MAX_SAMPLERS, num_samplers = 0;
@@ -1268,43 +1282,47 @@ void Graphics::set_samplers(const std::vector<GraphicsObjectHandle > &samplers) 
       if (samplers[i].is_valid()) {
         d3dsamplers[i] = _sampler_states.get(samplers[i]);
         first_sampler = min(first_sampler, i);
-        num_samplers = i - first_sampler + 1;
+        num_samplers++;
       }
     }
 
     if (num_samplers) {
-      _immediate_context->PSSetSamplers(first_sampler, num_samplers, d3dsamplers);
+      _immediate_context->PSSetSamplers(first_sampler, num_samplers, &d3dsamplers[first_sampler]);
       memcpy(prev_samplers, samplers.data(), size);
     }
   }
 }
 
-void Graphics::set_shader_resources(const GraphicsObjectHandle *view_handles, int first_view, int num_views) {
-  if (!num_views)
-    return;
+void Graphics::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources) {
+  int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;
-  if (force || memcmp(view_handles, prev_views, num_views * sizeof(GraphicsObjectHandle))) {
-    ID3D11ShaderResourceView *views[MAX_SAMPLERS];
-    bool valid_views = true;
-    for (int i = 0; i < num_views; ++i) {
-      GraphicsObjectHandle h = view_handles[i+first_view];
-      if (h.type() == GraphicsObjectHandle::kTexture) {
-        auto *data = _textures.get(h);
-        views[i] = data->view.resource;
-      } else if (h.type() == GraphicsObjectHandle::kResource) {
-        auto *data = _resources.get(h);
-        views[i] = data->view.resource;
-      } else if (h.type() == GraphicsObjectHandle::kRenderTarget) {
-        auto *data = _render_targets.get(h);
-        views[i] = data->srv.resource;
-      } else {
-        valid_views = false;
+  if (force || memcmp(resources.data(), prev_resources, size)) {
+    ID3D11ShaderResourceView *d3dresources[MAX_TEXTURES];
+    int first_resource = MAX_TEXTURES, num_resources = 0;
+    for (int i = 0; i < MAX_TEXTURES; ++i) {
+      if (resources[i].is_valid()) {
+        GraphicsObjectHandle h = resources[i];
+        if (h.type() == GraphicsObjectHandle::kTexture) {
+          auto *data = _textures.get(h);
+          d3dresources[i] = data->view.resource;
+        } else if (h.type() == GraphicsObjectHandle::kResource) {
+          auto *data = _resources.get(h);
+          d3dresources[i] = data->view.resource;
+        } else if (h.type() == GraphicsObjectHandle::kRenderTarget) {
+          auto *data = _render_targets.get(h);
+          d3dresources[i] = data->srv.resource;
+        } else {
+          LOG_ERROR_LN("Trying to set invalid resource type!");
+        }
+        num_resources++;
+        first_resource = min(first_resource, i);
       }
     }
-    if (valid_views) {
-      _immediate_context->PSSetShaderResources(first_view, num_views, views);
-      memcpy(prev_views, view_handles+first_view, num_views * sizeof(GraphicsObjectHandle));
+
+    if (num_resources) {
+      _immediate_context->PSSetShaderResources(first_resource, num_resources, &d3dresources[first_resource]);
+      memcpy(prev_resources, resources.data(), size);
     }
   }
 }

@@ -33,12 +33,12 @@ technique ssao_compute {
     
     vertex_shader {
         file effects/ssao.fx;
-        entry_point render_vs_main;
+        entry_point quad_vs_main;
     };
     
     pixel_shader {
         file effects/ssao.fx;
-        entry_point render_ps_main;
+        entry_point compute_ps_main;
         params [
             float4x4 proj system;
             texture2d rt_pos system;
@@ -59,14 +59,14 @@ technique ssao_blur {
     
     vertex_shader {
         file effects/ssao.fx;
-        entry_point blur_vs_main;
+        entry_point quad_vs_main;
     };
     
     pixel_shader {
         file effects/ssao.fx;
         entry_point blur_ps_main;
         params [
-            texture2d rt_occlusion_tmp system;
+            texture2d Texture0 user;
         ];
     };
    
@@ -81,7 +81,7 @@ technique ssao_blur {
 technique ssao_ambient {
     vertex_shader {
         file effects/ssao.fx;
-        entry_point ambient_vs_main;
+        entry_point quad_vs_main;
     };
     
     pixel_shader {
@@ -104,7 +104,7 @@ technique ssao_ambient {
 technique ssao_light {
     vertex_shader {
         file effects/ssao.fx;
-        entry_point light_vs_main;
+        entry_point quad_vs_main;
     };
     
     pixel_shader {
@@ -133,7 +133,7 @@ technique ssao_light {
 technique gamma_correction {
     vertex_shader {
         file effects/ssao.fx;
-        entry_point gamma_vs_main;
+        entry_point quad_vs_main;
     };
     
     pixel_shader {

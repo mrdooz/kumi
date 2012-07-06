@@ -7,12 +7,8 @@
 using namespace std;
 
 Shader::Shader(ShaderType::Enum type) 
-  : _type(type), _valid(false) 
+  : _type(type)
 {
-  _samplers.resize(MAX_SAMPLERS);
-}
-
-void Shader::prepare_cbuffers() {
 }
 
 bool Shader::on_loaded() {

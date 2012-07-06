@@ -116,8 +116,6 @@ public:
   const std::string &error_msg() const { return _error_msg; }
 
   void fill_cbuffer(CBuffer *cbuffer) const;
-  void fill_resource_views(const SparseUnknown &props, std::vector<GraphicsObjectHandle> *out) const;
-
 private:
 
   void prepare_cbuffers();

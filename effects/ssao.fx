@@ -15,7 +15,6 @@ Texture2D DiffuseTexture : register(t0);
 sampler LinearSampler : register(s0);
 #endif
 
-
 ///////////////////////////////////
 // g-buffer fill
 ///////////////////////////////////
@@ -79,25 +78,7 @@ sampler PointSampler : register(s0);
 float4 kernel[32];
 float4 noise[16];
 
-struct render_vs_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct render_ps_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-render_ps_input render_vs_main(render_vs_input input)
-{
-    render_ps_input output = (render_ps_input)0;
-    output.pos = input.pos;
-    output.tex = input.tex;
-    return output;
-}
-
-float render_ps_main(render_ps_input input) : SV_Target
+float compute_ps_main(quad_ps_input input) : SV_Target
 {
     float3 origin = rt_pos.Sample(PointSampler, input.tex).xyz;
     float3 normal = rt_normal.Sample(PointSampler, input.tex).xyz;
@@ -146,33 +127,13 @@ float render_ps_main(render_ps_input input) : SV_Target
 // blur
 ///////////////////////////////////
 
-Texture2D rt_occlusion_tmp : register(t0);
-
-struct blur_vs_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct blur_ps_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-blur_ps_input blur_vs_main(blur_vs_input input)
-{
-    blur_ps_input output = (blur_ps_input)0;
-    output.pos = input.pos;
-    output.tex = input.tex;
-    return output;
-}
-
-float blur_ps_main(blur_ps_input input) : SV_Target
+float blur_ps_main(quad_ps_input input) : SV_Target
 {
     float res = 0.0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
             float2 ofs = float2(1/ScreenWidth * j, 1/ScreenHeight*i);
-            res += rt_occlusion_tmp.Sample(PointSampler, input.tex + ofs).r;
+            res += Texture0.Sample(PointSampler, input.tex + ofs).r;
         }
     }
     float occ = res / 16.0;
@@ -186,25 +147,7 @@ float blur_ps_main(blur_ps_input input) : SV_Target
 Texture2D rt_occlusion;
 float4 Ambient;
 
-struct ambient_vs_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct ambient_ps_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-ambient_ps_input ambient_vs_main(ambient_vs_input input)
-{
-    ambient_ps_input output = (ambient_ps_input)0;
-    output.pos = input.pos;
-    output.tex = input.tex;
-    return output;
-}
-
-float4 ambient_ps_main(ambient_ps_input input) : SV_Target
+float4 ambient_ps_main(quad_ps_input input) : SV_Target
 {
   return Ambient * rt_occlusion.Sample(PointSampler, input.tex).r;
 }
@@ -215,25 +158,7 @@ float4 ambient_ps_main(ambient_ps_input input) : SV_Target
 float4 LightColor, LightPos;
 float AttenuationStart, AttenuationEnd;
 
-struct light_vs_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct light_ps_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-light_ps_input light_vs_main(light_vs_input input)
-{
-    light_ps_input output = (light_ps_input)0;
-    output.pos = input.pos;
-    output.tex = input.tex;
-    return output;
-}
-
-float4 light_ps_main(light_ps_input input) : SV_Target
+float4 light_ps_main(quad_ps_input input) : SV_Target
 {
     float3 pos = rt_pos.Sample(PointSampler, input.tex).xyz;
     float3 normal = normalize(rt_normal.Sample(PointSampler, input.tex).xyz);
@@ -276,25 +201,7 @@ float4 light_ps_main(light_ps_input input) : SV_Target
 Texture2D rt_composite;
 Texture2D rt_luminance;
 
-struct gamma_vs_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-struct gamma_ps_input {
-    float4 pos : SV_POSITION;
-    float2 tex : TEXCOORD;
-};
-
-gamma_ps_input gamma_vs_main(gamma_vs_input input)
-{
-    gamma_ps_input output = (gamma_ps_input)0;
-    output.pos = input.pos;
-    output.tex = input.tex;
-    return output;
-}
-
-float4 gamma_ps_main(gamma_ps_input input) : SV_Target
+float4 gamma_ps_main(quad_ps_input input) : SV_Target
 {
   float ll = exp(rt_luminance.SampleLevel(PointSampler, input.tex, 10.0));
   //float2 vtc = float2( input.tex - 0.5 );
