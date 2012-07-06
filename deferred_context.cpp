@@ -10,9 +10,12 @@ using namespace std;
 DeferredContext::DeferredContext() : _ctx(nullptr) {
 }
 
-void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
-  Technique *technique = _techniques.get(key.handle);
-  const TechniqueRenderData *rd = (const TechniqueRenderData *)data;
+
+void DeferredContext::render_technique(GraphicsObjectHandle technique_handle, 
+                                       const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources,
+                                       const InstanceData &instance_data) {
+  Technique *technique = GRAPHICS._techniques.get(technique_handle);
+  //const TechniqueRenderData *rd = (const TechniqueRenderData *)data;
 
   Shader *vs = technique->vertex_shader(0);
   Shader *ps = technique->pixel_shader(0);
@@ -25,8 +28,8 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
   set_ib(technique->ib(), technique->index_format());
 
   set_rs(technique->rasterizer_state());
-  set_dss(technique->depth_stencil_state(), default_stencil_ref());
-  set_bs(technique->blend_state(), default_blend_factors(), default_sample_mask());
+  set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+  set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
   // set samplers
   auto &samplers = ps->samplers();
@@ -39,24 +42,22 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
   if (rv.count > 0) {
     array<GraphicsObjectHandle, 8> rr;
     fill_system_resource_views(rv, &rr);
-    if (rd && rd->user_textures) {
-      for (int i = 0; i < MAX_TEXTURES; ++i) {
-        if (rd->textures[i].is_valid())
-          rr[i] = rd->textures[i];
-      }
+    for (int i = 0; i < MAX_TEXTURES; ++i) {
+      if (resources[i].is_valid())
+        rr[i] = resources[i];
     }
     set_shader_resources(rr);
   }
 
-  // Check if we're drawing instanced
-  if (rd && rd->num_instances) {
-    for (int ii = 0; ii < rd->num_instances; ++ii) {
+  // set cbuffers
+  auto &vs_cbuffers = vs->cbuffers();
+  for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
+    technique->fill_cbuffer(&vs_cbuffers[i]);
+  }
 
-      // set cbuffers
-      auto &vs_cbuffers = vs->cbuffers();
-      for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-        technique->fill_cbuffer(&vs_cbuffers[i]);
-      }
+  // Check if we're drawing instanced
+  if (instance_data.num_instances) {
+    for (int ii = 0; ii < instance_data.num_instances; ++ii) {
 
       auto &ps_cbuffers = ps->cbuffers();
       for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
@@ -65,16 +66,13 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
         for (size_t j = 0; j < ps_cbuffers[i].instance_vars.size(); ++j) {
           auto &var = ps_cbuffers[i].instance_vars[j];
 
-          int ofs = 0;
-          for (int k = 0; k < rd->num_instance_variables; ++k) {
-            PropertyId id = *(PropertyId *)&rd->payload[ofs + 0];
-            int len = *(int *)&rd->payload[ofs + 4];
-            const void *data = &rd->payload[ofs + 8 + ii * len];
-            if (id == var.id) {
-              memcpy(&ps_cbuffers[i].staging[var.ofs], data, var.len);
+          for (size_t k = 0; k < instance_data.vars.size(); ++k) {
+            auto &cur = instance_data.vars[k];
+            if (cur.id == var.id) {
+              const void *data = &instance_data.payload[cur.ofs + ii * instance_data.block_size];
+              memcpy(&ps_cbuffers[i].staging[var.ofs], data, cur.len);
               break;
             }
-            ofs += sizeof(PropertyId) + sizeof(int) + len * rd->num_instances;
           }
         }
       }
@@ -83,11 +81,6 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
     }
 
   } else {
-    // set cbuffers
-    auto &vs_cbuffers = vs->cbuffers();
-    for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-      technique->fill_cbuffer(&vs_cbuffers[i]);
-    }
 
     auto &ps_cbuffers = ps->cbuffers();
     for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
@@ -99,6 +92,10 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle) {
 
   if (rv.count > 0)
     unset_shader_resource(rv.first, rv.count);
+}
+
+void DeferredContext::fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
+
 }
 
 void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_handle) {

@@ -2,16 +2,32 @@
 #include "graphics_object_handle.hpp"
 #include "shader.hpp"
 
+
 class DeferredContext {
   friend class Graphics;
 public:
+
+  struct InstanceVar {
+    PropertyId id;
+    int len;
+    int ofs;
+  };
+
+  struct InstanceData {
+    int num_instances;
+    int block_size;
+    const char *payload;
+    std::vector<InstanceVar> vars;
+  };
 
   void set_default_render_target();
   void set_render_targets(GraphicsObjectHandle *render_targets, bool *clear_targets, int num_render_targets);
   void generate_mips(GraphicsObjectHandle h);
 
   void render_mesh(Mesh *mesh, GraphicsObjectHandle technique_handle);
-  void render_technique(GraphicsObjectHandle technique_handle);
+  void render_technique(GraphicsObjectHandle technique_handle, 
+    const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources,
+    const InstanceData &instance_data);
 
 private:
   DeferredContext();
