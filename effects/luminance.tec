@@ -1,11 +1,6 @@
 include common.tec;
 
-technique luminance_map {
-  vertex_shader {
-      file effects/common.fx;
-      entry_point quad_vs_main;
-  };
-  
+technique luminance_map inherits quad_base {  
   pixel_shader {
       file effects/luminance.fx;
       entry_point luminance_map_ps_main;
@@ -13,20 +8,9 @@ technique luminance_map {
           texture2d Texture0 user;
       ];
   };
-  
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
-technique scale_cutoff {
-  vertex_shader {
-      file effects/common.fx;
-      entry_point quad_vs_main;
-  };
-  
+technique scale_cutoff inherits quad_base {
   pixel_shader {
       file effects/luminance.fx;
       entry_point scale_cutoff;
@@ -35,21 +19,10 @@ technique scale_cutoff {
           texture2d rt_luminance system;
       ];
   };
-  
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
 
-technique scale {
-  vertex_shader {
-      file effects/common.fx;
-      entry_point quad_vs_main;
-  };
-  
+technique scale inherits quad_base {
   pixel_shader {
       file effects/luminance.fx;
       entry_point scale;
@@ -57,20 +30,9 @@ technique scale {
           texture2d Texture0 user;
       ];
   };
-  
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
-technique blur_horiz {
-  vertex_shader {
-      file effects/common.fx;
-      entry_point quad_vs_main;
-  };
-  
+technique blur_horiz inherits quad_base {
   pixel_shader {
       file effects/luminance.fx;
       entry_point blur_horiz;
@@ -78,20 +40,9 @@ technique blur_horiz {
           texture2d Texture0 user;
       ];
   };
-  
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
-technique blur_vert {
-  vertex_shader {
-      file effects/common.fx;
-      entry_point quad_vs_main;
-  };
-  
+technique blur_vert inherits quad_base {
   pixel_shader {
       file effects/luminance.fx;
       entry_point blur_vert;
@@ -99,12 +50,6 @@ technique blur_vert {
           texture2d Texture0 user;
       ];
   };
-  
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
 

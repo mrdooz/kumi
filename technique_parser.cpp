@@ -87,6 +87,7 @@ enum Symbol {
   kSymParenClose,
 
   kSymTechnique,
+  kSymInherits,
   kSymId,
   kSymVertexShader,
   kSymPixelShader,
@@ -173,6 +174,7 @@ struct {
   { kSymParenClose, ")" },
 
   { kSymTechnique, "technique" },
+  { kSymInherits, "inherits" },
 
   { kSymVertexShader, "vertex_shader" },
   { kSymPixelShader, "pixel_shader" },
@@ -1102,9 +1104,9 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         bool vs = symbol == kSymVertexShader;
         ShaderTemplate *st = nullptr;
         if (vs) {
-          technique->_vs_shader_template = st = new ShaderTemplate(ShaderType::kVertexShader);
+          technique->_vs_shader_template.reset(st = new ShaderTemplate(ShaderType::kVertexShader));
         } else {
-          technique->_ps_shader_template = st = new ShaderTemplate(ShaderType::kPixelShader);
+          technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader));
         }
         scope->munch(kSymBlockOpen);
         parse_shader_template(scope, technique, st);
@@ -1247,6 +1249,15 @@ void parse_standalone_desc(Scope *scope,
   (*states)[name] = creator(desc);
 }
 
+Technique *TechniqueParser::find_technique(const std::string &str) {
+  for (size_t i = 0; i < _result->techniques.size(); ++i) {
+    if (_result->techniques[i]->name() == str) {
+      return _result->techniques[i];
+    }
+  }
+  return nullptr;
+}
+
 bool TechniqueParser::parse() {
 
   vector<char> buf;
@@ -1316,10 +1327,21 @@ bool TechniqueParser::parse() {
 
         case kSymTechnique: {
           unique_ptr<Technique> t(new Technique);
-          scope.next_identifier(&t.get()->_name).munch(kSymBlockOpen);
+          scope.next_identifier(&t.get()->_name);
+          if (scope.consume_if(kSymBlockOpen)) {
+          } else if (scope.consume_if(kSymInherits)) {
+            string parent;
+            scope.next_identifier(&parent).munch(kSymBlockOpen);
+            Technique *tt = find_technique(parent);
+            if (!tt) {
+              LOG_ERROR_LN("Unknown parent: %s", parent.c_str());
+              return false;
+            }
+            t->init_from_parent(tt);
+          }
           parse_technique(&scope, t.get());
-          scope.munch(kSymBlockClose).munch(kSymSemicolon);
           _result->techniques.push_back(t.release());
+          scope.munch(kSymBlockClose).munch(kSymSemicolon);
           break;
         }
 

@@ -24,10 +24,26 @@ Technique::Technique()
 }
 
 Technique::~Technique() {
-  delete exch_null(_vs_shader_template);
-  delete exch_null(_ps_shader_template);
   seq_delete(&_vertex_shaders);
   seq_delete(&_pixel_shaders);
+}
+
+void Technique::init_from_parent(const Technique *parent) {
+  _vertex_size = parent->_vertex_size;
+  _index_format = parent->_index_format;
+  _index_count = parent->_index_count;
+  _vb = parent->_vb;
+  _ib = parent->_ib;
+
+  _rasterizer_state = parent->_rasterizer_state;
+  _blend_state = parent->_blend_state;
+  _depth_stencil_state = parent->_depth_stencil_state;
+
+  _vs_flag_mask = parent->_vs_flag_mask;
+  _ps_flag_mask = parent->_ps_flag_mask;
+  _vs_shader_template = parent->_vs_shader_template;
+  _ps_shader_template = parent->_ps_shader_template;
+
 }
 
 void Technique::add_error_msg(const char *fmt, ...) {
@@ -451,12 +467,12 @@ bool Technique::init() {
 
   // create the shaders from the templates
   if (_vs_shader_template) {
-    if (!create_shaders(_vs_shader_template))
+    if (!create_shaders(_vs_shader_template.get()))
       return false;
   }
 
   if (_ps_shader_template) {
-    if (!create_shaders(_ps_shader_template))
+    if (!create_shaders(_ps_shader_template.get()))
       return false;
   }
 
@@ -491,3 +507,12 @@ void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsO
   }
 }
 */
+
+Shader *Technique::vertex_shader(int flags) const { 
+  return _vertex_shaders.empty() ? nullptr : _vertex_shaders[flags & _vs_flag_mask];
+}
+
+Shader *Technique::pixel_shader(int flags) const { 
+  return _pixel_shaders.empty() ? nullptr : _pixel_shaders[flags & _ps_flag_mask];
+}
+

@@ -89,14 +89,12 @@ public:
   Technique();
   ~Technique();
 
-
   const std::string &name() const { return _name; }
+  void init_from_parent(const Technique *parent);
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
-  int vertex_shader_count() const { return (int)_vertex_shaders.size(); }
-  int pixel_shader_count() const { return (int)_pixel_shaders.size(); }
-  Shader *vertex_shader(int flags) const { return _vertex_shaders[flags & _vs_flag_mask]; }
-  Shader *pixel_shader(int flags) const { return _pixel_shaders[flags & _ps_flag_mask]; }
+  Shader *vertex_shader(int flags) const;
+  Shader *pixel_shader(int flags) const;
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }
@@ -145,8 +143,8 @@ private:
 
   int _vs_flag_mask;
   int _ps_flag_mask;
-  ShaderTemplate *_vs_shader_template;
-  ShaderTemplate *_ps_shader_template;
+  std::shared_ptr<ShaderTemplate> _vs_shader_template;
+  std::shared_ptr<ShaderTemplate> _ps_shader_template;
 
   std::vector<Material *> _materials;
 

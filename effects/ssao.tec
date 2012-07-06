@@ -29,13 +29,7 @@ technique ssao_fill {
     blend_desc = BlendDisable;
 };
 
-technique ssao_compute {
-    
-    vertex_shader {
-        file effects/ssao.fx;
-        entry_point quad_vs_main;
-    };
-    
+technique ssao_compute inherits quad_base {
     pixel_shader {
         file effects/ssao.fx;
         entry_point compute_ps_main;
@@ -47,21 +41,10 @@ technique ssao_compute {
             float4[16] noise system;
         ];
     };
-   
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
-technique ssao_blur {
-    
-    vertex_shader {
-        file effects/ssao.fx;
-        entry_point quad_vs_main;
-    };
-    
+technique ssao_blur inherits quad_base {
+        
     pixel_shader {
         file effects/ssao.fx;
         entry_point blur_ps_main;
@@ -69,21 +52,10 @@ technique ssao_blur {
             texture2d Texture0 user;
         ];
     };
-   
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
 
-technique ssao_ambient {
-    vertex_shader {
-        file effects/ssao.fx;
-        entry_point quad_vs_main;
-    };
-    
+technique ssao_ambient inherits quad_base {
     pixel_shader {
         file effects/ssao.fx;
         entry_point ambient_ps_main;
@@ -92,21 +64,10 @@ technique ssao_ambient {
             float4 Ambient system;
         ];
     };
-   
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };
 
 
-technique ssao_light {
-    vertex_shader {
-        file effects/ssao.fx;
-        entry_point quad_vs_main;
-    };
-    
+technique ssao_light inherits quad_base{
     pixel_shader {
         file effects/ssao.fx;
         entry_point light_ps_main;
@@ -121,20 +82,10 @@ technique ssao_light {
             float AttenuationEnd instance;
         ];
     };
-   
-  geometry = fs_quad_postex;
-  
-  rasterizer_desc = NoCulling; 
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendOneOne;
+	blend_desc = BlendOneOne;
 };
 
-
-technique gamma_correction {
-    vertex_shader {
-        file effects/ssao.fx;
-        entry_point quad_vs_main;
-    };
+technique gamma_correction inherits quad_base {
     
     pixel_shader {
         file effects/ssao.fx;
@@ -145,10 +96,4 @@ technique gamma_correction {
             texture2d Texture1 user;
         ];
     };
-   
-  geometry = fs_quad_postex;
-   
-  rasterizer_desc = NoCulling;
-  depth_stencil_desc = DepthDisable;
-  blend_desc = BlendDisable;
 };

@@ -44,6 +44,8 @@ private:
   void parse_vertices(Scope *scope, Technique *technique);
   void parse_indices(Scope *scope, Technique *technique);
 
+  Technique *find_technique(const std::string &str);
+
   std::unique_ptr<technique_parser_details::Trie> _symbol_trie;
   std::unordered_map<technique_parser_details::Symbol, std::string > _symbol_to_string;
 

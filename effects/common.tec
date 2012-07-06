@@ -39,3 +39,15 @@ sampler_desc LinearSampler {
   address_u = clamp;
   address_v = clamp;
 };
+
+technique quad_base {
+    vertex_shader {
+        file effects/common.fx;
+        entry_point quad_vs_main;
+    };
+	
+	geometry = fs_quad_postex;
+	rasterizer_desc = NoCulling;
+	depth_stencil_desc = DepthDisable;
+	blend_desc = BlendDisable;
+};
