@@ -10,6 +10,7 @@
 #include "tracked_location.hpp"
 #include "mesh.hpp"
 #include "vertex_types.hpp"
+#include "deferred_context.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -931,8 +932,15 @@ void Graphics::fill_system_resource_views(const SparseUnknown &props, std::array
   }
 }
 
-void Graphics::render() {
+DeferredContext *Graphics::create_deferred_context() {
+  DeferredContext *dc = new DeferredContext;
+  _device->CreateDeferredContext(0, &dc->_ctx);
 
+  return dc;
+}
+
+void Graphics::render() {
+  
   ID3D11DeviceContext *ctx = _immediate_context;
   ctx->RSSetViewports(1, &_viewport);
 

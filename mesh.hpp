@@ -4,37 +4,30 @@
 #include "property_manager.hpp"
 
 struct TrackedLocation;
-struct SubMesh;
-struct Mesh;
+class SubMesh;
+class Mesh;
 
-struct SubMesh {
+class SubMesh {
+public:
   SubMesh(Mesh *mesh);
   ~SubMesh();
-/*
-  void prepare_cbuffers(GraphicsObjectHandle technique_handle);
-  void prepare_textures(GraphicsObjectHandle technique_handle);
-
-  // low word: 
-  // 0 not found, free idx in HIWORD
-  // 1 found technique at idx HIWORD
-  // 2 too many techniques
-  uint32 find_technique_index(GraphicsObjectHandle technique);
-*/
-
   void update();
+  void fill_renderdata(MeshRenderData *render_data) const;
+  RenderKey render_key() const { return _render_key; }
+//private:
+
   std::vector<CBufferVariable> cbuffer_vars;
   std::vector<char> cbuffer_staged;
 
   std::string name;
   Mesh *mesh;
-  RenderKey render_key;
-  //MeshRenderData render_data;
+  RenderKey _render_key;
   GraphicsObjectHandle material_id;
   MeshGeometry geometry;
 };
 
-struct Mesh {
-
+class Mesh {
+public:
   Mesh(const std::string &name) : name(name) {}
   void submit(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique);
 
@@ -42,7 +35,7 @@ struct Mesh {
   void on_loaded();
 
   void fill_cbuffer(CBuffer *cbuffer) const;
-
+//private:
   std::string name;
   XMFLOAT4X4 obj_to_world;
   std::vector<SubMesh *> submeshes;

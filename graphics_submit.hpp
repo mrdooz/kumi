@@ -2,8 +2,8 @@
 #include "graphics_object_handle.hpp"
 #include "property_manager.hpp"
 
-struct Mesh;
-struct SubMesh;
+class Mesh;
+class SubMesh;
 class Material;
 
 struct MeshGeometry {

@@ -264,20 +264,20 @@ bool ScenePlayer::render() {
     int w = GRAPHICS.width();
     int h = GRAPHICS.height();
 
-    auto tmp_rt = [&](bool depth, DXGI_FORMAT fmt, bool mip_map, const string& name) {
-      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, depth, fmt, mip_map, name);
+    auto tmp_rt = [&](bool depth, DXGI_FORMAT fmt, const string& name) {
+      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, depth, fmt, false, name);
     };
 
-    GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_pos");
-    GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_normal");
-    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, false, "System::rt_diffuse");
-    GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_specular");
+    GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
+    GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
+    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
+    GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
 
-    GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_composite");
-    GraphicsObjectHandle rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_blur");
+    GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");
+    GraphicsObjectHandle rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_blur");
 
-    GraphicsObjectHandle rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion");
-    GraphicsObjectHandle rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion_tmp");
+    GraphicsObjectHandle rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion");
+    GraphicsObjectHandle rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion_tmp");
 
     GraphicsObjectHandle rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
 

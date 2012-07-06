@@ -17,6 +17,8 @@ using std::string;
 using std::vector;
 using std::pair;
 
+class DeferredContext;
+
 enum FileEvent;
 
 #if WITH_GWEN
@@ -25,6 +27,7 @@ struct IFW1FontWrapper;
 #endif
 
 class Graphics {
+  friend DeferredContext;
 public:
 
   enum PredefinedGeometry {
@@ -179,6 +182,8 @@ public:
   GraphicsObjectHandle  default_blend_state() const { return _default_blend_state; }
   const float *default_blend_factors() const { return _default_blend_factors; }
   uint32_t default_sample_mask() const { return 0xffffffff; }
+
+  DeferredContext *create_deferred_context();
 
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);

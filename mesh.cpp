@@ -8,10 +8,20 @@
 SubMesh::SubMesh(Mesh *mesh) 
   : mesh(mesh)
 {
-  render_key.cmd = RenderKey::kRenderMesh;
+  _render_key.cmd = RenderKey::kRenderMesh;
 }
 
 SubMesh::~SubMesh() {
+}
+
+void SubMesh::fill_renderdata(MeshRenderData *render_data) const {
+  render_data->geometry = &geometry;
+  render_data->material = material_id;
+  render_data->mesh = mesh;
+#if _DEBUG
+  render_data->submesh = this;
+#endif
+
 }
 
 void SubMesh::update() {
@@ -34,14 +44,9 @@ void Mesh::submit(const TrackedLocation &location, int material_id, GraphicsObje
   for (size_t i = 0; i < submeshes.size(); ++i) {
     const SubMesh *submesh = submeshes[i];
     MeshRenderData *render_data = GRAPHICS.alloc_command_data<MeshRenderData>();
-    render_data->geometry = &submesh->geometry;
     render_data->technique = technique;
-    render_data->material = submesh->material_id;
-    render_data->mesh = submesh->mesh;
-#if _DEBUG
-    render_data->submesh = submesh;
-#endif
-    GRAPHICS.submit_command(location, submesh->render_key, render_data);
+    submesh->fill_renderdata(render_data);
+    GRAPHICS.submit_command(location, submesh->render_key(), render_data);
   }
 }
 

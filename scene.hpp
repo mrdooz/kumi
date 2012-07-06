@@ -2,7 +2,7 @@
 #include "graphics_submit.hpp"
 
 struct TrackedLocation;
-struct Mesh;
+class Mesh;
 class Material;
 
 struct Camera {
