@@ -12,7 +12,6 @@ static const float InvGamma = 1/Gamma;
 
 #if DIFFUSE_TEXTURE
 Texture2D DiffuseTexture : register(t0);
-sampler LinearSampler : register(s0);
 #endif
 
 ///////////////////////////////////
@@ -73,7 +72,6 @@ Texture2D rt_pos : register(t0);
 Texture2D rt_normal : register(t1);
 Texture2D rt_diffuse : register(t2);
 Texture2D rt_specular : register(t3);
-sampler PointSampler : register(s0);
 
 float4 kernel[32];
 float4 noise[16];
@@ -195,24 +193,11 @@ float4 light_ps_main(quad_ps_input input) : SV_Target
 ///////////////////////////////////
 // Gamma correction
 ///////////////////////////////////
-
-//Texture2D rt_composite : register(t0);
-//Texture2D rt_luminance : register(t1);
-Texture2D rt_composite;
-Texture2D rt_luminance;
+Texture2D rt_composite : register(t0);
 
 float4 gamma_ps_main(quad_ps_input input) : SV_Target
 {
-  float ll = exp(rt_luminance.SampleLevel(PointSampler, input.tex, 10.0));
-  //float2 vtc = float2( input.tex - 0.5 );
-  //float vignette = pow( 1 - ( dot( vtc, vtc ) * 1.0 ), 2.0 );
-  float4 g = pow(rt_composite.Sample(PointSampler, input.tex), InvGamma);
- 
-  //float exposure = 2.0;
-  //float4 exposed = 1.0 - pow( 2.71, -( vignette * g * exposure ) );
-  //return exposed;
-  
-  //return g;
-  return float4(max(0, g.r - ll), max(0, g.g - ll), max(0, g.b - ll), 1);
-  //return pow(rt_composite.Sample(PointSampler, input.tex), InvGamma);
+  float4 color = rt_composite.Sample(PointSampler, input.tex);
+  float4 bloom = Texture1.Sample(LinearSampler, input.tex);
+  return pow(color + 0.25 * bloom, InvGamma);
 }

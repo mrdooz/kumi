@@ -120,7 +120,7 @@ public:
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
-  GraphicsObjectHandle create_temp_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);
+  GraphicsObjectHandle get_temp_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);
   void release_temp_render_target(GraphicsObjectHandle h);
 
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);

@@ -3,6 +3,9 @@ Texture2D Texture1 : register(t1);
 Texture2D Texture2 : register(t2);
 Texture2D Texture3 : register(t3);
 
+sampler LinearSampler;
+sampler PointSampler;
+
 struct quad_vs_input {
     float4 pos : SV_POSITION;
     float2 tex : TEXCOORD;

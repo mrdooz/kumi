@@ -2,7 +2,7 @@ include common.tec;
 
 technique luminance_map {
   vertex_shader {
-      file effects/luminance.fx;
+      file effects/common.fx;
       entry_point quad_vs_main;
   };
   
@@ -10,7 +10,7 @@ technique luminance_map {
       file effects/luminance.fx;
       entry_point luminance_map_ps_main;
       params [
-          texture2d rt_composite system;
+          texture2d Texture0 user;
       ];
   };
   
@@ -20,4 +20,91 @@ technique luminance_map {
   depth_stencil_desc = DepthDisable;
   blend_desc = BlendDisable;
 };
+
+technique scale_cutoff {
+  vertex_shader {
+      file effects/common.fx;
+      entry_point quad_vs_main;
+  };
+  
+  pixel_shader {
+      file effects/luminance.fx;
+      entry_point scale_cutoff;
+      params [
+          texture2d Texture0 user;
+          texture2d rt_luminance system;
+      ];
+  };
+  
+  geometry = fs_quad_postex;
+  
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
+};
+
+
+technique scale {
+  vertex_shader {
+      file effects/common.fx;
+      entry_point quad_vs_main;
+  };
+  
+  pixel_shader {
+      file effects/luminance.fx;
+      entry_point scale;
+      params [
+          texture2d Texture0 user;
+      ];
+  };
+  
+  geometry = fs_quad_postex;
+  
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
+};
+
+technique blur_horiz {
+  vertex_shader {
+      file effects/common.fx;
+      entry_point quad_vs_main;
+  };
+  
+  pixel_shader {
+      file effects/luminance.fx;
+      entry_point blur_horiz;
+      params [
+          texture2d Texture0 user;
+      ];
+  };
+  
+  geometry = fs_quad_postex;
+  
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
+};
+
+technique blur_vert {
+  vertex_shader {
+      file effects/common.fx;
+      entry_point quad_vs_main;
+  };
+  
+  pixel_shader {
+      file effects/luminance.fx;
+      entry_point blur_vert;
+      params [
+          texture2d Texture0 user;
+      ];
+  };
+  
+  geometry = fs_quad_postex;
+  
+  rasterizer_desc = NoCulling;
+  depth_stencil_desc = DepthDisable;
+  blend_desc = BlendDisable;
+};
+
 

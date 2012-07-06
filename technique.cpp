@@ -13,9 +13,6 @@ using namespace boost::assign;
 using namespace std;
 
 Technique::Technique()
-  //: _rasterizer_desc(CD3D11_DEFAULT())
-  //: _blend_desc(CD3D11_DEFAULT())
-  // _depth_stencil_desc(CD3D11_DEFAULT())
   : _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
   , _valid(false)
@@ -452,13 +449,6 @@ bool Technique::init() {
   if (!_depth_stencil_state.is_valid())
     _depth_stencil_state = GRAPHICS.default_depth_stencil_state();
 
-  // create all the sampler states from the descs
-/*
-  for (auto i = begin(_sampler_descs), e = end(_sampler_descs); i != e; ++i) {
-    PropertyId id = PROPERTY_MANAGER.get_or_create_placeholder(i->first);
-    _sampler_states.push_back(make_pair(id, GRAPHICS.create_sampler_state(FROM_HERE, i->second)));
-  }
-*/
   // create the shaders from the templates
   if (_vs_shader_template) {
     if (!create_shaders(_vs_shader_template))

@@ -118,7 +118,7 @@ void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
   _immediate_context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-GraphicsObjectHandle Graphics::create_temp_render_target(const TrackedLocation &loc, 
+GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc, 
     int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
 
   assert(_render_targets._key_to_idx.find(name) == _render_targets._key_to_idx.end());
@@ -950,18 +950,15 @@ void Graphics::render() {
     switch (key.cmd) {
 
       case RenderKey::kSetRenderTarget: {
-        ID3D11RenderTargetView *rts[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
-        ID3D11DepthStencilView *dsv = nullptr;
-        int num_targets = 0;
         if (!data) {
-          // set default render target
-          Graphics::RenderTargetResource *rt = _render_targets.get(GRAPHICS.default_render_target());
-          rts[0] = rt->rtv.resource;
-          dsv = rt->dsv.resource;
-          num_targets = 1;
+          set_default_render_target();
 
         } else {
+          ID3D11RenderTargetView *rts[8] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+          ID3D11DepthStencilView *dsv = nullptr;
+          int num_targets = 0;
           RenderTargetData *rt_data = (RenderTargetData *)data;
+          D3D11_TEXTURE2D_DESC texture_desc;
           int i;
           float color[4] = {0,0,0,0};
           // Collect the valid render targets, set the first available depth buffer
@@ -971,6 +968,7 @@ void Graphics::render() {
             if (!h.is_valid())
               break;
             Graphics::RenderTargetResource *rt = _render_targets.get(h);
+            texture_desc = rt->texture.desc;
             if (!dsv && rt->dsv.resource) {
               dsv = rt->dsv.resource;
             }
@@ -984,8 +982,10 @@ void Graphics::render() {
             }
           }
           num_targets = i;
+          CD3D11_VIEWPORT viewport(0.0f, 0.0f, (float)texture_desc.Width, (float)texture_desc.Height);
+          ctx->RSSetViewports(1, &viewport);
+          ctx->OMSetRenderTargets(num_targets, rts, dsv);
         }
-        ctx->OMSetRenderTargets(num_targets, rts, dsv);
         break;
       }
 
@@ -1321,7 +1321,23 @@ void Graphics::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_T
     }
 
     if (num_resources) {
-      _immediate_context->PSSetShaderResources(first_resource, num_resources, &d3dresources[first_resource]);
+      int ofs = first_resource;
+      int num_resources_set = 0;
+      while (ofs < MAX_TEXTURES && num_resources_set < num_resources) {
+        // handle non sequential resources
+        int cur = 0;
+        int tmp = ofs;
+        while (resources[ofs].is_valid()) {
+          ofs++;
+          cur++;
+          if (ofs == MAX_TEXTURES)
+            break;
+        }
+        _immediate_context->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+        num_resources_set += cur;
+        while (ofs < MAX_TEXTURES && !resources[ofs].is_valid())
+          ofs++;
+      }
       memcpy(prev_resources, resources.data(), size);
     }
   }

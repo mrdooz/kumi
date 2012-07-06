@@ -142,6 +142,7 @@ technique gamma_correction {
         params [
             texture2d rt_composite system;
             texture2d rt_luminance system;
+            texture2d Texture1 user;
         ];
     };
    

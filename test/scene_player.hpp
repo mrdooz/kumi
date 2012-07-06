@@ -33,6 +33,8 @@ private:
 
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
+  void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
+
   PropertyId _light_pos_id, _light_color_id, _light_att_start_id, _light_att_end_id;
   PropertyId _view_mtx_id, _proj_mtx_id;
 
@@ -54,6 +56,8 @@ private:
   GraphicsObjectHandle _ssao_ambient;
   GraphicsObjectHandle _ssao_light;
   GraphicsObjectHandle _gamma_correct;
+  GraphicsObjectHandle _scale, _scale_cutoff;
+  GraphicsObjectHandle _blur_horiz, _blur_vert;
 
   GraphicsObjectHandle _luminance_map;
 

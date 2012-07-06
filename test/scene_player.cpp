@@ -90,6 +90,10 @@ bool ScenePlayer::init() {
   _default_shader = GRAPHICS.find_technique("default_shader");
   _gamma_correct = GRAPHICS.find_technique("gamma_correction");
   _luminance_map = GRAPHICS.find_technique("luminance_map");
+  _scale = GRAPHICS.find_technique("scale");
+  _scale_cutoff = GRAPHICS.find_technique("scale_cutoff");
+  _blur_horiz = GRAPHICS.find_technique("blur_horiz");
+  _blur_vert = GRAPHICS.find_technique("blur_vert");
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
@@ -261,7 +265,7 @@ bool ScenePlayer::render() {
     int h = GRAPHICS.height();
 
     auto tmp_rt = [&](bool depth, DXGI_FORMAT fmt, bool mip_map, const string& name) {
-      return GRAPHICS.create_temp_render_target(FROM_HERE, w, h, depth, fmt, mip_map, name);
+      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, depth, fmt, mip_map, name);
     };
 
     GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, false, "System::rt_pos");
@@ -275,7 +279,7 @@ bool ScenePlayer::render() {
     GraphicsObjectHandle rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion");
     GraphicsObjectHandle rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, false, "System::rt_occlusion_tmp");
 
-    GraphicsObjectHandle rt_luminance = GRAPHICS.create_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
+    GraphicsObjectHandle rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
 
     {
       // Fill the g-buffer
@@ -293,37 +297,14 @@ bool ScenePlayer::render() {
       _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
     }
 
-    {
-      // Calc the occlusion
-      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = rt_occlusion_tmp;
-      data->clear_target[0] = true;
+    // Calc the occlusion
+    post_process(GraphicsObjectHandle(), rt_occlusion_tmp, _ssao_compute);
 
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
-      GFX_SUBMIT_TECH(_ssao_compute, nullptr);
-    }
+    // Blur the occlusion
+    post_process(rt_occlusion_tmp, rt_occlusion, _ssao_blur);
 
-    {
-      // Blur the occlusion
-      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = rt_occlusion;
-      data->clear_target[0] = true;
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
-
-      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
-      rd->user_textures = 1;
-      rd->textures[0] = rt_occlusion_tmp;
-      GFX_SUBMIT_TECH(_ssao_blur, rd);
-    }
-
-    {
-      // Render Ambient * occlusion
-      RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
-      rt->render_targets[0] = rt_composite;
-      rt->clear_target[0] = true;
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
-      GFX_SUBMIT_TECH(_ssao_ambient, nullptr);
-    }
+    // Render Ambient * occlusion
+    post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
 
     {
       // Add the lighting
@@ -390,23 +371,51 @@ bool ScenePlayer::render() {
 
     {
       // calc luminance
-      RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
-      rt->render_targets[0] = rt_luminance;
-      rt->clear_target[0] = true;
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
-      GFX_SUBMIT_TECH(_luminance_map, nullptr);
+      post_process(rt_composite, rt_luminance, _luminance_map);
 
       // meh, this is getting stupid now.. the whole submit stuff is close to disappearing :P
       // or, actually, I should move to using DX deferred contexts, because that's what I'm
       // trying to emulate anyways..
       GFX_SUBMIT_CMD(RenderKey(RenderKey::kGenerateMips, rt_luminance), nullptr);
     }
+    auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    GraphicsObjectHandle downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, false, fmt, false, "downscale1");
+    GraphicsObjectHandle downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, false, fmt, false, "downscale2");
+    GraphicsObjectHandle downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "downscale3");
+    GraphicsObjectHandle blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "blur_tmp");
+
+    {
+
+      // scale down
+      post_process(rt_composite, downscale1, _scale_cutoff);
+      post_process(downscale1, downscale2, _scale);
+      post_process(downscale2, downscale3, _scale);
+
+      // apply blur
+      for (int i = 0; i < 4; ++i) {
+        post_process(downscale3, blur_tmp, _blur_horiz);
+        post_process(blur_tmp, downscale3, _blur_horiz);
+      }
+
+      // scale up
+      post_process(downscale3, downscale2, _scale);
+      post_process(downscale2, downscale1, _scale);
+    }
 
     {
       // gamma correction
       GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), nullptr);
-      GFX_SUBMIT_TECH(_gamma_correct, nullptr);
+
+      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
+      rd->user_textures = 1;
+      rd->textures[1] = downscale1;
+      GFX_SUBMIT_TECH(_gamma_correct, rd);
     }
+
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, blur_tmp), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale3), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale2), nullptr);
+    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale1), nullptr);
 
     GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_pos), nullptr);
     GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_normal), nullptr);
@@ -420,6 +429,22 @@ bool ScenePlayer::render() {
   }
 
   return true;
+}
+
+void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique) {
+
+  RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
+  rt->render_targets[0] = output;
+  rt->clear_target[0] = true;
+  GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
+
+  TechniqueRenderData *rd = nullptr;
+  if (input.is_valid()) {
+    rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
+    rd->user_textures = 1;
+    rd->textures[0] = input;
+  }
+  GFX_SUBMIT_TECH(technique, rd);
 }
 
 bool ScenePlayer::close() {
