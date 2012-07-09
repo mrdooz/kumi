@@ -200,7 +200,43 @@ void App::on_idle() {
 }
 
 void App::add_network_msg(SOCKET sender, const char *msg, int len) {
-  WEBSOCKET_SERVER.send_msg(sender, msg, len);
+
+  if (strncmp(msg, "REQ:SYSTEM.FPS", len) == 0) {
+    auto obj = JsonValue::create_object();
+    obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
+    obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
+    string str = print_json(obj);
+    // meh
+    char *buf = new char[str.size()];
+    memcpy(buf, str.data(), str.size());
+    //WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
+
+  } else if (strncmp(msg, "REQ:DEMO.INFO", len) == 0) {
+    string str = print_json(DEMO_ENGINE.get_info());
+    char *buf = new char[str.size()];
+    memcpy(buf, str.data(), str.size());
+    WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
+
+  } else {
+    JsonValue::JsonValuePtr m = parse_json(msg, msg + len);
+    if ((*m)["msg"]) {
+      // msg has type and data fields
+      auto d = (*m)["msg"];
+      auto type = (*d)["type"]->to_string();
+      auto data = (*d)["data"];
+
+      if (type == "time") {
+        bool playing = (*data)["is_playing"]->to_bool();
+        int cur_time = (*data)["cur_time"]->to_int();
+        DEMO_ENGINE.set_pos(cur_time);
+        DEMO_ENGINE.set_paused(!playing);
+      } else if (type == "demo") {
+        DEMO_ENGINE.update(data);
+      }
+    }
+  }
+
+  delete [] msg;
 }
 
 UINT App::run(void *userdata) {

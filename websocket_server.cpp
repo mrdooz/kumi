@@ -60,7 +60,7 @@ struct WebSocketMessageHeader {
   char data[0];
 
   uint64_t GetMessageLength() const {
-    return sizeof(WebSocketMessageHeader) + GetPayloadOffset() + GetPayloadLength();
+    return GetPayloadOffset() + GetPayloadLength();
   }
 
   size_t GetPayloadOffset() const {
@@ -74,15 +74,15 @@ struct WebSocketMessageHeader {
     if (bits.LEN < 125 )
       return bits.LEN;
     else if (bits.LEN == 126)
-      return *(uint16_t*)data;
+      return ntohs(*(uint16_t*)data);
     else if (bits.LEN == 127)
       return *(uint64_t*)data;
     return -1;
   }
 
-  uint8_t *GetMask() const {
+  size_t GetMaskOffset() const {
     assert(bits.MASK);
-    return (uint8_t*)&data[GetPayloadOffset() - offsetof(WebSocketMessageHeader, data) - 4];
+    return GetPayloadOffset() - sizeof(uint32_t);
   }
 
   OpCode GetOpCode() const { return (OpCode)bits.OP_CODE; }
@@ -115,11 +115,13 @@ static string websocket_handshake(const char *msg) {
     response + "\r\n\r\n";
 }
 
+static uint64_t hton64(uint64_t x) {
+  return ((uint64_t)htonl(x & 0xffffffff)) << 32 | htonl(x >> 32);
+}
 
 static void websocket_frame(const char *payload, int len, vector<char> *msg) {
 
-  // we always use a mask
-  int hdr_size = sizeof(WebSocketMessageHeader) + sizeof(uint32_t);
+  int hdr_size = sizeof(WebSocketMessageHeader)/* + sizeof(uint32_t)*/;
 
   WebSocketMessageHeader *hdr = nullptr;
 
@@ -133,42 +135,44 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
     msg->resize(hdr_size + len);
     hdr = (WebSocketMessageHeader *)msg->data();
     hdr->bits.LEN = 126;
-    *(uint16_t *)&hdr->data = len;
+    *(uint16_t *)&hdr->data = htons(len);
 
   } else {
     hdr_size += sizeof(uint64_t);
     msg->resize(hdr_size + len);
     hdr = (WebSocketMessageHeader *)msg->data();
     hdr->bits.LEN = 127;
-    *(uint64_t *)&hdr->data = len;
+    *(uint64_t *)&hdr->data = hton64(len);
   }
 
-  hdr->bits.MASK = 1;
+  hdr->bits.MASK = 0;
   hdr->bits.FIN = 1;
   hdr->bits.OP_CODE = WebSocketMessageHeader::kOpTextMessage;
 
-  uint8_t *mask = hdr->GetMask();
-  for (int i = 0; i < 4; ++i)
-    mask[i] = i+1;
-
-  char *encoded = msg->data() + hdr->GetPayloadOffset();
-  for (int i = 0; i < len; ++i) {
-    encoded[i] = payload[i] ^ mask[i%4];
-  }
+  memcpy(msg->data() + hdr->GetPayloadOffset(), payload, len);
 }
 
 struct ClientData {
   SOCKET socket;
+  WebSocketThread *self;
   HANDLE close_event;
+  HANDLE thread;
 };
 
-DWORD WINAPI client_thread(void *param) {
+DWORD WINAPI WebSocketThread::client_thread(void *param) {
 
   const int BUF_SIZE = 32 * 1024;
   char *buf = (char *)_alloca(BUF_SIZE);
 
   ClientData cd = *(ClientData *)param;
-  DEFER([=]() { closesocket(cd.socket); });
+
+  // When we go out of scope, close the socket, and delete ourselves from the thread list
+  DEFER([=]() { 
+    closesocket(cd.socket); 
+    SCOPED_CS(cd.self->_thread_cs);
+    auto it = std::find(RANGE(cd.self->_client_threads), cd.thread);
+    cd.self->_client_threads.erase(it);
+  });
 
   int ret = recv(cd.socket, buf, BUF_SIZE, 0);
   if (ret < 0) {
@@ -210,7 +214,7 @@ DWORD WINAPI client_thread(void *param) {
     if (WSARecv(cd.socket, &wsabuf, 1, &bytes_read, &flags, &overlapped, NULL) == SOCKET_ERROR) {
       int err = WSAGetLastError();
       if (err != WSA_IO_PENDING) {
-        LOG_ERROR_LN("Error in recv: %d", WSAGetLastError());
+        LOG_INFO_LN("Error in recv: %d", WSAGetLastError());
         return 1;
       }
     }
@@ -229,8 +233,8 @@ DWORD WINAPI client_thread(void *param) {
         // decode the message, and send it to the app
         int len = (int)header->GetPayloadLength();
         char *decoded = new char[len];
-        const uint8_t *mask = header->GetMask();
-        uint8_t *data = (uint8_t *)(buf + header->GetPayloadOffset());
+        const char *mask = buf + header->GetMaskOffset();
+        const char *data = buf + header->GetPayloadOffset();
         for (int i = 0; i < len; ++i) {
           decoded[i] = data[i] ^ mask[i%4];
         }
@@ -309,10 +313,14 @@ UINT WebSocketThread::blocking_run(void *param) {
     if (client_socket != INVALID_SOCKET) {
       DWORD thread_id;
       ClientData cd;
+      cd.self = this;
       cd.close_event = _cancel_event;
       cd.socket = client_socket;
-      HANDLE h = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
-      _client_threads.push_back(h);
+      cd.thread = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
+      {
+        SCOPED_CS(_thread_cs);
+        _client_threads.push_back(cd.thread);
+      }
     }
   }
 
@@ -322,16 +330,11 @@ UINT WebSocketThread::blocking_run(void *param) {
 
 void WebSocketThread::send_msg(SOCKET receiver, const char *msg, int len) {
 
-  if (strncmp(msg, "REQ:SYSTEM.FPS", len) == 0) {
-    auto obj = JsonValue::create_object();
-    obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
-    obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
-    string str = print_json(obj);
+  vector<char> frame;
+  websocket_frame(msg, len, &frame);
+  int res = send(receiver, frame.data(), frame.size(), 0);
 
-    vector<char> frame;
-    websocket_frame(str.c_str(), str.size(), &frame);
-    send(receiver, frame.data(), frame.size(), 0);
-  }
+  delete [] msg;
 
 }
 
