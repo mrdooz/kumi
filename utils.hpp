@@ -50,6 +50,7 @@ struct ScopedObj
 
 #define SCOPED_CONC_CS(x) MAKE_SCOPED(Concurrency::critical_section::scoped_lock)(x);
 #define SCOPED_OBJ(x) MAKE_SCOPED(ScopedObj)(x);
+#define DEFER(x) MAKE_SCOPED(ScopedObj)(x);
 #define SCOPED_CS(cs) ScopedCs lock(cs);
 
 // A macro to disallow the copy constructor and operator= functions

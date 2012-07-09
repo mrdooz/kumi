@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "threading.hpp"
+#include "profiler.hpp"
 
 using std::pair;
 using std::make_pair;
@@ -79,7 +80,7 @@ void Dispatcher::set_thread(ThreadId id, Thread *thread) {
 //////////////////////////////////////////////////////////////////////////
 Thread::Thread(ThreadId thread_id) 
   : _thread(INVALID_HANDLE_VALUE) 
-  , _cancel_event(CreateEvent(NULL, FALSE, FALSE, NULL))
+  , _cancel_event(CreateEvent(NULL, TRUE, FALSE, NULL))
   , _thread_id(thread_id)
   , _thread_start(timeGetTime())
   , _ping_pong_idx(0)
@@ -122,6 +123,8 @@ void Thread::add_deferred(const DeferredCall &call) {
 }
 
 void Thread::process_deferred() {
+  //ADD_PROFILE_SCOPE();
+
   DWORD now = timeGetTime();
 
   // process time-dependent callbacks

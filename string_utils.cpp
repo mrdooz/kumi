@@ -101,3 +101,15 @@ bool begins_with(const char *str, const char *sub_str) {
 
 	return true;
 }
+
+string base64encode(const uint8_t *buf, int buf_size) {
+  DWORD len;
+  string res;
+  if (CryptBinaryToStringA(buf, buf_size, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, NULL, &len)) {
+    res.resize(len);
+    // drop the trailing '\0'
+    if (CryptBinaryToStringA(buf, buf_size, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF, (LPSTR)res.data(), &len))
+      res.pop_back();
+  }
+  return res;
+}

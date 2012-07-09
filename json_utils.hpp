@@ -33,6 +33,7 @@ public:
   virtual bool add_key_value(const std::string &key, uint32 value)  { assert(!"Not an object"); return false; }
   virtual bool add_key_value(const std::string &key, double value) { assert(!"Not an object"); return false; }
   virtual bool add_key_value(const std::string &key, const std::string &value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, const char *value) { return add_key_value(key, std::string(value)); }
   virtual bool add_key_value(const std::string &key, bool value) { assert(!"Not an object"); return false; }
 
   int to_int() const { assert(_type == JS_INT); return _int; }

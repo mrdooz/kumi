@@ -13,6 +13,7 @@
 #include "material_manager.hpp"
 #include "threading.hpp"
 #include "kumi.hpp"
+#include "profiler.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
@@ -97,6 +98,7 @@ bool App::init(HINSTANCE hinstance)
 #if WITH_WEBSOCKETS
   B_ERR_BOOL(WebSocketServer::create());
 #endif
+  B_ERR_BOOL(ProfileManager::create());
 
   B_ERR_BOOL(create_window());
 
@@ -135,6 +137,7 @@ bool App::init(HINSTANCE hinstance)
 
 bool App::close() {
 
+  B_ERR_BOOL(ProfileManager::close());
 #if WITH_WEBSOCKETS
   B_ERR_BOOL(WebSocketServer::close());
 #endif
@@ -196,6 +199,10 @@ bool App::create_window()
 void App::on_idle() {
 }
 
+void App::add_network_msg(SOCKET sender, const char *msg, int len) {
+  WEBSOCKET_SERVER.send_msg(sender, msg, len);
+}
+
 UINT App::run(void *userdata) {
   MSG msg = {0};
 
@@ -219,6 +226,7 @@ UINT App::run(void *userdata) {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
+      PROFILE_MANAGER.start_frame();
 
       LARGE_INTEGER start, end;
       QueryPerformanceCounter(&start);
@@ -246,6 +254,10 @@ UINT App::run(void *userdata) {
       } else {
         _frame_time = cur_frame;
       }
+
+      on_idle();
+
+      PROFILE_MANAGER.end_frame();
 
     }
   }

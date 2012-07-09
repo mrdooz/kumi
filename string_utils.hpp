@@ -13,4 +13,6 @@ wstring utf8_to_wide(const char *str);
 
 bool begins_with(const char *str, const char *sub_str);
 
+std::string base64encode(const uint8_t *buf, int buf_size);
+
 #endif

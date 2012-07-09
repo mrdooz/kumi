@@ -22,7 +22,7 @@
 #endif
 
 #if WITH_WEBSOCKETS
-#pragma comment(lib, "websocketpp.lib")
+//#pragma comment(lib, "websocketpp.lib")
 #endif
 
 #if WITH_GWEN
@@ -37,7 +37,10 @@
 #if WITH_ZMQ_LOGSERVER
 #include <zmq.h>
 #else
+#if WITH_WEBSOCKETS
 #include <WinSock2.h>
+#include <ws2tcpip.h>
+#endif
 #endif
 
 #include <windows.h>

@@ -3,6 +3,7 @@
 #include "logger.hpp"
 #include "json_utils.hpp"
 #include "effect.hpp"
+#include "profiler.hpp"
 
 using namespace std;
 
@@ -89,6 +90,7 @@ void DemoEngine::reclassify_effects() {
 }
 
 bool DemoEngine::tick() {
+  ADD_PROFILE_SCOPE();
   int64 now;
   QueryPerformanceCounter((LARGE_INTEGER *)&now);
   now = now * 1000000 / _frequency;

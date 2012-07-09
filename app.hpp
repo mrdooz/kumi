@@ -72,6 +72,8 @@ public:
   void debug_text(const char *fmt, ...);
   double frame_time() const { return _frame_time; }
 
+  void add_network_msg(SOCKET sender, const char *msg, int len);
+
 private:
   DISALLOW_COPY_AND_ASSIGN(App);
   App();

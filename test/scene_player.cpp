@@ -11,6 +11,7 @@
 #include "../material.hpp"
 #include "../material_manager.hpp"
 #include "../xmath.hpp"
+#include "../profiler.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -232,6 +233,7 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
 }
 
 bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
+  ADD_PROFILE_SCOPE();
 
   if (!_scene)
     return true;
@@ -256,7 +258,7 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 }
 
 bool ScenePlayer::render() {
-
+  ADD_PROFILE_SCOPE();
   if (_scene) {
 
     // allocate the required render targets

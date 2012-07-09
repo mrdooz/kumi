@@ -45,6 +45,8 @@ namespace threading {
 
     ThreadId thread_id() const;
   protected:
+    DISALLOW_COPY_AND_ASSIGN(Thread);
+
     Thread(ThreadId thread_id);
     virtual ~Thread();
     virtual void add_deferred(const DeferredCall &call);
