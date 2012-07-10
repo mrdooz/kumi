@@ -128,12 +128,14 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
   if (len <= 125) {
     msg->resize(hdr_size + len);
     hdr = (WebSocketMessageHeader *)msg->data();
+    ZeroMemory(hdr, hdr_size);
     hdr->bits.LEN = len;
 
   } else if (len <= 65535) {
     hdr_size += sizeof(uint16_t);
     msg->resize(hdr_size + len);
     hdr = (WebSocketMessageHeader *)msg->data();
+    ZeroMemory(hdr, hdr_size);
     hdr->bits.LEN = 126;
     *(uint16_t *)&hdr->data = htons(len);
 
@@ -141,6 +143,7 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
     hdr_size += sizeof(uint64_t);
     msg->resize(hdr_size + len);
     hdr = (WebSocketMessageHeader *)msg->data();
+    ZeroMemory(hdr, hdr_size);
     hdr->bits.LEN = 127;
     *(uint64_t *)&hdr->data = hton64(len);
   }
@@ -174,23 +177,23 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
     cd.self->_client_threads.erase(it);
   });
 
+  HANDLE async_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+  DEFER([=] { CloseHandle(async_event); });
+  WSAEventSelect(cd.socket, async_event, FD_READ);
+  WaitForSingleObject(async_event, INFINITE);
+
   int ret = recv(cd.socket, buf, BUF_SIZE, 0);
   if (ret < 0) {
-    LOG_ERROR_LN("Error in recv: %d", ret);
-    return 1;
+    return WSAGetLastError();
   }
 
   string reply = websocket_handshake(buf);
-  if (reply.empty()) {
-    LOG_ERROR_LN("Error creating websocket handshake");
+  if (reply.empty())
     return 1;
-  }
 
   int send_result = send(cd.socket, reply.data(), reply.size(), 0);
-  if (send_result < 0) {
-    LOG_ERROR_LN("Error second handshake: %d", send_result);
-    return 1;
-  }
+  if (send_result < 0)
+    return WSAGetLastError();
 
   // create an accept event
   HANDLE events[2];
@@ -204,7 +207,6 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
     ZeroMemory(&overlapped, sizeof(overlapped));
     overlapped.hEvent = events[1];
 
-    // Receive until the peer shuts down the connection
     WSABUF wsabuf;
     wsabuf.buf = buf;
     wsabuf.len = BUF_SIZE;
@@ -213,13 +215,12 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
     DWORD flags = 0;
     if (WSARecv(cd.socket, &wsabuf, 1, &bytes_read, &flags, &overlapped, NULL) == SOCKET_ERROR) {
       int err = WSAGetLastError();
-      if (err != WSA_IO_PENDING) {
-        LOG_INFO_LN("Error in recv: %d", WSAGetLastError());
-        return 1;
-      }
+      if (err != WSA_IO_PENDING)
+        return err;
     }
 
     int idx = WSAWaitForMultipleEvents(ELEMS_IN_ARRAY(events), events, FALSE, INFINITE, FALSE);
+    // break if the cancel event was signaled
     if (idx == WSA_WAIT_EVENT_0)
       break;
 
@@ -287,40 +288,47 @@ UINT WebSocketThread::blocking_run(void *param) {
   if (res = ::bind(listen_socket, result->ai_addr, (int)result->ai_addrlen))
     return res;
 
+  // set socket to non-blocking
   ULONG p = 1;
   ioctlsocket(listen_socket, FIONBIO, &p);
 
-  while (WaitForSingleObject(_cancel_event, 0) != WAIT_OBJECT_0) {
-    if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR) {
+  HANDLE events[] = {
+    _cancel_event,
+    CreateEvent(NULL, TRUE, FALSE, NULL),
+    _callbacks_added
+  };
+
+  WSAEventSelect(listen_socket, events[1], FD_ACCEPT);
+
+//  while (WaitForSingleObject(_cancel_event, 0) != WAIT_OBJECT_0) {
+  while (true) {
+    if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR)
       return 1;
+
+    int res = WaitForMultipleObjects(3, events, FALSE, INFINITE);
+    if (res == WAIT_OBJECT_0) {
+      break;
     }
 
-    SOCKET client_socket = INVALID_SOCKET;
-    while (client_socket == INVALID_SOCKET) {
-      client_socket = accept(listen_socket, NULL, NULL);
-      if (WaitForSingleObject(_cancel_event, 0) == WAIT_OBJECT_0)
-        break;
-      if (client_socket == INVALID_SOCKET) {
-        int r = WSAGetLastError();
-        if (r != WSAEWOULDBLOCK) {
-          return 1;
+    if (res <= WAIT_OBJECT_0 + 1 && WaitForSingleObject(events[1], 0) == WAIT_OBJECT_0) {
+      SOCKET client_socket = accept(listen_socket, NULL, NULL);
+      if (client_socket != INVALID_SOCKET) {
+        DWORD thread_id;
+        ClientData cd;
+        cd.self = this;
+        cd.close_event = _cancel_event;
+        cd.socket = client_socket;
+        cd.thread = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
+        {
+          SCOPED_CS(_thread_cs);
+          _client_threads.push_back(cd.thread);
         }
-        process_deferred();
-        Sleep(1000);
       }
+      ResetEvent(events[1]);
     }
 
-    if (client_socket != INVALID_SOCKET) {
-      DWORD thread_id;
-      ClientData cd;
-      cd.self = this;
-      cd.close_event = _cancel_event;
-      cd.socket = client_socket;
-      cd.thread = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
-      {
-        SCOPED_CS(_thread_cs);
-        _client_threads.push_back(cd.thread);
-      }
+    if (res <= WAIT_OBJECT_0 + 2 && WaitForSingleObject(events[2], 0) == WAIT_OBJECT_0) {
+      process_deferred();
     }
   }
 
@@ -333,9 +341,7 @@ void WebSocketThread::send_msg(SOCKET receiver, const char *msg, int len) {
   vector<char> frame;
   websocket_frame(msg, len, &frame);
   int res = send(receiver, frame.data(), frame.size(), 0);
-
   delete [] msg;
-
 }
 
 void WebSocketThread::stop() {
@@ -364,95 +370,5 @@ WebSocketServer& WebSocketServer::instance() {
   assert(_instance);
   return *_instance;
 }
-
-#if 0
-
-class echo_server_handler : public server::handler {
-public:
-
-  static void on_main_thread(connection_ptr con, std::string str) {
-    if (str == "REQ:SYSTEM.FPS") {
-      auto obj = JsonValue::create_object();
-      obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
-      obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
-      con->send(print_json(obj), frame::opcode::TEXT);
-    } else if (str == "REQ:DEMO.INFO") {
-      con->send(print_json(DEMO_ENGINE.get_info()), frame::opcode::TEXT);
-    } else {
-      JsonValue::JsonValuePtr m = parse_json(str.c_str(), str.c_str() + str.size());
-      if ((*m)["msg"]) {
-        // msg has type and data fields
-        auto d = (*m)["msg"];
-        auto type = (*d)["type"]->to_string();
-        auto data = (*d)["data"];
-
-        if (type == "time") {
-          bool playing = (*data)["is_playing"]->to_bool();
-          int cur_time = (*data)["cur_time"]->to_int();
-          DEMO_ENGINE.set_pos(cur_time);
-          DEMO_ENGINE.set_paused(!playing);
-
-        } else if (type == "demo") {
-          DEMO_ENGINE.update(data);
-        }
-      } else {
-        LOG_WARNING_LN("Unknown websocket message: %s", str);
-      }
-    }
-  }
-
-  void on_message(connection_ptr con, message_ptr msg) {
-    DISPATCHER.invoke(FROM_HERE, threading::kMainThread, boost::bind(&echo_server_handler::on_main_thread, con, msg->get_payload()));
-  }
-};
-
-struct WebSocketThread::Impl {
-  Impl() : _server(nullptr) {}
-  websocketpp::server *_server;
-};
-
-WebSocketThread::WebSocketThread() 
-  : BlockingThread(threading::kWebSocketThread, nullptr)
-  , _impl(nullptr)
-{
-}
-
-UINT WebSocketThread::blocking_run(void *data) {
-
-  unsigned short port = 9002;
-  _impl = new Impl;
-
-  try {       
-    websocketpp::server::handler::ptr h(new echo_server_handler());
-    _impl->_server = new websocketpp::server(h);
-
-    _impl->_server->alog().unset_level(websocketpp::log::alevel::ALL);
-    _impl->_server->elog().unset_level(websocketpp::log::elevel::ALL);
-
-    _impl->_server->alog().set_level(websocketpp::log::alevel::CONNECT);
-    _impl->_server->alog().set_level(websocketpp::log::alevel::DISCONNECT);
-
-    _impl->_server->elog().set_level(websocketpp::log::elevel::RERROR);
-    _impl->_server->elog().set_level(websocketpp::log::elevel::FATAL);
-
-    _impl->_server->listen(port);
-  } catch (std::exception& e) {
-    std::cerr << "Exception: " << e.what() << std::endl;
-  }
-
-  SAFE_DELETE(_impl->_server);
-  SAFE_DELETE(_impl);
-
-  return 0;
-}
-
-void WebSocketThread::stop() {
-  if (_impl && _impl->_server)
-    _impl->_server->stop();
-  join();
-}
-
-#endif
-
 
 #endif

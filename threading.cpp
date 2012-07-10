@@ -81,6 +81,7 @@ void Dispatcher::set_thread(ThreadId id, Thread *thread) {
 Thread::Thread(ThreadId thread_id) 
   : _thread(INVALID_HANDLE_VALUE) 
   , _cancel_event(CreateEvent(NULL, TRUE, FALSE, NULL))
+  , _callbacks_added(CreateEvent(NULL, TRUE, FALSE, NULL))
   , _thread_id(thread_id)
   , _thread_start(timeGetTime())
   , _ping_pong_idx(0)
@@ -116,6 +117,7 @@ bool Thread::join() {
 }
 
 void Thread::add_deferred(const DeferredCall &call) {
+  SetEvent(_callbacks_added);
   if (call.invoke_at != ~0)
     _deferred_ping_pong[0].push(call);
   else 
@@ -151,6 +153,8 @@ void Thread::process_deferred() {
         SetEvent(cur.handle);
     }
   }
+
+  ResetEvent(_callbacks_added);
 }
 
 //////////////////////////////////////////////////////////////////////////

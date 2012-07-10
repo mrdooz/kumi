@@ -56,6 +56,7 @@ namespace threading {
     HANDLE _thread;
     ThreadId _thread_id;
     HANDLE _cancel_event;
+    HANDLE _callbacks_added;
     Concurrency::concurrent_queue<DeferredCall> _deferred;
     int _ping_pong_idx;
     Concurrency::concurrent_queue<DeferredCall> _deferred_ping_pong[2];

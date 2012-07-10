@@ -209,7 +209,7 @@ void App::add_network_msg(SOCKET sender, const char *msg, int len) {
     // meh
     char *buf = new char[str.size()];
     memcpy(buf, str.data(), str.size());
-    //WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
+    WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
 
   } else if (strncmp(msg, "REQ:DEMO.INFO", len) == 0) {
     string str = print_json(DEMO_ENGINE.get_info());
