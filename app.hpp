@@ -3,6 +3,7 @@
 
 #include "graphics.hpp"
 #include "threading.hpp"
+#include "json_utils.hpp"
 #if WITH_WEBSOCKETS
 #include "websocket_server.hpp"
 #endif
@@ -72,13 +73,14 @@ public:
   void debug_text(const char *fmt, ...);
   double frame_time() const { return _frame_time; }
 
-  void add_network_msg(SOCKET sender, const char *msg, int len);
+  void process_network_msg(SOCKET sender, const char *msg, int len);
 
 private:
   DISALLOW_COPY_AND_ASSIGN(App);
   App();
   ~App();
 
+  void send_stats(const JsonValue::JsonValuePtr &frame);
   bool create_window();
   void set_client_size();
   void find_app_root();

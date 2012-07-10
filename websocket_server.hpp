@@ -19,7 +19,15 @@ private:
   static DWORD WINAPI client_thread(void *param);
 
   CriticalSection _thread_cs;
-  std::vector<HANDLE> _client_threads;
+  struct ClientData {
+    friend bool operator==(const ClientData &lhs, const ClientData &rhs) { return lhs.thread == rhs.thread; }
+    SOCKET socket;
+    WebSocketThread *self;
+    HANDLE close_event;
+    HANDLE thread;
+  };
+
+  std::vector<ClientData> _client_threads;
 };
 
 class WebSocketServer {

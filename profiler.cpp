@@ -3,14 +3,12 @@
 #include "utils.hpp"
 #include "json_utils.hpp"
 
+using namespace std;
+
 ProfileManager *ProfileManager::_instance;
 
-ProfileManager::StackEntry::StackEntry(ProfileScope *scope)
-  : scope(scope) {
-  QueryPerformanceCounter(&start_time);
-}
-
 ProfileManager::ProfileManager() {
+  QueryPerformanceFrequency(&_frequency);
 }
 
 ProfileManager &ProfileManager::instance() {
@@ -31,48 +29,85 @@ bool ProfileManager::close() {
 }
 
 void ProfileManager::enter_scope(ProfileScope *scope) {
-  _active_threads.insert(scope->thread_id);
-  auto &callstack = _callstack[scope->thread_id];
-  callstack.emplace(StackEntry(scope));
+  SCOPED_CS(_callstack_cs);
+
+  LARGE_INTEGER now;
+  QueryPerformanceCounter(&now);
+
+  DWORD thread_id = scope->thread_id;
+  Timeline *timeline = nullptr;
+  auto it = _timeline.find(thread_id);
+  if (it == _timeline.end()) {
+    timeline = new Timeline(thread_id, now);
+    _timeline.insert(make_pair(thread_id, timeline));
+  } else {
+    timeline = it->second;
+  }
+
+  auto &cs = timeline->callstack;
+  TimelineEvent event(scope->name, now, cs.size(), cs.empty() ? -1 : cs.top());
+  timeline->callstack.push(timeline->events.size());
+  timeline->events.emplace_back(event);
+  timeline->max_depth = max(timeline->max_depth, (int)timeline->callstack.size());
+
 }
 
 void ProfileManager::leave_scope(ProfileScope *scope) {
-  auto &callstack = _callstack[scope->thread_id];
-  auto &top = callstack.top();
-  assert(top.scope == scope);
-  QueryPerformanceCounter(&top.end_time);
-  _timeline[scope->thread_id].emplace_back(ProfileEvent(top));
-  callstack.pop();
+  SCOPED_CS(_callstack_cs);
+
+  DWORD thread_id = scope->thread_id;
+  assert(_timeline.find(thread_id) != _timeline.end());
+  Timeline *timeline = _timeline[thread_id];
+  int idx = timeline->callstack.top();
+  timeline->callstack.pop();
+  QueryPerformanceCounter(&timeline->events[idx].end);
 }
 
 void ProfileManager::start_frame() {
+  QueryPerformanceCounter(&_frame_start);
 }
 
-void ProfileManager::end_frame() {
+JsonValue::JsonValuePtr ProfileManager::end_frame() {
+
+  SCOPED_CS(_callstack_cs);
+
   // create the json rep of the current frame
+  QueryPerformanceCounter(&_frame_end);
+
+  double freq = (double)_frequency.QuadPart;
 
   auto &root = JsonValue::create_object();
-  for (auto it = begin(_active_threads); it != end(_active_threads); ++it) {
+  auto &container = JsonValue::create_object();
+  root->add_key_value("system.profile", container);
+  auto &threads = JsonValue::create_array();
+  container->add_key_value("startTime", _frame_start.QuadPart / freq);
+  container->add_key_value("endTime", _frame_end.QuadPart / freq);
+  container->add_key_value("threads", threads);
+
+  for (auto it = begin(_timeline); it != end(_timeline); ++it) {
 
     auto &cur_thread = JsonValue::create_object();
-    DWORD thread_id = *it;
-    cur_thread->add_key_value("ThreadId", (int)thread_id);
+    auto &tl = it->second;
+    DWORD thread_id = it->first;
+    cur_thread->add_key_value("threadId", (int)thread_id);
+    cur_thread->add_key_value("maxDepth", tl->max_depth);
     auto &timeline = JsonValue::create_array();
 
-    for (auto j = begin(_timeline[thread_id]); j != end(_timeline[thread_id]); ++j) {
+    for (auto j = begin(tl->events); j != end(tl->events); ++j) {
       auto &cur_event = JsonValue::create_object();
-      cur_event->add_key_value("Name", j->name);
-      cur_event->add_key_value("Start", (double)j->start_time.QuadPart);
-      cur_event->add_key_value("End", (double)j->end_time.QuadPart);
+      cur_event->add_key_value("name", j->name);
+      cur_event->add_key_value("start", j->start.QuadPart / freq);
+      cur_event->add_key_value("end", j->end.QuadPart / freq);
+      cur_event->add_key_value("level", j->cur_level);
       timeline->add_value(cur_event);
     }
-    cur_thread->add_key_value("Events", timeline);
+    cur_thread->add_key_value("events", timeline);
+    threads->add_value(cur_thread);
   }
 
-  _callstack.clear();
-  _timeline.clear();
-  _active_threads.clear();
+  assoc_delete(&_timeline);
 
+  return root;
 }
 
 

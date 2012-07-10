@@ -161,7 +161,6 @@ void App::set_client_size()
   GetWindowRect(_hwnd, &window_rect);
   window_rect.right -= window_rect.left;
   window_rect.bottom -= window_rect.top;
-  window_rect.left = window_rect.top = 0;
   const int dx = window_rect.right - client_rect.right;
   const int dy = window_rect.bottom - client_rect.bottom;
 
@@ -199,24 +198,23 @@ bool App::create_window()
 void App::on_idle() {
 }
 
-void App::add_network_msg(SOCKET sender, const char *msg, int len) {
+static void send_json(SOCKET socket, const JsonValue::JsonValuePtr json) {
+  string str = print_json(json);
+  char *buf = new char[str.size()];
+  memcpy(buf, str.data(), str.size());
+  WEBSOCKET_SERVER.send_msg(socket, buf, str.size());
+}
+
+void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 
   if (strncmp(msg, "REQ:SYSTEM.FPS", len) == 0) {
     auto obj = JsonValue::create_object();
     obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
     obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
-    string str = print_json(obj);
-    // meh
-    char *buf = new char[str.size()];
-    memcpy(buf, str.data(), str.size());
-    WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
+    send_json(sender, obj);
 
   } else if (strncmp(msg, "REQ:DEMO.INFO", len) == 0) {
-    string str = print_json(DEMO_ENGINE.get_info());
-    char *buf = new char[str.size()];
-    memcpy(buf, str.data(), str.size());
-    WEBSOCKET_SERVER.send_msg(sender, buf, str.size());
-
+    send_json(sender, DEMO_ENGINE.get_info());
   } else {
     JsonValue::JsonValuePtr m = parse_json(msg, msg + len);
     if ((*m)["msg"]) {
@@ -237,6 +235,19 @@ void App::add_network_msg(SOCKET sender, const char *msg, int len) {
   }
 
   delete [] msg;
+}
+
+void App::send_stats(const JsonValue::JsonValuePtr &frame) {
+
+  {
+    auto obj = JsonValue::create_object();
+    obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
+    obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
+    send_json(0, obj);
+  }
+
+  send_json(0, frame);
+
 }
 
 UINT App::run(void *userdata) {
@@ -263,38 +274,41 @@ UINT App::run(void *userdata) {
       DispatchMessage(&msg);
     } else {
       PROFILE_MANAGER.start_frame();
+      {
+        ADD_PROFILE_SCOPE();
+        LARGE_INTEGER start, end;
+        QueryPerformanceCounter(&start);
 
-      LARGE_INTEGER start, end;
-      QueryPerformanceCounter(&start);
+        process_deferred();
 
-      process_deferred();
-
-      GRAPHICS.clear(XMFLOAT4(0,0,0,1));
-      DEMO_ENGINE.tick();
+        GRAPHICS.clear(XMFLOAT4(0,0,0,1));
+        DEMO_ENGINE.tick();
 
 #if WITH_GWEN
-      XMFLOAT4 tt;
-      PROPERTY_MANAGER.get_system_property("g_time", &tt);
-      _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
-      _gwen_canvas->RenderCanvas();
+        XMFLOAT4 tt;
+        PROPERTY_MANAGER.get_system_property("g_time", &tt);
+        _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
+        _gwen_canvas->RenderCanvas();
 #endif
-      GRAPHICS.render();
-      GRAPHICS.present();
+        GRAPHICS.render();
+        GRAPHICS.present();
 
-      QueryPerformanceCounter(&end);
-      int64 delta = end.QuadPart - start.QuadPart;
-      double cur_frame = delta / (double)freq.QuadPart;
-      if (_frame_time > 0) {
-        double p = 0.4;
-        _frame_time = p * _frame_time + (1-p) * cur_frame;
-      } else {
-        _frame_time = cur_frame;
+        QueryPerformanceCounter(&end);
+        int64 delta = end.QuadPart - start.QuadPart;
+        double cur_frame = delta / (double)freq.QuadPart;
+        if (_frame_time > 0) {
+          double p = 0.4;
+          _frame_time = p * _frame_time + (1-p) * cur_frame;
+        } else {
+          _frame_time = cur_frame;
+        }
+
+        on_idle();
       }
 
-      on_idle();
 
-      PROFILE_MANAGER.end_frame();
-
+      JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
+      send_stats(frame);
     }
   }
   return 0;

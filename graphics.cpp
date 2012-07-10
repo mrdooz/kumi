@@ -11,6 +11,7 @@
 #include "mesh.hpp"
 #include "vertex_types.hpp"
 #include "deferred_context.hpp"
+#include "profiler.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -940,6 +941,8 @@ DeferredContext *Graphics::create_deferred_context() {
 }
 
 void Graphics::render() {
+
+  ADD_PROFILE_SCOPE();
   
   ID3D11DeviceContext *ctx = _immediate_context;
   ctx->RSSetViewports(1, &_viewport);

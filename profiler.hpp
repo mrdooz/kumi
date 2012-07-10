@@ -1,4 +1,6 @@
 #pragma once
+#include "json_utils.hpp"
+#include "utils.hpp"
 
 struct ProfileScope {
   ProfileScope(const char *name);
@@ -15,7 +17,7 @@ public:
   static bool close();
 
   void start_frame();
-  void end_frame();
+  JsonValue::JsonValuePtr end_frame();
 
   void enter_scope(ProfileScope *scope);
   void leave_scope(ProfileScope *scope);
@@ -23,24 +25,30 @@ private:
 
   ProfileManager();
 
-  struct StackEntry {
-    StackEntry(ProfileScope *scope);
-    ProfileScope *scope;
-    LARGE_INTEGER start_time;
-    LARGE_INTEGER end_time;
-  };
-
-  struct ProfileEvent {
-    ProfileEvent(const StackEntry &e) : name(e.scope->name), start_time(e.start_time), end_time(e.end_time) {}
+  struct TimelineEvent {
+    TimelineEvent(const char *name, LARGE_INTEGER start, int cur_level, int parent) 
+      : name(name), start(start), cur_level(cur_level), parent(parent) {}
     const char *name;
-    LARGE_INTEGER start_time;
-    LARGE_INTEGER end_time;
+    LARGE_INTEGER start, end;
+    int cur_level;
+    int parent;
   };
 
-  std::unordered_map<DWORD, std::stack<StackEntry>> _callstack;
-  std::unordered_map<DWORD, std::vector<ProfileEvent>> _timeline;
-  std::set<DWORD> _active_threads;
+  struct Timeline {
+    Timeline(int thread_id, LARGE_INTEGER start) : max_depth(0), thread_id(thread_id), start_time(start) {}
+    int max_depth;
+    int thread_id;
+    LARGE_INTEGER start_time;
+    std::stack<int> callstack;
+    std::vector<TimelineEvent> events;
+  };
 
+  std::unordered_map<DWORD, Timeline *> _timeline;
+
+  CriticalSection _callstack_cs;
+
+  LARGE_INTEGER _frequency;
+  LARGE_INTEGER _frame_start, _frame_end;
   static ProfileManager *_instance;
 };
 

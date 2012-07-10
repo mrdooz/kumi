@@ -7,7 +7,6 @@ var KUMI = (function($, KUMI_LIB) {
     var websocket;
     var performanceFps = false;
     var fps_series;
-    var fps_interval_id;
     var demoInfo = { effects :[] };
 
     var controlWidth = 250;
@@ -125,13 +124,11 @@ var KUMI = (function($, KUMI_LIB) {
             // icons from http://findicons.com/pack/2103/discovery
             $('#connection-status').attr('src', 'assets/gfx/connected.png');
             websocket.send('REQ:DEMO.INFO');
-            fps_interval_id = setInterval(function() { websocket.send('REQ:SYSTEM.FPS'); }, 100);
             smoothie.start();
             initial_open = false;
         };
 
         websocket.onclose = function(e) {
-            clearInterval(fps_interval_id);
             $('#connection-status').attr('src', 'assets/gfx/disconnected.png');
             smoothie.stop();
             if (initial_open && retry_count < 10) {
@@ -140,22 +137,66 @@ var KUMI = (function($, KUMI_LIB) {
             }
         };
 
-        websocket.onmessage = function(e) {
-            var res = JSON.parse(e.data);
+        function drawFps(data) {
+            var fps = performanceFps ? data['system.fps'] : 1000 * data['system.ms'];
+            fps_series.append(new Date().getTime(), fps);
+            $('#cur-fps').text(fps.toFixed(2) + ' fps');
+        }
 
-            if (res['system.fps'] !== undefined) {
-                var fps = performanceFps ? res['system.fps'] : 1000 * res['system.ms'];
-                fps_series.append(new Date().getTime(), fps);
-                $('#cur-fps').text(fps.toFixed(2) + ' fps');
-            } else if (res.demo) {
+        function drawProfile(prof) {
+            var start = prof.startTime;
+            var end = prof.endTime;
+            var frameTime = end - start;
+
+            var canvas = $('#profile-canvas').get(0);
+            var ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            var ms = 20; //Math.ceil(frameTime * 1000);
+            var x = 0;
+            var w = canvas.width / ms;
+
+            var pixelsPerSecond = canvas.width * (1000 / 20);
+
+            for (var i = 0; i < ms; ++i) {
+                ctx.fillStyle = i % 2 ? "#ccc" : "#aaa";
+                ctx.fillRect(x, 0, w, canvas.height);
+                x += w;
+            }
+
+            var levelHeight = 20;
+
+            var cols = ["#c22", "#2c2", "#22c", "#cc2", "#2cc"];
+
+
+            $.each(prof.threads, function(i, thread) {
+                $.each(thread.events, function(i, event) {
+                    var x = (event.start - start) * pixelsPerSecond;
+                    var xEnd = (event.end - event.start) * pixelsPerSecond;
+
+                    ctx.fillStyle = cols[i%cols.length];
+                    ctx.fillRect(x, canvas.height - (event.level + 1) * (10 + levelHeight), xEnd, levelHeight);
+
+                });
+            });
+
+        }
+
+        websocket.onmessage = function(e) {
+            var msg = JSON.parse(e.data);
+
+            if (msg['system.profile']) {
+                drawProfile(msg['system.profile']);
+            } else if (msg['system.fps']) {
+                drawFps(msg);
+            } else if (msg.demo) {
                 // append interpolation functions to the parameters
-                demoInfo = res.demo;
+                demoInfo = msg.demo;
                 demoInfo.effects.forEach( function(effect) {
                     function decorateParam(param) {
                         if (param.children) {
                             param.children.forEach(decorateParam);
                         }
-
                         if (param.keys) {
                             param.evalParam = evalLookup[param.anim][param.type](param.keys);
                             param.valueToString = toStringLookup[param.type];
@@ -167,7 +208,7 @@ var KUMI = (function($, KUMI_LIB) {
         };
 
         websocket.onerror = function(e) {
-            window.console.log(e);
+            window.console.log("** WS ERROR **", e);
         };
     }
 
@@ -762,6 +803,28 @@ var KUMI = (function($, KUMI_LIB) {
     };
 
     kumi.kbInit = function() {
+/*
+        var prof = $("#profile-container");
+        stage = new Kinetic.Stage( {
+            container: "profile-container",
+            width: prof.get(0).width,
+            height: prof.get(0).height
+        });
+        layer = new Kinetic.Layer();
+
+        var rect = new Kinetic.Rect({
+            x: 50,
+            y: 50,
+            width: 100,
+            height: 100,
+            fill: "#00d2ff",
+            stroke: "black",
+            strokeWidth: 2
+        });
+        layer.add(rect);
+
+        stage.add(layer);
+*/
         output = document.getElementById("output");
         initSmoothie();
         openWebSocket();

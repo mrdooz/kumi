@@ -19,19 +19,24 @@
         }
     </style>
 
-    <!--<script type="text/javascript" src="assets/js/jquery-1.7.2.min.js"></script>-->
-    <script type="text/javascript" src="assets/js/jquery-1.7.2.js"></script>
-    <script type="text/javascript" src="assets/js/jquery.mousewheel.js"></script>
-    <script type="text/javascript" src="assets/js/smoothie.js"></script>
-    <script type="text/javascript" src="assets/js/jquery-impromptu.js"></script>
-    <script type="text/javascript" src="assets/js/jquery.jeditable.js"></script>
-    <script type="text/javascript" src="assets/js/bootstrap.js"></script>
-    <script type="text/javascript" src="assets/js/bootstrap-button.js"></script>
-    <script type="text/javascript" src="kumi_lib.js"></script>
-    <script type="text/javascript" src="kumi_browser.js"></script>
+    <script type="text/javascript" src="assets/js/jquery-1.7.2.min.js"></script>
+    <!--<script type="application/javascript" src="assets/js/jquery-1.7.2.js"></script>-->
+    <script type="application/javascript" src="assets/js/jquery.mousewheel.js"></script>
+    <script type="application/javascript" src="assets/js/smoothie.js"></script>
+    <script type="application/javascript" src="assets/js/jquery-impromptu.js"></script>
+    <script type="application/javascript" src="assets/js/jquery.jeditable.js"></script>
+    <script type="application/javascript" src="assets/js/bootstrap.js"></script>
+    <script type="application/javascript" src="assets/js/bootstrap-button.js"></script>
+    <!--<script type="application/javascript" src="assets/js/kinetic-v3.10.3.js"></script>-->
+    <script type="application/javascript" src="kumi_lib.js"></script>
+    <script type="application/javascript" src="kumi_browser.js"></script>
 
     <script type="text/javascript">
         $(document).ready(function () {
+
+            var prof = $('#profile-canvas');
+            prof.get(0).width = prof.parent().width();
+            prof.get(0).height = 200;
 
             var fps = $('#fps-canvas');
             fps.get(0).width = fps.parent().width();
@@ -91,6 +96,10 @@
 </div>
 
 <div class="container">
+    <div class="row-fluid span12">
+        <canvas id="profile-canvas"></canvas>
+    </div>
+
     <div class="row-fluid">
         <div class="span6">
             <div class="span6">

@@ -155,13 +155,6 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
   memcpy(msg->data() + hdr->GetPayloadOffset(), payload, len);
 }
 
-struct ClientData {
-  SOCKET socket;
-  WebSocketThread *self;
-  HANDLE close_event;
-  HANDLE thread;
-};
-
 DWORD WINAPI WebSocketThread::client_thread(void *param) {
 
   const int BUF_SIZE = 32 * 1024;
@@ -173,7 +166,7 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
   DEFER([=]() { 
     closesocket(cd.socket); 
     SCOPED_CS(cd.self->_thread_cs);
-    auto it = std::find(RANGE(cd.self->_client_threads), cd.thread);
+    auto it = std::find(RANGE(cd.self->_client_threads), cd);
     cd.self->_client_threads.erase(it);
   });
 
@@ -224,11 +217,10 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
     if (idx == WSA_WAIT_EVENT_0)
       break;
 
-    BOOL res = WSAGetOverlappedResult(cd.socket, &overlapped, &bytes_read, FALSE, &flags);
+    if (WSAGetOverlappedResult(cd.socket, &overlapped, &bytes_read, FALSE, &flags) && bytes_read > 0) {
+      WebSocketMessageHeader *header = (WebSocketMessageHeader *)buf;
 
-    WebSocketMessageHeader *header = (WebSocketMessageHeader *)buf;
-
-    switch (header->GetOpCode()) {
+      switch (header->GetOpCode()) {
 
       case WebSocketMessageHeader::kOpTextMessage: {
         // decode the message, and send it to the app
@@ -241,7 +233,7 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
         }
         DISPATCHER.invoke(FROM_HERE, 
           threading::kMainThread, 
-          std::bind(&App::add_network_msg, &App::instance(), cd.socket, decoded, len));
+          std::bind(&App::process_network_msg, &App::instance(), cd.socket, decoded, len));
         break;
       }
 
@@ -250,6 +242,7 @@ DWORD WINAPI WebSocketThread::client_thread(void *param) {
 
       default:
         LOG_WARNING_LN("Unhandled websocket opcode: %d", header->GetOpCode());
+      }
     }
   }
 
@@ -300,17 +293,18 @@ UINT WebSocketThread::blocking_run(void *param) {
 
   WSAEventSelect(listen_socket, events[1], FD_ACCEPT);
 
-//  while (WaitForSingleObject(_cancel_event, 0) != WAIT_OBJECT_0) {
   while (true) {
     if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR)
-      return 1;
+      return WSAGetLastError();
 
     int res = WaitForMultipleObjects(3, events, FALSE, INFINITE);
-    if (res == WAIT_OBJECT_0) {
-      break;
-    }
 
-    if (res <= WAIT_OBJECT_0 + 1 && WaitForSingleObject(events[1], 0) == WAIT_OBJECT_0) {
+    if (res == WAIT_OBJECT_0) {
+      // cancel event
+      break;
+
+    } else if (res == WAIT_OBJECT_0 + 1) {
+      // accept event
       SOCKET client_socket = accept(listen_socket, NULL, NULL);
       if (client_socket != INVALID_SOCKET) {
         DWORD thread_id;
@@ -321,18 +315,21 @@ UINT WebSocketThread::blocking_run(void *param) {
         cd.thread = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
         {
           SCOPED_CS(_thread_cs);
-          _client_threads.push_back(cd.thread);
+          _client_threads.push_back(cd);
         }
       }
       ResetEvent(events[1]);
-    }
 
-    if (res <= WAIT_OBJECT_0 + 2 && WaitForSingleObject(events[2], 0) == WAIT_OBJECT_0) {
+    } else if (res == WAIT_OBJECT_0 + 2) {
       process_deferred();
     }
   }
 
-  WaitForMultipleObjects(_client_threads.size(), _client_threads.data(), TRUE, INFINITE);
+  vector<HANDLE> threads;
+  for (size_t i = 0; i < _client_threads.size(); ++i)
+    threads.push_back(_client_threads[i].thread);
+
+  WaitForMultipleObjects(threads.size(), threads.data(), TRUE, INFINITE);
   return 0;
 }
 
@@ -340,7 +337,16 @@ void WebSocketThread::send_msg(SOCKET receiver, const char *msg, int len) {
 
   vector<char> frame;
   websocket_frame(msg, len, &frame);
-  int res = send(receiver, frame.data(), frame.size(), 0);
+  if (receiver == 0) {
+    // multicast
+    SCOPED_CS(_thread_cs);
+    for (size_t i = 0; i < _client_threads.size(); ++i) {
+      int res = send(_client_threads[i].socket, frame.data(), frame.size(), 0);
+    }
+
+  } else {
+    int res = send(receiver, frame.data(), frame.size(), 0);
+  }
   delete [] msg;
 }
 
