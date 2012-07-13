@@ -5,18 +5,18 @@
 PropertyManager *PropertyManager::_instance = nullptr;
 
 PropertyManager& PropertyManager::instance() {
-  assert(_instance);
+  KASSERT(_instance);
 	return *_instance;
 }
 
 bool PropertyManager::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new PropertyManager;
   return true;
 }
 
 bool PropertyManager::close() {
-  assert(_instance);
+  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }

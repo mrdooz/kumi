@@ -35,9 +35,11 @@ private:
   };
 
   struct Timeline {
-    Timeline(int thread_id, LARGE_INTEGER start) : max_depth(0), thread_id(thread_id), start_time(start) {}
+    Timeline(int thread_id, const char *thread_name, LARGE_INTEGER start) 
+      : max_depth(0), thread_id(thread_id), thread_name(thread_name), start_time(start) {}
     int max_depth;
     int thread_id;
+    const char *thread_name;
     LARGE_INTEGER start_time;
     std::stack<int> callstack;
     std::vector<TimelineEvent> events;

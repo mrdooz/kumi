@@ -108,10 +108,10 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
   if (_output_device & File) {
     if (_file == INVALID_HANDLE_VALUE) {
       // no output file has been specified, so we use the current module as name
-      char buf[MAX_PATH+1];
-      buf[MAX_PATH] = 0;
-      GetModuleFileNameA(NULL, buf, MAX_PATH);
-      open_output_file(ansi_to_host(Path::replace_extension(buf, "log").c_str()).c_str());
+      char module[MAX_PATH+1];
+      module[MAX_PATH] = 0;
+      GetModuleFileNameA(NULL, module, MAX_PATH);
+      open_output_file(ansi_to_host(Path::replace_extension(module, "log").c_str()).c_str());
     }
   }
 
@@ -164,6 +164,9 @@ Logger& Logger::open_output_file(const TCHAR *filename) {
   _file = CreateFile(filename, GENERIC_WRITE, FILE_SHARE_READ, &attr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
   if (_file == INVALID_HANDLE_VALUE)
     return *this;
+
+  // move the end of log file
+  SetFilePointer(_file, 0, 0, FILE_END);
 
   // write header
   time_t rawTime;

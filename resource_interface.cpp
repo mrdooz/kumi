@@ -9,18 +9,18 @@
 ResourceManager *g_instance;
 
 ResourceInterface &ResourceInterface::instance() {
-  assert(g_instance);
+  KASSERT(g_instance);
   return *g_instance;
 }
 
 bool ResourceInterface::create() {
-  assert(!g_instance);
+  KASSERT(!g_instance);
   g_instance = new ResourceManager();
   return true;
 }
 
 bool ResourceInterface::close() {
-  assert(g_instance);
+  KASSERT(g_instance);
   delete exch_null(g_instance);
   return true;
 }

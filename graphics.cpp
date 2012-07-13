@@ -88,7 +88,7 @@ Graphics::~Graphics()
 }
 
 bool Graphics::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new Graphics();
   return true;
 }
@@ -123,7 +123,7 @@ void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
 GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc, 
     int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
 
-  assert(_render_targets._key_to_idx.find(name) == _render_targets._key_to_idx.end());
+  KASSERT(_render_targets._key_to_idx.find(name) == _render_targets._key_to_idx.end());
 
   // look for a free render target with the wanted properties
   // TODO: make betterer
@@ -153,7 +153,7 @@ GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc
 
 void Graphics::release_temp_render_target(GraphicsObjectHandle h) {
   auto rt = _render_targets.get(h);
-  assert(rt->in_use);
+  KASSERT(rt->in_use);
   rt->in_use = false;
   int idx = h.id();
   string key = _render_targets._idx_to_key[idx];
@@ -519,7 +519,7 @@ void Graphics::set_default_render_target()
 }
 
 bool Graphics::close() {
-  assert(_instance);
+  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }
@@ -832,7 +832,7 @@ GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
 
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
   int idx = _techniques.idx_from_token(name);
-  assert(idx != -1);
+  KASSERT(idx != -1);
   return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
 }
 
@@ -992,10 +992,14 @@ void Graphics::render() {
               }
             }
           }
-          num_targets = i;
-          CD3D11_VIEWPORT viewport(0.0f, 0.0f, (float)texture_desc.Width, (float)texture_desc.Height);
-          ctx->RSSetViewports(1, &viewport);
-          ctx->OMSetRenderTargets(num_targets, rts, dsv);
+          if (i) {
+            num_targets = i;
+            CD3D11_VIEWPORT viewports[16];
+            for (int i = 0; i < 16; ++i)
+              viewports[i] = CD3D11_VIEWPORT(0.0f, 0.0f, (float)texture_desc.Width, (float)texture_desc.Height);
+            ctx->RSSetViewports(16, viewports);
+            ctx->OMSetRenderTargets(num_targets, rts, dsv);
+          }
         }
         break;
       }
@@ -1129,16 +1133,19 @@ void Graphics::render() {
                 auto &var = ps_cbuffers[i].instance_vars[j];
 
                 int ofs = 0;
+                bool found = false;
                 for (int k = 0; k < rd->num_instance_variables; ++k) {
                   PropertyId id = *(PropertyId *)&rd->payload[ofs + 0];
                   int len = *(int *)&rd->payload[ofs + 4];
                   const void *data = &rd->payload[ofs + 8 + ii * len];
                   if (id == var.id) {
                     memcpy(&ps_cbuffers[i].staging[var.ofs], data, var.len);
+                    found = true;
                     break;
                   }
                   ofs += sizeof(PropertyId) + sizeof(int) + len * rd->num_instances;
                 }
+                KASSERT(found);
               }
             }
             set_cbuffer(vs_cbuffers, ps_cbuffers);
@@ -1176,7 +1183,7 @@ void *Graphics::alloc_command_data_raw(size_t size) {
     return nullptr;
 
   void *ptr = &_effect_data[_effect_data_ofs];
-  assert(_effect_data_ofs + size <= _effect_data.size());
+  KASSERT(_effect_data_ofs + size <= _effect_data.size());
   _effect_data_ofs += size;
   return ptr;
 }
@@ -1193,11 +1200,11 @@ void Graphics::validate_command(RenderKey key, const void *data) {
 /*
       MeshRenderData *render_data = (MeshRenderData *)data;
       Technique *technique = _techniques.get(render_data->cur_technique);
-      assert(technique);
+      KASSERT(technique);
       Shader *vertex_shader = technique->vertex_shader(0);
-      assert(vertex_shader);
+      KASSERT(vertex_shader);
       Shader *pixel_shader = technique->pixel_shader(0);
-      assert(pixel_shader);
+      KASSERT(pixel_shader);
 */
       break;
     }
@@ -1403,7 +1410,7 @@ void Graphics::draw_indexed(int count, int start_index, int base_vertex) {
 void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count) {
 
   *index_format = DXGI_FORMAT_R16_UINT;
-  assert(_predefined_geometry.find(geom) != _predefined_geometry.end());
+  KASSERT(_predefined_geometry.find(geom) != _predefined_geometry.end());
 
   switch (geom) {
     case kGeomFsQuadPosTex:

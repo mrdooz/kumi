@@ -200,10 +200,10 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
 
   int num_materials = read_and_advance<int>(&buf);
   for (int i = 0; i < num_materials; ++i) {
-    string name = read_and_advance<const char *>(&buf);
+    string material_name = read_and_advance<const char *>(&buf);
     string technique = read_and_advance<const char *>(&buf);
-    _technique_for_material[name] = technique;
-    Material *material = new Material(name);
+    _technique_for_material[material_name] = technique;
+    Material *material = new Material(material_name);
     _material_name_to_id[material->name()] = MATERIAL_MANAGER.add_material(material, true);
 
     int num_props = read_and_advance<int>(&buf);

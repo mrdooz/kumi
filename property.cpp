@@ -2,7 +2,7 @@
 #include "property.hpp"
 
 namespace PropertySource {
-  std::string to_string(Enum e) {
+  const char *to_string(Enum e) {
     switch (e) {
     case kUnknown: return "Unknown";
     case kMaterial: return "Material";
@@ -14,7 +14,7 @@ namespace PropertySource {
     return "INVALID";
   }
   std::string qualify_name(const std::string &name, PropertySource::Enum source) {
-    return PropertySource::to_string(source) + "::" + name;
+    return std::string(PropertySource::to_string(source)) + "::" + name;
   }
 }
 

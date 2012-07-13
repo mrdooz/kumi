@@ -1,6 +1,12 @@
 #pragma once
 #include "property.hpp"
 
+#ifdef _DEBUG
+#define TYPE_CHECK 1
+#else
+#define TYPE_CHECK 0
+#endif
+
 // this is really just a fancy wrapper around a big old slab of memory :)
 class PropertyManager {
 public:
@@ -15,10 +21,10 @@ public:
 
   typedef std::pair<Token, std::string> CompoundKey;
 
-#ifdef _DEBUG
+#if TYPE_CHECK
   void type_check(PropertyId id, int size) {
     int cur_size = *((uint32*)&_raw_data[id-4]);
-    assert(cur_size == size);
+    KASSERT(cur_size == size);
   }
 #else
   void type_check(PropertyId id, int size) {}
@@ -42,8 +48,8 @@ public:
   }
 
   void get_property_raw(PropertyId id, char *out, int len) {
-#if _DEBUG
-    assert(*((uint32*)&_raw_data[id-4]) == len);
+#if TYPE_CHECK
+    KASSERT(*((uint32*)&_raw_data[id-4]) == len);
 #endif
     memcpy(out, &_raw_data[id], len);
   }
@@ -56,7 +62,7 @@ public:
     auto it = _ids.find(name);
     PropertyId id;
     if (it == _ids.end()) {
-#if _DEBUG
+#if TYPE_CHECK
       *(uint32*)&_raw_data[_property_ofs] = size;
       _property_ofs += sizeof(uint32);
 #endif
@@ -83,7 +89,7 @@ public:
     auto it = _compound_ids.find(key);
     PropertyId id;
     if (it == _compound_ids.end()) {
-#if _DEBUG
+#if TYPE_CHECK
       *(uint32*)&_raw_data[_property_ofs] = size;
       _property_ofs += sizeof(uint32);
 #endif

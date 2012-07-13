@@ -179,7 +179,7 @@ void DeferredContext::set_render_targets(GraphicsObjectHandle *render_targets, b
   // and clear targets if specified
   for (int i = 0; num_render_targets < 8; ++i) {
     GraphicsObjectHandle h = render_targets[i];
-    assert(h.is_valid());
+    KASSERT(h.is_valid());
     auto rt = GRAPHICS._render_targets.get(h);
     texture_desc = rt->texture.desc;
     if (!dsv && rt->dsv.resource) {

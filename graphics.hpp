@@ -84,7 +84,7 @@ public:
 
   static bool create();
   inline static Graphics& instance() {
-    assert(_instance);
+    KASSERT(_instance);
     return *_instance;
   }
 
@@ -169,6 +169,7 @@ public:
   T *alloc_command_data(int payload_size = 0) {
     void *t = alloc_command_data_raw(sizeof(T) + payload_size);
     T *tt = new (t)T();
+    KASSERT(t == tt);
     return tt;
   }
   void *alloc_command_data_raw(size_t size);

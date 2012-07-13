@@ -6,6 +6,8 @@ class Mesh;
 class SubMesh;
 class Material;
 
+#pragma pack(push, 1)
+
 struct MeshGeometry {
   MeshGeometry() : topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST) {}
   GraphicsObjectHandle vb, ib;
@@ -122,4 +124,5 @@ struct RenderKey {
   };
 };
 
+#pragma pack(pop)
 static_assert(sizeof(RenderKey) <= sizeof(uint64_t), "RenderKey too large");

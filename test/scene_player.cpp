@@ -109,7 +109,7 @@ bool ScenePlayer::init() {
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
     Material *mat = *it;
-    TweakableParam *mp = new TweakableParam(mat->name());
+    auto mp = unique_ptr<TweakableParam>(new TweakableParam(mat->name()));
 
     for (auto j = begin(mat->properties()); j != end(mat->properties()); ++j) {
       const Material::Property *prop = *j;
@@ -138,7 +138,7 @@ bool ScenePlayer::init() {
       }
     }
 
-    _params.push_back(unique_ptr<TweakableParam>(mp));
+    _params.push_back(move(mp));
   }
 
 /*
@@ -257,6 +257,33 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
   return true;
 }
 
+#pragma pack(push, 1)
+struct LightBase {
+  PropertyId id;
+  int len;
+};
+
+struct LightPos : public LightBase {
+#pragma warning(suppress: 4200)
+  XMFLOAT4 pos[];
+};
+
+struct LightColor : public LightBase {
+#pragma warning(suppress: 4200)
+  XMFLOAT4 color[];
+};
+
+struct LightAttenuationStart : public LightBase {
+#pragma warning(suppress: 4200)
+  float start[];
+};
+
+struct LightAttenuationEnd : public LightBase {
+#pragma warning(suppress: 4200)
+  float end[];
+};
+#pragma pack(pop)
+
 bool ScenePlayer::render() {
   ADD_PROFILE_SCOPE();
   if (_scene) {
@@ -309,41 +336,22 @@ bool ScenePlayer::render() {
     post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
 
     {
+
       // Add the lighting
       int num_lights = (int)_scene->lights.size();
-      int pos_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
-      int color_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(XMFLOAT4);
-      int as_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
-      int ae_size = sizeof(PropertyId) + sizeof(int) + num_lights * sizeof(float);
-      int data_size = pos_size + color_size + as_size + ae_size;
+      int pos_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
+      int color_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
+      int as_size = sizeof(LightBase) + num_lights * sizeof(float);
+      int ae_size = sizeof(LightBase) + num_lights * sizeof(float);
+      int data_size = pos_size + color_size + 2 * ae_size/* + as_size*/;
       TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>(data_size);
       rd->num_instances = num_lights;
       rd->num_instance_variables = 4;
 
-      struct LightBase {
-        PropertyId id;
-        int len;
-      };
-
-      struct LightPos : public LightBase {
-#pragma warning(suppress: 4200)
-        XMFLOAT4 pos[];
-      } *lightpos = (LightPos *)&rd->payload[0];
-
-      struct LightColor : public LightBase {
-#pragma warning(suppress: 4200)
-        XMFLOAT4 color[];
-      } *lightcolor = (LightColor *)&rd->payload[pos_size];
-
-      struct LightAttenuationStart : public LightBase {
-#pragma warning(suppress: 4200)
-        float start[];
-      } *lightattstart = (LightAttenuationStart *)&rd->payload[pos_size + color_size];
-
-      struct LightAttenuationEnd : public LightBase {
-#pragma warning(suppress: 4200)
-        float end[];
-      } *lightattend = (LightAttenuationEnd *)&rd->payload[pos_size + color_size + as_size];
+      LightPos *lightpos = (LightPos *)&rd->payload[0];
+      LightColor *lightcolor = (LightColor *)&rd->payload[pos_size];
+      LightAttenuationStart *lightattstart = (LightAttenuationStart *)&rd->payload[pos_size + color_size];
+      LightAttenuationEnd *lightattend = (LightAttenuationEnd *)&rd->payload[pos_size + color_size + as_size];
 
       lightpos->id = _light_pos_id;
       lightpos->len = sizeof(XMFLOAT4);
@@ -476,7 +484,7 @@ void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
         // this should be a material
         GraphicsObjectHandle mat_handle = MATERIAL_MANAGER.find_material(parent->get("name")->to_string());
         Material *cur_material = MATERIAL_MANAGER.get_material(mat_handle);
-        assert(cur_material);
+        KASSERT(cur_material);
 
         if (Material::Property *prop = cur_material->property_by_name(param_name)) {
           XMFLOAT4 value;

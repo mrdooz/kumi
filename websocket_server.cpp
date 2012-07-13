@@ -81,7 +81,7 @@ struct WebSocketMessageHeader {
   }
 
   size_t GetMaskOffset() const {
-    assert(bits.MASK);
+    KASSERT(bits.MASK);
     return GetPayloadOffset() - sizeof(uint32_t);
   }
 
@@ -157,7 +157,7 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
 
 DWORD WINAPI WebSocketThread::client_thread(void *param) {
 
-  const int BUF_SIZE = 32 * 1024;
+  const int BUF_SIZE = 16 * 1024;
   char *buf = (char *)_alloca(BUF_SIZE);
 
   ClientData cd = *(ClientData *)param;
@@ -355,13 +355,13 @@ void WebSocketThread::stop() {
 }
 
 bool WebSocketServer::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new WebSocketServer();
   return _instance->_thread.start();
 }
 
 bool WebSocketServer::close() {
-  assert(_instance);
+  KASSERT(_instance);
   _instance->_thread.stop();
   delete exch_null(_instance);
   return true;
@@ -373,7 +373,7 @@ void WebSocketServer::send_msg(SOCKET receiver, const char *msg, int len) {
 }
 
 WebSocketServer& WebSocketServer::instance() {
-  assert(_instance);
+  KASSERT(_instance);
   return *_instance;
 }
 

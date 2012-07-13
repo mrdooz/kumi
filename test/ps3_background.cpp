@@ -4,8 +4,6 @@
 #include "../graphics.hpp"
 
 bool Ps3BackgroundEffect::init() {
-  LOG_VERBOSE_LN(__FUNCTION__);
-
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ps3background.tec", true));
   //B_ERR_BOOL(GRAPHICS.load_techniques("effects/bloom.tec", true));
 

@@ -13,7 +13,7 @@ namespace PropertySource {
     kMesh,
   };
 
-  std::string to_string(Enum e);
+  const char *to_string(Enum e);
   std::string qualify_name(const std::string &name, PropertySource::Enum source);
 }
 
@@ -36,6 +36,7 @@ namespace PropertyType {
 }
 
 struct CBufferVariable {
+  CBufferVariable(int ofs, int len, PropertyId id) : ofs(ofs), len(len), id(id) {}
   int ofs;
   int len;
   PropertyId id;

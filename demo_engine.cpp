@@ -10,7 +10,7 @@ using namespace std;
 DemoEngine *DemoEngine::_instance = NULL;
 
 DemoEngine& DemoEngine::instance() {
-  assert(_instance);
+  KASSERT(_instance);
   return *_instance;
 }
 
@@ -35,7 +35,7 @@ DemoEngine::~DemoEngine() {
 }
 
 bool DemoEngine::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new DemoEngine;
   return true;
 }

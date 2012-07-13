@@ -108,5 +108,13 @@ typedef uint64_t uint64;
 #include "FW1FontWrapper.h"
 #endif
 
+#include "logger.hpp"
+
+#ifdef DISTRIBUTION
+#define KASSERT(x) __assume((x));
+#else
+#define KASSERT(x) do { if (!(x)) { LOG_ERROR_LN("** Assert failed: %s", #x); __debugbreak(); } } while(0);
+#endif
+
 typedef std::basic_string<TCHAR> ustring;
 

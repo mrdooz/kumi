@@ -269,7 +269,7 @@ public:
       }
       cur = cur->children[ch];
     }
-    assert(cur->symbol == kSymUnknown);
+    KASSERT(cur->symbol == kSymUnknown);
     cur->symbol = symbol;
   }
 

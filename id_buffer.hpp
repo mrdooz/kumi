@@ -47,12 +47,12 @@ public:
   }
 
   T &operator[](int idx) {
-    assert(idx >= 0 && idx < N);
+    KASSERT(idx >= 0 && idx < N);
     return Traits::get(_buffer[idx]);
   }
 
   const T &operator[](int idx) const {
-    assert(idx >= 0 && idx < N);
+    KASSERT(idx >= 0 && idx < N);
     return Traits::get(_buffer[idx]);
   }
 
@@ -113,7 +113,7 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N>
   }
 
   void set_pair(int idx, const typename Traits::Elem &e) {
-    assert(idx >= 0 && idx < N);
+    KASSERT(idx >= 0 && idx < N);
     _buffer[idx] = e;
     auto &key = Traits::get_key(_buffer[idx]);
     _key_to_idx[key] = idx;

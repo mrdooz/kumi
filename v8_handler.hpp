@@ -222,7 +222,7 @@ struct MyV8Handler : public CefV8Handler {
 
 	template <typename Fn> 
 	void AddFunction(const char *cef_name, const char *native_name, Fn fn) {
-		assert(_functions.find(cef_name) == _functions.end());
+		KASSERT(_functions.find(cef_name) == _functions.end());
 		typedef FunctionT<Fn, Fn> F;
 		Function *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), fn);
 		_functions[cef_name] = f;
@@ -234,7 +234,7 @@ struct MyV8Handler : public CefV8Handler {
 	// add member function
 	template <class Obj, typename MemFn> 
 	void AddFunction(const char *cef_name, const char *native_name, Obj obj, MemFn fn) {
-		assert(_functions.find(cef_name) == _functions.end());
+		KASSERT(_functions.find(cef_name) == _functions.end());
 		auto bb = MakeDelegate(obj, fn);
 		typedef FunctionT<MemFn, decltype(bb)> F;
 		Function *f = new F(cef_name, native_name, get_param_string<Int2Type<F::Arity>>(), bb);
@@ -286,7 +286,7 @@ struct MyV8Handler : public CefV8Handler {
 
 	template <typename T>
 	void AddVariable(const char *cef_name, T* ptr) {
-		assert(_variables.find(cef_name) == _variables.end());
+		KASSERT(_variables.find(cef_name) == _variables.end());
 		Variable *v = new VariableT<T>(cef_name, ptr);
 		_variables[cef_name] = v;
 	}

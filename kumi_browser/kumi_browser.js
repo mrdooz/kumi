@@ -168,16 +168,16 @@ var KUMI = (function($, KUMI_LIB) {
 
             var cols = ["#c22", "#2c2", "#22c", "#cc2", "#2cc"];
 
-
             $.each(prof.threads, function(i, thread) {
+                var y = 0;
                 $.each(thread.events, function(i, event) {
                     var x = (event.start - start) * pixelsPerSecond;
                     var xEnd = (event.end - event.start) * pixelsPerSecond;
 
                     ctx.fillStyle = cols[i%cols.length];
-                    ctx.fillRect(x, canvas.height - (event.level + 1) * (10 + levelHeight), xEnd, levelHeight);
-
+                    ctx.fillRect(x, y + ((thread.maxDepth + 1) * (levelHeight+10)) - (event.level + 1) * (10 + levelHeight), xEnd, levelHeight);
                 });
+                y += (thread.maxDepth + 1) * (levelHeight + 10);
             });
 
         }

@@ -34,7 +34,7 @@ public:
 
   int unmap(Vtx *final = NULL)
   {
-    assert(_mapped);
+    KASSERT(_mapped);
     if (!_mapped) return -1;
     GRAPHICS.unmap(_vb, 0);
     _mapped = false;
@@ -96,7 +96,7 @@ public:
 
   int unmap(Vtx *final)
   {
-    assert(_mapped);
+    KASSERT(_mapped);
     if (!_mapped) return -1;
     ID3D11DeviceContext *c = Graphics::instance().context();
     c->Unmap(_vb, 0);
@@ -107,7 +107,7 @@ public:
 
   void reset()
   {
-    assert(!_mapped);
+    KASSERT(!_mapped);
     _ofs = 0;
     _num_verts = 0;
   }

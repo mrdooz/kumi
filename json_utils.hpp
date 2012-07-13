@@ -27,27 +27,27 @@ public:
 
   JsonType type() const { return _type; }
 
-  virtual bool add_value(JsonValuePtr value) { assert(!"Not an array"); return false; }
-  virtual bool add_key_value(const std::string &key, JsonValuePtr value) { assert(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, int value) { assert(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, uint32 value)  { assert(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, double value) { assert(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, const std::string &value) { assert(!"Not an object"); return false; }
+  virtual bool add_value(JsonValuePtr value) { KASSERT(!"Not an array"); return false; }
+  virtual bool add_key_value(const std::string &key, JsonValuePtr value) { KASSERT(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, int value) { KASSERT(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, uint32 value)  { KASSERT(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, double value) { KASSERT(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, const std::string &value) { KASSERT(!"Not an object"); return false; }
   virtual bool add_key_value(const std::string &key, const char *value) { return add_key_value(key, std::string(value)); }
-  virtual bool add_key_value(const std::string &key, bool value) { assert(!"Not an object"); return false; }
+  virtual bool add_key_value(const std::string &key, bool value) { KASSERT(!"Not an object"); return false; }
 
-  int to_int() const { assert(_type == JS_INT); return _int; }
-  double to_number() const { assert(_type == JS_NUMBER || _type == JS_INT); return _type == JS_NUMBER ? _number : _int; }
-  bool to_bool() const { assert(_type == JS_BOOL); return _bool; }
-  std::string to_string() const { assert(_type == JS_STRING); return _string; }
+  int to_int() const { KASSERT(_type == JS_INT); return _int; }
+  double to_number() const { KASSERT(_type == JS_NUMBER || _type == JS_INT); return _type == JS_NUMBER ? _number : _int; }
+  bool to_bool() const { KASSERT(_type == JS_BOOL); return _bool; }
+  std::string to_string() const { KASSERT(_type == JS_STRING); return _string; }
 
-  virtual JsonValuePtr operator[](int idx) const { assert(!"Not an array"); return _empty_value; }
+  virtual JsonValuePtr operator[](int idx) const { KASSERT(!"Not an array"); return _empty_value; }
   virtual JsonValuePtr get(int idx) const { return (*this)[idx]; }
-  virtual int count() const { assert(!"Not an array"); return -1; }
+  virtual int count() const { KASSERT(!"Not an array"); return -1; }
 
-  virtual JsonValuePtr operator[](const std::string &key) const { assert(!"Not an object"); return _empty_value; }
+  virtual JsonValuePtr operator[](const std::string &key) const { KASSERT(!"Not an object"); return _empty_value; }
   virtual JsonValuePtr get(const std::string &key) const { return (*this)[key]; }
-  virtual bool has_key(const std::string &key) const { assert(!"Not an object"); return false; }
+  virtual bool has_key(const std::string &key) const { KASSERT(!"Not an object"); return false; }
 
   bool is_null() const { return _type == JS_NULL; }
 

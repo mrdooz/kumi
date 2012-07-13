@@ -36,7 +36,7 @@ public:
   template<typename T>
   void add_key(uint32 time, const T &value) {
     auto v = get_values(Int2Type<T>());
-    assert(_animation != kAnimStatic || v->empty());
+    KASSERT(_animation != kAnimStatic || v->empty());
     v->push_back(Key<T>(time, value));
     // sort keys by time (if needed)
     if (v->size() != 1 && time != (*v)[v->size() - 2].time)
@@ -62,13 +62,13 @@ private:
   JsonValue::JsonValuePtr add_param(const TweakableParam *param);
 
   template<typename T> struct Int2Type {};
-  std::vector<Key<bool> > *&get_values(Int2Type<bool>) { assert(_type == kTypeBool); return _bool; }
-  std::vector<Key<int> > *&get_values(Int2Type<int>) { assert(_type == kTypeInt); return _int; }
-  std::vector<Key<float> > *&get_values(Int2Type<float>) { assert(_type == kTypeFloat); return _float; }
-  std::vector<Key<XMFLOAT2> > *&get_values(Int2Type<XMFLOAT2>) { assert(_type == kTypeFloat2); return _float2; }
-  std::vector<Key<XMFLOAT3> > *&get_values(Int2Type<XMFLOAT3>) { assert(_type == kTypeFloat3); return _float3; }
-  std::vector<Key<XMFLOAT4> > *&get_values(Int2Type<XMFLOAT4>) { assert(_type == kTypeFloat4 || _type == kTypeColor); return _float4; }
-  std::string *&get_values(Int2Type<std::string>) { assert(_type == kTypeString || _type == kTypeFile); return _string; }
+  std::vector<Key<bool> > *&get_values(Int2Type<bool>) { KASSERT(_type == kTypeBool); return _bool; }
+  std::vector<Key<int> > *&get_values(Int2Type<int>) { KASSERT(_type == kTypeInt); return _int; }
+  std::vector<Key<float> > *&get_values(Int2Type<float>) { KASSERT(_type == kTypeFloat); return _float; }
+  std::vector<Key<XMFLOAT2> > *&get_values(Int2Type<XMFLOAT2>) { KASSERT(_type == kTypeFloat2); return _float2; }
+  std::vector<Key<XMFLOAT3> > *&get_values(Int2Type<XMFLOAT3>) { KASSERT(_type == kTypeFloat3); return _float3; }
+  std::vector<Key<XMFLOAT4> > *&get_values(Int2Type<XMFLOAT4>) { KASSERT(_type == kTypeFloat4 || _type == kTypeColor); return _float4; }
+  std::string *&get_values(Int2Type<std::string>) { KASSERT(_type == kTypeString || _type == kTypeFile); return _string; }
 
   PropertyId _id;
 

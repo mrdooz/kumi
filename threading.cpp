@@ -6,7 +6,56 @@ using std::pair;
 using std::make_pair;
 using boost::scoped_ptr;
 
+const DWORD MS_VC_EXCEPTION=0x406D1388;
+
+CriticalSection g_thread_name_cs;
+std::map<DWORD, std::string> g_thread_names;
+
+#pragma pack(push,8)
+typedef struct tagTHREADNAME_INFO
+{
+  DWORD dwType; // Must be 0x1000.
+  LPCSTR szName; // Pointer to name (in user addr space).
+  DWORD dwThreadID; // Thread ID (-1=caller thread).
+  DWORD dwFlags; // Reserved for future use, must be zero.
+} THREADNAME_INFO;
+#pragma pack(pop)
+
+static void SetThreadName(DWORD dwThreadID, const char* threadName)
+{
+#ifdef _DEBUG
+  THREADNAME_INFO info;
+  info.dwType = 0x1000;
+  info.szName = threadName;
+  info.dwThreadID = dwThreadID;
+  info.dwFlags = 0;
+
+  __try {
+    RaiseException( MS_VC_EXCEPTION, 0, sizeof(info)/sizeof(ULONG_PTR), (ULONG_PTR*)&info );
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
+  }
+#endif
+
+  g_thread_name_cs.enter();
+  g_thread_names[dwThreadID] = threadName;
+  g_thread_name_cs.leave();
+}
 namespace threading {
+
+  const char *thread_name(ThreadId id) {
+    switch (id) {
+    case kMainThread: return "Main Thread";
+    case kIoThread: return "IO Thread";
+    case kFileMonitorThread: return "File Monitor Thread";
+    case kWebSocketThread: return "WebSocket Thread";
+    default: return "Unknown";
+    }
+  }
+
+  const char *thread_name(DWORD id) {
+    SCOPED_CS(g_thread_name_cs);
+    return g_thread_names[id].c_str();
+  }
 
 //////////////////////////////////////////////////////////////////////////
 //
@@ -32,7 +81,7 @@ Dispatcher::Dispatcher() {
 void Dispatcher::invoke(const TrackedLocation &location, ThreadId id, const std::function<void()> &cb) {
   SCOPED_CS(_thread_cs);
   Thread *thread = _threads[id];
-  assert(thread);
+  KASSERT(thread);
   if (!thread)
     return;
 
@@ -42,7 +91,7 @@ void Dispatcher::invoke(const TrackedLocation &location, ThreadId id, const std:
 void Dispatcher::invoke_in(const TrackedLocation &location, ThreadId id, DWORD delta_ms, const std::function<void()> &cb) {
   SCOPED_CS(_thread_cs);
   Thread *thread = _threads[id];
-  assert(thread);
+  KASSERT(thread);
   if (!thread)
     return;
 
@@ -69,7 +118,7 @@ void Dispatcher::invoke_and_wait(const TrackedLocation &location, ThreadId id, c
 
 void Dispatcher::set_thread(ThreadId id, Thread *thread) {
   SCOPED_CS(_thread_cs);
-  assert(!_threads[id]);
+  KASSERT(!_threads[id]);
   _threads[id] = thread;
 }
 
@@ -87,6 +136,9 @@ Thread::Thread(ThreadId thread_id)
   , _ping_pong_idx(0)
 {
   DISPATCHER.set_thread(thread_id, this);
+  if (thread_id == kMainThread) {
+    SetThreadName(GetCurrentThreadId(), thread_name(kMainThread));
+  }
 }
 
 Thread::~Thread() {
@@ -125,7 +177,7 @@ void Thread::add_deferred(const DeferredCall &call) {
 }
 
 void Thread::process_deferred() {
-  //ADD_PROFILE_SCOPE();
+  ADD_PROFILE_SCOPE();
 
   DWORD now = timeGetTime();
 
@@ -166,7 +218,9 @@ bool GreedyThread::start() {
   if (_thread != INVALID_HANDLE_VALUE)
     return false;
 
-  _thread = (HANDLE)_beginthreadex(NULL, 0, &GreedyThread::run, this, 0, NULL);
+  UINT id;
+  _thread = (HANDLE)_beginthreadex(NULL, 0, &GreedyThread::run, this, 0, &id);
+  SetThreadName(id, thread_name(_thread_id));
   return _thread != INVALID_HANDLE_VALUE;
 }
 
@@ -202,7 +256,10 @@ bool SleepyThread::start() {
   if (_thread != INVALID_HANDLE_VALUE)
     return false;
 
-  _thread = (HANDLE)_beginthreadex(NULL, 0, &SleepyThread::run, this, 0, NULL);
+  UINT id;
+  _thread = (HANDLE)_beginthreadex(NULL, 0, &SleepyThread::run, this, 0, &id);
+  SetThreadName(id, thread_name(_thread_id));
+
   return _thread != INVALID_HANDLE_VALUE;
 }
 
@@ -240,7 +297,10 @@ bool BlockingThread::start() {
   if (_thread != INVALID_HANDLE_VALUE)
     return false;
 
-  _thread = (HANDLE)_beginthreadex(NULL, 0, &BlockingThread::run, this, 0, NULL);
+  UINT id;
+  _thread = (HANDLE)_beginthreadex(NULL, 0, &BlockingThread::run, this, 0, &id);
+  SetThreadName(id, thread_name(_thread_id));
+
   return _thread != INVALID_HANDLE_VALUE;
 }
 

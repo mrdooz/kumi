@@ -2,6 +2,7 @@
 #include "profiler.hpp"
 #include "utils.hpp"
 #include "json_utils.hpp"
+#include "threading.hpp"
 
 using namespace std;
 
@@ -12,18 +13,18 @@ ProfileManager::ProfileManager() {
 }
 
 ProfileManager &ProfileManager::instance() {
-  assert (_instance);
+  KASSERT(_instance);
   return *_instance;
 }
 
 bool ProfileManager::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new ProfileManager();
   return true;
 }
 
 bool ProfileManager::close() {
-  assert(_instance);
+  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }
@@ -38,7 +39,7 @@ void ProfileManager::enter_scope(ProfileScope *scope) {
   Timeline *timeline = nullptr;
   auto it = _timeline.find(thread_id);
   if (it == _timeline.end()) {
-    timeline = new Timeline(thread_id, now);
+    timeline = new Timeline(thread_id, threading::thread_name(thread_id), now);
     _timeline.insert(make_pair(thread_id, timeline));
   } else {
     timeline = it->second;
@@ -56,8 +57,12 @@ void ProfileManager::leave_scope(ProfileScope *scope) {
   SCOPED_CS(_callstack_cs);
 
   DWORD thread_id = scope->thread_id;
-  assert(_timeline.find(thread_id) != _timeline.end());
-  Timeline *timeline = _timeline[thread_id];
+  // Handle the case where an event stradles a frame because it's run on a seperate thread
+  auto it = _timeline.find(thread_id);
+  if (it == _timeline.end())
+    return;
+
+  Timeline *timeline = it->second;
   int idx = timeline->callstack.top();
   timeline->callstack.pop();
   QueryPerformanceCounter(&timeline->events[idx].end);
@@ -90,6 +95,7 @@ JsonValue::JsonValuePtr ProfileManager::end_frame() {
     auto &tl = it->second;
     DWORD thread_id = it->first;
     cur_thread->add_key_value("threadId", (int)thread_id);
+    cur_thread->add_key_value("threadName", tl->thread_name);
     cur_thread->add_key_value("maxDepth", tl->max_depth);
     auto &timeline = JsonValue::create_array();
 

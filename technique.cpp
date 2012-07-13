@@ -154,14 +154,14 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
               return false;
             }
 
-            CBufferVariable var;
-            var.ofs = atoi(row[4].c_str());
-            var.len = atoi(row[6].c_str());
-            size = max(size, var.ofs + var .len);
+            int ofs = atoi(row[4].c_str());
+            int len = atoi(row[6].c_str());
+            size = max(size, ofs + len);
             // The id is either a classifer (for mesh/material), or a real id in the system case
-            string class_id = PropertySource::to_string(param->source) + "::" + name;
-            int var_size = param->source == PropertySource::kMesh ? sizeof(int) : var.len;
-            var.id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
+            string class_id = PropertySource::qualify_name(name, param->source);
+            int var_size = param->source == PropertySource::kMesh ? sizeof(int) : len;
+            auto id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
+            CBufferVariable var(ofs, len, id);
 #ifdef _DEBUG
             var.name = class_id;
 #endif
@@ -257,7 +257,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
           //string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
           if (param->source == PropertySource::kSystem) {
             //GraphicsObjectHandle h = GRAPHICS.find_resource(name);
-            //assert(h.is_valid());
+            //KASSERT(h.is_valid());
             *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
           } else {
             *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
@@ -265,7 +265,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
 
         } else if (type == "sampler") {
           GraphicsObjectHandle sampler = GRAPHICS.find_sampler(name);
-          assert(sampler.is_valid());
+          KASSERT(sampler.is_valid());
           shader->_samplers[bind_point] = sampler;
           //shader->_first_sampler = min(shader->_first_sampler, bind_point);
         }
@@ -322,10 +322,11 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
     defines.c_str(),
     src);
 #else
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Fo %s %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O3 -Zi -Fo %s -Fh %s %s %s", 
     profile,
     entry_point,
     obj,
+    Path::replace_extension(obj, "h").c_str(),
     defines.c_str(),
     src);
 #endif
@@ -425,9 +426,9 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
     int len = (int)buf.size();
 
     Shader *shader = new Shader(type);
+    shader->_source_filename = src;
 #if _DEBUG
     shader->_entry_point = ep;
-    shader->_source_filename = src;
     shader->_obj_filename = obj;
     shader->_flags = cur.flags;
 #endif

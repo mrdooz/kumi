@@ -14,6 +14,9 @@ namespace threading {
     kThreadCount,
   };
 
+  const char *thread_name(ThreadId id);
+  const char *thread_name(DWORD id);
+
   struct DeferredCall {
     typedef std::function<void()> Fn;
 

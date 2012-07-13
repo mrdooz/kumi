@@ -55,8 +55,7 @@ namespace Gwen {
 }
 #endif
 
-class App : 
-  public threading::GreedyThread
+class App : public threading::GreedyThread
 {
 public:
 

@@ -181,7 +181,7 @@ static void print_inner(const JsonValue *obj, int indent_level, std::string *res
     break;
 
   default:
-    assert(!"invalid type in print_inner");
+    KASSERT(!"invalid type in print_inner");
     break;
   }
 }
@@ -322,7 +322,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
             break;
           if (ch != ',') {
             LOG_WARNING_LN("invalid json at: %s", s-1);
-            assert(false);
+            KASSERT(false);
             break;
           }
         }
@@ -342,7 +342,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
           break;
         if (ch != ',') {
           LOG_WARNING_LN("invalid json at: %s", s-1);
-          assert(false);
+          KASSERT(false);
           break;
         }
       }
@@ -376,7 +376,7 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
       return JsonValue::create_string(key);
     }
   } else {
-    assert(!"UNKNOWN JSON VALUE");
+    KASSERT(!"UNKNOWN JSON VALUE");
   }
 
   return JsonValue::JsonValuePtr();

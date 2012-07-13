@@ -9,19 +9,19 @@ using namespace std;
 MaterialManager* MaterialManager::_instance = nullptr;
 
 bool MaterialManager::create() {
-  assert(!_instance);
+  KASSERT(!_instance);
   _instance = new MaterialManager;
   return true;
 }
 
 bool MaterialManager::close() {
-  assert(_instance);
+  KASSERT(_instance);
   SAFE_DELETE(_instance);
   return true;
 }
 
 MaterialManager &MaterialManager::instance() {
-  assert(_instance);
+  KASSERT(_instance);
   return *_instance;
 }
 
@@ -36,7 +36,7 @@ Material *MaterialManager::get_material(GraphicsObjectHandle obj) {
 }
 
 void MaterialManager::remove_material(const std::string &name) {
-  assert(!"fix plz!");
+  KASSERT(!"fix plz!");
   /*
   auto it = _materials.find(name);
   if (it == end(_materials))

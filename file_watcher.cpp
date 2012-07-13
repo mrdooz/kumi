@@ -323,7 +323,7 @@ void FileWatcher::add_file_watch(const char *filename, void *token, ThreadId thr
 }
 
 void FileWatcher::remove_watch(const CbFileChanged &fn) {
-  assert(_thread);
+  KASSERT(_thread);
   if (!_thread)
     return;
 
