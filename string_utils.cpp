@@ -20,7 +20,7 @@ bool wide_char_to_utf8(LPCOLESTR unicode, size_t len, string *str)
 	if (!unicode)
 		return false;
 
-	char *buf = (char *)_alloca(len*2) + 1;
+	char *buf = (char *)_alloca(len*2 + 1);
 
 	int res;
 	if (!(res = WideCharToMultiByte(CP_UTF8, 0, unicode, len, buf, len * 2 + 1, NULL, NULL)))
@@ -34,7 +34,7 @@ bool wide_char_to_utf8(LPCOLESTR unicode, size_t len, string *str)
 
 string wide_char_to_utf8(const wstring &str) {
   int len = str.size();
-  char *buf = (char *)_alloca(len*2) + 1;
+  char *buf = (char *)_alloca(len*2 + 1);
   WideCharToMultiByte(CP_UTF8, 0, str.c_str(), len, buf, len * 2 + 1, NULL, NULL);
   buf[len] = '\0';
   return string(buf);

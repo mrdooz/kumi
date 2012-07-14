@@ -259,7 +259,7 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 
 #pragma pack(push, 1)
 struct LightBase {
-  PropertyId id;
+  uint32 id;
   int len;
 };
 
@@ -299,7 +299,7 @@ bool ScenePlayer::render() {
 
     GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
     GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
-    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
+    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_diffuse");
     GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
 
     GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");
@@ -336,14 +336,13 @@ bool ScenePlayer::render() {
     post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
 
     {
-
       // Add the lighting
       int num_lights = (int)_scene->lights.size();
       int pos_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
       int color_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
       int as_size = sizeof(LightBase) + num_lights * sizeof(float);
       int ae_size = sizeof(LightBase) + num_lights * sizeof(float);
-      int data_size = pos_size + color_size + 2 * ae_size/* + as_size*/;
+      int data_size = pos_size + color_size + 2 * ae_size;
       TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>(data_size);
       rd->num_instances = num_lights;
       rd->num_instance_variables = 4;
@@ -367,13 +366,14 @@ bool ScenePlayer::render() {
 
       for (size_t i = 0; i < _scene->lights.size(); ++i) {
         // transform pos to camera space
-        XMVECTOR v = XMLoadFloat4(&_scene->lights[i]->pos);
+        auto light = _scene->lights[i];
+        XMVECTOR v = XMLoadFloat4(&light->pos);
         XMMATRIX m = XMLoadFloat4x4(&transpose(_view));
         XMVECTOR v2 = XMVector3Transform(v, m);
         XMStoreFloat4(&lightpos->pos[i], v2);
-        lightcolor->color[i] = _scene->lights[i]->color;
-        lightattstart->start[i] = _scene->lights[i]->far_attenuation_start;
-        lightattend->end[i] = _scene->lights[i]->far_attenuation_end;
+        lightcolor->color[i] = light->color;
+        lightattstart->start[i] = light->far_attenuation_start;
+        lightattend->end[i] = light->far_attenuation_end;
       }
 
       GFX_SUBMIT_TECH(_ssao_light, rd);

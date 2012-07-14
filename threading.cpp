@@ -267,9 +267,7 @@ UINT SleepyThread::run(void *data) {
   SleepyThread *self = (SleepyThread *)data;
 
   HANDLE events[] = { self->_cancel_event, self->_deferred_event };
-  DWORD res;
-  while ((res = WaitForMultipleObjectsEx(ARRAYSIZE(events), events, FALSE, self->_sleep_interval, TRUE) 
-         != WAIT_OBJECT_0)) {
+  while (WaitForMultipleObjectsEx(ARRAYSIZE(events), events, FALSE, self->_sleep_interval, TRUE) != WAIT_OBJECT_0) {
     self->process_deferred();
     self->on_idle();
   }

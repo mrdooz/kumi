@@ -198,7 +198,7 @@ bool App::create_window()
 void App::on_idle() {
 }
 
-static void send_json(SOCKET socket, const JsonValue::JsonValuePtr json) {
+static void send_json(SOCKET socket, const JsonValue::JsonValuePtr &json) {
   string str = print_json(json);
   char *buf = new char[str.size()];
   memcpy(buf, str.data(), str.size());
@@ -240,10 +240,20 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 void App::send_stats(const JsonValue::JsonValuePtr &frame) {
 
   {
+    auto root = JsonValue::create_object();
     auto obj = JsonValue::create_object();
-    obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
-    obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
-    send_json(0, obj);
+
+    FILETIME time;
+    GetSystemTimeAsFileTime(&time);
+    int64 now = (LONGLONG)time.dwLowDateTime + ((LONGLONG)(time.dwHighDateTime) << 32LL);
+    now = (now / 10000) - 11644473600000;
+
+    obj->add_key_value("timestamp", (double)now);
+    obj->add_key_value("fps", JsonValue::create_number(GRAPHICS.fps()));
+    obj->add_key_value("ms", JsonValue::create_number(APP.frame_time()));
+    root->add_key_value("system.frame", obj);
+
+    send_json(0, root);
   }
 
   send_json(0, frame);
@@ -274,9 +284,9 @@ UINT App::run(void *userdata) {
       DispatchMessage(&msg);
     } else {
       PROFILE_MANAGER.start_frame();
+      LARGE_INTEGER start, end;
       {
         ADD_PROFILE_SCOPE();
-        LARGE_INTEGER start, end;
         QueryPerformanceCounter(&start);
 
         process_deferred();
@@ -291,6 +301,9 @@ UINT App::run(void *userdata) {
         _gwen_canvas->RenderCanvas();
 #endif
         GRAPHICS.render();
+      }
+      {
+        ADD_PROFILE_SCOPE();
         GRAPHICS.present();
 
         QueryPerformanceCounter(&end);

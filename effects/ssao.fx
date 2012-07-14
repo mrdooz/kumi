@@ -185,8 +185,12 @@ float4 light_ps_main(quad_ps_input input) : SV_Target
     
     float3 h = normalize(-pos + ll);
     float ss = specular * pow(saturate(dot(h, normal)), shininess);
+
+    float occ = rt_occlusion.Sample(PointSampler, input.tex).r;
     
-    return scale * (dd + ss);
+    float decay = dist < 40 ? 1 : 40 / dist;
+   
+    return pow(occ, 2)  * decay * scale * (dd + ss);
 }
 
 

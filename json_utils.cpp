@@ -77,7 +77,7 @@ JsonObject::JsonObject()
 {
 }
 
-bool JsonObject::add_key_value(const string &key, JsonValuePtr value) {
+bool JsonObject::add_key_value(const string &key, const JsonValuePtr &value) {
   _key_value[key] = value;
   return true;
 }
@@ -126,11 +126,10 @@ bool JsonObject::has_key(const std::string &key) const
 
 JsonArray::JsonArray() 
   : JsonValue(JS_ARRAY) 
-
 {
 }
 
-bool JsonArray::add_value(JsonValuePtr value) {
+bool JsonArray::add_value(const JsonValuePtr &value) {
   _value.push_back(value);
   return true;
 }
@@ -148,7 +147,7 @@ JsonValue::JsonValuePtr JsonArray::operator[](int idx) const
 //////////////////////////////////////////////////////////////////////////
 
 static void print_dispatch(const JsonValue *obj, int indent_level, std::string *res);
-string print_json(JsonValue::JsonValuePtr root) {
+string print_json(const JsonValue::JsonValuePtr &root) {
   string res;
   print_dispatch(root.get(), 1, &res);
   return res;

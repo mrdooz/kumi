@@ -437,19 +437,19 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   _height = height;
   _buffer_format = DXGI_FORMAT_B8G8R8A8_UNORM; //DXGI_FORMAT_R8G8B8A8_UNORM;
 
-  DXGI_SWAP_CHAIN_DESC sd;
-  ZeroMemory( &sd, sizeof( sd ) );
-  sd.BufferCount = 2;
-  sd.BufferDesc.Width = width;
-  sd.BufferDesc.Height = height;
-  sd.BufferDesc.Format = _buffer_format;
-  sd.BufferDesc.RefreshRate.Numerator = 0;
-  sd.BufferDesc.RefreshRate.Denominator = 0;
-  sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  sd.OutputWindow = hwnd;
-  sd.SampleDesc.Count = 1;
-  sd.SampleDesc.Quality = 0;
-  sd.Windowed = TRUE;
+  DXGI_SWAP_CHAIN_DESC swapchain_desc;
+  ZeroMemory(&swapchain_desc, sizeof( swapchain_desc ) );
+  swapchain_desc.BufferCount = 3;
+  swapchain_desc.BufferDesc.Width = width;
+  swapchain_desc.BufferDesc.Height = height;
+  swapchain_desc.BufferDesc.Format = _buffer_format;
+  swapchain_desc.BufferDesc.RefreshRate.Numerator = 0;
+  swapchain_desc.BufferDesc.RefreshRate.Denominator = 1;
+  swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  swapchain_desc.OutputWindow = hwnd;
+  swapchain_desc.SampleDesc.Count = 1;
+  swapchain_desc.SampleDesc.Quality = 0;
+  swapchain_desc.Windowed = TRUE;
 
   // Create DXGI factory to enumerate adapters
   IDXGIFactory1 *dxgi_factory = nullptr;
@@ -482,7 +482,8 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   // Create the DX11 device
   B_ERR_HR(D3D11CreateDeviceAndSwapChain(
-    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, D3D11_SDK_VERSION, &sd, &_swap_chain.p, &_device.p,
+    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, 
+    D3D11_SDK_VERSION, &swapchain_desc, &_swap_chain.p, &_device.p,
     &_feature_level, &_immediate_context.p));
   set_private_data(FROM_HERE, _immediate_context.p);
 
@@ -547,7 +548,7 @@ void Graphics::present()
     _start_fps_time = now;
     _frame_count = 0;
   }
-  _swap_chain->Present(0,0);
+  _swap_chain->Present(1,0);
 }
 
 void Graphics::resize(const int width, const int height)
@@ -1293,7 +1294,7 @@ void Graphics::set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT 
 
 void Graphics::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
-  if (memcmp(samplers.data(), prev_samplers, size)) {
+  if (memcmp(samplers.data(), prev_samplers, size) != 0) {
     int first_sampler = MAX_SAMPLERS, num_samplers = 0;
     ID3D11SamplerState *d3dsamplers[MAX_SAMPLERS];
     for (int i = 0; i < MAX_SAMPLERS; ++i) {
@@ -1315,7 +1316,7 @@ void Graphics::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_T
   int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;
-  if (force || memcmp(resources.data(), prev_resources, size)) {
+  if (force || memcmp(resources.data(), prev_resources, size) != 0) {
     ID3D11ShaderResourceView *d3dresources[MAX_TEXTURES];
     int first_resource = MAX_TEXTURES, num_resources = 0;
     for (int i = 0; i < MAX_TEXTURES; ++i) {

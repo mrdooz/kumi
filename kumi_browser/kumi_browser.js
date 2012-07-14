@@ -138,9 +138,10 @@ var KUMI = (function($, KUMI_LIB) {
         };
 
         function drawFps(data) {
-            var fps = performanceFps ? data['system.fps'] : 1000 * data['system.ms'];
-            fps_series.append(new Date().getTime(), fps);
-            $('#cur-fps').text(fps.toFixed(2) + ' fps');
+            var value = performanceFps ? data.fps : 1000 * data.ms;
+            var suffix = performanceFps ? " fps" : " ms";
+            fps_series.append(data.timestamp, value);
+            $('#cur-fps').text(value.toFixed(2) + suffix);
         }
 
         function drawProfile(prof) {
@@ -187,8 +188,8 @@ var KUMI = (function($, KUMI_LIB) {
 
             if (msg['system.profile']) {
                 drawProfile(msg['system.profile']);
-            } else if (msg['system.fps']) {
-                drawFps(msg);
+            } else if (msg['system.frame']) {
+                drawFps(msg['system.frame']);
             } else if (msg.demo) {
                 // append interpolation functions to the parameters
                 demoInfo = msg.demo;

@@ -374,7 +374,7 @@ struct ShaderInstance {
 
 bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
-  bool force = true;
+  bool force = false;
   bool ok = true;
 
   const char *src = shader_template->_source_filename.c_str();

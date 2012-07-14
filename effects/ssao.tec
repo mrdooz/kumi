@@ -76,6 +76,7 @@ technique ssao_light inherits quad_base{
             texture2d rt_normal system;
             texture2d rt_diffuse system;
             texture2d rt_specular system;
+            texture2d rt_occlusion system;
             float4 LightPos instance;
             float4 LightColor instance;
             float AttenuationStart instance;

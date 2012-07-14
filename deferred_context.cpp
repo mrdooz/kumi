@@ -279,7 +279,7 @@ void DeferredContext::set_bs(GraphicsObjectHandle bs, const float *blend_factors
 
 void DeferredContext::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
-  if (memcmp(samplers.data(), prev_samplers, size)) {
+  if (memcmp(samplers.data(), prev_samplers, size) != 0) {
     int first_sampler = MAX_SAMPLERS, num_samplers = 0;
     ID3D11SamplerState *d3dsamplers[MAX_SAMPLERS];
     for (int i = 0; i < MAX_SAMPLERS; ++i) {
@@ -301,7 +301,7 @@ void DeferredContext::set_shader_resources(const std::array<GraphicsObjectHandle
   int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;
-  if (force || memcmp(resources.data(), prev_resources, size)) {
+  if (force || memcmp(resources.data(), prev_resources, size) != 0) {
     ID3D11ShaderResourceView *d3dresources[MAX_TEXTURES];
     int first_resource = MAX_TEXTURES, num_resources = 0;
     for (int i = 0; i < MAX_TEXTURES; ++i) {

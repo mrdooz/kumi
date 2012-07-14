@@ -155,7 +155,7 @@ static void websocket_frame(const char *payload, int len, vector<char> *msg) {
   memcpy(msg->data() + hdr->GetPayloadOffset(), payload, len);
 }
 
-DWORD WINAPI WebSocketThread::client_thread(void *param) {
+UINT WebSocketThread::client_thread(void *param) {
 
   const int BUF_SIZE = 16 * 1024;
   char *buf = (char *)_alloca(BUF_SIZE);
@@ -307,12 +307,12 @@ UINT WebSocketThread::blocking_run(void *param) {
       // accept event
       SOCKET client_socket = accept(listen_socket, NULL, NULL);
       if (client_socket != INVALID_SOCKET) {
-        DWORD thread_id;
+        uint32 thread_id;
         ClientData cd;
         cd.self = this;
         cd.close_event = _cancel_event;
         cd.socket = client_socket;
-        cd.thread = CreateThread(NULL, 0, client_thread, &cd, 0, &thread_id);
+        cd.thread = (HANDLE)_beginthreadex(NULL, 0, client_thread, &cd, 0, &thread_id);
         {
           SCOPED_CS(_thread_cs);
           _client_threads.push_back(cd);

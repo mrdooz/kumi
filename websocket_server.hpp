@@ -16,7 +16,7 @@ protected:
   virtual void on_idle() {}
   UINT blocking_run(void *data);
 private:
-  static DWORD WINAPI client_thread(void *param);
+  static UINT __stdcall client_thread(void *param);
 
   CriticalSection _thread_cs;
   struct ClientData {
