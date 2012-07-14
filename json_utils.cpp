@@ -146,6 +146,101 @@ JsonValue::JsonValuePtr JsonArray::operator[](int idx) const
 //
 //////////////////////////////////////////////////////////////////////////
 
+struct Buffer {
+  Buffer(int initial_size) : ofs(0) {
+    buf.resize(initial_size);
+  }
+
+  void add_char(char ch) {
+    safety(32);
+    buf[ofs++] = ch;
+  }
+
+  void add_int(int a) {
+    safety(32);
+    ofs += sprintf(&buf[ofs], "%d", a);
+  }
+
+  void add_number(double a) {
+    safety(2048);
+    ofs += sprintf(&buf[ofs], "%f", a);
+  }
+
+  void add_string(const string &str) {
+    safety(2 * str.size());
+    memcpy(&buf[ofs], str.c_str(), str.size());
+    ofs += str.size();
+  }
+
+  void safety(size_t s) {
+    if (remaining() < s)
+      buf.resize(2 * buf.size());
+  }
+
+  size_t remaining() const { return buf.size() - ofs; }
+
+  vector<char> buf;
+  size_t ofs;
+};
+
+void print_json2_runner(const JsonValue::JsonValuePtr &node, Buffer *buf) {
+
+  switch (node->type()) {
+    case JsonValue::JS_STRING:
+      buf->add_char('\"');
+      buf->add_string(node->to_string());
+      buf->add_char('\"');
+      break;
+
+    case JsonValue::JS_NUMBER:
+      buf->add_number(node->to_number());
+      break;
+
+    case JsonValue::JS_INT:
+      buf->add_int(node->to_int());
+      break;
+
+    case JsonValue::JS_BOOL:
+      buf->add_string(node->to_bool() ? "true" : "false");
+      break;
+
+    case JsonValue::JS_ARRAY:
+      buf->add_char('[');
+      for (int i = 0; i < node->count(); ++i) {
+        print_json2_runner(node->get(i), buf);
+        if (i != node->count() - 1)
+          buf->add_char(',');
+      }
+      buf->add_char(']');
+      buf->add_char('\n');
+      break;
+
+    case JsonValue::JS_OBJECT: {
+      buf->add_char('{');
+      JsonObject *obj = (JsonObject *)node.get();
+      int i = 0;
+      for (auto it = begin(obj->kv()); it != end(obj->kv()); ++it) {
+        buf->add_char('\"');
+        buf->add_string(it->first);
+        buf->add_char('\"');
+        buf->add_char(':');
+        print_json2_runner(it->second, buf);
+        if (++i != obj->kv().size())
+          buf->add_char(',');
+      }
+      buf->add_char('}');
+      buf->add_char('\n');
+      break;
+    }
+  }
+}
+
+std::string print_json2(const JsonValue::JsonValuePtr &root) {
+  Buffer buf(10000);
+  print_json2_runner(root, &buf);
+  return string(buf.buf.data(), buf.ofs);
+}
+
 static void print_dispatch(const JsonValue *obj, int indent_level, std::string *res);
 string print_json(const JsonValue::JsonValuePtr &root) {
   string res;

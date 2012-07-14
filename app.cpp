@@ -199,7 +199,7 @@ void App::on_idle() {
 }
 
 static void send_json(SOCKET socket, const JsonValue::JsonValuePtr &json) {
-  string str = print_json(json);
+  string str = print_json2(json);
   char *buf = new char[str.size()];
   memcpy(buf, str.data(), str.size());
   WEBSOCKET_SERVER.send_msg(socket, buf, str.size());

@@ -84,6 +84,8 @@ public:
   virtual JsonValuePtr operator[](const std::string &key) const override;
   virtual bool has_key(const std::string &key) const;
 
+  const std::map<std::string, JsonValuePtr> &kv() const { return _key_value; }
+
 protected:
   JsonObject();
   std::map<std::string, JsonValuePtr> _key_value;
@@ -102,6 +104,9 @@ private:
   JsonArray();
   std::vector<JsonValuePtr> _value;
 };
+
+// no pretty printing, but uzi-fast!
+std::string print_json2(const JsonValue::JsonValuePtr &root);
 
 std::string print_json(const JsonValue::JsonValuePtr &root);
 JsonValue::JsonValuePtr parse_json(const char *start, const char *end);
