@@ -166,10 +166,14 @@ struct Buffer {
     ofs += sprintf(&buf[ofs], "%f", a);
   }
 
-  void add_string(const string &str) {
+  void add_string(const string &str, bool quote) {
     safety(2 * str.size());
+    if (quote)
+      buf[ofs++] = '\"';
     memcpy(&buf[ofs], str.c_str(), str.size());
     ofs += str.size();
+    if (quote)
+      buf[ofs++] = '\"';
   }
 
   void safety(size_t s) {
@@ -187,9 +191,7 @@ void print_json2_runner(const JsonValue::JsonValuePtr &node, Buffer *buf) {
 
   switch (node->type()) {
     case JsonValue::JS_STRING:
-      buf->add_char('\"');
-      buf->add_string(node->to_string());
-      buf->add_char('\"');
+      buf->add_string(node->to_string(), true);
       break;
 
     case JsonValue::JS_NUMBER:
@@ -201,7 +203,7 @@ void print_json2_runner(const JsonValue::JsonValuePtr &node, Buffer *buf) {
       break;
 
     case JsonValue::JS_BOOL:
-      buf->add_string(node->to_bool() ? "true" : "false");
+      buf->add_string(node->to_bool() ? "true" : "false", false);
       break;
 
     case JsonValue::JS_ARRAY:
@@ -212,7 +214,6 @@ void print_json2_runner(const JsonValue::JsonValuePtr &node, Buffer *buf) {
           buf->add_char(',');
       }
       buf->add_char(']');
-      buf->add_char('\n');
       break;
 
     case JsonValue::JS_OBJECT: {
@@ -220,16 +221,13 @@ void print_json2_runner(const JsonValue::JsonValuePtr &node, Buffer *buf) {
       JsonObject *obj = (JsonObject *)node.get();
       int i = 0;
       for (auto it = begin(obj->kv()); it != end(obj->kv()); ++it) {
-        buf->add_char('\"');
-        buf->add_string(it->first);
-        buf->add_char('\"');
+        buf->add_string(it->first, true);
         buf->add_char(':');
         print_json2_runner(it->second, buf);
         if (++i != obj->kv().size())
           buf->add_char(',');
       }
       buf->add_char('}');
-      buf->add_char('\n');
       break;
     }
   }
@@ -251,32 +249,32 @@ string print_json(const JsonValue::JsonValuePtr &root) {
 static void print_inner(const JsonValue *obj, int indent_level, std::string *res) {
 
   switch (obj->type()) {
-  case JsonValue::JS_STRING: 
-    res->append("\"");
-    res->append(obj->to_string());
-    res->append("\"");
-    break;
+    case JsonValue::JS_STRING: 
+      res->append("\"");
+      res->append(obj->to_string());
+      res->append("\"");
+      break;
 
-  case JsonValue::JS_NUMBER: {
-    static char buf[2048];
-    sprintf(buf, "%f", obj->to_number());
-    res->append(buf);
-    break;
-                  }
+    case JsonValue::JS_NUMBER: {
+      static char buf[2048];
+      sprintf(buf, "%f", obj->to_number());
+      res->append(buf);
+      break;
+    }
 
-  case JsonValue::JS_INT:
-    static char buf2[32];
-    sprintf(buf2, "%d", obj->to_int());
-    res->append(buf2);
-    break;
+    case JsonValue::JS_INT:
+      static char buf2[32];
+      sprintf(buf2, "%d", obj->to_int());
+      res->append(buf2);
+      break;
 
-  case JsonValue::JS_BOOL:
-    res->append(obj->to_bool() ? "true" : "false");
-    break;
+    case JsonValue::JS_BOOL:
+      res->append(obj->to_bool() ? "true" : "false");
+      break;
 
-  default:
-    KASSERT(!"invalid type in print_inner");
-    break;
+    default:
+      KASSERT(!"invalid type in print_inner");
+      break;
   }
 }
 

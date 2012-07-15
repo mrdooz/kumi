@@ -30,6 +30,8 @@ var KUMI = (function($, KUMI_LIB) {
     var snapping = true;
     var curSelected;
 
+    var profileResolution = 20;
+
     var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
 
@@ -153,21 +155,21 @@ var KUMI = (function($, KUMI_LIB) {
             var ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            var ms = 20; //Math.ceil(frameTime * 1000);
             var x = 0;
-            var w = canvas.width / ms;
+            var w = canvas.width / profileResolution;
 
-            var pixelsPerSecond = canvas.width * (1000 / 20);
+            var pixelsPerSecond = canvas.width * (1000 / profileResolution);
 
-            for (var i = 0; i < ms; ++i) {
+            for (var i = 0; i < profileResolution; ++i) {
                 ctx.fillStyle = i % 2 ? "#ccc" : "#aaa";
                 ctx.fillRect(x, 0, w, canvas.height);
                 x += w;
             }
 
             var levelHeight = 20;
+            var cols = ["#c44", "#4c4", "#44c", "#cc4", "#4cc"];
 
-            var cols = ["#c22", "#2c2", "#22c", "#cc2", "#2cc"];
+            var profileCount = 0;
 
             $.each(prof.threads, function(i, thread) {
                 var y = 0;
@@ -176,7 +178,14 @@ var KUMI = (function($, KUMI_LIB) {
                     var xEnd = (event.end - event.start) * pixelsPerSecond;
 
                     ctx.fillStyle = cols[i%cols.length];
-                    ctx.fillRect(x, y + ((thread.maxDepth + 1) * (levelHeight+10)) - (event.level + 1) * (10 + levelHeight), xEnd, levelHeight);
+                    var curY = y + ((thread.maxDepth + 1) * (levelHeight+10)) - (event.level + 1) * (10 + levelHeight);
+                    ctx.fillRect(x, curY, xEnd, levelHeight);
+
+                    ctx.fillStyle = "Black";
+                    setFont(ctx, "10px Arial", "middle", "center");
+                    ctx.fillText(profileCount, x + xEnd/2, curY + levelHeight/2);
+                    profileCount++;
+
                 });
                 y += (thread.maxDepth + 1) * (levelHeight + 10);
             });
@@ -780,6 +789,10 @@ var KUMI = (function($, KUMI_LIB) {
         smoothie.streamTo(document.getElementById("fps-canvas"), 0, false);
         smoothie.addTimeSeries(fps_series);
     }
+
+    kumi.setProfileResolution = function(ms) {
+        profileResolution = ms;
+    };
 
     kumi.showFps = function(value) {
         performanceFps = value;
