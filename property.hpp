@@ -1,6 +1,12 @@
 #pragma once
 #include "graphics_object_handle.hpp"
 
+static const int MAX_SAMPLERS = 8;
+static const int MAX_TEXTURES = 8;
+
+typedef std::array<GraphicsObjectHandle, MAX_TEXTURES> TextureArray;
+typedef std::array<GraphicsObjectHandle, MAX_SAMPLERS> SamplerArray;
+
 typedef uint32 PropertyId;
 
 namespace PropertySource {
@@ -46,6 +52,13 @@ struct CBufferVariable {
 };
 
 struct CBuffer {
+  void init() {
+    auto &fn = [&](const CBufferVariable &a, const CBufferVariable &b) { return a.id < b.id; };
+    sort(begin(mesh_vars), end(mesh_vars), fn);
+    sort(begin(material_vars), end(material_vars), fn);
+    sort(begin(system_vars), end(system_vars), fn);
+    sort(begin(instance_vars), end(instance_vars), fn);
+  }
   GraphicsObjectHandle handle;
   std::vector<CBufferVariable> mesh_vars;
   std::vector<CBufferVariable> material_vars;

@@ -923,13 +923,11 @@ GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx
   return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : GraphicsObjectHandle();
 }
 
-void Graphics::fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
+void Graphics::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {
 
-  for (size_t i = 0; i < props.res.size(); ++i) {
-    auto &cur = props.res[i];
-    if (cur.source == PropertySource::kSystem) {
-      auto goh = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(*cur.pid());
-      (*out)[i] = goh;
+  for (size_t i = 0; i < views.size(); ++i) {
+    if (views[i].used && views[i].source == PropertySource::kSystem) {
+      (*out)[i] = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(views[i].class_id);
     }
   }
 }
@@ -1064,17 +1062,22 @@ void Graphics::render() {
 
         // set resource views
         auto &rv = ps->resource_views();
-        if (rv.count > 0) {
-          array<GraphicsObjectHandle, MAX_TEXTURES> rr;
-          fill_system_resource_views(rv, &rr);
-          material->fill_resource_views(rv, &rr);
-          set_shader_resources(rr);
+        TextureArray all_views;
+        fill_system_resource_views(rv, &all_views);
+        material->fill_resource_views(rv, &all_views);
+        bool has_resources = false;
+        for (size_t i = 0; i < all_views.size(); ++i) {
+          if (all_views[i].is_valid()) {
+            set_shader_resources(all_views);
+            has_resources = true;
+            break;
+          }
         }
 
         draw_indexed(geometry->index_count, 0, 0);
 
-        if (rv.count > 0)
-          unset_shader_resource(rv.first, rv.count);
+        if (has_resources)
+          unset_shader_resource(all_views);
         break;
       }
 
@@ -1104,6 +1107,24 @@ void Graphics::render() {
 
         // set resource views
         auto &rv = ps->resource_views();
+        TextureArray all_views;
+        fill_system_resource_views(rv, &all_views);
+        if (rd && rd->user_textures) {
+          for (int i = 0; i < MAX_TEXTURES; ++i) {
+            if (rd->textures[i].is_valid())
+              all_views[i] = rd->textures[i];
+          }
+        }
+
+        bool has_resources = false;
+        for (size_t i = 0; i < all_views.size(); ++i) {
+          if (all_views[i].is_valid()) {
+            set_shader_resources(all_views);
+            has_resources = true;
+            break;
+          }
+        }
+/*
         if (rv.count > 0) {
           array<GraphicsObjectHandle, 8> rr;
           fill_system_resource_views(rv, &rr);
@@ -1115,7 +1136,7 @@ void Graphics::render() {
           }
           set_shader_resources(rr);
         }
-
+*/
         // Check if we're drawing instanced
         if (rd && rd->num_instances) {
           for (int ii = 0; ii < rd->num_instances; ++ii) {
@@ -1168,8 +1189,8 @@ void Graphics::render() {
           draw_indexed(technique->index_count(), 0, 0);
         }
 
-        if (rv.count > 0)
-          unset_shader_resource(rv.first, rv.count);
+        if (has_resources)
+          unset_shader_resource(all_views);
         break;
       }
     }
@@ -1292,7 +1313,7 @@ void Graphics::set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT 
   }
 }
 
-void Graphics::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers) {
+void Graphics::set_samplers(const SamplerArray &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
   if (memcmp(samplers.data(), prev_samplers, size) != 0) {
     int first_sampler = MAX_SAMPLERS, num_samplers = 0;
@@ -1312,7 +1333,7 @@ void Graphics::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS>
   }
 }
 
-void Graphics::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources) {
+void Graphics::set_shader_resources(const TextureArray &resources) {
   int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;
@@ -1363,6 +1384,20 @@ void Graphics::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_T
 }
 
 void Graphics::unset_shader_resource(int first_view, int num_views) {
+  if (!num_views)
+    return;
+  static ID3D11ShaderResourceView *null_views[MAX_SAMPLERS] = {0, 0, 0, 0, 0, 0, 0, 0};
+  _immediate_context->PSSetShaderResources(first_view, num_views, null_views);
+}
+
+void Graphics::unset_shader_resource(const TextureArray &resources) {
+  int first_view = MAX_TEXTURES, num_views = 0;
+  for (size_t i = 0; i < resources.size(); ++i) {
+    if (resources[i].is_valid()) {
+      first_view = min(first_view, (int)i);
+      num_views = i - first_view + 1;
+    }
+  }
   if (!num_views)
     return;
   static ID3D11ShaderResourceView *null_views[MAX_SAMPLERS] = {0, 0, 0, 0, 0, 0, 0, 0};

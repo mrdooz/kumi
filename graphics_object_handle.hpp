@@ -1,8 +1,5 @@
 #pragma once
 
-static const int MAX_SAMPLERS = 8;
-static const int MAX_TEXTURES = 8;
-
 class GraphicsObjectHandle {
 public:
   enum Type {

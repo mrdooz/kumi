@@ -224,13 +224,14 @@ private:
   void set_rs(GraphicsObjectHandle rs);
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
-  void set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers);
-  void set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources);
+  void set_samplers(const SamplerArray &samplers);
+  void set_shader_resources(const TextureArray &resources);
   void unset_shader_resource(int first_view, int num_views);
+  void unset_shader_resource(const TextureArray &resources);
   void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
 
-  void fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const;
+  void fill_system_resource_views(const ResourceViewArray &props, TextureArray *out) const;
 
   GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
   GraphicsObjectHandle prev_rs, prev_bs, prev_dss;

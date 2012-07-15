@@ -12,7 +12,7 @@ DeferredContext::DeferredContext() : _ctx(nullptr) {
 
 
 void DeferredContext::render_technique(GraphicsObjectHandle technique_handle, 
-                                       const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources,
+                                       const TextureArray &resources,
                                        const InstanceData &instance_data) {
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
   //const TechniqueRenderData *rd = (const TechniqueRenderData *)data;
@@ -39,15 +39,14 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 
   // set resource views
   auto &rv = ps->resource_views();
-  if (rv.count > 0) {
-    array<GraphicsObjectHandle, 8> rr;
-    fill_system_resource_views(rv, &rr);
-    for (int i = 0; i < MAX_TEXTURES; ++i) {
-      if (resources[i].is_valid())
-        rr[i] = resources[i];
-    }
-    set_shader_resources(rr);
+  TextureArray all_views(resources);
+  fill_system_resource_views(rv, &all_views);
+  bool has_resources = false;
+  for (size_t i = 0; i < all_views.size() && !has_resources; ++i) {
+    has_resources |= all_views[i].is_valid();
   }
+  if (has_resources)
+    set_shader_resources(all_views);
 
   // set cbuffers
   auto &vs_cbuffers = vs->cbuffers();
@@ -90,11 +89,11 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
     draw_indexed(technique->index_count(), 0, 0);
   }
 
-  if (rv.count > 0)
-    unset_shader_resource(rv.first, rv.count);
+  if (has_resources)
+    unset_shader_resource(0, MAX_TEXTURES);
 }
 
-void DeferredContext::fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
+void DeferredContext::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {
 
 }
 
@@ -149,17 +148,19 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
 
     // set resource views
     auto &rv = ps->resource_views();
-    if (rv.count > 0) {
-      array<GraphicsObjectHandle, MAX_TEXTURES> rr;
-      fill_system_resource_views(rv, &rr);
-      material->fill_resource_views(rv, &rr);
-      set_shader_resources(rr);
+    TextureArray all_views;
+    fill_system_resource_views(rv, &all_views);
+    bool has_resources = false;
+    for (size_t i = 0; i < all_views.size() && !has_resources; ++i) {
+      has_resources |= all_views[i].is_valid();
     }
+    if (has_resources)
+      set_shader_resources(all_views);
 
     draw_indexed(geometry->index_count, 0, 0);
 
-    if (rv.count > 0)
-      unset_shader_resource(rv.first, rv.count);
+    if (has_resources)
+      unset_shader_resource(0, MAX_TEXTURES);
   }
 
 }
@@ -277,7 +278,7 @@ void DeferredContext::set_bs(GraphicsObjectHandle bs, const float *blend_factors
   }
 }
 
-void DeferredContext::set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers) {
+void DeferredContext::set_samplers(const SamplerArray &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
   if (memcmp(samplers.data(), prev_samplers, size) != 0) {
     int first_sampler = MAX_SAMPLERS, num_samplers = 0;
@@ -297,7 +298,7 @@ void DeferredContext::set_samplers(const std::array<GraphicsObjectHandle, MAX_SA
   }
 }
 
-void DeferredContext::set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources) {
+void DeferredContext::set_shader_resources(const TextureArray &resources) {
   int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;

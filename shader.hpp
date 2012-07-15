@@ -11,25 +11,14 @@ namespace ShaderType {
   };
 }
 
-// worse names evar!
-template<typename T>
-struct SparseResource {
-  SparseResource() : first(INT_MAX), count(0) {}
-  int first;
-  int count;
-  std::vector<T> res;
-};
-
-struct UnknownResource {
+struct ResourceView {
+  ResourceView() : used(false), source(PropertySource::kUnknown), class_id(~0) {}
+  bool used;
   PropertySource::Enum source;
-  char data[max(sizeof(GraphicsObjectHandle), sizeof(PropertyId))];
-  const GraphicsObjectHandle *goh() const { return (GraphicsObjectHandle *)&data; }
-  GraphicsObjectHandle *goh() { return (GraphicsObjectHandle *)&data; }
-  const PropertyId *pid() const { return (PropertyId *)&data; }
-  PropertyId *pid() { return (PropertyId *)&data; }
+  PropertyId class_id;
 };
 
-typedef SparseResource<UnknownResource> SparseUnknown;
+typedef std::array<ResourceView, MAX_TEXTURES> ResourceViewArray;
 
 class Shader {
   friend class TechniqueParser;
@@ -44,8 +33,8 @@ public:
   GraphicsObjectHandle handle() const { return _handle; }
 
   std::vector<CBuffer> &cbuffers() { return _cbuffers; }
-  const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers() { return _samplers; }
-  const SparseUnknown &resource_views() const { return _resource_views; }
+  const SamplerArray &samplers() { return _samplers; }
+  const ResourceViewArray &resource_views() { return _resource_views; }
 
   bool on_loaded();
 
@@ -62,7 +51,7 @@ private:
   ShaderType::Enum _type;
 
   ResourceViews _resource_views2;
-  SparseUnknown _resource_views;
+  ResourceViewArray _resource_views;
 
-  std::array<GraphicsObjectHandle, MAX_SAMPLERS> _samplers;
+  SamplerArray _samplers;
 };

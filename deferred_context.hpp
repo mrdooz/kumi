@@ -25,8 +25,8 @@ public:
   void generate_mips(GraphicsObjectHandle h);
 
   void render_mesh(Mesh *mesh, GraphicsObjectHandle technique_handle);
-  void render_technique(GraphicsObjectHandle technique_handle, 
-    const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources,
+  void render_technique(GraphicsObjectHandle technique_handle,
+    const TextureArray &resources,
     const InstanceData &instance_data);
 
 private:
@@ -43,13 +43,13 @@ private:
   void set_rs(GraphicsObjectHandle rs);
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
-  void set_samplers(const std::array<GraphicsObjectHandle, MAX_SAMPLERS> &samplers);
-  void set_shader_resources(const std::array<GraphicsObjectHandle, MAX_TEXTURES> &resources);
+  void set_samplers(const SamplerArray &samplers);
+  void set_shader_resources(const TextureArray &resources);
   void unset_shader_resource(int first_view, int num_views);
   void set_cbuffer(const std::vector<CBuffer> &vs, const std::vector<CBuffer> &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
 
-  void fill_system_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const;
+  void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;
 
   GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
   GraphicsObjectHandle prev_rs, prev_bs, prev_dss;

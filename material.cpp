@@ -19,12 +19,15 @@ Material::Property *Material::property_by_name(const std::string &name) {
 }
 
 void Material::fill_cbuffer(CBuffer *cbuffer) const {
-  for (size_t i = 0; i < cbuffer->material_vars.size(); ++i) {
-    auto &cur = cbuffer->material_vars[i];
-    auto it = _properties_by_id.find(cur.id);
-    if (it != _properties_by_id.end()) {
-      PROPERTY_MANAGER.get_property_raw(it->second->id, &cbuffer->staging[cur.ofs], cur.len);
-    }
+
+  auto j = begin(_property_list);
+  for (auto i = begin(cbuffer->material_vars); i != end(cbuffer->material_vars); ++i) {
+    // find the correct material id.
+    while (j != end(_property_list) && i->id != j->second->class_id)
+      ++j;
+    if (j == end(_property_list))
+      return;
+    memcpy(&cbuffer->staging[i->ofs], j->second->_data, i->len);
   }
 }
 
@@ -36,11 +39,11 @@ void Material::add_flag(int flag) {
   _flags |= flag;
 }
 
-void Material::fill_resource_views(const SparseUnknown &props, std::array<GraphicsObjectHandle, MAX_TEXTURES> *out) const {
-  for (size_t i = 0; i < props.res.size(); ++i) {
-    if (props.res[i].source == PropertySource::kMaterial) {
-      auto it = _properties_by_id.find(*props.res[i].pid());
-      if (it != _properties_by_id.end()) {
+void Material::fill_resource_views(const ResourceViewArray &views, TextureArray *out) const {
+  for (size_t i = 0; i < views.size(); ++i) {
+    if (views[i].used && views[i].source == PropertySource::kMaterial) {
+      auto it = _properties_by_class_id.find(views[i].class_id);
+      if (it != _properties_by_class_id.end()) {
         (*out)[i] = it->second->resource;
       }
     }

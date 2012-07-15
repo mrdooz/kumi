@@ -12,6 +12,9 @@ Shader::Shader(ShaderType::Enum type)
 }
 
 bool Shader::on_loaded() {
+  for (size_t i = 0; i < _cbuffers.size(); ++i) {
+    _cbuffers[i].init();
+  }
   return true;
 }
 

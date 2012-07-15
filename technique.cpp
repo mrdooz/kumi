@@ -247,20 +247,14 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
             LOG_WARNING_LN("Unsupported property source for texture: %s", name.c_str());
           }
 
-          SparseUnknown &res = shader->_resource_views;
-          res.first = min(bind_point, res.first);
-          res.count = max(res.count, bind_point - res.first + 1);
-          res.res.resize(max(bind_point + 1, (int)res.res.size()));
-          res.res[bind_point].source = param->source;
+          auto &rv = shader->_resource_views;
+          rv[bind_point].source = param->source;
+          rv[bind_point].used = true;
 
-          // the system resource has already been created, so we can grab it's handle right now
-          //string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
           if (param->source == PropertySource::kSystem) {
-            //GraphicsObjectHandle h = GRAPHICS.find_resource(name);
-            //KASSERT(h.is_valid());
-            *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
+            rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
           } else {
-            *res.res[bind_point].pid() = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+            rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
           }
 
         } else if (type == "sampler") {

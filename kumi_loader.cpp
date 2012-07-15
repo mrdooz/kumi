@@ -223,10 +223,6 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
           LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());
       }
 
-      if (!strcmp(name, "Diffuse")) {
-        material->add_property("HasDiffuseMap", PropertyType::kInt, filename.empty() ? 0 : 1);
-      }
-
       PropertyType::Enum type = read_and_advance<PropertyType::Enum>(&buf);
       Material::Property *property = nullptr;
 
