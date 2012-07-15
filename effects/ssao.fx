@@ -1,8 +1,17 @@
 #include "common.fx"
 
-matrix proj, view, world;
-float4 Diffuse, Specular;
-float Shininess;
+cbuffer PerFrame {
+  matrix proj, view;
+};
+
+cbuffer PerMaterial {
+  float4 Diffuse, Specular;
+  float Shininess;
+};
+
+cbuffer PerInstance {
+  matrix world;
+};
 
 static const float ScreenWidth = 1440;
 static const float ScreenHeight = 900;

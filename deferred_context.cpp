@@ -7,11 +7,14 @@
 
 using namespace std;
 
-DeferredContext::DeferredContext() : _ctx(nullptr), prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED) {
+DeferredContext::DeferredContext() 
+  : _ctx(nullptr), prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED) {
+    _default_stencil_ref = GRAPHICS.default_stencil_ref();
+    memcpy(_default_blend_factors, GRAPHICS.default_blend_factors(), sizeof(_default_blend_factors));
+    _default_sample_mask = GRAPHICS.default_sample_mask();
 }
 
 DeferredContext::~DeferredContext() {
-
 }
 
 
@@ -19,7 +22,6 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
                                        const TextureArray &resources,
                                        const InstanceData &instance_data) {
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
-  //const TechniqueRenderData *rd = (const TechniqueRenderData *)data;
 
   Shader *vs = technique->vertex_shader(0);
   Shader *ps = technique->pixel_shader(0);
@@ -32,8 +34,8 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   set_ib(technique->ib(), technique->index_format());
 
   set_rs(technique->rasterizer_state());
-  set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+  set_dss(technique->depth_stencil_state(), _default_stencil_ref);
+  set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
 
   // set samplers
   auto &samplers = ps->samplers();
@@ -113,8 +115,8 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
 
   set_layout(technique->input_layout());
   set_rs(technique->rasterizer_state());
-  set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+  set_dss(technique->depth_stencil_state(), _default_stencil_ref);
+  set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
 
   for (size_t i = 0; i < mesh->submeshes.size(); ++i) {
     SubMesh *submesh = mesh->submeshes[i];

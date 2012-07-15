@@ -84,4 +84,8 @@ private:
   GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
   GraphicsObjectHandle prev_resources[MAX_TEXTURES];
   D3D11_PRIMITIVE_TOPOLOGY prev_topology;
+
+  uint32 _default_stencil_ref;
+  float _default_blend_factors[4];
+  uint32 _default_sample_mask;
 };
