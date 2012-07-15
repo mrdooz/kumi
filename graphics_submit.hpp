@@ -5,6 +5,7 @@
 class Mesh;
 class SubMesh;
 class Material;
+class Effect;
 
 #pragma pack(push, 1)
 
@@ -23,15 +24,17 @@ struct MeshRenderData {
   GraphicsObjectHandle technique;
   GraphicsObjectHandle material;
   const Mesh *mesh;
+  const Effect *effect;
 #if _DEBUG
   const SubMesh *submesh;
 #endif
 };
 
 struct TechniqueRenderData {
-  TechniqueRenderData() : user_textures(0), num_instances(0), num_instance_variables(0) {}
+  TechniqueRenderData() : user_textures(0), effect(nullptr), num_instances(0), num_instance_variables(0) {}
   int user_textures;
   GraphicsObjectHandle textures[MAX_TEXTURES];
+  const Effect *effect;
   int num_instances;
   int num_instance_variables;
 #pragma warning(suppress: 4200)

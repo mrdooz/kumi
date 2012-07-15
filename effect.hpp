@@ -26,7 +26,7 @@ public:
   void set_duration(uint32 start_time, uint32 end_time);
 
   virtual void wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {}
-  virtual void fill_cbuffer(CBuffer *cbuffer) {}
+  virtual void fill_cbuffer(CBuffer *cbuffer) const {}
 
 protected:
   std::string _name;

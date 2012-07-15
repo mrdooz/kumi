@@ -12,6 +12,7 @@
 #include "../material_manager.hpp"
 #include "../xmath.hpp"
 #include "../profiler.hpp"
+#include "../deferred_context.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -39,6 +40,7 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
 }
 
 ScenePlayer::~ScenePlayer() {
+  GRAPHICS.destroy_deferred_context(_ctx);
   delete exch_null(_scene);
 }
 
@@ -105,6 +107,8 @@ bool ScenePlayer::init() {
 
   _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);
   PROPERTY_MANAGER.set_property_raw(_ambient_id, &_scene->ambient.x, sizeof(XMFLOAT4));
+
+  _ctx = GRAPHICS.create_deferred_context();
 
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
@@ -286,6 +290,7 @@ struct LightAttenuationEnd : public LightBase {
 
 bool ScenePlayer::render() {
   ADD_PROFILE_SCOPE();
+  _ctx->begin_frame();
   if (_scene) {
 
     // allocate the required render targets
@@ -311,19 +316,13 @@ bool ScenePlayer::render() {
     GraphicsObjectHandle rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
 
     {
-      // Fill the g-buffer
-      RenderTargetData *data = GRAPHICS.alloc_command_data<RenderTargetData>();
-      data->render_targets[0] = rt_pos;
-      data->render_targets[1] = rt_normal;
-      data->render_targets[2] = rt_diffuse;
-      data->render_targets[3] = rt_specular;
-      data->clear_target[0] = true;
-      data->clear_target[1] = true;
-      data->clear_target[2] = true;
-      data->clear_target[3] = true;
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), data);
+      GraphicsObjectHandle render_targets[] = { rt_pos, rt_normal, rt_diffuse, rt_specular };
+      bool clear[] = { true, true, true, true };
+      _ctx->set_render_targets(render_targets, clear, 4);
 
-      _scene->submit_meshes(FROM_HERE, -1, _ssao_fill);
+      for (size_t i = 0; i < _scene->meshes.size(); ++i) {
+        _ctx->render_mesh(_scene->meshes[i], _ssao_fill);
+      }
     }
 
     // Calc the occlusion
@@ -336,125 +335,98 @@ bool ScenePlayer::render() {
     post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
 
     {
-      // Add the lighting
+      DeferredContext::InstanceData data;
       int num_lights = (int)_scene->lights.size();
-      int pos_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
-      int color_size = sizeof(LightBase) + num_lights * sizeof(XMFLOAT4);
-      int as_size = sizeof(LightBase) + num_lights * sizeof(float);
-      int ae_size = sizeof(LightBase) + num_lights * sizeof(float);
-      int data_size = pos_size + color_size + 2 * ae_size;
-      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>(data_size);
-      rd->num_instances = num_lights;
-      rd->num_instance_variables = 4;
-
-      LightPos *lightpos = (LightPos *)&rd->payload[0];
-      LightColor *lightcolor = (LightColor *)&rd->payload[pos_size];
-      LightAttenuationStart *lightattstart = (LightAttenuationStart *)&rd->payload[pos_size + color_size];
-      LightAttenuationEnd *lightattend = (LightAttenuationEnd *)&rd->payload[pos_size + color_size + as_size];
-
-      lightpos->id = _light_pos_id;
-      lightpos->len = sizeof(XMFLOAT4);
-
-      lightcolor->id = _light_color_id;
-      lightcolor->len = sizeof(XMFLOAT4);
-
-      lightattstart->id = _light_att_start_id;
-      lightattstart->len = sizeof(float);
-
-      lightattend->id = _light_att_end_id;
-      lightattend->len = sizeof(float);
+      data.add_variable(_light_pos_id, sizeof(XMFLOAT4));
+      data.add_variable(_light_color_id, sizeof(XMFLOAT4));
+      data.add_variable(_light_att_start_id, sizeof(float));
+      data.add_variable(_light_att_end_id, sizeof(float));
+      data.alloc(num_lights);
 
       for (size_t i = 0; i < _scene->lights.size(); ++i) {
+
+        XMFLOAT4 *lightpos = (XMFLOAT4 *)data.data(0, i);
+        XMFLOAT4 *lightcolor = (XMFLOAT4 *)data.data(1, i);
+        float *lightattstart = (float *)data.data(2, i);
+        float *lightattend = (float *)data.data(3, i);
+
         // transform pos to camera space
         auto light = _scene->lights[i];
         XMVECTOR v = XMLoadFloat4(&light->pos);
         XMMATRIX m = XMLoadFloat4x4(&transpose(_view));
         XMVECTOR v2 = XMVector3Transform(v, m);
-        XMStoreFloat4(&lightpos->pos[i], v2);
-        lightcolor->color[i] = light->color;
-        lightattstart->start[i] = light->far_attenuation_start;
-        lightattend->end[i] = light->far_attenuation_end;
+        XMStoreFloat4(lightpos, v2);
+        *lightcolor = light->color;
+        *lightattstart = light->far_attenuation_start;
+        *lightattend = light->far_attenuation_end;
       }
 
-      GFX_SUBMIT_TECH(_ssao_light, rd);
+      _ctx->render_technique(_ssao_light, TextureArray(), data);
     }
 
-    {
-      // calc luminance
-      post_process(rt_composite, rt_luminance, _luminance_map);
+    // calc luminance
+    post_process(rt_composite, rt_luminance, _luminance_map);
+    _ctx->generate_mips(rt_luminance);
 
-      // meh, this is getting stupid now.. the whole submit stuff is close to disappearing :P
-      // or, actually, I should move to using DX deferred contexts, because that's what I'm
-      // trying to emulate anyways..
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kGenerateMips, rt_luminance), nullptr);
-    }
     auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
     GraphicsObjectHandle downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, false, fmt, false, "downscale1");
     GraphicsObjectHandle downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, false, fmt, false, "downscale2");
     GraphicsObjectHandle downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "downscale3");
     GraphicsObjectHandle blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "blur_tmp");
 
-    {
+    // scale down
+    post_process(rt_composite, downscale1, _scale_cutoff);
+    post_process(downscale1, downscale2, _scale);
+    post_process(downscale2, downscale3, _scale);
 
-      // scale down
-      post_process(rt_composite, downscale1, _scale_cutoff);
-      post_process(downscale1, downscale2, _scale);
-      post_process(downscale2, downscale3, _scale);
-
-      // apply blur
-      for (int i = 0; i < 4; ++i) {
-        post_process(downscale3, blur_tmp, _blur_horiz);
-        post_process(blur_tmp, downscale3, _blur_horiz);
-      }
-
-      // scale up
-      post_process(downscale3, downscale2, _scale);
-      post_process(downscale2, downscale1, _scale);
+    // apply blur
+    for (int i = 0; i < 4; ++i) {
+      post_process(downscale3, blur_tmp, _blur_horiz);
+      post_process(blur_tmp, downscale3, _blur_horiz);
     }
+
+    // scale up
+    post_process(downscale3, downscale2, _scale);
+    post_process(downscale2, downscale1, _scale);
 
     {
       // gamma correction
-      GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), nullptr);
+      _ctx->set_default_render_target();
 
-      TechniqueRenderData *rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
-      rd->user_textures = 1;
-      rd->textures[1] = downscale1;
-      GFX_SUBMIT_TECH(_gamma_correct, rd);
+      TextureArray arr;
+      arr[1] = downscale1;
+      _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
     }
 
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, blur_tmp), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale3), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale2), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, downscale1), nullptr);
+    GRAPHICS.release_temp_render_target(blur_tmp);
+    GRAPHICS.release_temp_render_target(downscale3);
+    GRAPHICS.release_temp_render_target(downscale2);
+    GRAPHICS.release_temp_render_target(downscale1);
 
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_pos), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_normal), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_diffuse), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_specular), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_composite), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_blur), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_occlusion), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_occlusion_tmp), nullptr);
-    GFX_SUBMIT_CMD(RenderKey(RenderKey::kReleaseRenderTarget, rt_luminance), nullptr);
+    GRAPHICS.release_temp_render_target(rt_pos);
+    GRAPHICS.release_temp_render_target(rt_normal);
+    GRAPHICS.release_temp_render_target(rt_diffuse);
+    GRAPHICS.release_temp_render_target(rt_specular);
+    GRAPHICS.release_temp_render_target(rt_composite);
+    GRAPHICS.release_temp_render_target(rt_blur);
+    GRAPHICS.release_temp_render_target(rt_occlusion);
+    GRAPHICS.release_temp_render_target(rt_occlusion_tmp);
+    GRAPHICS.release_temp_render_target(rt_luminance);
   }
+
+  _ctx->end_frame();
 
   return true;
 }
 
 void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique) {
+  GraphicsObjectHandle rt[] = { output };
+  bool clear[] = { true };
+  _ctx->set_render_targets(rt, clear, 1);
 
-  RenderTargetData *rt = GRAPHICS.alloc_command_data<RenderTargetData>();
-  rt->render_targets[0] = output;
-  rt->clear_target[0] = true;
-  GFX_SUBMIT_CMD(RenderKey(RenderKey::kSetRenderTarget), rt);
-
-  TechniqueRenderData *rd = nullptr;
-  if (input.is_valid()) {
-    rd = GRAPHICS.alloc_command_data<TechniqueRenderData>();
-    rd->user_textures = 1;
-    rd->textures[0] = input;
-  }
-  GFX_SUBMIT_TECH(technique, rd);
+  TextureArray arr;
+  arr[0] = input;
+  _ctx->render_technique(technique, arr, DeferredContext::InstanceData());
 }
 
 bool ScenePlayer::close() {
@@ -516,7 +488,10 @@ void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
       param_stack.pop_front();
     }
   }
+}
 
+void ScenePlayer::fill_cbuffer(CBuffer *cbuffer) const {
+  int a = 10;
 }
 
 void ScenePlayer::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {

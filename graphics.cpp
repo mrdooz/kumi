@@ -12,6 +12,7 @@
 #include "vertex_types.hpp"
 #include "deferred_context.hpp"
 #include "profiler.hpp"
+#include "effect.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -932,6 +933,10 @@ void Graphics::fill_system_resource_views(const ResourceViewArray &views, Textur
   }
 }
 
+void Graphics::destroy_deferred_context(DeferredContext *ctx) {
+  ctx->_ctx->Release();
+}
+
 DeferredContext *Graphics::create_deferred_context() {
   DeferredContext *dc = new DeferredContext;
   _device->CreateDeferredContext(0, &dc->_ctx);
@@ -1087,6 +1092,7 @@ void Graphics::render() {
 
         Shader *vs = technique->vertex_shader(0);
         Shader *ps = technique->pixel_shader(0);
+        const Effect *effect = rd ? rd->effect : nullptr;
         set_vs(vs->handle());
         set_ps(ps->handle());
 
@@ -1124,19 +1130,7 @@ void Graphics::render() {
             break;
           }
         }
-/*
-        if (rv.count > 0) {
-          array<GraphicsObjectHandle, 8> rr;
-          fill_system_resource_views(rv, &rr);
-          if (rd && rd->user_textures) {
-            for (int i = 0; i < MAX_TEXTURES; ++i) {
-              if (rd->textures[i].is_valid())
-                rr[i] = rd->textures[i];
-            }
-          }
-          set_shader_resources(rr);
-        }
-*/
+
         // Check if we're drawing instanced
         if (rd && rd->num_instances) {
           for (int ii = 0; ii < rd->num_instances; ++ii) {
@@ -1145,11 +1139,16 @@ void Graphics::render() {
             auto &vs_cbuffers = vs->cbuffers();
             for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
               technique->fill_cbuffer(&vs_cbuffers[i]);
+              if (effect)
+                effect->fill_cbuffer(&vs_cbuffers[i]);
             }
 
             auto &ps_cbuffers = ps->cbuffers();
             for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
               technique->fill_cbuffer(&ps_cbuffers[i]);
+
+              if (effect)
+                effect->fill_cbuffer(&ps_cbuffers[i]);
 
               for (size_t j = 0; j < ps_cbuffers[i].instance_vars.size(); ++j) {
                 auto &var = ps_cbuffers[i].instance_vars[j];
@@ -1456,4 +1455,9 @@ void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHa
       *index_count = 6;
       break;
   }
+}
+
+void Graphics::add_command_list(ID3D11CommandList *cmd_list) {
+  _immediate_context->ExecuteCommandList(cmd_list, FALSE);
+  cmd_list->Release();
 }

@@ -4,6 +4,7 @@
 #include "../property_manager.hpp"
 
 struct Scene;
+class DeferredContext;
 
 struct FreeFlyCamera {
   FreeFlyCamera() : theta(XM_PIDIV2), rho(XM_PIDIV2), roll(0), pos(0,0,0), dir(0,0,1), right(1,0,0), up(0,1,0) {} // points down the z-axis
@@ -23,10 +24,11 @@ public:
   virtual bool update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
   virtual bool render() override;
   virtual bool close() override;
-
   virtual void wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) override;
 
 private:
+
+  virtual void fill_cbuffer(CBuffer *cbuffer) const;
 
   virtual void update_from_json(const JsonValue::JsonValuePtr &state) override;
   bool file_changed(const char *filename, void *token);
@@ -64,4 +66,6 @@ private:
   PropertyId _kernel_id, _noise_id, _ambient_id;
 
   XMFLOAT4X4 _view, _proj;
+
+  DeferredContext *_ctx;
 };

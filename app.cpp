@@ -300,7 +300,7 @@ UINT App::run(void *userdata) {
         _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
         _gwen_canvas->RenderCanvas();
 #endif
-        GRAPHICS.render();
+        //GRAPHICS.render();
       }
       {
         ADD_PROFILE_SCOPE();

@@ -490,18 +490,6 @@ void Technique::fill_cbuffer(CBuffer *cbuffer) const {
     PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }
-/*
-void Technique::fill_samplers(const SparseProperty& input, std::vector<GraphicsObjectHandle> *out) const {
-  out->resize(input.res.size());
-  for (size_t i = 0; i < input.res.size(); ++i) {
-    for (size_t j = 0; j < _sampler_states.size(); ++j) {
-      if (input.res[i] == _sampler_states[j].first) {
-        (*out)[i] = _sampler_states[j].second;
-      }
-    }
-  }
-}
-*/
 
 Shader *Technique::vertex_shader(int flags) const { 
   return _vertex_shaders.empty() ? nullptr : _vertex_shaders[flags & _vs_flag_mask];

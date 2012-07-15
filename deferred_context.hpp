@@ -8,15 +8,38 @@ class DeferredContext {
 public:
 
   struct InstanceVar {
+    InstanceVar(PropertyId id, int len) : id(id), len(len), ofs(0) {}
     PropertyId id;
     int len;
     int ofs;
   };
 
   struct InstanceData {
+    InstanceData() : num_instances(0), block_size(0) {}
+
+    void add_variable(PropertyId id, int len) {
+      vars.push_back(InstanceVar(id, len));
+    }
+
+    void alloc(int count) {
+      num_instances = count;
+      block_size = 0;
+      int ofs = 0;
+      for (size_t i = 0; i < vars.size(); ++i) {
+        vars[i].ofs = ofs;
+        ofs += vars[i].len;
+        block_size += vars[i].len;
+      }
+      payload.resize(block_size * num_instances);
+    }
+
+    char *data(int idx, int instance) {
+      return payload.data() + vars[idx].ofs + instance * block_size;
+    }
+
     int num_instances;
-    int block_size;
-    const char *payload;
+    int block_size; // size of a single batch of instance variables
+    std::vector<char> payload;
     std::vector<InstanceVar> vars;
   };
 
@@ -29,8 +52,12 @@ public:
     const TextureArray &resources,
     const InstanceData &instance_data);
 
+  void begin_frame();
+  void end_frame();
+
 private:
   DeferredContext();
+  ~DeferredContext();
   ID3D11DeviceContext *_ctx;
 
   void set_vb(ID3D11Buffer *buf, uint32_t stride);

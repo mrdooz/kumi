@@ -185,6 +185,8 @@ public:
   uint32_t default_sample_mask() const { return 0xffffffff; }
 
   DeferredContext *create_deferred_context();
+  void destroy_deferred_context(DeferredContext *ctx);
+  void add_command_list(ID3D11CommandList *cmd_list);
 
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);

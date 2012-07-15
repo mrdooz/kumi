@@ -7,7 +7,11 @@
 
 using namespace std;
 
-DeferredContext::DeferredContext() : _ctx(nullptr) {
+DeferredContext::DeferredContext() : _ctx(nullptr), prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED) {
+}
+
+DeferredContext::~DeferredContext() {
+
 }
 
 
@@ -42,11 +46,13 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   TextureArray all_views(resources);
   fill_system_resource_views(rv, &all_views);
   bool has_resources = false;
-  for (size_t i = 0; i < all_views.size() && !has_resources; ++i) {
-    has_resources |= all_views[i].is_valid();
+  for (size_t i = 0; i < all_views.size(); ++i) {
+    if (all_views[i].is_valid()) {
+      has_resources = true;
+      set_shader_resources(all_views);
+      break;
+    }
   }
-  if (has_resources)
-    set_shader_resources(all_views);
 
   // set cbuffers
   auto &vs_cbuffers = vs->cbuffers();
@@ -94,7 +100,11 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 }
 
 void DeferredContext::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {
-
+  for (size_t i = 0; i < views.size(); ++i) {
+    if (views[i].used && views[i].source == PropertySource::kSystem) {
+      (*out)[i] = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(views[i].class_id);
+    }
+  }
 }
 
 void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_handle) {
@@ -122,6 +132,7 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
 
     set_vb(geometry->vb, geometry->vertex_size);
     set_ib(geometry->ib, geometry->index_format);
+    KASSERT(geometry->topology);
     set_topology(geometry->topology);
 
     // set cbuffers
@@ -150,12 +161,15 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
     auto &rv = ps->resource_views();
     TextureArray all_views;
     fill_system_resource_views(rv, &all_views);
+    material->fill_resource_views(rv, &all_views);
     bool has_resources = false;
-    for (size_t i = 0; i < all_views.size() && !has_resources; ++i) {
-      has_resources |= all_views[i].is_valid();
+    for (size_t i = 0; i < all_views.size(); ++i) {
+      if (all_views[i].is_valid()) {
+        has_resources = true;
+        set_shader_resources(all_views);
+        break;
+      }
     }
-    if (has_resources)
-      set_shader_resources(all_views);
 
     draw_indexed(geometry->index_count, 0, 0);
 
@@ -178,7 +192,7 @@ void DeferredContext::set_render_targets(GraphicsObjectHandle *render_targets, b
   float color[4] = {0,0,0,0};
   // Collect the valid render targets, set the first available depth buffer
   // and clear targets if specified
-  for (int i = 0; num_render_targets < 8; ++i) {
+  for (int i = 0; i < num_render_targets; ++i) {
     GraphicsObjectHandle h = render_targets[i];
     KASSERT(h.is_valid());
     auto rt = GRAPHICS._render_targets.get(h);
@@ -392,4 +406,25 @@ void DeferredContext::set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffe
 
 void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) {
   _ctx->DrawIndexed(count, start_index, base_vertex);
+}
+
+void DeferredContext::begin_frame() {
+
+  prev_vs = prev_ps = prev_layout = GraphicsObjectHandle();
+  prev_rs = prev_bs = prev_dss = GraphicsObjectHandle();
+  prev_ib = prev_vb = GraphicsObjectHandle();
+
+  for (size_t i = 0; i < MAX_SAMPLERS; ++i)
+    prev_samplers[i] = GraphicsObjectHandle();
+
+  for (size_t i = 0; i < MAX_TEXTURES; ++i)
+    prev_resources[i] = GraphicsObjectHandle();
+
+  prev_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+}
+
+void DeferredContext::end_frame() {
+  ID3D11CommandList *cmd_list;
+  _ctx->FinishCommandList(FALSE, &cmd_list);
+  GRAPHICS.add_command_list(cmd_list);
 }
