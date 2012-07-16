@@ -1,11 +1,13 @@
 #include "common.fx"
 
 cbuffer PerFrame {
-  matrix proj, view;
+  matrix proj;
+  matrix view;
 };
 
 cbuffer PerMaterial {
-  float4 Diffuse, Specular;
+  float4 Diffuse;
+  float4 Specular;
   float Shininess;
 };
 

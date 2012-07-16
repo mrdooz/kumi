@@ -73,7 +73,7 @@ private:
   void set_samplers(const SamplerArray &samplers);
   void set_shader_resources(const TextureArray &resources);
   void unset_shader_resource(int first_view, int num_views);
-  void set_cbuffer(const std::vector<CBuffer> &vs, const std::vector<CBuffer> &ps);
+  void set_cbuffers(const std::vector<CBuffer> &vs, const std::vector<CBuffer> &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
 
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;
@@ -88,4 +88,8 @@ private:
   uint32 _default_stencil_ref;
   float _default_blend_factors[4];
   uint32 _default_sample_mask;
+
+  //static const int CBUFFER_CACHE = 4;
+  //std::array<vector<char>, CBUFFER_CACHE> _vs_cbuffer_cache;
+  //std::array<vector<char>, CBUFFER_CACHE> _ps_cbuffer_cache;
 };

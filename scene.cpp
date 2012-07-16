@@ -41,10 +41,22 @@ bool Scene::on_loaded() {
     _meshes_by_name[mesh->name] = mesh;
   }
 
+  sort_by_material();
+
   return true;
 }
 
 void Scene::update() {
   for (auto i = begin(meshes), e = end(meshes); i != e; ++i)
     (*i)->update();
+}
+
+void Scene::sort_by_material() {
+
+  for (size_t i = 0; i < meshes.size(); ++i) {
+    for (size_t j = 0; j < meshes[i]->submeshes.size(); ++j) {
+      auto &submesh = meshes[i]->submeshes[j];
+      _submesh_by_material[submesh->material_id].push_back(submesh);
+    }
+  }
 }

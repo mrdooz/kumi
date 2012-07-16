@@ -316,6 +316,7 @@ bool ScenePlayer::render() {
     GraphicsObjectHandle rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
 
     {
+      ADD_NAMED_PROFILE_SCOPE("render_meshes");
       GraphicsObjectHandle render_targets[] = { rt_pos, rt_normal, rt_diffuse, rt_specular };
       bool clear[] = { true, true, true, true };
       _ctx->set_render_targets(render_targets, clear, 4);

@@ -31,6 +31,8 @@ var KUMI = (function($, KUMI_LIB) {
     var curSelected;
 
     var profileResolution = 20;
+    var profileUpdating = true;
+    var profileRects = [];
 
     var requestAnimationFrame = window.requestAnimationFrame || window.mozRequestAnimationFrame ||
         window.webkitRequestAnimationFrame || window.msRequestAnimationFrame;
@@ -170,6 +172,7 @@ var KUMI = (function($, KUMI_LIB) {
             var cols = ["#c44", "#4c4", "#44c", "#cc4", "#4cc"];
 
             var profileCount = 0;
+            profileRects = [];
 
             $.each(prof.threads, function(i, thread) {
                 var y = 0;
@@ -183,7 +186,8 @@ var KUMI = (function($, KUMI_LIB) {
 
                     ctx.fillStyle = "Black";
                     setFont(ctx, "10px Arial", "middle", "center");
-                    ctx.fillText(profileCount, x + xEnd/2, curY + levelHeight/2);
+                    ctx.fillText(event.name.slice(0,8), x + xEnd/2, curY + levelHeight/2);
+                    profileRects.push({x: x, y: curY, w: xEnd, h: levelHeight, txt: event.name, duration: event.end - event.start});
                     profileCount++;
 
                 });
@@ -192,11 +196,25 @@ var KUMI = (function($, KUMI_LIB) {
 
         }
 
+        kumi.profileOnMouseMove = function(e) {
+            var ofs = $('#profile-canvas').offset();
+
+            $.each(profileRects, function(i, rect) {
+                var x = e.clientX - ofs.left;
+                var y = e.clientY - ofs.top;
+                if (x >= rect.x && x < rect.x + rect.w && y >= rect.y && y < rect.y + rect.h) {
+                    $("#profileItem").text(rect.txt + " " + (rect.duration * 1000).toFixed(3) + "ms");
+                    return false;
+                }
+            });
+        };
+
         websocket.onmessage = function(e) {
             var msg = JSON.parse(e.data);
 
             if (msg['system.profile']) {
-                drawProfile(msg['system.profile']);
+                if (profileUpdating)
+                    drawProfile(msg['system.profile']);
             } else if (msg['system.frame']) {
                 drawFps(msg['system.frame']);
             } else if (msg.demo) {
@@ -792,6 +810,10 @@ var KUMI = (function($, KUMI_LIB) {
 
     kumi.setProfileResolution = function(ms) {
         profileResolution = ms;
+    };
+
+    kumi.setProfileUpdating = function(status) {
+        profileUpdating = status;
     };
 
     kumi.showFps = function(value) {

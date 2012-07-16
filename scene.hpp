@@ -54,6 +54,8 @@ struct Scene {
 
   std::unordered_map<std::string, Mesh *> _meshes_by_name;
 
+  void sort_by_material();
+
   XMFLOAT4 ambient;
   std::vector<Mesh *> meshes;
   std::vector<Camera *> cameras;
@@ -62,4 +64,6 @@ struct Scene {
   std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
   std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;
   std::map<std::string, std::vector<KeyFrameMatrix>> animation_mtx;
+
+  std::map<GraphicsObjectHandle, std::vector<SubMesh*>> _submesh_by_material;
 };

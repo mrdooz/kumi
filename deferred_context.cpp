@@ -83,7 +83,7 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
           }
         }
       }
-      set_cbuffer(vs_cbuffers, ps_cbuffers);
+      set_cbuffers(vs_cbuffers, ps_cbuffers);
       draw_indexed(technique->index_count(), 0, 0);
     }
 
@@ -93,7 +93,7 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
     for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
       technique->fill_cbuffer(&ps_cbuffers[i]);
     }
-    set_cbuffer(vs_cbuffers, ps_cbuffers);
+    set_cbuffers(vs_cbuffers, ps_cbuffers);
     draw_indexed(technique->index_count(), 0, 0);
   }
 
@@ -134,7 +134,6 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
 
     set_vb(geometry->vb, geometry->vertex_size);
     set_ib(geometry->ib, geometry->index_format);
-    KASSERT(geometry->topology);
     set_topology(geometry->topology);
 
     // set cbuffers
@@ -151,7 +150,7 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
       material->fill_cbuffer(&ps_cbuffers[i]);
       technique->fill_cbuffer(&ps_cbuffers[i]);
     }
-    set_cbuffer(vs_cbuffers, ps_cbuffers);
+    set_cbuffers(vs_cbuffers, ps_cbuffers);
 
     // set samplers
     auto &samplers = ps->samplers();
@@ -371,7 +370,67 @@ void DeferredContext::unset_shader_resource(int first_view, int num_views) {
   _ctx->PSSetShaderResources(first_view, num_views, null_views);
 }
 
-void DeferredContext::set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
+#if 0
+void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
+
+  ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
+  ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
+
+  // Copy the vs cbuffers
+  for (size_t i = 0; i < vs.size(); ++i) {
+    auto &cur = vs[i];
+    bool new_buffer = false;
+    if (i < CBUFFER_CACHE) {
+      if (_vs_cbuffer_cache[i] != cur.staging) {
+        new_buffer = true;
+        _vs_cbuffer_cache[i] = cur.staging;
+      }
+    }
+    if (new_buffer) {
+      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+      _ctx->Unmap(buffer, 0);
+      vs_cb[i] = buffer;
+
+      _ctx->VSSetConstantBuffers(i, 1, &vs_cb[i]);
+    }
+  }
+
+  // Copy the ps cbuffers
+  for (size_t i = 0; i < ps.size(); ++i) {
+    auto &cur = ps[i];
+    bool new_buffer = false;
+    if (i < CBUFFER_CACHE) {
+      if (_ps_cbuffer_cache[i] != cur.staging) {
+        new_buffer = true;
+        _ps_cbuffer_cache[i] = cur.staging;
+      }
+    }
+    if (new_buffer) {
+      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+      _ctx->Unmap(buffer, 0);
+      ps_cb[i] = buffer;
+
+      _ctx->PSSetConstantBuffers(i, 1, &ps_cb[i]);
+    }
+
+  }
+
+  //if (!vs.empty())
+    //_ctx->VSSetConstantBuffers(0, vs.size(), vs_cb);
+
+  //if (!ps.empty())
+//    _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
+
+}
+#endif
+
+void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
 
   ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
   ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
@@ -396,13 +455,15 @@ void DeferredContext::set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffe
     memcpy(sub.pData, cur.staging.data(), cur.staging.size());
     _ctx->Unmap(buffer, 0);
     ps_cb[i] = buffer;
+
+    _ctx->PSSetConstantBuffers(i, 1, &ps_cb[i]);
   }
 
   if (!vs.empty())
     _ctx->VSSetConstantBuffers(0, vs.size(), vs_cb);
 
   if (!ps.empty())
-    _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
+      _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
 
 }
 
@@ -423,6 +484,12 @@ void DeferredContext::begin_frame() {
     prev_resources[i] = GraphicsObjectHandle();
 
   prev_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+/*
+  for (size_t i = 0; i < CBUFFER_CACHE; ++i) {
+    _vs_cbuffer_cache[i].clear();
+    _ps_cbuffer_cache[i].clear();
+  }
+*/
 }
 
 void DeferredContext::end_frame() {
