@@ -1,5 +1,15 @@
-matrix proj, view, world;
-float4 Diffuse, LightColor, LightPos;
+cbuffer PerFrame {
+  matrix proj, view;
+  float4 LightColor, LightPos;
+};
+
+cbuffer PerInstance {
+  matrix world;
+};
+
+cbuffer PerMaterial {
+  float4 Diffuse;
+};
 
 #if DIFFUSE_TEXTURE
 Texture2D diffuse_texture : register(t0);

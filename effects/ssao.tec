@@ -5,11 +5,6 @@ technique ssao_fill {
     vertex_shader {
         file effects/ssao.fx;
         entry_point fill_vs_main;
-        params [
-            float4x4 view system;
-            float4x4 proj system;
-            float4x4 world mesh;
-        ];
     };
     
     pixel_shader {
@@ -17,9 +12,6 @@ technique ssao_fill {
         entry_point fill_ps_main;
         params [
             texture2d DiffuseTexture Diffuse material;
-            float4 Diffuse material;
-            float4 Specular material;
-            float Shininess material;
         ];
         flags [ DIFFUSE_TEXTURE ];
     };
@@ -34,11 +26,8 @@ technique ssao_compute inherits quad_base {
         file effects/ssao.fx;
         entry_point compute_ps_main;
         params [
-            float4x4 proj system;
             texture2d rt_pos system;
             texture2d rt_normal system;
-            float4[32] kernel system;
-            float4[16] noise system;
         ];
     };
 };
@@ -61,7 +50,6 @@ technique ssao_ambient inherits quad_base {
         entry_point ambient_ps_main;
         params [
             texture2d rt_occlusion system;
-            float4 Ambient system;
         ];
     };
 };
@@ -77,10 +65,6 @@ technique ssao_light inherits quad_base{
             texture2d rt_diffuse system;
             texture2d rt_specular system;
             texture2d rt_occlusion system;
-            float4 LightPos instance;
-            float4 LightColor instance;
-            float AttenuationStart instance;
-            float AttenuationEnd instance;
         ];
     };
 	blend_desc = BlendOneOne;

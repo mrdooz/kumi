@@ -119,6 +119,26 @@ static void trim_input(const vector<char> &input, vector<vector<string>> *res) {
   }
 }
 
+static PropertySource::Enum source_from_name(const std::string &cbuffer_name) {
+
+  static struct {
+    string prefix;
+    PropertySource::Enum src;
+  } prefixes[] = {
+    { "PerFrame", PropertySource::kSystem },
+    { "PerMaterial", PropertySource::kMaterial},
+    { "PerInstance", PropertySource::kInstance},
+    { "PerMesh", PropertySource::kMesh},
+  };
+
+  for (int i = 0; i < ARRAYSIZE(prefixes); ++i) {
+    if (begins_with(cbuffer_name, prefixes[i].prefix))
+      return prefixes[i].src;
+  }
+
+  return PropertySource::kUnknown;
+}
+
 bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const vector<char> &obj) {
 
   // extract the relevant text
@@ -130,6 +150,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
     auto &cur_line = input[i];
 
     if (cur_line[0] == "cbuffer") {
+      string cbuffer_name(cur_line[1]);
       // Parse cbuffer
       CBuffer &cbuffer = dummy_push_back(&shader->_cbuffers);
       int size = 0;
@@ -147,25 +168,33 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
             if (bracket != name.npos) {
               name = string(name.c_str(), bracket);
             }
+
+            // Get the parameter source from the cbuffer name
+            auto source = source_from_name(cbuffer_name);
+            if (source == PropertySource::kUnknown) {
+              add_error_msg("Unable to deduce source from cbuffer name: %s", cbuffer_name.c_str());
+              return false;
+            }
+/*
             // Find the parameter in the template, so we can get the source
             CBufferParam *param = shader_template->find_cbuffer_param(name);
             if (!param) {
               add_error_msg("Shader parameter %s not found", name.c_str());
               return false;
             }
-
+*/
             int ofs = atoi(row[4].c_str());
             int len = atoi(row[6].c_str());
             size = max(size, ofs + len);
             // The id is either a classifer (for mesh/material), or a real id in the system case
-            string class_id = PropertySource::qualify_name(name, param->source);
-            int var_size = param->source == PropertySource::kMesh ? sizeof(int) : len;
+            string class_id = PropertySource::qualify_name(name, source);
+            int var_size = source == PropertySource::kMesh ? sizeof(int) : len;
             auto id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
             CBufferVariable var(ofs, len, id);
 #ifdef _DEBUG
             var.name = class_id;
 #endif
-            switch (param->source) {
+            switch (source) {
               case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
               case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
               case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;

@@ -11,7 +11,7 @@ cbuffer PerMaterial {
   float Shininess;
 };
 
-cbuffer PerInstance {
+cbuffer PerMesh {
   matrix world;
 };
 
@@ -84,8 +84,10 @@ Texture2D rt_normal : register(t1);
 Texture2D rt_diffuse : register(t2);
 Texture2D rt_specular : register(t3);
 
-float4 kernel[32];
-float4 noise[16];
+cbuffer PerFrame {
+  float4 kernel[32];
+  float4 noise[16];
+};
 
 float compute_ps_main(quad_ps_input input) : SV_Target
 {
@@ -154,7 +156,10 @@ float blur_ps_main(quad_ps_input input) : SV_Target
 ///////////////////////////////////
 
 Texture2D rt_occlusion;
-float4 Ambient;
+
+cbuffer PerFrame {
+  float4 Ambient;
+};
 
 float4 ambient_ps_main(quad_ps_input input) : SV_Target
 {
@@ -164,8 +169,10 @@ float4 ambient_ps_main(quad_ps_input input) : SV_Target
 ///////////////////////////////////
 // Add light
 ///////////////////////////////////
-float4 LightColor, LightPos;
-float AttenuationStart, AttenuationEnd;
+cbuffer PerInstance {
+  float4 LightColor, LightPos;
+  float AttenuationStart, AttenuationEnd;
+};
 
 float4 light_ps_main(quad_ps_input input) : SV_Target
 {

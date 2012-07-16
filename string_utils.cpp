@@ -102,6 +102,20 @@ bool begins_with(const char *str, const char *sub_str) {
 	return true;
 }
 
+bool begins_with(const std::string &str, const std::string &sub_str) {
+  const size_t len_a = str.size();
+  const size_t len_b = sub_str.size();
+  if (len_a < len_b)
+    return false;
+
+  for (size_t i = 0; i < len_b; ++i) {
+    if (sub_str[i] != str[i])
+      return false;
+  }
+
+  return true;
+}
+
 string base64encode(const uint8_t *buf, int buf_size) {
   DWORD len;
   string res;

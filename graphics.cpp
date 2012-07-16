@@ -775,7 +775,7 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   for (auto it = begin(tmp); it != end(tmp); ) {
     Technique *t = *it;
     if (!t->init()) {
-      LOG_ERROR_LN("init failed for technique: %s. Error msg: %s", t->name().c_str(), t->error_msg().c_str());
+      LOG_ERROR_LN("init failed for technique: %s (%s). Error msg: %s", t->name().c_str(), filename, t->error_msg().c_str());
       delete exch_null(t);
       it = tmp.erase(it);
     } else {
