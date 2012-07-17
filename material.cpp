@@ -21,7 +21,7 @@ Material::Property *Material::property_by_name(const std::string &name) {
 void Material::fill_cbuffer(CBuffer *cbuffer) const {
 
   auto j = begin(_property_list);
-  for (auto i = begin(cbuffer->material_vars); i != end(cbuffer->material_vars); ++i) {
+  for (auto i = begin(cbuffer->vars); i != end(cbuffer->vars); ++i) {
     // find the correct material id.
     while (j != end(_property_list) && i->id != j->second->class_id)
       ++j;

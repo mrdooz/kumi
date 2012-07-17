@@ -54,16 +54,14 @@ struct CBufferVariable {
 struct CBuffer {
   void init() {
     auto &fn = [&](const CBufferVariable &a, const CBufferVariable &b) { return a.id < b.id; };
-    sort(begin(mesh_vars), end(mesh_vars), fn);
-    sort(begin(material_vars), end(material_vars), fn);
-    sort(begin(system_vars), end(system_vars), fn);
-    sort(begin(instance_vars), end(instance_vars), fn);
+    sort(begin(vars), end(vars), fn);
   }
   GraphicsObjectHandle handle;
-  std::vector<CBufferVariable> mesh_vars;
-  std::vector<CBufferVariable> material_vars;
-  std::vector<CBufferVariable> system_vars;
-  std::vector<CBufferVariable> instance_vars;
+  std::vector<CBufferVariable> vars;
+  //std::vector<CBufferVariable> mesh_vars;
+  //std::vector<CBufferVariable> material_vars;
+  //std::vector<CBufferVariable> system_vars;
+  //std::vector<CBufferVariable> instance_vars;
   std::vector<char> staging;
 };
 

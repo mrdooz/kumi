@@ -57,43 +57,40 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   }
 
   // set cbuffers
-  auto &vs_cbuffers = vs->cbuffers();
-  for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-    technique->fill_cbuffer(&vs_cbuffers[i]);
-  }
+  auto &vs_s_cbuffer = vs->system_cbuffer();
+  technique->fill_cbuffer(&vs_s_cbuffer);
 
   // Check if we're drawing instanced
   if (instance_data.num_instances) {
     for (int ii = 0; ii < instance_data.num_instances; ++ii) {
 
-      auto &ps_cbuffers = ps->cbuffers();
-      for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
-        technique->fill_cbuffer(&ps_cbuffers[i]);
+      auto &ps_s_cbuffer = ps->system_cbuffer();
+      technique->fill_cbuffer(&ps_s_cbuffer);
+      auto &ps_i_cbuffer = ps->instance_cbuffer();
 
-        for (size_t j = 0; j < ps_cbuffers[i].instance_vars.size(); ++j) {
-          auto &var = ps_cbuffers[i].instance_vars[j];
+      for (size_t j = 0; j < ps_i_cbuffer.vars.size(); ++j) {
+        auto &var = ps_i_cbuffer.vars[j];
 
-          for (size_t k = 0; k < instance_data.vars.size(); ++k) {
-            auto &cur = instance_data.vars[k];
-            if (cur.id == var.id) {
-              const void *data = &instance_data.payload[cur.ofs + ii * instance_data.block_size];
-              memcpy(&ps_cbuffers[i].staging[var.ofs], data, cur.len);
-              break;
-            }
+        for (size_t k = 0; k < instance_data.vars.size(); ++k) {
+          auto &cur = instance_data.vars[k];
+          if (cur.id == var.id) {
+            const void *data = &instance_data.payload[cur.ofs + ii * instance_data.block_size];
+            memcpy(&ps_i_cbuffer.staging[var.ofs], data, cur.len);
+            break;
           }
         }
       }
-      set_cbuffers(vs_cbuffers, ps_cbuffers);
+
+      set_cbuffers(vs->cbuffers(), ps->cbuffers());
       draw_indexed(technique->index_count(), 0, 0);
     }
 
   } else {
 
-    auto &ps_cbuffers = ps->cbuffers();
-    for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
-      technique->fill_cbuffer(&ps_cbuffers[i]);
-    }
-    set_cbuffers(vs_cbuffers, ps_cbuffers);
+    auto &ps_s_cbuffer = ps->system_cbuffer();
+    technique->fill_cbuffer(&ps_s_cbuffer);
+
+    set_cbuffers(vs->cbuffers(), ps->cbuffers());
     draw_indexed(technique->index_count(), 0, 0);
   }
 
@@ -137,20 +134,15 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
     set_topology(geometry->topology);
 
     // set cbuffers
-    auto &vs_cbuffers = vs->cbuffers();
-    for (size_t i = 0; i < vs_cbuffers.size(); ++i) {
-      mesh->fill_cbuffer(&vs_cbuffers[i]);
-      material->fill_cbuffer(&vs_cbuffers[i]);
-      technique->fill_cbuffer(&vs_cbuffers[i]);
-    }
+    mesh->fill_cbuffer(&vs->mesh_cbuffer());
+    material->fill_cbuffer(&vs->material_cbuffer());
+    technique->fill_cbuffer(&vs->system_cbuffer());
 
-    auto &ps_cbuffers = ps->cbuffers();
-    for (size_t i = 0; i < ps_cbuffers.size(); ++i) {
-      mesh->fill_cbuffer(&ps_cbuffers[i]);
-      material->fill_cbuffer(&ps_cbuffers[i]);
-      technique->fill_cbuffer(&ps_cbuffers[i]);
-    }
-    set_cbuffers(vs_cbuffers, ps_cbuffers);
+    mesh->fill_cbuffer(&ps->mesh_cbuffer());
+    material->fill_cbuffer(&ps->material_cbuffer());
+    technique->fill_cbuffer(&ps->system_cbuffer());
+
+    set_cbuffers(vs->cbuffers(), ps->cbuffers());
 
     // set samplers
     auto &samplers = ps->samplers();
@@ -370,8 +362,7 @@ void DeferredContext::unset_shader_resource(int first_view, int num_views) {
   _ctx->PSSetShaderResources(first_view, num_views, null_views);
 }
 
-#if 0
-void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
+void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps) {
 
   ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
   ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
@@ -379,69 +370,10 @@ void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuff
   // Copy the vs cbuffers
   for (size_t i = 0; i < vs.size(); ++i) {
     auto &cur = vs[i];
-    bool new_buffer = false;
-    if (i < CBUFFER_CACHE) {
-      if (_vs_cbuffer_cache[i] != cur.staging) {
-        new_buffer = true;
-        _vs_cbuffer_cache[i] = cur.staging;
-      }
-    }
-    if (new_buffer) {
-      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
-      D3D11_MAPPED_SUBRESOURCE sub;
-      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
-      _ctx->Unmap(buffer, 0);
-      vs_cb[i] = buffer;
-
-      _ctx->VSSetConstantBuffers(i, 1, &vs_cb[i]);
-    }
-  }
-
-  // Copy the ps cbuffers
-  for (size_t i = 0; i < ps.size(); ++i) {
-    auto &cur = ps[i];
-    bool new_buffer = false;
-    if (i < CBUFFER_CACHE) {
-      if (_ps_cbuffer_cache[i] != cur.staging) {
-        new_buffer = true;
-        _ps_cbuffer_cache[i] = cur.staging;
-      }
-    }
-    if (new_buffer) {
-      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
-      D3D11_MAPPED_SUBRESOURCE sub;
-      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-      memcpy(sub.pData, cur.staging.data(), cur.staging.size());
-      _ctx->Unmap(buffer, 0);
-      ps_cb[i] = buffer;
-
-      _ctx->PSSetConstantBuffers(i, 1, &ps_cb[i]);
-    }
-
-  }
-
-  //if (!vs.empty())
-    //_ctx->VSSetConstantBuffers(0, vs.size(), vs_cb);
-
-  //if (!ps.empty())
-//    _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
-
-}
-#endif
-
-void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuffer> &ps) {
-
-  ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
-  ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
-
-  // Copy the vs cbuffers
-  for (size_t i = 0; i < vs.size(); ++i) {
-    auto &cur = vs[i];
-    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
+    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
     D3D11_MAPPED_SUBRESOURCE sub;
     _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+    memcpy(sub.pData, cur->staging.data(), cur->staging.size());
     _ctx->Unmap(buffer, 0);
     vs_cb[i] = buffer;
   }
@@ -449,10 +381,10 @@ void DeferredContext::set_cbuffers(const vector<CBuffer> &vs, const vector<CBuff
   // Copy the ps cbuffers
   for (size_t i = 0; i < ps.size(); ++i) {
     auto &cur = ps[i];
-    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur.handle);
+    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
     D3D11_MAPPED_SUBRESOURCE sub;
     _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    memcpy(sub.pData, cur.staging.data(), cur.staging.size());
+    memcpy(sub.pData, cur->staging.data(), cur->staging.size());
     _ctx->Unmap(buffer, 0);
     ps_cb[i] = buffer;
 

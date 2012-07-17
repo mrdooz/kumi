@@ -73,7 +73,7 @@ private:
   void set_samplers(const SamplerArray &samplers);
   void set_shader_resources(const TextureArray &resources);
   void unset_shader_resource(int first_view, int num_views);
-  void set_cbuffers(const std::vector<CBuffer> &vs, const std::vector<CBuffer> &ps);
+  void set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
 
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;

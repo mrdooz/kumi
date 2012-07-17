@@ -3,8 +3,15 @@
 cbuffer PerFrame {
   matrix proj;
   matrix view;
+  float4 kernel[32];
+  float4 noise[16];
 };
-
+/*
+cbuffer PerFrame {
+  float4 kernel[32];
+  float4 noise[16];
+};
+*/
 cbuffer PerMaterial {
   float4 Diffuse;
   float4 Specular;
@@ -84,10 +91,6 @@ Texture2D rt_normal : register(t1);
 Texture2D rt_diffuse : register(t2);
 Texture2D rt_specular : register(t3);
 
-cbuffer PerFrame {
-  float4 kernel[32];
-  float4 noise[16];
-};
 
 float compute_ps_main(quad_ps_input input) : SV_Target
 {

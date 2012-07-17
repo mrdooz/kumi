@@ -145,6 +145,8 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
   vector<vector<string>> input;
   trim_input(text, &input);
 
+  set<string> cbuffers_found;
+
   // parse it!
   for (size_t i = 0; i < input.size(); ++i) {
     auto &cur_line = input[i];
@@ -152,7 +154,7 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
     if (cur_line[0] == "cbuffer") {
       string cbuffer_name(cur_line[1]);
       // Parse cbuffer
-      CBuffer &cbuffer = dummy_push_back(&shader->_cbuffers);
+      CBuffer *cbuffer = nullptr;
       int size = 0;
 
       for (i += 2; i < input.size(); ++i) {
@@ -175,14 +177,19 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
               add_error_msg("Unable to deduce source from cbuffer name: %s", cbuffer_name.c_str());
               return false;
             }
-/*
-            // Find the parameter in the template, so we can get the source
-            CBufferParam *param = shader_template->find_cbuffer_param(name);
-            if (!param) {
-              add_error_msg("Shader parameter %s not found", name.c_str());
+
+            if (cbuffers_found.find(cbuffer_name) != cbuffers_found.end()) {
+              add_error_msg("Found duplicate cbuffer: %s", cbuffer_name.c_str());
               return false;
             }
-*/
+
+            switch (source) {
+              case PropertySource::kMaterial: cbuffer = &shader->_material_cbuffer; break;
+              case PropertySource::kMesh: cbuffer = &shader->_mesh_cbuffer; break;
+              case PropertySource::kSystem: cbuffer = &shader->_system_cbuffer; break;
+              case PropertySource::kInstance: cbuffer = &shader->_instance_cbuffer; break;
+            }
+
             int ofs = atoi(row[4].c_str());
             int len = atoi(row[6].c_str());
             size = max(size, ofs + len);
@@ -194,18 +201,12 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
 #ifdef _DEBUG
             var.name = class_id;
 #endif
-            switch (source) {
-              case PropertySource::kMaterial: cbuffer.material_vars.emplace_back(var); break;
-              case PropertySource::kMesh: cbuffer.mesh_vars.emplace_back(var); break;
-              case PropertySource::kSystem: cbuffer.system_vars.emplace_back(var); break;
-              case PropertySource::kInstance: cbuffer.instance_vars.emplace_back(var); break;
-              default: LOG_WARNING_LN("Unsupported property source for %s", name.c_str());
-            }
+            cbuffer->vars.emplace_back(var);
           }
         }
       }
-      cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
-      cbuffer.staging.resize(size);
+      cbuffer->handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
+      cbuffer->staging.resize(size);
 
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
@@ -252,7 +253,11 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
         const string &type = row[1];
         int bind_point = atoi(row[4].c_str());
 
-        if (type == "texture") {
+        if (type == "cbuffer") {
+          // arrange the cbuffer in the correct slot
+          shader->set_cbuffer_slot(source_from_name(name), bind_point);
+
+        } else if (type == "texture") {
           ResourceViewParam *param = shader_template->find_resource_view(name.c_str());
           if (!param) {
             add_error_msg("Resource view %s not found", name.c_str());
@@ -514,8 +519,8 @@ bool Technique::init() {
 }
 
 void Technique::fill_cbuffer(CBuffer *cbuffer) const {
-  for (size_t i = 0; i < cbuffer->system_vars.size(); ++i) {
-    auto &cur = cbuffer->system_vars[i];
+  for (size_t i = 0; i < cbuffer->vars.size(); ++i) {
+    auto &cur = cbuffer->vars[i];
     PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
   }
 }

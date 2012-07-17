@@ -164,19 +164,6 @@ public:
   void add_shader_flag(const std::string &flag);
   int get_shader_flag(const std::string &flag);
 
-  // Rendering related
-  template <typename T>
-  T *alloc_command_data(int payload_size = 0) {
-    void *t = alloc_command_data_raw(sizeof(T) + payload_size);
-    T *tt = new (t)T();
-    KASSERT(t == tt);
-    return tt;
-  }
-  void *alloc_command_data_raw(size_t size);
-  void submit_command(const TrackedLocation &location, RenderKey key, void *data);
-  void submit_technique(const TrackedLocation &location, GraphicsObjectHandle technique, void *data);
-  void render();
-
   GraphicsObjectHandle default_rasterizer_state() const { return _default_rasterizer_state; }
   GraphicsObjectHandle default_depth_stencil_state() const { return _default_depth_stencil_state; }
   uint32_t default_stencil_ref() const { return 0; }
@@ -214,45 +201,7 @@ private:
   // given texture data and a name, insert it into the GOH chain
   GraphicsObjectHandle insert_texture(TextureResource *data, const char *friendly_name);
 
-  void validate_command(RenderKey key, const void *data);
-
-  // Renderer related
-  void set_vs(GraphicsObjectHandle vs);
-  void set_ps(GraphicsObjectHandle ps);
-  void set_layout(GraphicsObjectHandle layout);
-  void set_vb(GraphicsObjectHandle vb, int vertex_size);
-  void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format);
-  void set_topology(D3D11_PRIMITIVE_TOPOLOGY top);
-  void set_rs(GraphicsObjectHandle rs);
-  void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
-  void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
-  void set_samplers(const SamplerArray &samplers);
-  void set_shader_resources(const TextureArray &resources);
-  void unset_shader_resource(int first_view, int num_views);
-  void unset_shader_resource(const TextureArray &resources);
-  void set_cbuffer(const vector<CBuffer> &vs, const vector<CBuffer> &ps);
-  void draw_indexed(int count, int start_index, int base_vertex);
-
   void fill_system_resource_views(const ResourceViewArray &props, TextureArray *out) const;
-
-  GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
-  GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
-  GraphicsObjectHandle prev_ib, prev_vb;
-  GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
-  GraphicsObjectHandle prev_resources[MAX_TEXTURES];
-  D3D11_PRIMITIVE_TOPOLOGY prev_topology;
-
-  struct RenderCmd {
-    RenderCmd(const TrackedLocation &location, RenderKey key, void *data) : location(location), key(key), data(data) {}
-    TrackedLocation location;
-    RenderKey key;
-    void *data;
-  };
-
-  std::vector<RenderCmd > _render_commands;
-
-  std::vector<uint8> _effect_data;
-  int _effect_data_ofs;
 
   // resources
   enum { IdCount = 1 << GraphicsObjectHandle::cIdBits };
@@ -294,7 +243,6 @@ private:
 #endif
 
   GraphicsObjectHandle _default_rasterizer_state;
-  //CComPtr<ID3D11RasterizerState> _default_rasterizer_state;
   GraphicsObjectHandle _default_depth_stencil_state;
   CComPtr<ID3D11SamplerState> _default_sampler_state;
   float _default_blend_factors[4];
@@ -323,7 +271,5 @@ private:
 };
 
 #define GRAPHICS Graphics::instance()
-#define GFX_SUBMIT_CMD(cmd, data) GRAPHICS.submit_command(FROM_HERE, (cmd), (data))
-#define GFX_SUBMIT_TECH(technique, data) GRAPHICS.submit_technique(FROM_HERE, (technique), (data))
 
 #endif

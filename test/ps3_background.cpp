@@ -24,7 +24,7 @@ bool Ps3BackgroundEffect::render() {
   key.handle = _bloom_rt;
   RENDERER.submit_command(FROM_HERE, key, nullptr);
 */
-  GFX_SUBMIT_TECH(_background_technique, nullptr);
+  //GFX_SUBMIT_TECH(_background_technique, nullptr);
 /*
   key.handle = GRAPHICS.default_render_target();
   RENDERER.submit_command(FROM_HERE, key, nullptr);

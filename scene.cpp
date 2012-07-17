@@ -7,7 +7,7 @@ Scene::~Scene() {
   seq_delete(&meshes);
   seq_delete(&cameras);
 }
-
+/*
 void Scene::submit_meshes(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
   for (auto i = begin(meshes), e = end(meshes); i != e; ++i)
     (*i)->submit(location, material_id, technique);
@@ -28,7 +28,7 @@ void Scene::submit_mesh(const TrackedLocation &location, const char *name, int m
     }
   }
 }
-
+*/
 Mesh *Scene::find_mesh_by_name(const std::string &name) {
   auto it = _meshes_by_name.find(name);
   return it != _meshes_by_name.end() ? it->second : nullptr;
