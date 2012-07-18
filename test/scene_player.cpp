@@ -13,6 +13,7 @@
 #include "../xmath.hpp"
 #include "../profiler.hpp"
 #include "../deferred_context.hpp"
+#include "../animation_manager.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -215,8 +216,9 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
   } else {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT3 pos = value_at_time(_scene->animation_vec3[camera->name], time);
-    XMFLOAT3 target = value_at_time(_scene->animation_vec3[camera->name + ".Target"], time);
+    XMFLOAT3 pos = ANIMATION_MANAGER.get_pos(camera->pos_id);
+    XMFLOAT3 target = ANIMATION_MANAGER.get_pos(camera->target_pos_id);
+    // value_at_time(_scene->animation_vec3[camera->name + ".Target"], time);
 
     XMMATRIX xlookat = XMMatrixTranspose(XMMatrixLookAtLH(
       XMVectorSet(pos.x, pos.y, pos.z,0),
@@ -244,13 +246,13 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
 
   double time = local_time  / 1000.0;
 
+  ANIMATION_MANAGER.update(time);
+
   _scene->update();
 
-  for (auto it = begin(_scene->animation_mtx); it != end(_scene->animation_mtx); ++it) {
-    if (Mesh *mesh = _scene->find_mesh_by_name(it->first)) {
-      XMFLOAT4X4 mtx = value_at_time(it->second, time);
-      PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, transpose(mtx));
-    }
+  for (size_t i = 0; i < _scene->meshes.size(); ++i) {
+    Mesh *mesh = _scene->meshes[i];
+    PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, ANIMATION_MANAGER.get_xform(mesh->anim_id(), true));
   }
 
   calc_camera_matrices(time, (double)delta / 1000000.0, &_view, &_proj);
@@ -320,10 +322,7 @@ bool ScenePlayer::render() {
       GraphicsObjectHandle render_targets[] = { rt_pos, rt_normal, rt_diffuse, rt_specular };
       bool clear[] = { true, true, true, true };
       _ctx->set_render_targets(render_targets, clear, 4);
-
-      for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-        _ctx->render_mesh(_scene->meshes[i], _ssao_fill);
-      }
+      _ctx->render_scene(_scene, _ssao_fill);
     }
 
     // Calc the occlusion

@@ -134,6 +134,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\animation_manager.cpp" />
     <ClCompile Include="..\app.cpp">
       <PreprocessToFile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</PreprocessToFile>
     </ClCompile>
@@ -197,6 +198,7 @@
     <ClCompile Include="..\websocket_server.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\animation_manager.hpp" />
     <ClInclude Include="..\app.hpp" />
     <ClInclude Include="..\async_file_loader.hpp" />
     <ClInclude Include="..\bitmap_utils.hpp" />

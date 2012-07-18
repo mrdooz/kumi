@@ -8,6 +8,8 @@ class Material;
 struct Camera {
   Camera(const std::string &name) : name(name) {}
   std::string name;
+  PropertyId pos_id;
+  PropertyId target_pos_id;
   XMFLOAT3 pos, target, up;
   float roll;
   float aspect_ratio;
@@ -18,6 +20,7 @@ struct Camera {
 struct Light {
   Light(const std::string &name) : name(name) {}
   std::string name;
+  PropertyId pos_id;
   XMFLOAT4 pos;
   XMFLOAT4 color;
   float intensity;
@@ -35,18 +38,17 @@ struct KeyFrame {
 
 typedef KeyFrame<float> KeyFrameFloat;
 typedef KeyFrame<XMFLOAT3> KeyFrameVec3;
+typedef KeyFrame<XMFLOAT4> KeyFrameQuat;
 typedef KeyFrame<XMFLOAT4X4> KeyFrameMatrix;
 
 #pragma pack(pop)
 
 struct Scene {
 
+  Scene();
   ~Scene();
 
   void update();
-
-  void submit_meshes(const TrackedLocation &location, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
-  void submit_mesh(const TrackedLocation &location, const char *name, int material_id = -1, GraphicsObjectHandle technique = GraphicsObjectHandle());
 
   Mesh *find_mesh_by_name(const std::string &name);
 
@@ -61,9 +63,9 @@ struct Scene {
   std::vector<Camera *> cameras;
   std::vector<Light *> lights;
   std::vector<Material *> materials;
-  std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
-  std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;
-  std::map<std::string, std::vector<KeyFrameMatrix>> animation_mtx;
+  //std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
+  //std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;
+  //std::map<std::string, std::vector<KeyFrameMatrix>> animation_mtx;
 
   std::map<GraphicsObjectHandle, std::vector<SubMesh*>> _submesh_by_material;
 };

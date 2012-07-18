@@ -37,6 +37,12 @@ public:
     return *(T*)&_raw_data[id];
   }
 
+  template<typename T>
+  T *get_property_ptr(PropertyId id) {
+    type_check(id, sizeof(T));
+    return (T*)&_raw_data[id];
+  }
+
   void get_property_raw(PropertyId id, char *out, int len) {
 #if TYPE_CHECK
     KASSERT(*((uint32*)&_raw_data[id-4]) == len);
@@ -63,12 +69,18 @@ public:
   }
 
   template<typename T>
-  PropertyId get_or_create(const char *name, Token token, const FnPropertyChanged &cb = FnPropertyChanged()) {
+  PropertyId get_or_create(const std::string &name, Token token, const FnPropertyChanged &cb = FnPropertyChanged()) {
     return get_or_create_raw(name, token, sizeof(T), nullptr, cb);
   }
 
   PropertyId get_or_create_placeholder(const std::string &name, const FnPropertyChanged &cb = FnPropertyChanged()) {
     return get_or_create_raw(name, sizeof(PropertyId), nullptr, cb);
+  }
+
+  PropertyId get_id(const std::string &name) {
+    auto it = _ids.find(name);
+    KASSERT(it != _ids.end());
+    return it->second;
   }
 
 private:
@@ -121,7 +133,7 @@ private:
 
   std::unordered_map<std::string, PropertyId> _ids;
   std::map<CompoundKey, PropertyId> _compound_ids;
-  std::map<PropertyId, std::vector<FnPropertyChanged> > _listeners;
+  std::unordered_map<PropertyId, std::vector<FnPropertyChanged> > _listeners;
 
   std::vector<uint8> _raw_data;
   uint32 _property_ofs;

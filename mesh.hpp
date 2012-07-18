@@ -35,7 +35,10 @@ public:
   void on_loaded();
 
   void fill_cbuffer(CBuffer *cbuffer) const;
+  PropertyId anim_id() const { return _anim_id; }
+
 //private:
+  PropertyId _anim_id;
   std::string name;
   XMFLOAT4X4 obj_to_world;
   std::vector<SubMesh *> submeshes;

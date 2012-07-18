@@ -4,6 +4,7 @@
 #include "mesh.hpp"
 #include "deferred_context.hpp"
 #include "material_manager.hpp"
+#include "scene.hpp"
 
 using namespace std;
 
@@ -58,14 +59,18 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 
   // set cbuffers
   auto &vs_s_cbuffer = vs->system_cbuffer();
-  technique->fill_cbuffer(&vs_s_cbuffer);
+  technique->fill_cbuffer(&vs->system_cbuffer());
+
+  auto &ps_s_cbuffer = ps->system_cbuffer();
+  technique->fill_cbuffer(&ps_s_cbuffer);
 
   // Check if we're drawing instanced
   if (instance_data.num_instances) {
+
+    set_cbuffer(vs_s_cbuffer, ps_s_cbuffer);
+
     for (int ii = 0; ii < instance_data.num_instances; ++ii) {
 
-      auto &ps_s_cbuffer = ps->system_cbuffer();
-      technique->fill_cbuffer(&ps_s_cbuffer);
       auto &ps_i_cbuffer = ps->instance_cbuffer();
 
       for (size_t j = 0; j < ps_i_cbuffer.vars.size(); ++j) {
@@ -81,14 +86,11 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
         }
       }
 
-      set_cbuffers(vs->cbuffers(), ps->cbuffers());
+      set_cbuffer(vs->instance_cbuffer(), ps->instance_cbuffer());
       draw_indexed(technique->index_count(), 0, 0);
     }
 
   } else {
-
-    auto &ps_s_cbuffer = ps->system_cbuffer();
-    technique->fill_cbuffer(&ps_s_cbuffer);
 
     set_cbuffers(vs->cbuffers(), ps->cbuffers());
     draw_indexed(technique->index_count(), 0, 0);
@@ -103,6 +105,77 @@ void DeferredContext::fill_system_resource_views(const ResourceViewArray &views,
     if (views[i].used && views[i].source == PropertySource::kSystem) {
       (*out)[i] = PROPERTY_MANAGER.get_property<GraphicsObjectHandle>(views[i].class_id);
     }
+  }
+}
+
+void DeferredContext::render_scene(Scene *scene, GraphicsObjectHandle technique_handle) {
+
+  Technique *technique = GRAPHICS._techniques.get(technique_handle);
+  set_layout(technique->input_layout());
+  set_rs(technique->rasterizer_state());
+  set_dss(technique->depth_stencil_state(), _default_stencil_ref);
+  set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
+
+  for (auto it = begin(scene->_submesh_by_material); it != end(scene->_submesh_by_material); ++it) {
+    GraphicsObjectHandle m = it->first;
+    const Material *material = MATERIAL_MANAGER.get_material(m);
+
+    // get the shader for the current technique, based on the flags used by the material
+    int flags = material->flags();
+    Shader *vs = technique->vertex_shader(flags);
+    Shader *ps = technique->pixel_shader(flags);
+
+    material->fill_cbuffer(&vs->material_cbuffer());
+    material->fill_cbuffer(&ps->material_cbuffer());
+    set_cbuffer(vs->material_cbuffer(), ps->material_cbuffer());
+
+
+    technique->fill_cbuffer(&vs->system_cbuffer());
+    technique->fill_cbuffer(&ps->system_cbuffer());
+    set_cbuffer(vs->system_cbuffer(), ps->system_cbuffer());
+
+    set_vs(vs->handle());
+    set_ps(ps->handle());
+
+    // set samplers
+    auto &samplers = ps->samplers();
+    if (!samplers.empty()) {
+      set_samplers(samplers);
+    }
+
+    // set resource views
+    auto &rv = ps->resource_views();
+    TextureArray all_views;
+    fill_system_resource_views(rv, &all_views);
+    material->fill_resource_views(rv, &all_views);
+    bool has_resources = false;
+    for (size_t i = 0; i < all_views.size(); ++i) {
+      if (all_views[i].is_valid()) {
+        has_resources = true;
+        set_shader_resources(all_views);
+        break;
+      }
+    }
+
+    for (auto jt = begin(it->second); jt != end(it->second); ++jt) {
+      SubMesh *submesh = *jt;
+      const MeshGeometry *geometry = &submesh->geometry;
+      Mesh *mesh = submesh->mesh;
+
+      set_vb(geometry->vb, geometry->vertex_size);
+      set_ib(geometry->ib, geometry->index_format);
+      set_topology(geometry->topology);
+
+      // set cbuffers
+      mesh->fill_cbuffer(&vs->mesh_cbuffer());
+      mesh->fill_cbuffer(&ps->mesh_cbuffer());
+      set_cbuffer(vs->mesh_cbuffer(), ps->mesh_cbuffer());
+
+      draw_indexed(geometry->index_count, 0, 0);
+    }
+
+    if (has_resources)
+      unset_shader_resource(0, MAX_TEXTURES);
   }
 }
 
@@ -362,6 +435,29 @@ void DeferredContext::unset_shader_resource(int first_view, int num_views) {
   _ctx->PSSetShaderResources(first_view, num_views, null_views);
 }
 
+void DeferredContext::set_cbuffer(const CBuffer &vs, const CBuffer &ps) {
+
+  if (vs.staging.size() > 0) {
+    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(vs.handle);
+    D3D11_MAPPED_SUBRESOURCE sub;
+    _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+    memcpy(sub.pData, vs.staging.data(), vs.staging.size());
+    _ctx->Unmap(buffer, 0);
+
+    _ctx->VSSetConstantBuffers(vs.slot, 1, &buffer);
+  }
+
+  if (ps.staging.size() > 0) {
+    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(ps.handle);
+    D3D11_MAPPED_SUBRESOURCE sub;
+    _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+    memcpy(sub.pData, ps.staging.data(), ps.staging.size());
+    _ctx->Unmap(buffer, 0);
+
+    _ctx->PSSetConstantBuffers(ps.slot, 1, &buffer);
+  }
+}
+
 void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps) {
 
   ID3D11Buffer **vs_cb = (ID3D11Buffer **)_alloca(vs.size() * sizeof(ID3D11Buffer *));
@@ -387,8 +483,6 @@ void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::
     memcpy(sub.pData, cur->staging.data(), cur->staging.size());
     _ctx->Unmap(buffer, 0);
     ps_cb[i] = buffer;
-
-    _ctx->PSSetConstantBuffers(i, 1, &ps_cb[i]);
   }
 
   if (!vs.empty())

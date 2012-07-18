@@ -14,6 +14,7 @@
 #include "threading.hpp"
 #include "kumi.hpp"
 #include "profiler.hpp"
+#include "animation_manager.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
@@ -90,6 +91,7 @@ bool App::init(HINSTANCE hinstance)
   _width = 3 * GetSystemMetrics(SM_CXSCREEN) / 4;
   _height = 3 * GetSystemMetrics(SM_CYSCREEN) / 4;
 
+  B_ERR_BOOL(ProfileManager::create());
   B_ERR_BOOL(PropertyManager::create());
   B_ERR_BOOL(ResourceManager::create());
   B_ERR_BOOL(Graphics::create());
@@ -98,7 +100,7 @@ bool App::init(HINSTANCE hinstance)
 #if WITH_WEBSOCKETS
   B_ERR_BOOL(WebSocketServer::create());
 #endif
-  B_ERR_BOOL(ProfileManager::create());
+  B_ERR_BOOL(AnimationManager::create());
 
   B_ERR_BOOL(create_window());
 
@@ -137,7 +139,8 @@ bool App::init(HINSTANCE hinstance)
 
 bool App::close() {
 
-  B_ERR_BOOL(ProfileManager::close());
+  B_ERR_BOOL(AnimationManager::close());
+
 #if WITH_WEBSOCKETS
   B_ERR_BOOL(WebSocketServer::close());
 #endif
@@ -147,6 +150,8 @@ bool App::close() {
   B_ERR_BOOL(MaterialManager::close());
   B_ERR_BOOL(ResourceManager::close());
   B_ERR_BOOL(PropertyManager::close());
+  B_ERR_BOOL(ProfileManager::close());
+
   Logger::close();
   Dispatcher::close();
   delete exch_null(_instance);

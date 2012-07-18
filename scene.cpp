@@ -2,33 +2,16 @@
 #include "scene.hpp"
 #include "graphics.hpp"
 #include "mesh.hpp"
+#include "animation_manager.hpp"
+
+Scene::Scene() {
+}
 
 Scene::~Scene() {
   seq_delete(&meshes);
   seq_delete(&cameras);
 }
-/*
-void Scene::submit_meshes(const TrackedLocation &location, int material_id, GraphicsObjectHandle technique) {
-  for (auto i = begin(meshes), e = end(meshes); i != e; ++i)
-    (*i)->submit(location, material_id, technique);
-}
 
-void Scene::submit_mesh(const TrackedLocation &location, const char *name, int material_id, GraphicsObjectHandle technique) {
-  static Mesh *prev_mesh = nullptr;
-  if (prev_mesh && prev_mesh->name == name) {
-    prev_mesh->submit(location, material_id, technique);
-  } else {
-    for (size_t i = 0; i < meshes.size(); ++i) {
-      Mesh *cur = meshes[i];
-      if (cur->name == name) {
-        cur->submit(location, material_id, technique);
-        prev_mesh = cur;
-        break;
-      }
-    }
-  }
-}
-*/
 Mesh *Scene::find_mesh_by_name(const std::string &name) {
   auto it = _meshes_by_name.find(name);
   return it != _meshes_by_name.end() ? it->second : nullptr;
@@ -39,6 +22,17 @@ bool Scene::on_loaded() {
     Mesh *mesh = *it;
     mesh->on_loaded();
     _meshes_by_name[mesh->name] = mesh;
+  }
+
+  for (size_t i = 0; i < cameras.size(); ++i) {
+    auto *camera = cameras[i];
+    camera->pos_id = PROPERTY_MANAGER.get_id(camera->name + "::Anim");
+    camera->target_pos_id = PROPERTY_MANAGER.get_id(camera->name + ".Target::Anim");
+  }
+
+  for (size_t i = 0; i < lights.size(); ++i) {
+    auto *light = lights[i];
+    light->pos_id = PROPERTY_MANAGER.get_id(light->name + "::Anim");
   }
 
   sort_by_material();

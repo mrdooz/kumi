@@ -108,6 +108,7 @@ typedef uint64_t uint64;
 #include "FW1FontWrapper.h"
 #endif
 
+#include "xmath.hpp"
 #include "logger.hpp"
 
 #ifdef DISTRIBUTION

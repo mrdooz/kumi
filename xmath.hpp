@@ -26,6 +26,26 @@ inline XMFLOAT3 operator*(float s, const XMFLOAT3 &rhs) {
   return XMFLOAT3(s*rhs.x, s*rhs.y, s*rhs.z);
 }
 
+inline XMFLOAT3 operator-(const XMFLOAT3 &lhs, const XMFLOAT3 &rhs) {
+  return XMFLOAT3(lhs.x-rhs.x, lhs.y-rhs.y, lhs.z-rhs.z);
+}
+
+inline XMFLOAT3 operator+(const XMFLOAT3 &lhs, const XMFLOAT3 &rhs) {
+  return XMFLOAT3(lhs.x+rhs.x, lhs.y+rhs.y, lhs.z+rhs.z);
+}
+
+inline XMFLOAT4 operator*(float s, const XMFLOAT4 &rhs) {
+  return XMFLOAT4(s*rhs.x, s*rhs.y, s*rhs.z, s*rhs.w);
+}
+
+inline XMFLOAT4 operator-(const XMFLOAT4 &lhs, const XMFLOAT4 &rhs) {
+  return XMFLOAT4(lhs.x-rhs.x, lhs.y-rhs.y, lhs.z-rhs.z, lhs.w-rhs.w);
+}
+
+inline XMFLOAT4 operator+(const XMFLOAT4 &lhs, const XMFLOAT4 &rhs) {
+  return XMFLOAT4(lhs.x+rhs.x, lhs.y+rhs.y, lhs.z+rhs.z, lhs.w+rhs.w);
+}
+
 inline XMFLOAT3 &operator+=(XMFLOAT3 &lhs, const XMFLOAT3 &rhs) {
   lhs.x += rhs.x;
   lhs.y += rhs.y;

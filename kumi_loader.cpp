@@ -9,8 +9,9 @@
 #include "mesh.hpp"
 #include "file_utils.hpp"
 #include "json_utils.hpp"
+#include "animation_manager.hpp"
 
-#define FILE_VERSION 9
+#define FILE_VERSION 10
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -178,11 +179,30 @@ bool KumiLoader::load_animation(const char *buf, Scene *scene) {
 
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
+  const char *buf_end = buf + header->size;
+  while (buf < buf_end) {
+    string node_name = read_and_advance<const char *>(&buf);
+    // pos
+    if (int num_pos_keys = read_and_advance<int>(&buf)) {
+      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimPos, num_pos_keys);
+      read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_pos_keys);
+    }
 
-  // load different animation types
-  load_animation_inner(&buf, &scene->animation_float);
-  load_animation_inner(&buf, &scene->animation_vec3);
-  load_animation_inner(&buf, &scene->animation_mtx);
+    // rot
+    if (int num_rot_keys = read_and_advance<int>(&buf)) {
+      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimRot, num_rot_keys);
+      read_and_advance_raw(&buf, p, sizeof(KeyFrameQuat) * num_rot_keys);
+    }
+
+    // scale
+    if (int num_scale_keys = read_and_advance<int>(&buf)) {
+      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimScale, num_scale_keys);
+      read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_scale_keys);
+    }
+  }
+
+  ANIMATION_MANAGER.on_loaded();
+
   return true;
 }
 

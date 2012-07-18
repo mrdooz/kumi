@@ -28,4 +28,7 @@ void Shader::set_cbuffer_slot(PropertySource::Enum src, int slot) {
     case PropertySource::kSystem: _cbuffers[slot] = &_system_cbuffer; break;
     case PropertySource::kInstance: _cbuffers[slot] = &_instance_cbuffer; break;
   }
+
+  KASSERT(_cbuffers[slot]->slot == ~0);
+  _cbuffers[slot]->slot = slot;
 }

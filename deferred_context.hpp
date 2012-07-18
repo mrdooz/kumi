@@ -2,6 +2,7 @@
 #include "graphics_object_handle.hpp"
 #include "shader.hpp"
 
+struct Scene;
 
 class DeferredContext {
   friend class Graphics;
@@ -47,6 +48,7 @@ public:
   void set_render_targets(GraphicsObjectHandle *render_targets, bool *clear_targets, int num_render_targets);
   void generate_mips(GraphicsObjectHandle h);
 
+  void render_scene(Scene *scene, GraphicsObjectHandle technique_handle);
   void render_mesh(Mesh *mesh, GraphicsObjectHandle technique_handle);
   void render_technique(GraphicsObjectHandle technique_handle,
     const TextureArray &resources,
@@ -74,6 +76,7 @@ private:
   void set_shader_resources(const TextureArray &resources);
   void unset_shader_resource(int first_view, int num_views);
   void set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps);
+  void set_cbuffer(const CBuffer &vs, const CBuffer &ps);
   void draw_indexed(int count, int start_index, int base_vertex);
 
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;

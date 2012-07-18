@@ -171,7 +171,7 @@ T randf(T a, T b) {
   return a + (b-a) * rand() / RAND_MAX;
 }
 
-template <typename T>
-T lerp(T a, T b, float v) {
-  return (T)(a + (b-a) * v);
+template <typename T, typename U>
+T lerp(T a, T b, U v) {
+  return a + (v * (b-a));
 }
