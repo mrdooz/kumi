@@ -19,8 +19,10 @@ public:
   void set_paused(bool pause);
   bool paused() const;
 
-  void set_pos(uint32 ms);
-  uint32 duration() const;
+  void set_pos(int64 ms);
+  int64 pos();
+
+  int64 duration() const; // in ms
   bool tick();
 
   JsonValue::JsonValuePtr get_info();
@@ -37,16 +39,18 @@ private:
 
   Effect *find_effect_by_name(const std::string &name);
 
+  int64 ctr_to_ns(int64 ctr);
+
   std::deque<Effect *> _active_effects;
   std::deque<Effect *> _inactive_effects;
   std::deque<Effect *> _expired_effects;
   std::vector<Effect *> _effects;
   int _cur_effect;
   int64 _frequency;
-  int64 _last_time;
-  int64 _active_time;
-  int64 _running_time;
-  uint32 _duration_ms;
+  int64 _last_time_ctr;
+  int64 _active_time_ctr;
+  int64 _running_time_ctr;
+  int64 _duration_ns;
 
   PropertyId _time_id;
 

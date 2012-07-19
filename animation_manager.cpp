@@ -33,6 +33,12 @@ void *AnimationManager::alloc_anim(const std::string &name, AnimationType type, 
   PropertyId id = PROPERTY_MANAGER.get_or_create<AnimData>(name + "::Anim");
   AnimData *anim_data = PROPERTY_MANAGER.get_property_ptr<AnimData>(id);
 
+  // Keep track of all the unique anim datas
+  if (_anim_data_id.find(id) == _anim_data_id.end()) {
+    _anim_data_id.insert(id);
+    _anim_data.push_back(anim_data);
+  }
+
   switch (type) {
 
     case kAnimPos: {
@@ -61,8 +67,22 @@ void *AnimationManager::alloc_anim(const std::string &name, AnimationType type, 
   return nullptr;
 }
 
+XMFLOAT3 interpolate(const XMFLOAT3 &a, const XMFLOAT3 &b, float t) {
+  return lerp(a,b,t);
+}
+
+XMFLOAT4 interpolate(const XMFLOAT4 &a, const XMFLOAT4 &b, float t) {
+  // When doing quaternian lerp, we have to check the sign of the dot(a,b)
+  XMFLOAT4 c = a;
+  if (dot(a,b) < 0) {
+    c.x = -c.x; c.y = -c.y; c.z = -c.z; c.w = -c.w;
+  }
+  return lerp(c, b, t);
+}
+
 template<class T>
-void AnimationManager::update_inner(double time, vector<KeyFrameCache<T> *> *keyframes) {
+void AnimationManager::update_inner(double time, 
+  vector<KeyFrameCache<T> *> *keyframes) {
   for (size_t i = 0; i < keyframes->size(); ++i) {
     auto *p = (*keyframes)[i];
     auto *frames = p->keyframes;
@@ -79,7 +99,7 @@ void AnimationManager::update_inner(double time, vector<KeyFrameCache<T> *> *key
       // At the last frame, so we don't have to update anything..
     } else {
       int cur_frame = start_frame;
-      while (time > frames[cur_frame].time && cur_frame < p->num_frames - 1)
+      while (time >= frames[cur_frame].time && cur_frame < p->num_frames - 1)
         cur_frame++;
 
       if (cur_frame > 0) {
@@ -89,7 +109,8 @@ void AnimationManager::update_inner(double time, vector<KeyFrameCache<T> *> *key
           double at = frames[cur_frame-1].time;
           double bt = frames[cur_frame].time;
           double t = (time - at) / (bt - at);
-          p->cur = lerp(a, b, (float)t);
+          KASSERT(t >= 0 && t < 1);
+          p->cur = interpolate(a, b, (float)t);
           p->prev_frame = cur_frame;
 
         } else {
@@ -99,12 +120,17 @@ void AnimationManager::update_inner(double time, vector<KeyFrameCache<T> *> *key
       }
     }
   }
-
 }
 
 void AnimationManager::update(double time) {
-  update_inner(time, &_vec3_keyframes);
-  update_inner(time, &_vec4_keyframes);
+
+/*
+  for (size_t i = 0; i < _anim_data.size(); ++i) {
+    AnimData *cur = _anim_data[i];
+  }
+*/
+  update_inner<XMFLOAT3>(time, &_vec3_keyframes);
+  update_inner<XMFLOAT4>(time, &_vec4_keyframes);
 }
 
 XMFLOAT4X4 AnimationManager::get_xform(PropertyId id, bool transpose) {

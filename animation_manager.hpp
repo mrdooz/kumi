@@ -39,17 +39,22 @@ private:
 
   struct AnimData {
     AnimData() : pos(nullptr), rot(nullptr), scale(nullptr) {}
-    KeyFrameCache<XMFLOAT3> *pos;
-    KeyFrameCache<XMFLOAT4> *rot;
-    KeyFrameCache<XMFLOAT3> *scale;
+    KeyFrameCacheVec3 *pos;
+    KeyFrameCacheVec4 *rot;
+    KeyFrameCacheVec3 *scale;
+    XMFLOAT4X4 cur_mtx;
   };
 
   AnimationManager();
 
-  template<class T> void update_inner(double time, std::vector<KeyFrameCache<T> *> *);
+  template<class T> void update_inner(double time, 
+    std::vector<KeyFrameCache<T> *> *keyframes);
 
   std::vector<KeyFrameCacheVec3 *> _vec3_keyframes;
   std::vector<KeyFrameCacheVec4 *> _vec4_keyframes;
+
+  std::vector<AnimData *> _anim_data;
+  std::set<PropertyId> _anim_data_id;
 };
 
 #define ANIMATION_MANAGER AnimationManager::instance()

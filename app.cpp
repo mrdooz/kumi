@@ -132,7 +132,7 @@ bool App::init(HINSTANCE hinstance)
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
   auto effect = new ScenePlayer(GraphicsObjectHandle(), "simple effect");
-  DEMO_ENGINE.add_effect(effect, 0, 7 * 1000);
+  DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
   return true;
 }
@@ -382,10 +382,37 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     break;
 
   case WM_KEYUP:
+
     switch (wParam) {
+
       case VK_ESCAPE:
         PostQuitMessage( 0 );
         break;
+    
+      case VK_SPACE:
+        DEMO_ENGINE.set_paused(!DEMO_ENGINE.paused());
+        break;
+
+      case VK_PRIOR:
+        DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() - 1000);
+        break;
+
+      case VK_NEXT:
+        DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() + 1000);
+        break;
+
+      case VK_LEFT:
+        DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() - 100);
+        break;
+
+      case VK_RIGHT:
+        DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() + 100);
+        break;
+
+      case VK_HOME:
+        DEMO_ENGINE.set_pos(0);
+        break;
+
       default:
         break;
       }

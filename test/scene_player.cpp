@@ -103,7 +103,7 @@ bool ScenePlayer::init() {
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
   KumiLoader loader;
-  if (!loader.load(resolved_name.c_str(), material_connections.c_str(), &RESOURCE_MANAGER, &_scene))
+  if (!loader.load(resolved_name.c_str(), nullptr /*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))
     return false;
 
   _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);
