@@ -235,8 +235,8 @@ bool Technique::do_reflection(const std::vector<char> &text, Shader *shader, Sha
         inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, 0));
       }
 
-      _input_layout = GRAPHICS.create_input_layout(FROM_HERE, inputs, obj);
-      if (!_input_layout.is_valid()) {
+      shader->_input_layout = GRAPHICS.create_input_layout(FROM_HERE, inputs, obj);
+      if (!shader->_input_layout.is_valid()) {
         add_error_msg("Invalid input layout");
         return false;
       }

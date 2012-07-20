@@ -149,7 +149,7 @@ public:
   bool load_techniques(const char *filename, bool add_materials);
   Technique *get_technique(GraphicsObjectHandle h);
   GraphicsObjectHandle find_technique(const char *name);
-  GraphicsObjectHandle find_input_layout(const std::string &technique_name);
+  //GraphicsObjectHandle find_input_layout(const std::string &technique_name);
   GraphicsObjectHandle find_resource(const std::string &name);
   GraphicsObjectHandle find_sampler(const std::string &name);
 

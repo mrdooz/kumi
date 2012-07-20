@@ -11,7 +11,7 @@
 #include "json_utils.hpp"
 #include "animation_manager.hpp"
 
-#define FILE_VERSION 10
+#define FILE_VERSION 11
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -75,6 +75,44 @@ void read_and_advance_raw(const U **buf, void *dst, int len) {
   *buf += len;
 }
 
+static enum VertexFlags {
+  kPos     = 1 << 0,
+  kNormal  = 1 << 1,
+  kTex0    = 1 << 2,
+  kTex1    = 1 << 3,
+};
+
+static void decompress_vb(const char *vb, int len, int vb_flags, int vertex_size, vector<char> *out) {
+  int elems = len / (vertex_size - 8);
+  out->resize(vertex_size * elems);
+  char *buf = out->data();
+
+  for (int i = 0; i < elems; ++i) {
+    *(XMFLOAT3 *)buf = *(XMFLOAT3 *)vb;
+    buf += sizeof(XMFLOAT3);
+    vb += sizeof(XMFLOAT3);
+
+    uint32 normal = *(uint32 *)vb;
+    XMFLOAT3 n;
+    bool neg_x = !!(normal & (1 << 31));
+    bool neg_y = !!(normal & (1 << 16));
+    bool neg_z = !!(normal & 1);
+
+    n.x = (neg_x ? -1 : 1) * (((normal >> 17) & 0x3fff) / 16383.0f);
+    n.y = (neg_y ? -1 : 1) * (((normal >>  1) & 0x7fff) / 32767.0f);
+    n.z = (neg_z ? -1 : 1) * sqrtf(1 - n.x * n.x - n.y * n.y);
+    *(XMFLOAT3 *)buf = normalize(n);
+    buf += sizeof(XMFLOAT3);
+    vb += sizeof(uint32);
+
+    if (vb_flags & kTex0) {
+      *(XMFLOAT2 *)buf = *(XMFLOAT2 *)vb;
+      buf += sizeof(XMFLOAT2);
+      vb += sizeof(XMFLOAT2);
+    }
+  }
+
+}
 
 bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
@@ -111,8 +149,10 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
       submesh->geometry.index_format = index_size_to_format(read_and_advance<int>(&buf));
       const int *vb = read_and_advance<const int*>(&buf);
       const int vb_size = *vb;
-      submesh->geometry.vertex_count = vb_size / submesh->geometry.vertex_size;
-      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, vb_size, (const void *)(vb + 1));
+      vector<char> decompressed;
+      decompress_vb((const char *)(vb + 1), vb_size, vb_flags, submesh->geometry.vertex_size, &decompressed);
+      submesh->geometry.vertex_count = decompressed.size() / submesh->geometry.vertex_size;
+      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed.size(), decompressed.data());
       const int *ib = read_and_advance<const int*>(&buf);
       const int ib_size = *ib;
       submesh->geometry.index_count = ib_size / index_format_to_size(submesh->geometry.index_format);

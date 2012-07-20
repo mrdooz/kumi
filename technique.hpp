@@ -92,7 +92,7 @@ public:
   const std::string &name() const { return _name; }
   void init_from_parent(const Technique *parent);
 
-  GraphicsObjectHandle input_layout() const { return _input_layout; }
+//  GraphicsObjectHandle input_layout() const { return _input_layout; }
   Shader *vertex_shader(int flags) const;
   Shader *pixel_shader(int flags) const;
 
@@ -129,7 +129,7 @@ private:
   std::vector<Shader *> _vertex_shaders;
   std::vector<Shader *> _pixel_shaders;
 
-  GraphicsObjectHandle _input_layout;
+  //GraphicsObjectHandle _input_layout;
 
   int _vertex_size;
   DXGI_FORMAT _index_format;

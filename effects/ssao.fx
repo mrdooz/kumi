@@ -38,7 +38,9 @@ Texture2D DiffuseTexture : register(t0);
 struct fill_vs_input {
     float4 pos : POSITION;
     float3 normal : NORMAL;
+#if DIFFUSE_TEXTURE
     float2 tex : TEXCOORD;
+#endif
 };
 
 struct fill_ps_input {
@@ -60,7 +62,9 @@ fill_ps_input fill_vs_main(fill_vs_input input)
     fill_ps_input output = (fill_ps_input)0;
     float4x4 world_view = mul(world, view);
     output.pos = mul(input.pos, mul(world_view, proj));
+#if DIFFUSE_TEXTURE
     output.tex = input.tex;
+#endif
     output.vs_pos = mul(input.pos, world_view);
     output.vs_normal = mul(float4(input.normal,0), world_view);
     return output;

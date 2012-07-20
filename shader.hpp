@@ -44,6 +44,8 @@ public:
 
   void set_cbuffer_slot(PropertySource::Enum src, int slot);
 
+  GraphicsObjectHandle input_layout() const { return _input_layout; }
+
 private:
 
   CBuffer _mesh_cbuffer;
@@ -59,6 +61,8 @@ private:
 #endif
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;
+
+  GraphicsObjectHandle _input_layout;
 
   ResourceViews _resource_views2;
   ResourceViewArray _resource_views;

@@ -30,8 +30,8 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   set_ps(ps->handle());
 
   set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  set_layout(vs->input_layout());
   set_vb(technique->vb(), technique->vertex_size());
-  set_layout(technique->input_layout());
   set_ib(technique->ib(), technique->index_format());
 
   set_rs(technique->rasterizer_state());
@@ -111,7 +111,6 @@ void DeferredContext::fill_system_resource_views(const ResourceViewArray &views,
 void DeferredContext::render_scene(Scene *scene, GraphicsObjectHandle technique_handle) {
 
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
-  set_layout(technique->input_layout());
   set_rs(technique->rasterizer_state());
   set_dss(technique->depth_stencil_state(), _default_stencil_ref);
   set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
@@ -124,6 +123,7 @@ void DeferredContext::render_scene(Scene *scene, GraphicsObjectHandle technique_
     int flags = material->flags();
     Shader *vs = technique->vertex_shader(flags);
     Shader *ps = technique->pixel_shader(flags);
+    set_layout(vs->input_layout());
 
     material->fill_cbuffer(&vs->material_cbuffer());
     material->fill_cbuffer(&ps->material_cbuffer());
@@ -183,7 +183,6 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
 
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
 
-  set_layout(technique->input_layout());
   set_rs(technique->rasterizer_state());
   set_dss(technique->depth_stencil_state(), _default_stencil_ref);
   set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
@@ -202,6 +201,7 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
     set_vs(vs->handle());
     set_ps(ps->handle());
 
+    set_layout(vs->input_layout());
     set_vb(geometry->vb, geometry->vertex_size);
     set_ib(geometry->ib, geometry->index_format);
     set_topology(geometry->topology);

@@ -840,12 +840,13 @@ GraphicsObjectHandle Graphics::find_sampler(const std::string &name) {
   return make_goh(GraphicsObjectHandle::kSamplerState, idx);
 }
 
+/*
 GraphicsObjectHandle Graphics::find_input_layout(const std::string &technique_name) {
   if (Technique *technique = _techniques.find(technique_name, (Technique *)NULL))
     return technique->input_layout();
   return GraphicsObjectHandle();
 }
-
+*/
 void Graphics::unbind_resource_views(int resource_bitmask) {
 
   ID3D11ShaderResourceView *null_view = nullptr;
