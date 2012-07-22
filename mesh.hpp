@@ -43,6 +43,8 @@ public:
   XMFLOAT4X4 obj_to_world;
   std::vector<SubMesh *> submeshes;
 
+  XMFLOAT3 center, extents;
+
   PropertyId _world_mtx_class;
   PropertyId _world_mtx_id;
   PropertyId _world_it_mtx_id;
