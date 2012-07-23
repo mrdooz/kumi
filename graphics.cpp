@@ -78,6 +78,7 @@ Graphics::Graphics()
 #if WITH_GWEN
   , _font_wrappers(release_obj<IFW1FontWrapper *>)
 #endif
+  , _vsync(false)
 {
 }
 
@@ -546,7 +547,7 @@ void Graphics::present()
     _start_fps_time = now;
     _frame_count = 0;
   }
-  _swap_chain->Present(1,0);
+  _swap_chain->Present(_vsync ? 1 : 0,0);
 }
 
 void Graphics::resize(const int width, const int height)

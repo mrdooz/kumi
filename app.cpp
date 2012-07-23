@@ -385,6 +385,10 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (wParam) {
 
+      case 'V':
+        GRAPHICS.set_vsync(!GRAPHICS.vsync());
+        break;
+
       case VK_ESCAPE:
         PostQuitMessage( 0 );
         break;

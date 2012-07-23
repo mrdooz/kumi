@@ -10,8 +10,9 @@
 #include "file_utils.hpp"
 #include "json_utils.hpp"
 #include "animation_manager.hpp"
+#include "bitutils.hpp"
 
-#define FILE_VERSION 12
+#define FILE_VERSION 13
 
 #pragma pack(push, 1)
 struct MainHeader {
@@ -82,42 +83,84 @@ static enum VertexFlags {
   kTex1    = 1 << 3,
 };
 
-static void decompress_vb(Mesh *mesh, const char *vb, int len, int vb_flags, int vertex_size, vector<char> *out) {
-  int elems = len / (vertex_size - 8 - 6);
-  out->resize(vertex_size * elems);
-  char *buf = out->data();
+uint32 quantize(float value, int num_bits) {
+  // assume value is in the [-1..1] range
+  uint32 scale = (1 << (num_bits-1)) - 1;
+  uint32 v = (uint32)(scale * fabs(value));
+  if (value < 0)
+    v = set_bit(v, num_bits - 1);
+  return v;
+}
 
-  for (int i = 0; i < elems; ++i) {
-    int16 *p = (int16 *)vb;
-    int x = p[0], y = p[1], z = p[2];
-    vb += 3 * sizeof(int16);
+float dequant(uint32 value, int num_bits) {
+  uint32 uscale = (1 << (num_bits-1)) - 1;
+  bool neg = is_bit_set(value, num_bits-1);
+  float f = clear_bit(value, num_bits-1) / (float)uscale;
+  return (neg ? -1 : 1) * f;
+}
 
-    *(XMFLOAT3 *)buf = XMFLOAT3(
-      mesh->center.x + mesh->extents.x * x/32767.0f,
-      mesh->center.y + mesh->extents.y * y/32767.0f,
-      mesh->center.z + mesh->extents.z * z/32767.0f);
-    buf += sizeof(XMFLOAT3);
+static void decompress_ib(BitReader *reader, int num_indices, int index_size, vector<char> *out) {
 
-    uint32 normal = *(uint32 *)vb;
-    XMFLOAT3 n;
-    bool neg_x = !!(normal & (1 << 31));
-    bool neg_y = !!(normal & (1 << 16));
-    bool neg_z = !!(normal & 1);
+  out->resize(num_indices * index_size);
 
-    n.x = (neg_x ? -1 : 1) * (((normal >> 17) & 0x3fff) / 16383.0f);
-    n.y = (neg_y ? -1 : 1) * (((normal >>  1) & 0x7fff) / 32767.0f);
-    n.z = (neg_z ? -1 : 1) * sqrtf(1 - n.x * n.x - n.y * n.y);
-    *(XMFLOAT3 *)buf = normalize(n);
-    buf += sizeof(XMFLOAT3);
-    vb += sizeof(uint32);
+  if (index_size == 2) {
+    uint16 *buf = (uint16 *)out->data();
+    int prev = reader->read_varint();
+    prev = zigzag_decode(prev);
+    *buf++ = prev;
+    for (int i = 1; i < num_indices; ++i) {
+      int delta = reader->read_varint();
+      delta = zigzag_decode(delta);
+      int cur = prev + delta;
+      *buf++ = cur;
+      prev = cur;
+    }
 
-    if (vb_flags & kTex0) {
-      *(XMFLOAT2 *)buf = *(XMFLOAT2 *)vb;
-      buf += sizeof(XMFLOAT2);
-      vb += sizeof(XMFLOAT2);
+  } else {
+    int32 *buf = (int32 *)out->data();
+    int prev = reader->read_varint();
+    prev = zigzag_decode(prev);
+    *buf++ = prev;
+    for (int i = 1; i < num_indices; ++i) {
+      int delta = reader->read_varint();
+      delta = zigzag_decode(delta);
+      int cur = prev + delta;
+      *buf++ = cur;
+      prev = cur;
     }
   }
 
+}
+
+static void decompress_vb(Mesh *mesh, BitReader *reader, int num_verts, int vertex_size, int vb_flags, vector<char> *out) {
+
+  out->resize(num_verts * vertex_size);
+  char *buf = out->data();
+
+  for (int i = 0; i < num_verts; ++i) {
+
+    float x = mesh->center.x + mesh->extents.x * dequant(reader->read(14), 14);
+    float y = mesh->center.y + mesh->extents.y * dequant(reader->read(14), 14);
+    float z = mesh->center.z + mesh->extents.z * dequant(reader->read(14), 14);
+    *(XMFLOAT3 *)buf = XMFLOAT3(x, y, z);
+    buf += sizeof(XMFLOAT3);
+
+    XMFLOAT3 n;
+    n.x = dequant(reader->read(11), 11);
+    n.y = dequant(reader->read(11), 11);
+    bool neg_z = !!reader->read(1);
+    n.z = (neg_z ? -1 : 1) * sqrtf(1 - n.x * n.x - n.y * n.y);
+    *(XMFLOAT3 *)buf = normalize(n);
+    buf += sizeof(XMFLOAT3);
+
+    if (vb_flags & kTex0) {
+      XMFLOAT2 t;
+      t.x = dequant(reader->read(11), 11);
+      t.y = dequant(reader->read(11), 11);
+      *(XMFLOAT2 *)buf = t;
+      buf += sizeof(XMFLOAT2);
+    }
+  }
 }
 
 bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
@@ -155,17 +198,30 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
 
       const int vb_flags = read_and_advance<int>(&buf);
       submesh->geometry.vertex_size = read_and_advance<int>(&buf);
-      submesh->geometry.index_format = index_size_to_format(read_and_advance<int>(&buf));
+      int index_size = read_and_advance<int>(&buf);
+      submesh->geometry.index_format = index_size_to_format(index_size);
+
+      int num_verts = read_and_advance<int>(&buf);
+      int num_indices = read_and_advance<int>(&buf);
+
       const int *vb = read_and_advance<const int*>(&buf);
       const int vb_size = *vb;
-      vector<char> decompressed;
-      decompress_vb(mesh, (const char *)(vb + 1), vb_size, vb_flags, submesh->geometry.vertex_size, &decompressed);
-      submesh->geometry.vertex_count = decompressed.size() / submesh->geometry.vertex_size;
-      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed.size(), decompressed.data());
+      vector<char> decompressed_vb;
+      BitReader vb_reader((const uint8 *)(vb + 1), vb_size * 8);
+      decompress_vb(mesh, &vb_reader, num_verts, submesh->geometry.vertex_size, vb_flags, &decompressed_vb);
+
+      submesh->geometry.vertex_count = num_verts;
+      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed_vb.size(), decompressed_vb.data());
+
+
       const int *ib = read_and_advance<const int*>(&buf);
       const int ib_size = *ib;
-      submesh->geometry.index_count = ib_size / index_format_to_size(submesh->geometry.index_format);
-      submesh->geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, ib_size, (const void *)(ib + 1));
+      vector<char> decompressed_ib;
+      BitReader ib_reader((const uint8 *)(ib + 1), ib_size * 8);
+      decompress_ib(&ib_reader, num_indices, index_size, &decompressed_ib);
+
+      submesh->geometry.index_count = num_indices;
+      submesh->geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, decompressed_ib.size(), decompressed_ib.data());
     }
   }
 

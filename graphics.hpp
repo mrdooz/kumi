@@ -175,6 +175,9 @@ public:
   void destroy_deferred_context(DeferredContext *ctx);
   void add_command_list(ID3D11CommandList *cmd_list);
 
+  bool vsync() const { return _vsync; }
+  void set_vsync(bool value) { _vsync = value; }
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
@@ -259,6 +262,8 @@ private:
 
   string _vs_profile;
   string _ps_profile;
+
+  bool _vsync;
 
 #if WITH_GWEN
   CComPtr<IFW1Factory> _fw1_factory;
