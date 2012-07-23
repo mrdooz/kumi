@@ -15,18 +15,6 @@
 #define FILE_VERSION 13
 
 #pragma pack(push, 1)
-struct MainHeader {
-  int version;
-  int global_ofs;
-  int material_ofs;
-  int mesh_ofs;
-  int light_ofs;
-  int camera_ofs;
-  int animation_ofs;
-  int binary_ofs;
-  int total_size;
-};
-
 namespace BlockId {
   enum Enum {
     kMaterials,
@@ -99,7 +87,7 @@ float dequant(uint32 value, int num_bits) {
   return (neg ? -1 : 1) * f;
 }
 
-static void decompress_ib(BitReader *reader, int num_indices, int index_size, vector<char> *out) {
+void KumiLoader::decompress_ib(BitReader *reader, int num_indices, int index_size, vector<char> *out) {
 
   out->resize(num_indices * index_size);
 
@@ -132,22 +120,26 @@ static void decompress_ib(BitReader *reader, int num_indices, int index_size, ve
 
 }
 
-static void decompress_vb(Mesh *mesh, BitReader *reader, int num_verts, int vertex_size, int vb_flags, vector<char> *out) {
+void KumiLoader::decompress_vb(Mesh *mesh, BitReader *reader, int num_verts, int vertex_size, int vb_flags, vector<char> *out) {
 
   out->resize(num_verts * vertex_size);
   char *buf = out->data();
 
+  int pos_bits = _header.position_bits;
+  int normal_bits = _header.normal_bits;
+  int tex_bits = _header.texcoord_bits;
+
   for (int i = 0; i < num_verts; ++i) {
 
-    float x = mesh->center.x + mesh->extents.x * dequant(reader->read(14), 14);
-    float y = mesh->center.y + mesh->extents.y * dequant(reader->read(14), 14);
-    float z = mesh->center.z + mesh->extents.z * dequant(reader->read(14), 14);
+    float x = mesh->center.x + mesh->extents.x * dequant(reader->read(pos_bits), pos_bits);
+    float y = mesh->center.y + mesh->extents.y * dequant(reader->read(pos_bits), pos_bits);
+    float z = mesh->center.z + mesh->extents.z * dequant(reader->read(pos_bits), pos_bits);
     *(XMFLOAT3 *)buf = XMFLOAT3(x, y, z);
     buf += sizeof(XMFLOAT3);
 
     XMFLOAT3 n;
-    n.x = dequant(reader->read(11), 11);
-    n.y = dequant(reader->read(11), 11);
+    n.x = dequant(reader->read(normal_bits), normal_bits);
+    n.y = dequant(reader->read(normal_bits), normal_bits);
     bool neg_z = !!reader->read(1);
     n.z = (neg_z ? -1 : 1) * sqrtf(1 - n.x * n.x - n.y * n.y);
     *(XMFLOAT3 *)buf = normalize(n);
@@ -155,8 +147,8 @@ static void decompress_vb(Mesh *mesh, BitReader *reader, int num_verts, int vert
 
     if (vb_flags & kTex0) {
       XMFLOAT2 t;
-      t.x = dequant(reader->read(11), 11);
-      t.y = dequant(reader->read(11), 11);
+      t.x = dequant(reader->read(tex_bits), tex_bits);
+      t.y = dequant(reader->read(tex_bits), tex_bits);
       *(XMFLOAT2 *)buf = t;
       buf += sizeof(XMFLOAT2);
     }
@@ -268,16 +260,24 @@ bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
   return true;
 }
 
-template<class T>
-void load_animation_inner(const char **buf, map<string, vector<KeyFrame<T>>> *out) {
-  const int count = read_and_advance<int>(&(*buf));
-  for (int i = 0; i < count; ++i) {
-    const char *node_name = read_and_advance<const char *>(&(*buf));
-    auto &keys = (*out)[node_name];
-    const int num_frames = read_and_advance<int>(&(*buf));
-    keys.resize(num_frames);
-    read_and_advance_raw(&(*buf), &keys[0], num_frames * sizeof(KeyFrame<T>));
-  }
+static XMFLOAT3 read_float3(BitReader *reader) {
+  uint32 x = reader->read(32);
+  uint32 y = reader->read(32);
+  uint32 z = reader->read(32);
+  return XMFLOAT3(*(float *)&x, *(float *)&y, *(float *)&z);
+}
+
+static XMFLOAT4 read_float4(BitReader *reader) {
+  uint32 x = reader->read(32);
+  uint32 y = reader->read(32);
+  uint32 z = reader->read(32);
+  uint32 w = reader->read(32);
+  return XMFLOAT4(*(float *)&x, *(float *)&y, *(float *)&z, *(float *)&w);
+}
+
+static float read_float(BitReader *reader) {
+  uint32 v = reader->read(32);
+  return *(float *)&v;
 }
 
 bool KumiLoader::load_animation(const char *buf, Scene *scene) {
@@ -285,9 +285,81 @@ bool KumiLoader::load_animation(const char *buf, Scene *scene) {
   BlockHeader *header = (BlockHeader *)buf;
   buf += sizeof(BlockHeader);
   const char *buf_end = buf + header->size;
+
+  int anim_bits = _header.animation_bits;
+
   while (buf < buf_end) {
+
     string node_name = read_and_advance<const char *>(&buf);
-    // pos
+    {
+      // pos
+      const int *frames = read_and_advance<const int*>(&buf);
+      const int frames_size = *frames;
+      BitReader reader((const uint8 *)(frames + 1), frames_size * 8);
+
+      if (int num_pos_keys = reader.read_varint()) {
+        XMFLOAT3 center = read_float3(&reader);
+        XMFLOAT3 extents = read_float3(&reader);
+
+        KeyFrameVec3 *keyframes = (KeyFrameVec3 *)ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimPos, num_pos_keys);
+        for (int i = 0; i < num_pos_keys; ++i) {
+          keyframes[i].time = read_float(&reader);
+
+          float x = center.x + extents.x * dequant(reader.read(anim_bits), anim_bits);
+          float y = center.y + extents.y * dequant(reader.read(anim_bits), anim_bits);
+          float z = center.z + extents.z * dequant(reader.read(anim_bits), anim_bits);
+          keyframes[i].value = XMFLOAT3(x, y, z);
+        }
+      }
+    }
+
+    {
+      // rot
+      const int *frames = read_and_advance<const int*>(&buf);
+      const int frames_size = *frames;
+      BitReader reader((const uint8 *)(frames + 1), frames_size * 8);
+
+      if (int num_rot_keys = reader.read_varint()) {
+        XMFLOAT4 center = read_float4(&reader);
+        XMFLOAT4 extents = read_float4(&reader);
+
+        KeyFrameVec4 *keyframes = (KeyFrameVec4 *)ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimRot, num_rot_keys);
+        for (int i = 0; i < num_rot_keys; ++i) {
+          keyframes[i].time = read_float(&reader);
+
+          float x = center.x + extents.x * dequant(reader.read(anim_bits), anim_bits);
+          float y = center.y + extents.y * dequant(reader.read(anim_bits), anim_bits);
+          float z = center.z + extents.z * dequant(reader.read(anim_bits), anim_bits);
+          float w = center.w + extents.w * dequant(reader.read(anim_bits), anim_bits);
+          keyframes[i].value = XMFLOAT4(x, y, z, w);
+        }
+      }
+    }
+
+    {
+      // scale
+      const int *frames = read_and_advance<const int*>(&buf);
+      const int frames_size = *frames;
+      BitReader reader((const uint8 *)(frames + 1), frames_size * 8);
+
+      if (int num_scale_keys = reader.read_varint()) {
+        XMFLOAT3 center = read_float3(&reader);
+        XMFLOAT3 extents = read_float3(&reader);
+
+        KeyFrameVec3 *keyframes = (KeyFrameVec3 *)ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimScale, num_scale_keys);
+        for (int i = 0; i < num_scale_keys; ++i) {
+          keyframes[i].time = read_float(&reader);
+
+          float x = center.x + extents.x * dequant(reader.read(anim_bits), anim_bits);
+          float y = center.y + extents.y * dequant(reader.read(anim_bits), anim_bits);
+          float z = center.z + extents.z * dequant(reader.read(anim_bits), anim_bits);
+          keyframes[i].value = XMFLOAT3(x, y, z);
+        }
+      }
+    }
+
+/*
+
     if (int num_pos_keys = read_and_advance<int>(&buf)) {
       auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimPos, num_pos_keys);
       read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_pos_keys);
@@ -304,6 +376,7 @@ bool KumiLoader::load_animation(const char *buf, Scene *scene) {
       auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimScale, num_scale_keys);
       read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_scale_keys);
     }
+*/
   }
 
   ANIMATION_MANAGER.on_loaded();
@@ -432,33 +505,32 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
     }
   }
 
-  MainHeader header;
-  if (!resource->load_inplace(filename, 0, sizeof(header), (void *)&header))
+  if (!resource->load_inplace(filename, 0, sizeof(_header), (void *)&_header))
     return false;
-  if (header.version != FILE_VERSION) {
-    LOG_ERROR_LN("Incompatible kumi file version: want: %d, got: %d", FILE_VERSION, header.version);
+  if (_header.version != FILE_VERSION) {
+    LOG_ERROR_LN("Incompatible kumi file version: want: %d, got: %d", FILE_VERSION, _header.version);
     return false;
   }
 
-  const int scene_data_size = header.binary_ofs;
+  const int scene_data_size = _header.binary_ofs;
   vector<char> scene_data;
   B_ERR_BOOL(resource->load_partial(filename, 0, scene_data_size, &scene_data));
 
-  const int buffer_data_size = header.total_size - header.binary_ofs;
+  const int buffer_data_size = _header.total_size - _header.binary_ofs;
   vector<char> buffer_data;
-  B_ERR_BOOL(resource->load_partial(filename, header.binary_ofs, buffer_data_size, &buffer_data));
+  B_ERR_BOOL(resource->load_partial(filename, _header.binary_ofs, buffer_data_size, &buffer_data));
 
   // apply the binary fixup
   apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);
 
   Scene *s = *scene = new Scene;
 
-  B_ERR_BOOL(load_globals(&scene_data[0] + header.global_ofs, s));
-  B_ERR_BOOL(load_materials(&scene_data[0] + header.material_ofs, s));
-  B_ERR_BOOL(load_meshes(&scene_data[0] + header.mesh_ofs, s));
-  B_ERR_BOOL(load_cameras(&scene_data[0] + header.camera_ofs, s));
-  B_ERR_BOOL(load_lights(&scene_data[0] + header.light_ofs, s));
-  B_ERR_BOOL(load_animation(&scene_data[0] + header.animation_ofs, s));
+  B_ERR_BOOL(load_globals(&scene_data[0] + _header.global_ofs, s));
+  B_ERR_BOOL(load_materials(&scene_data[0] + _header.material_ofs, s));
+  B_ERR_BOOL(load_meshes(&scene_data[0] + _header.mesh_ofs, s));
+  B_ERR_BOOL(load_cameras(&scene_data[0] + _header.camera_ofs, s));
+  B_ERR_BOOL(load_lights(&scene_data[0] + _header.light_ofs, s));
+  B_ERR_BOOL(load_animation(&scene_data[0] + _header.animation_ofs, s));
 
   B_ERR_BOOL(s->on_loaded());
 

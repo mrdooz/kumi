@@ -1,6 +1,20 @@
 #pragma once
 #include "scene.hpp"
 
+#pragma pack(push, 1)
+template <typename T>
+struct KeyFrame {
+  double time;
+  T value;
+};
+
+typedef KeyFrame<float> KeyFrameFloat;
+typedef KeyFrame<XMFLOAT3> KeyFrameVec3;
+typedef KeyFrame<XMFLOAT4> KeyFrameVec4;
+typedef KeyFrame<XMFLOAT4X4> KeyFrameMatrix;
+
+#pragma pack(pop)
+
 class AnimationManager {
 public:
 
@@ -47,8 +61,7 @@ private:
 
   AnimationManager();
 
-  template<class T> void update_inner(double time, 
-    std::vector<KeyFrameCache<T> *> *keyframes);
+  template<class T> void update_inner(double time, std::vector<KeyFrameCache<T> *> *keyframes);
 
   std::vector<KeyFrameCacheVec3 *> _vec3_keyframes;
   std::vector<KeyFrameCacheVec4 *> _vec4_keyframes;

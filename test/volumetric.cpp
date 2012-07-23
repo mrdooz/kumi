@@ -57,7 +57,7 @@ bool VolumetricEffect::init() {
 
   return true;
 }
-
+/*
 static XMFLOAT4X4 mtx_at_time(const vector<KeyFrameMatrix> &frames, double time) {
   for (int i = 0; i < (int)frames.size() - 1; ++i) {
     if (time >= frames[i+0].time && time < frames[i+1].time) {
@@ -66,7 +66,7 @@ static XMFLOAT4X4 mtx_at_time(const vector<KeyFrameMatrix> &frames, double time)
   }
   return frames.back().value;
 }
-
+*/
 bool VolumetricEffect::update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
 #if 0
   if (_scene && !_scene->cameras.empty()) {

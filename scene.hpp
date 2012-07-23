@@ -29,20 +29,6 @@ struct Light {
   float far_attenuation_end;
 };
 
-#pragma pack(push, 1)
-template <typename T>
-struct KeyFrame {
-  double time;
-  T value;
-};
-
-typedef KeyFrame<float> KeyFrameFloat;
-typedef KeyFrame<XMFLOAT3> KeyFrameVec3;
-typedef KeyFrame<XMFLOAT4> KeyFrameQuat;
-typedef KeyFrame<XMFLOAT4X4> KeyFrameMatrix;
-
-#pragma pack(pop)
-
 struct Scene {
 
   Scene();
@@ -63,9 +49,6 @@ struct Scene {
   std::vector<Camera *> cameras;
   std::vector<Light *> lights;
   std::vector<Material *> materials;
-  //std::map<std::string, std::vector<KeyFrameFloat>> animation_float;
-  //std::map<std::string, std::vector<KeyFrameVec3>> animation_vec3;
-  //std::map<std::string, std::vector<KeyFrameMatrix>> animation_mtx;
 
   std::map<GraphicsObjectHandle, std::vector<SubMesh*>> _submesh_by_material;
 };
