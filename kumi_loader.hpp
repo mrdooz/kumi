@@ -37,6 +37,8 @@ private:
   bool load_lights(const char *buf, Scene *scene);
   bool load_materials(const char *buf, Scene *scene);
   bool load_animation(const char *buf, Scene *scene);
+  bool load_animation2(const char *buf, Scene *scene);
+  bool load_animation3(const char *buf, Scene *scene);
   std::unordered_map<std::string, GraphicsObjectHandle> _material_name_to_id;
   std::unordered_map<std::string, std::string> _technique_for_material;
 

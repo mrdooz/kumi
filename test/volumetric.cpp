@@ -17,6 +17,7 @@ VolumetricEffect::VolumetricEffect(GraphicsObjectHandle context, const std::stri
 
 bool VolumetricEffect::init() {
 
+#if 0
   LOG_VERBOSE_LN(__FUNCTION__);
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/volumetric.tec", true));
@@ -26,7 +27,7 @@ bool VolumetricEffect::init() {
   loader.load("meshes\\torus.kumi", nullptr, &RESOURCE_MANAGER, &_scene);
 
   for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-    XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->obj_to_world));
+    XMMATRIX mtx = XMMatrixTranspose(XMLoadFloat4x4(&_scene->meshes[i]->_obj_to_world));
     XMFLOAT4X4 tmp;
     XMStoreFloat4x4(&tmp, mtx);
     //PROPERTY_MANAGER.set_mesh_property(_scene->meshes[i], "world", tmp);
@@ -54,7 +55,7 @@ bool VolumetricEffect::init() {
   //_occluder_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_occluder");
   //_shaft_rt = g.create_render_target(FROM_HERE, w, h, true, "volumetric_shaft");
   B_ERR_BOOL(_occluder_rt.is_valid() && _shaft_rt.is_valid());
-
+#endif
   return true;
 }
 /*

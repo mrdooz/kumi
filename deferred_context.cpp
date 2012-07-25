@@ -159,8 +159,8 @@ void DeferredContext::render_scene(Scene *scene, GraphicsObjectHandle technique_
 
     for (auto jt = begin(it->second); jt != end(it->second); ++jt) {
       SubMesh *submesh = *jt;
-      const MeshGeometry *geometry = &submesh->geometry;
-      Mesh *mesh = submesh->mesh;
+      const MeshGeometry *geometry = submesh->geometry();
+      Mesh *mesh = submesh->mesh();
 
       set_vb(geometry->vb, geometry->vertex_size);
       set_ib(geometry->ib, geometry->index_format);
@@ -187,11 +187,12 @@ void DeferredContext::render_mesh(Mesh *mesh, GraphicsObjectHandle technique_han
   set_dss(technique->depth_stencil_state(), _default_stencil_ref);
   set_bs(technique->blend_state(), _default_blend_factors, _default_sample_mask);
 
-  for (size_t i = 0; i < mesh->submeshes.size(); ++i) {
-    SubMesh *submesh = mesh->submeshes[i];
+  auto &submeshes = mesh->submeshes();
+  for (size_t i = 0; i < submeshes.size(); ++i) {
+    SubMesh *submesh = submeshes[i];
 
-    const MeshGeometry *geometry = &submesh->geometry;
-    const Material *material = MATERIAL_MANAGER.get_material(submesh->material_id);
+    const MeshGeometry *geometry = submesh->geometry();
+    const Material *material = MATERIAL_MANAGER.get_material(submesh->material_id());
 
     // get the shader for the current technique, based on the flags used by the material
     int flags = material->flags();

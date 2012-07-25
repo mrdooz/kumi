@@ -4,9 +4,10 @@
 #include "technique.hpp"
 #include "material_manager.hpp"
 #include "logger.hpp"
+#include "animation_manager.hpp"
 
 SubMesh::SubMesh(Mesh *mesh) 
-  : mesh(mesh)
+  : _mesh(mesh)
 {
   _render_key.cmd = RenderKey::kRenderMesh;
 }
@@ -15,9 +16,9 @@ SubMesh::~SubMesh() {
 }
 
 void SubMesh::fill_renderdata(MeshRenderData *render_data) const {
-  render_data->geometry = &geometry;
-  render_data->material = material_id;
-  render_data->mesh = mesh;
+  render_data->geometry = &_geometry;
+  render_data->material = _material_id;
+  render_data->mesh = _mesh;
 #if _DEBUG
   render_data->submesh = this;
 #endif
@@ -33,22 +34,43 @@ void SubMesh::update() {
   }
 }
 
+Mesh::Mesh(const std::string &name) 
+  : _name(name)
+  , _is_static(true)
+  , _anim_id(~0)
+  , _world_mtx_class(~0)
+{
+}
+
 void Mesh::on_loaded() {
   _world_mtx_class = PROPERTY_MANAGER.get_or_create<int>("Mesh::world");
-  _world_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world", this);
-  _world_it_mtx_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("world_it", this);
-  _anim_id = PROPERTY_MANAGER.get_id(name + "::Anim");
+  if (!_is_static) {
+    _anim_id = PROPERTY_MANAGER.get_id(_name + "::Anim");
+  }
 }
 
 void Mesh::update() {
-  for (auto i = begin(submeshes), e = end(submeshes); i != e; ++i)
+
+  if (!_is_static) {
+    uint32 flags;
+    PosRotScale prs;
+    ANIMATION_MANAGER.get_xform(_anim_id, &flags, &prs);
+    _obj_to_world = compose_transform(
+      flags & AnimationManager::kAnimPos ? prs.pos : _pos,
+      flags & AnimationManager::kAnimRot ? prs.rot : _rot,
+      flags & AnimationManager::kAnimScale ? prs.scale : _scale,
+      true);
+  }
+
+  for (auto i = begin(_submeshes), e = end(_submeshes); i != e; ++i)
     (*i)->update();
 }
 
 void Mesh::fill_cbuffer(CBuffer *cbuffer) const {
   for (size_t i = 0; i < cbuffer->vars.size(); ++i) {
     auto &cur = cbuffer->vars[i];
-    if (cur.id == _world_mtx_class)
-      PROPERTY_MANAGER.get_property_raw(_world_mtx_id, &cbuffer->staging[cur.ofs], cur.len);
+    if (cur.id == _world_mtx_class) {
+      memcpy(&cbuffer->staging[cur.ofs], (void *)&_obj_to_world, cur.len);
+    }
   }
 }

@@ -51,10 +51,6 @@ bool ScenePlayer::file_changed(const char *filename, void *token) {
   KumiLoader loader;
   if (!loader.load(filename, &RESOURCE_MANAGER, &_scene))
     return false;
-
-  for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-    PROPERTY_MANAGER.set_property(_scene->meshes[i]->_world_mtx_id, transpose(_scene->meshes[i]->obj_to_world));
-  }
 */
   return true;
 }
@@ -216,8 +212,14 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
   } else {
     Camera *camera = _scene->cameras[0];
 
-    XMFLOAT3 pos = ANIMATION_MANAGER.get_pos(camera->pos_id);
-    XMFLOAT3 target = ANIMATION_MANAGER.get_pos(camera->target_pos_id);
+    XMFLOAT3 pos, target;
+    if (!camera->is_static) {
+      pos = ANIMATION_MANAGER.get_pos(camera->pos_id);
+      target = ANIMATION_MANAGER.get_pos(camera->target_pos_id);
+    } else {
+      pos = camera->pos;
+      target = camera->target;
+    }
     // value_at_time(_scene->animation_vec3[camera->name + ".Target"], time);
 
     XMMATRIX xlookat = XMMatrixTranspose(XMMatrixLookAtLH(
@@ -249,11 +251,6 @@ bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequ
   ANIMATION_MANAGER.update(time);
 
   _scene->update();
-
-  for (size_t i = 0; i < _scene->meshes.size(); ++i) {
-    Mesh *mesh = _scene->meshes[i];
-    PROPERTY_MANAGER.set_property(mesh->_world_mtx_id, ANIMATION_MANAGER.get_xform(mesh->anim_id(), true));
-  }
 
   calc_camera_matrices(time, (double)delta / 1000000.0, &_view, &_proj);
 

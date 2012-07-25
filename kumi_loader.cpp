@@ -131,9 +131,9 @@ void KumiLoader::decompress_vb(Mesh *mesh, BitReader *reader, int num_verts, int
 
   for (int i = 0; i < num_verts; ++i) {
 
-    float x = mesh->center.x + mesh->extents.x * dequant(reader->read(pos_bits), pos_bits);
-    float y = mesh->center.y + mesh->extents.y * dequant(reader->read(pos_bits), pos_bits);
-    float z = mesh->center.z + mesh->extents.z * dequant(reader->read(pos_bits), pos_bits);
+    float x = mesh->_center.x + mesh->_extents.x * dequant(reader->read(pos_bits), pos_bits);
+    float y = mesh->_center.y + mesh->_extents.y * dequant(reader->read(pos_bits), pos_bits);
+    float z = mesh->_center.z + mesh->_extents.z * dequant(reader->read(pos_bits), pos_bits);
     *(XMFLOAT3 *)buf = XMFLOAT3(x, y, z);
     buf += sizeof(XMFLOAT3);
 
@@ -163,35 +163,41 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
   for (int i = 0; i < mesh_count; ++i) {
 
     Mesh *mesh = new Mesh(read_and_advance<const char *>(&buf));
-    mesh->obj_to_world = read_and_advance<XMFLOAT4X4>(&buf);
-    mesh->center = read_and_advance<XMFLOAT3>(&buf);
-    mesh->extents = read_and_advance<XMFLOAT3>(&buf);
+    mesh->_pos = read_and_advance<XMFLOAT3>(&buf);
+    mesh->_rot = read_and_advance<XMFLOAT4>(&buf);
+    mesh->_scale = read_and_advance<XMFLOAT3>(&buf);
+    mesh->_obj_to_world = compose_transform(mesh->_pos, mesh->_rot, mesh->_scale, true);
+
+    mesh->_center = read_and_advance<XMFLOAT3>(&buf);
+    mesh->_extents = read_and_advance<XMFLOAT3>(&buf);
+    mesh->_is_static = read_and_advance<bool>(&buf);
 
     scene->meshes.push_back(mesh);
     const int sub_meshes = read_and_advance<int>(&buf);
 
     for (int j = 0; j < sub_meshes; ++j) {
       SubMesh *submesh = new SubMesh(mesh);
-      submesh->name = read_and_advance<const char *>(&buf);
+      submesh->_name = read_and_advance<const char *>(&buf);
       const char *material_name = read_and_advance<const char *>(&buf);
-      mesh->submeshes.push_back(submesh);
+      mesh->_submeshes.push_back(submesh);
       // check if we have a material/technique override
-      auto it = _material_overrides.find(submesh->name);
+      auto it = _material_overrides.find(submesh->name());
       if (it != end(_material_overrides)) {
         auto &technique = it->second.first;
         auto &material = it->second.second;
-        submesh->material_id = _material_name_to_id[material];
+        submesh->_material_id = _material_name_to_id[material];
         //submesh->render_data.cur_technique = GRAPHICS.find_technique(technique.c_str());
       } else {
         // set the default technique for the material
-        submesh->material_id = _material_name_to_id[material_name];
+        submesh->_material_id = _material_name_to_id[material_name];
         //submesh->render_data.cur_technique = GRAPHICS.find_technique(_technique_for_material[material_name].c_str());
       }
 
       const int vb_flags = read_and_advance<int>(&buf);
-      submesh->geometry.vertex_size = read_and_advance<int>(&buf);
+      int vertex_size = read_and_advance<int>(&buf);
+      submesh->_geometry.vertex_size = vertex_size;
       int index_size = read_and_advance<int>(&buf);
-      submesh->geometry.index_format = index_size_to_format(index_size);
+      submesh->_geometry.index_format = index_size_to_format(index_size);
 
       int num_verts = read_and_advance<int>(&buf);
       int num_indices = read_and_advance<int>(&buf);
@@ -200,10 +206,10 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
       const int vb_size = *vb;
       vector<char> decompressed_vb;
       BitReader vb_reader((const uint8 *)(vb + 1), vb_size * 8);
-      decompress_vb(mesh, &vb_reader, num_verts, submesh->geometry.vertex_size, vb_flags, &decompressed_vb);
+      decompress_vb(mesh, &vb_reader, num_verts, vertex_size, vb_flags, &decompressed_vb);
 
-      submesh->geometry.vertex_count = num_verts;
-      submesh->geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed_vb.size(), decompressed_vb.data());
+      submesh->_geometry.vertex_count = num_verts;
+      submesh->_geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed_vb.size(), decompressed_vb.data());
 
 
       const int *ib = read_and_advance<const int*>(&buf);
@@ -212,8 +218,8 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
       BitReader ib_reader((const uint8 *)(ib + 1), ib_size * 8);
       decompress_ib(&ib_reader, num_indices, index_size, &decompressed_ib);
 
-      submesh->geometry.index_count = num_indices;
-      submesh->geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, decompressed_ib.size(), decompressed_ib.data());
+      submesh->_geometry.index_count = num_indices;
+      submesh->_geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, decompressed_ib.size(), decompressed_ib.data());
     }
   }
 
@@ -235,6 +241,7 @@ bool KumiLoader::load_lights(const char *buf, Scene *scene) {
     light->use_far_attenuation = read_and_advance<bool>(&buf);
     light->far_attenuation_start = read_and_advance<float>(&buf);
     light->far_attenuation_end = read_and_advance<float>(&buf);
+    light->is_static = read_and_advance<bool>(&buf);
   }
   return true;
 }
@@ -256,6 +263,7 @@ bool KumiLoader::load_cameras(const char *buf, Scene *scene) {
     camera->fov_y = XMConvertToRadians(read_and_advance<float>(&buf));
     camera->near_plane = read_and_advance<float>(&buf);
     camera->far_plane = read_and_advance<float>(&buf);
+    camera->is_static = read_and_advance<bool>(&buf);
   }
   return true;
 }
@@ -357,26 +365,72 @@ bool KumiLoader::load_animation(const char *buf, Scene *scene) {
         }
       }
     }
+  }
 
-/*
+  ANIMATION_MANAGER.on_loaded();
+
+  return true;
+}
+
+bool KumiLoader::load_animation2(const char *buf, Scene *scene) {
+
+  BlockHeader *header = (BlockHeader *)buf;
+  buf += sizeof(BlockHeader);
+  const char *buf_end = buf + header->size;
+
+  int anim_bits = _header.animation_bits;
+
+  while (buf < buf_end) {
+
+    string node_name = read_and_advance<const char *>(&buf);
+
+    if (int num_control_pts = read_and_advance<int>(&buf)) {
+      auto control_pts = ANIMATION_MANAGER.alloc_anim2(node_name, AnimationManager::kAnimPos, num_control_pts);
+      read_and_advance_raw(&buf, control_pts, num_control_pts * sizeof(XMFLOAT3));
+    }
+
+    if (int num_control_pts = read_and_advance<int>(&buf)) {
+      auto control_pts = ANIMATION_MANAGER.alloc_anim2(node_name, AnimationManager::kAnimRot, num_control_pts);
+      read_and_advance_raw(&buf, control_pts, num_control_pts * sizeof(XMFLOAT4));
+    }
+
+    if (int num_control_pts = read_and_advance<int>(&buf)) {
+      auto control_pts = ANIMATION_MANAGER.alloc_anim2(node_name, AnimationManager::kAnimScale, num_control_pts);
+      read_and_advance_raw(&buf, control_pts, num_control_pts * sizeof(XMFLOAT3));
+    }
+  }
+
+  ANIMATION_MANAGER.on_loaded();
+
+  return true;
+}
+
+bool KumiLoader::load_animation3(const char *buf, Scene *scene) {
+
+  BlockHeader *header = (BlockHeader *)buf;
+  buf += sizeof(BlockHeader);
+  const char *buf_end = buf + header->size;
+
+  int anim_bits = _header.animation_bits;
+
+  while (buf < buf_end) {
+
+    string node_name = read_and_advance<const char *>(&buf);
 
     if (int num_pos_keys = read_and_advance<int>(&buf)) {
-      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimPos, num_pos_keys);
-      read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_pos_keys);
+      auto *keyframes = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimPos, num_pos_keys);
+      read_and_advance_raw(&buf, keyframes, num_pos_keys * sizeof(KeyFrameVec3));
     }
 
-    // rot
     if (int num_rot_keys = read_and_advance<int>(&buf)) {
-      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimRot, num_rot_keys);
-      read_and_advance_raw(&buf, p, sizeof(KeyFrameQuat) * num_rot_keys);
+      auto *keyframes = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimRot, num_rot_keys);
+      read_and_advance_raw(&buf, keyframes, num_rot_keys * sizeof(KeyFrameVec4));
     }
 
-    // scale
     if (int num_scale_keys = read_and_advance<int>(&buf)) {
-      auto *p = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimScale, num_scale_keys);
-      read_and_advance_raw(&buf, p, sizeof(KeyFrameVec3) * num_scale_keys);
+      auto *keyframes = ANIMATION_MANAGER.alloc_anim(node_name, AnimationManager::kAnimScale, num_scale_keys);
+      read_and_advance_raw(&buf, keyframes, num_scale_keys * sizeof(KeyFrameVec3));
     }
-*/
   }
 
   ANIMATION_MANAGER.on_loaded();
@@ -530,7 +584,7 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
   B_ERR_BOOL(load_meshes(&scene_data[0] + _header.mesh_ofs, s));
   B_ERR_BOOL(load_cameras(&scene_data[0] + _header.camera_ofs, s));
   B_ERR_BOOL(load_lights(&scene_data[0] + _header.light_ofs, s));
-  B_ERR_BOOL(load_animation(&scene_data[0] + _header.animation_ofs, s));
+  B_ERR_BOOL(load_animation3(&scene_data[0] + _header.animation_ofs, s));
 
   B_ERR_BOOL(s->on_loaded());
 

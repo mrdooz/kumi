@@ -15,6 +15,7 @@ struct Camera {
   float aspect_ratio;
   float fov_x, fov_y;
   float near_plane, far_plane;
+  bool is_static;
 };
 
 struct Light {
@@ -27,6 +28,7 @@ struct Light {
   bool use_far_attenuation; 
   float far_attenuation_start;
   float far_attenuation_end;
+  bool is_static;
 };
 
 struct Scene {

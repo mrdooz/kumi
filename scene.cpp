@@ -21,18 +21,21 @@ bool Scene::on_loaded() {
   for (auto it = begin(meshes), e = end(meshes); it != e; ++it) {
     Mesh *mesh = *it;
     mesh->on_loaded();
-    _meshes_by_name[mesh->name] = mesh;
+    _meshes_by_name[mesh->name()] = mesh;
   }
 
   for (size_t i = 0; i < cameras.size(); ++i) {
     auto *camera = cameras[i];
-    camera->pos_id = PROPERTY_MANAGER.get_id(camera->name + "::Anim");
-    camera->target_pos_id = PROPERTY_MANAGER.get_id(camera->name + ".Target::Anim");
+    if (!camera->is_static) {
+      camera->pos_id = PROPERTY_MANAGER.get_id(camera->name + "::Anim");
+      camera->target_pos_id = PROPERTY_MANAGER.get_id(camera->name + ".Target::Anim");
+    }
   }
 
   for (size_t i = 0; i < lights.size(); ++i) {
     auto *light = lights[i];
-    light->pos_id = PROPERTY_MANAGER.get_id(light->name + "::Anim");
+    if (!light->is_static)
+      light->pos_id = PROPERTY_MANAGER.get_id(light->name + "::Anim");
   }
 
   sort_by_material();
@@ -48,9 +51,10 @@ void Scene::update() {
 void Scene::sort_by_material() {
 
   for (size_t i = 0; i < meshes.size(); ++i) {
-    for (size_t j = 0; j < meshes[i]->submeshes.size(); ++j) {
-      auto &submesh = meshes[i]->submeshes[j];
-      _submesh_by_material[submesh->material_id].push_back(submesh);
+    auto &submeshes = meshes[i]->submeshes();
+    for (size_t j = 0; j < submeshes.size(); ++j) {
+      auto &submesh = submeshes[j];
+      _submesh_by_material[submesh->material_id()].push_back(submesh);
     }
   }
 }
