@@ -16,7 +16,8 @@ public:
   enum { Size = N };
 
   IdBufferBase(const Deleter &deleter) : _deleter(deleter) {
-    ZeroMemory(&_buffer, sizeof(_buffer));
+    for (int i = 0; i < Size; ++i)
+      Traits::get(_buffer[i]) = 0;
   }
 
   virtual ~IdBufferBase() {
@@ -28,7 +29,6 @@ public:
       }
     }
 
-    ZeroMemory(&_buffer, sizeof(_buffer));
     while (!reclaimed_indices.empty())
       reclaimed_indices.pop();
   }
@@ -70,7 +70,8 @@ public:
 
 protected:
   Deleter _deleter;
-  E _buffer[N];
+  std::array<E, N> _buffer;
+  //E _buffer[N];
   stack<int> reclaimed_indices;
 };
 
@@ -131,8 +132,8 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N>
     return idx == -1 ? def : Traits::get(_buffer[idx]);
   }
 
-  std::unordered_map<typename Traits::Key, int> _key_to_idx;
-  std::unordered_map<int, typename Traits::Key> _idx_to_key;
+  std::map<typename Traits::Key, int> _key_to_idx;
+  std::map<int, typename Traits::Key> _idx_to_key;
 };
 
 template<typename T, int N>

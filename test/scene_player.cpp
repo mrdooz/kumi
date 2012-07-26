@@ -36,6 +36,7 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
   , _mouse_lbutton(false)
   , _mouse_rbutton(false)
   , _mouse_pos_prev(~0)
+  , _ctx(nullptr)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }

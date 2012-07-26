@@ -331,14 +331,13 @@ void FileWatcher::remove_watch(const CbFileChanged &fn) {
 }
 
 bool FileWatcher::close() {
-  if (!_instance)
-    return false;
+  if (_instance) {
+    if (_instance->_thread) {
+      _instance->_thread->join();
+      delete exch_null(_instance->_thread);
+    }
 
-  if (_instance->_thread) {
-    _instance->_thread->join();
-    delete exch_null(_instance->_thread);
+    delete exch_null(_instance);
   }
-
-  delete exch_null(_instance);
   return true;
 }

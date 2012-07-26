@@ -42,6 +42,10 @@ Mesh::Mesh(const std::string &name)
 {
 }
 
+Mesh::~Mesh() {
+  seq_delete(&_submeshes);
+}
+
 void Mesh::on_loaded() {
   _world_mtx_class = PROPERTY_MANAGER.get_or_create<int>("Mesh::world");
   if (!_is_static) {

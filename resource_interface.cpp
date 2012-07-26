@@ -20,7 +20,6 @@ bool ResourceInterface::create() {
 }
 
 bool ResourceInterface::close() {
-  KASSERT(g_instance);
   delete exch_null(g_instance);
   return true;
 }

@@ -2,6 +2,7 @@
 #include "scene.hpp"
 #include "graphics.hpp"
 #include "mesh.hpp"
+#include "material.hpp"
 #include "animation_manager.hpp"
 
 Scene::Scene() {
@@ -10,6 +11,8 @@ Scene::Scene() {
 Scene::~Scene() {
   seq_delete(&meshes);
   seq_delete(&cameras);
+  seq_delete(&lights);
+  //seq_delete(&materials);
 }
 
 Mesh *Scene::find_mesh_by_name(const std::string &name) {

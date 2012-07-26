@@ -24,6 +24,7 @@ public:
 private:
 
   ProfileManager();
+  ~ProfileManager();
 
   struct TimelineEvent {
     TimelineEvent(const char *name, LARGE_INTEGER start, int cur_level, int parent) 

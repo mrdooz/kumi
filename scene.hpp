@@ -50,6 +50,8 @@ struct Scene {
   std::vector<Mesh *> meshes;
   std::vector<Camera *> cameras;
   std::vector<Light *> lights;
+
+  // TODO: move this to material mgr
   std::vector<Material *> materials;
 
   std::map<GraphicsObjectHandle, std::vector<SubMesh*>> _submesh_by_material;

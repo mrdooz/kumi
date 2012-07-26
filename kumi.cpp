@@ -84,10 +84,25 @@ static bool global_close() {
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line, int cmd_show)
 {
+#ifdef _DEBUG
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+  _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_DEBUG);
+  _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
+  _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
+#endif
+
+  struct Tjong {
+    pair<string, int> buf[1000];
+  };
+
+  auto a = new Tjong();
+  delete a;
+  string str;
+
+  //return 0;
 
   if (!global_init())
     return 1;
-
 
   int res = 0;
 

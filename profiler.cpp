@@ -12,6 +12,10 @@ ProfileManager::ProfileManager() {
   QueryPerformanceFrequency(&_frequency);
 }
 
+ProfileManager::~ProfileManager() {
+  assoc_delete(&_timeline);
+}
+
 ProfileManager &ProfileManager::instance() {
   KASSERT(_instance);
   return *_instance;
@@ -24,7 +28,6 @@ bool ProfileManager::create() {
 }
 
 bool ProfileManager::close() {
-  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }

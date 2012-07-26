@@ -15,8 +15,7 @@ bool MaterialManager::create() {
 }
 
 bool MaterialManager::close() {
-  KASSERT(_instance);
-  SAFE_DELETE(_instance);
+  delete exch_null(_instance);
   return true;
 }
 

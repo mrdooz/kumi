@@ -361,9 +361,10 @@ bool WebSocketServer::create() {
 }
 
 bool WebSocketServer::close() {
-  KASSERT(_instance);
-  _instance->_thread.stop();
-  delete exch_null(_instance);
+  if (_instance) {
+    _instance->_thread.stop();
+    delete exch_null(_instance);
+  }
   return true;
 }
 

@@ -49,7 +49,7 @@ namespace
   static const int cEffectDataSize = 1024 * 1024;
 }
 
-Graphics* Graphics::_instance = NULL;
+Graphics* Graphics::_instance;
 
 Graphics::Graphics()
   : _width(-1)
@@ -79,10 +79,6 @@ Graphics::Graphics()
   , _font_wrappers(release_obj<IFW1FontWrapper *>)
 #endif
   , _vsync(false)
-{
-}
-
-Graphics::~Graphics()
 {
 }
 
@@ -519,7 +515,6 @@ void Graphics::set_default_render_target()
 }
 
 bool Graphics::close() {
-  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }
@@ -933,7 +928,10 @@ void Graphics::fill_system_resource_views(const ResourceViewArray &views, Textur
 }
 
 void Graphics::destroy_deferred_context(DeferredContext *ctx) {
-  ctx->_ctx->Release();
+  if (ctx) {
+    ctx->_ctx->Release();
+    delete exch_null(ctx);
+  }
 }
 
 DeferredContext *Graphics::create_deferred_context() {

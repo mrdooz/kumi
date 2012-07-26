@@ -52,11 +52,16 @@ private:
   template<typename T>
   struct KeyFrameCache {
     KeyFrameCache(int frames) : cur(T()), prev_time(-1), num_frames(frames), prev_frame(-1), keyframes(new KeyFrame<T>[frames]) {}
+    ~KeyFrameCache() {
+      delete [] keyframes;
+    }
     T cur;
     double prev_time;
     int num_frames;
     int prev_frame;
     KeyFrame<T> *keyframes;
+    KeyFrameCache(const KeyFrameCache &);
+    void operator=(const KeyFrameCache &);
   };
 
   template<typename T>
@@ -89,6 +94,7 @@ private:
   };
 
   AnimationManager();
+  ~AnimationManager();
 
   template<class T> void update_inner(double time, std::vector<KeyFrameCache<T> *> *keyframes);
 
@@ -98,7 +104,8 @@ private:
   std::vector<SplineCacheVec3 *> _vec3_splines;
   std::vector<SplineCacheVec4 *> _vec4_splines;
 
-  std::vector<AnimData *> _anim_data;
+  // TODO: make this indepenedent of property mgr
+  std::vector<AnimData *> _anim_data;   // note, we don't own these pointers!
   std::set<PropertyId> _anim_data_id;
 };
 

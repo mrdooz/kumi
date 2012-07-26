@@ -38,6 +38,7 @@ class Mesh {
   friend class KumiLoader;
 public:
   Mesh(const std::string &name);
+  ~Mesh();
   void update();
   void on_loaded();
 

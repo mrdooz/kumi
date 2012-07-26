@@ -16,7 +16,6 @@ bool PropertyManager::create() {
 }
 
 bool PropertyManager::close() {
-  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }

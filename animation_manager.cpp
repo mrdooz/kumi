@@ -109,13 +109,26 @@ bool AnimationManager::create() {
 }
 
 bool AnimationManager::close() {
-  KASSERT(_instance);
   delete exch_null(_instance);
   return true;
 }
 
 AnimationManager::AnimationManager() {
 
+}
+
+AnimationManager::~AnimationManager() {
+
+  for (size_t i = 0; i < _anim_data.size(); ++i) {
+    AnimData *cur = _anim_data[i];
+    delete exch_null(cur->pos);
+    delete exch_null(cur->rot);
+    delete exch_null(cur->scale);
+
+    delete exch_null(cur->pos_spline);
+    delete exch_null(cur->rot_spline);
+    delete exch_null(cur->scale_spline);
+  }
 }
 
 AnimationManager &AnimationManager::instance() {

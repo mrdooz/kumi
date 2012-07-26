@@ -182,7 +182,6 @@ private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
   Graphics();
-  ~Graphics();
 
   void set_default_render_target();
 
