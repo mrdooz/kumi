@@ -106,7 +106,7 @@ bool ScenePlayer::init() {
   _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);
   PROPERTY_MANAGER.set_property_raw(_ambient_id, &_scene->ambient.x, sizeof(XMFLOAT4));
 
-  _ctx = GRAPHICS.create_deferred_context();
+  _ctx = GRAPHICS.create_deferred_context(true);
 
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
@@ -302,9 +302,9 @@ bool ScenePlayer::render() {
       return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, depth, fmt, false, name);
     };
 
-    GraphicsObjectHandle rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
+    auto rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
     GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
-    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_diffuse");
+    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
     GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
 
     GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");

@@ -82,6 +82,12 @@ public:
     ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> view;
   };
 
+  struct StructuredBuffer {
+    ResourceAndDesc<ID3D11Buffer, D3D11_BUFFER_DESC> buffer;
+    ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> srv;
+    ResourceAndDesc<ID3D11UnorderedAccessView, D3D11_UNORDERED_ACCESS_VIEW_DESC> uav;
+  };
+
   static bool create();
   inline static Graphics& instance() {
     KASSERT(_instance);
@@ -127,6 +133,7 @@ public:
   void release_temp_render_target(GraphicsObjectHandle h);
 
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);
+  GraphicsObjectHandle create_structured_buffer(const TrackedLocation &loc, int elemSize, int numElems, bool createSrv);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
   GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
@@ -171,7 +178,7 @@ public:
   const float *default_blend_factors() const { return _default_blend_factors; }
   uint32_t default_sample_mask() const { return 0xffffffff; }
 
-  DeferredContext *create_deferred_context();
+  DeferredContext *create_deferred_context(bool can_use_immediate);
   void destroy_deferred_context(DeferredContext *ctx);
   void add_command_list(ID3D11CommandList *cmd_list);
 
@@ -223,6 +230,7 @@ private:
   SearchableIdBuffer<string, TextureResource *, IdCount> _textures;
   SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
   SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
+  IdBuffer<StructuredBuffer *, IdCount> _structed_buffers;
 #if WITH_GWEN
   SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
 #endif

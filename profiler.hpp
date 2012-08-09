@@ -6,8 +6,9 @@ struct ProfileScope {
   ProfileScope(const char *name);
   ~ProfileScope();
 
-  const char *name;
-  DWORD thread_id;
+  const char *_name;
+  DWORD _thread_id;
+  bool _dummy_scope;
 };
 
 class ProfileManager {

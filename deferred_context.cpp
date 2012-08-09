@@ -9,7 +9,10 @@
 using namespace std;
 
 DeferredContext::DeferredContext() 
-  : _ctx(nullptr), prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED) {
+  : _ctx(nullptr)
+  , _prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED)
+  , _is_immediate_context(false)
+{
     _default_stencil_ref = GRAPHICS.default_stencil_ref();
     memcpy(_default_blend_factors, GRAPHICS.default_blend_factors(), sizeof(_default_blend_factors));
     _default_sample_mask = GRAPHICS.default_sample_mask();
@@ -332,9 +335,9 @@ void DeferredContext::set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format) {
 }
 
 void DeferredContext::set_topology(D3D11_PRIMITIVE_TOPOLOGY top) {
-  if (prev_topology != top) {
+  if (_prev_topology != top) {
     _ctx->IASetPrimitiveTopology(top);
-    prev_topology = top;
+    _prev_topology = top;
   }
 }
 
@@ -510,7 +513,7 @@ void DeferredContext::begin_frame() {
   for (size_t i = 0; i < MAX_TEXTURES; ++i)
     prev_resources[i] = GraphicsObjectHandle();
 
-  prev_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+  _prev_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
 /*
   for (size_t i = 0; i < CBUFFER_CACHE; ++i) {
     _vs_cbuffer_cache[i].clear();
@@ -520,7 +523,9 @@ void DeferredContext::begin_frame() {
 }
 
 void DeferredContext::end_frame() {
-  ID3D11CommandList *cmd_list;
-  _ctx->FinishCommandList(FALSE, &cmd_list);
-  GRAPHICS.add_command_list(cmd_list);
+  if (!_is_immediate_context) {
+    ID3D11CommandList *cmd_list;
+    _ctx->FinishCommandList(FALSE, &cmd_list);
+    GRAPHICS.add_command_list(cmd_list);
+  }
 }

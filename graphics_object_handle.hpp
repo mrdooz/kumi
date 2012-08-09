@@ -20,9 +20,9 @@ public:
     kTechnique,
     kVertexShader,
     kPixelShader,
-    kREsou,
     kFontFamily,
     kMaterial,
+    kStructuredBuffer,
   };	
 private:
   friend class Graphics;

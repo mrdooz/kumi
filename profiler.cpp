@@ -38,7 +38,7 @@ void ProfileManager::enter_scope(ProfileScope *scope) {
   LARGE_INTEGER now;
   QueryPerformanceCounter(&now);
 
-  DWORD thread_id = scope->thread_id;
+  DWORD thread_id = scope->_thread_id;
   Timeline *timeline = nullptr;
   auto it = _timeline.find(thread_id);
   if (it == _timeline.end()) {
@@ -49,7 +49,7 @@ void ProfileManager::enter_scope(ProfileScope *scope) {
   }
 
   auto &cs = timeline->callstack;
-  TimelineEvent event(scope->name, now, cs.size(), cs.empty() ? -1 : cs.top());
+  TimelineEvent event(scope->_name, now, cs.size(), cs.empty() ? -1 : cs.top());
   timeline->callstack.push(timeline->events.size());
   timeline->events.emplace_back(event);
   timeline->max_depth = max(timeline->max_depth, (int)timeline->callstack.size());
@@ -59,7 +59,7 @@ void ProfileManager::enter_scope(ProfileScope *scope) {
 void ProfileManager::leave_scope(ProfileScope *scope) {
   SCOPED_CS(_callstack_cs);
 
-  DWORD thread_id = scope->thread_id;
+  DWORD thread_id = scope->_thread_id;
   // Handle the case where an event stradles a frame because it's run on a seperate thread
   auto it = _timeline.find(thread_id);
   if (it == _timeline.end())
@@ -104,7 +104,7 @@ JsonValue::JsonValuePtr ProfileManager::end_frame() {
 
     for (auto j = begin(tl->events); j != end(tl->events); ++j) {
       auto &cur_event = JsonValue::create_object();
-      cur_event->add_key_value("name", j->name);
+      cur_event->add_key_value("name", j->name ? j->name : "Unknown");
       cur_event->add_key_value("start", j->start.QuadPart / freq);
       cur_event->add_key_value("end", j->end.QuadPart / freq);
       cur_event->add_key_value("level", j->cur_level);
@@ -121,12 +121,15 @@ JsonValue::JsonValuePtr ProfileManager::end_frame() {
 
 
 ProfileScope::ProfileScope(const char *name)
-  : name(name)
-  , thread_id(GetCurrentThreadId())
+  : _name(name)
+  , _thread_id(name ? GetCurrentThreadId() : 0)
+  , _dummy_scope(name == nullptr)
 {
-  PROFILE_MANAGER.enter_scope(this);
+  if (!_dummy_scope)
+    PROFILE_MANAGER.enter_scope(this);
 }
 
 ProfileScope::~ProfileScope() {
-  PROFILE_MANAGER.leave_scope(this);
+  if (!_dummy_scope)
+    PROFILE_MANAGER.leave_scope(this);
 }

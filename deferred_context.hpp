@@ -86,13 +86,11 @@ private:
   GraphicsObjectHandle prev_ib, prev_vb;
   GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
   GraphicsObjectHandle prev_resources[MAX_TEXTURES];
-  D3D11_PRIMITIVE_TOPOLOGY prev_topology;
+  D3D11_PRIMITIVE_TOPOLOGY _prev_topology;
 
   uint32 _default_stencil_ref;
   float _default_blend_factors[4];
   uint32 _default_sample_mask;
 
-  //static const int CBUFFER_CACHE = 4;
-  //std::array<vector<char>, CBUFFER_CACHE> _vs_cbuffer_cache;
-  //std::array<vector<char>, CBUFFER_CACHE> _ps_cbuffer_cache;
+  bool _is_immediate_context;
 };

@@ -49,6 +49,8 @@ namespace
   static const int cEffectDataSize = 1024 * 1024;
 }
 
+static GraphicsObjectHandle emptyGoh;
+
 Graphics* Graphics::_instance;
 
 Graphics::Graphics()
@@ -75,6 +77,7 @@ Graphics::Graphics()
   , _textures(delete_obj<TextureResource *>)
   , _render_targets(delete_obj<RenderTargetResource *>)
   , _resources(delete_obj<SimpleResource *>)
+  , _structed_buffers(delete_obj<StructuredBuffer *>)
 #if WITH_GWEN
   , _font_wrappers(release_obj<IFW1FontWrapper *>)
 #endif
@@ -156,6 +159,62 @@ void Graphics::release_temp_render_target(GraphicsObjectHandle h) {
   _render_targets._key_to_idx.erase(key);
 }
 
+GraphicsObjectHandle Graphics::create_structured_buffer(const TrackedLocation &loc, int elemSize, int numElems, bool createSrv) {
+
+  unique_ptr<StructuredBuffer> sb(new StructuredBuffer);
+
+  // Create Structured Buffer
+  D3D11_BUFFER_DESC sbDesc;
+  sbDesc.BindFlags            = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
+  sbDesc.CPUAccessFlags       = 0;
+  sbDesc.MiscFlags            = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+  sbDesc.StructureByteStride  = elemSize;
+  sbDesc.ByteWidth            = elemSize * numElems;
+  sbDesc.Usage                = D3D11_USAGE_DEFAULT;
+  if (FAILED(_device->CreateBuffer(&sbDesc, NULL, &sb->buffer.resource)))
+    return emptyGoh;
+
+  auto buf = sb->buffer.resource.p;
+  set_private_data(loc, sb->buffer.resource.p);
+
+  // create the UAV for the structured buffer
+  D3D11_UNORDERED_ACCESS_VIEW_DESC sbUAVDesc;
+  sbUAVDesc.Buffer.FirstElement       = 0;
+  sbUAVDesc.Buffer.Flags              = 0;
+  sbUAVDesc.Buffer.NumElements        = numElems;
+  sbUAVDesc.Format                    = DXGI_FORMAT_UNKNOWN;
+  sbUAVDesc.ViewDimension             = D3D11_UAV_DIMENSION_BUFFER;
+  if (FAILED(_device->CreateUnorderedAccessView(buf, &sbUAVDesc, &sb->uav.resource)))
+    return emptyGoh;
+
+  set_private_data(loc, sb->uav.resource.p);
+
+  if (createSrv) {
+    // create the Shader Resource View (SRV) for the structured buffer
+    D3D11_SHADER_RESOURCE_VIEW_DESC sbSRVDesc;
+    sbSRVDesc.Buffer.ElementOffset          = 0;
+    sbSRVDesc.Buffer.ElementWidth           = elemSize;
+    sbSRVDesc.Buffer.FirstElement           = 0;
+    sbSRVDesc.Buffer.NumElements            = numElems;
+    sbSRVDesc.Format                        = DXGI_FORMAT_UNKNOWN;
+    sbSRVDesc.ViewDimension                 = D3D11_SRV_DIMENSION_BUFFER;
+    if (FAILED(_device->CreateShaderResourceView(buf, &sbSRVDesc, &sb->srv.resource)))
+      return emptyGoh;
+
+    set_private_data(loc, sb->srv.resource.p);
+
+  }
+
+  int idx = _structed_buffers.find_free_index();
+  if (idx != -1) {
+    _structed_buffers[idx] = sb.get();
+    sb.reset(nullptr);
+    return make_goh(GraphicsObjectHandle::kStructuredBuffer, idx);
+  }
+
+  return emptyGoh;
+}
+
 GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
 
     unique_ptr<RenderTargetResource> data(new RenderTargetResource);
@@ -171,7 +230,7 @@ GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, 
         return goh;
       }
     }
-    return GraphicsObjectHandle();
+    return emptyGoh;
 }
 
 bool Graphics::create_render_target(
@@ -260,21 +319,21 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
     HRESULT hr;
     D3DX11GetImageInfoFromFile(filename, NULL, info, &hr);
     if (FAILED(hr))
-      return GraphicsObjectHandle();
+      return emptyGoh;
   }
 
   auto *data = new SimpleResource();
   HRESULT hr;
   D3DX11CreateTextureFromFile(_device, filename, NULL, NULL, &data->resource, &hr);
   if (FAILED(hr)) {
-    return GraphicsObjectHandle();
+    return emptyGoh;
   }
 
   // TODO: allow for srgb loading
   auto fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
   auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, fmt);
   if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->view.resource)))
-    return GraphicsObjectHandle();
+    return emptyGoh;
 
   int idx = _resources.idx_from_token(friendly_name);
   if (idx != -1 || (idx = _resources.find_free_index()) != -1) {
@@ -300,7 +359,7 @@ GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, const 
   TextureResource *data = new TextureResource;
   if (!create_texture(loc, desc, data)) {
     delete exch_null(data);
-    return GraphicsObjectHandle();
+    return emptyGoh;
   }
   return insert_texture(data, name);
 }
@@ -329,7 +388,7 @@ GraphicsObjectHandle Graphics::create_texture(const TrackedLocation &loc, int wi
   TextureResource *data = new TextureResource;
   if (!create_texture(loc, width, height, fmt, data_bits, data_width, data_height, data_pitch, data)) {
     delete exch_null(data);
-    return GraphicsObjectHandle();
+    return emptyGoh;
   }
   return insert_texture(data, friendly_name);
 }
@@ -561,21 +620,21 @@ GraphicsObjectHandle Graphics::create_constant_buffer(const TrackedLocation &loc
   const int idx = _constant_buffers.find_free_index();
   if (idx != -1 && SUCCEEDED(create_buffer_inner(loc, _device, desc, NULL, &_constant_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data) {
   const int idx = _vertex_buffers.find_free_index();
   if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(loc, buffer_size, data, &_vertex_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size) {
   const int idx = _vertex_buffers.find_free_index();
   if (idx != -1 && SUCCEEDED(create_dynamic_vertex_buffer(loc, buffer_size, &_vertex_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 
@@ -583,14 +642,14 @@ GraphicsObjectHandle Graphics::create_static_index_buffer(const TrackedLocation 
   const int idx = _index_buffers.find_free_index();
   if (idx != -1 && SUCCEEDED(create_static_index_buffer(loc, data_size, data, &_index_buffers[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode) {
   const int idx = _input_layouts.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(&desc[0], desc.size(), &shader_bytecode[0], shader_bytecode.size(), &_input_layouts[idx])))
     return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
@@ -605,7 +664,7 @@ GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, 
       return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
     }
   }
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
@@ -620,7 +679,7 @@ GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, c
       return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
     }
   }
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 template<typename T, class Cont>
@@ -646,7 +705,7 @@ GraphicsObjectHandle Graphics::create_rasterizer_state(const TrackedLocation &lo
   if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_rasterizer_states[idx]))) {
     return make_goh(GraphicsObjectHandle::kRasterizerState, idx);
   }
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc) {
@@ -657,7 +716,7 @@ GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, co
   idx = _blend_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_blend_states[idx])))
     return make_goh(GraphicsObjectHandle::kBlendState, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc) {
@@ -668,7 +727,7 @@ GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation 
   idx = _depth_stencil_states.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_depth_stencil_states[idx])))
     return make_goh(GraphicsObjectHandle::kDepthStencilState, idx);
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc) {
@@ -684,7 +743,7 @@ GraphicsObjectHandle Graphics::create_sampler(const TrackedLocation &loc, const 
     _sampler_states.set_pair(idx, make_pair(name, ss));
     return make_goh(GraphicsObjectHandle::kSamplerState, idx);
   }
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 #if WITH_GWEN
@@ -701,7 +760,7 @@ GraphicsObjectHandle Graphics::get_or_create_font_family(const wstring &name) {
     _font_wrappers.set_pair(idx, make_pair(name, font));
     return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
   }
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 
 bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect) {
@@ -828,7 +887,7 @@ GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
 GraphicsObjectHandle Graphics::find_technique(const char *name) {
   int idx = _techniques.idx_from_token(name);
   KASSERT(idx != -1);
-  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : GraphicsObjectHandle();
+  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::find_sampler(const std::string &name) {
@@ -840,7 +899,7 @@ GraphicsObjectHandle Graphics::find_sampler(const std::string &name) {
 GraphicsObjectHandle Graphics::find_input_layout(const std::string &technique_name) {
   if (Technique *technique = _techniques.find(technique_name, (Technique *)NULL))
     return technique->input_layout();
-  return GraphicsObjectHandle();
+  return emptyGoh;
 }
 */
 void Graphics::unbind_resource_views(int resource_bitmask) {
@@ -915,7 +974,7 @@ int Graphics::get_shader_flag(const std::string &flag) {
 }
 
 GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx) {
-  return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : GraphicsObjectHandle();
+  return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : emptyGoh;
 }
 
 void Graphics::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {
@@ -929,19 +988,26 @@ void Graphics::fill_system_resource_views(const ResourceViewArray &views, Textur
 
 void Graphics::destroy_deferred_context(DeferredContext *ctx) {
   if (ctx) {
-    ctx->_ctx->Release();
+    if (!ctx->_is_immediate_context)
+      ctx->_ctx->Release();
     delete exch_null(ctx);
   }
 }
 
-DeferredContext *Graphics::create_deferred_context() {
+DeferredContext *Graphics::create_deferred_context(bool can_use_immediate) {
   DeferredContext *dc = new DeferredContext;
-  _device->CreateDeferredContext(0, &dc->_ctx);
+  if (can_use_immediate) {
+    dc->_is_immediate_context = true;
+    dc->_ctx = _immediate_context;
+  } else {
+    _device->CreateDeferredContext(0, &dc->_ctx);
+  }
 
   return dc;
 }
 
-void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count) {
+void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, 
+                                       DXGI_FORMAT *index_format, int *index_count) {
 
   *index_format = DXGI_FORMAT_R16_UINT;
   KASSERT(_predefined_geometry.find(geom) != _predefined_geometry.end());
