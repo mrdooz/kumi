@@ -207,8 +207,7 @@ GraphicsObjectHandle Graphics::create_structured_buffer(const TrackedLocation &l
 
   int idx = _structed_buffers.find_free_index();
   if (idx != -1) {
-    _structed_buffers[idx] = sb.get();
-    sb.reset(nullptr);
+    _structed_buffers[idx] = sb.release();
     return make_goh(GraphicsObjectHandle::kStructuredBuffer, idx);
   }
 

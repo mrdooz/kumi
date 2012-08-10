@@ -96,6 +96,9 @@ bool ScenePlayer::init() {
   _blur_horiz = GRAPHICS.find_technique("blur_horiz");
   _blur_vert = GRAPHICS.find_technique("blur_vert");
 
+  _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
+  _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rt_final");
+
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
   string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
 
@@ -320,7 +323,7 @@ bool ScenePlayer::render() {
       GraphicsObjectHandle render_targets[] = { rt_pos, rt_normal, rt_diffuse, rt_specular };
       bool clear[] = { true, true, true, true };
       _ctx->set_render_targets(render_targets, clear, 4);
-      _ctx->render_scene(_scene, _ssao_fill);
+      _scene->render(_ctx, _ssao_fill);
     }
 
     // Calc the occlusion
@@ -389,6 +392,7 @@ bool ScenePlayer::render() {
 
     {
       // gamma correction
+      //_ctx->set_render_target(_rt_final, true);
       _ctx->set_default_render_target();
 
       TextureArray arr;
@@ -418,9 +422,7 @@ bool ScenePlayer::render() {
 }
 
 void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique) {
-  GraphicsObjectHandle rt[] = { output };
-  bool clear[] = { true };
-  _ctx->set_render_targets(rt, clear, 1);
+  _ctx->set_render_target(output, true);
 
   TextureArray arr;
   arr[0] = input;

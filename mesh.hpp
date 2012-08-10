@@ -6,6 +6,7 @@
 struct TrackedLocation;
 class SubMesh;
 class Mesh;
+class DeferredContext;
 
 class SubMesh {
   friend class KumiLoader;
@@ -47,6 +48,8 @@ public:
   const std::string &name() const { return _name; }
 
   const std::vector<SubMesh *> &submeshes() const { return _submeshes; }
+
+  void render(DeferredContext *ctx, GraphicsObjectHandle technique_handle);
 
 private:
   std::string _name;

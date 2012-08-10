@@ -63,6 +63,9 @@ private:
 
   GraphicsObjectHandle _luminance_map;
 
+  GraphicsObjectHandle _blur_sbuffer;
+  GraphicsObjectHandle _rt_final;
+
   PropertyId _kernel_id, _noise_id, _ambient_id;
 
   XMFLOAT4X4 _view, _proj;
