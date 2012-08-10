@@ -59,6 +59,7 @@ public:
   void set_vb(ID3D11Buffer *buf, uint32_t stride);
   void set_vs(GraphicsObjectHandle vs);
   void set_ps(GraphicsObjectHandle ps);
+  void set_cs(GraphicsObjectHandle cs);
   void set_layout(GraphicsObjectHandle layout);
   void set_vb(GraphicsObjectHandle vb, int vertex_size);
   void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format);
@@ -67,13 +68,17 @@ public:
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
   void set_samplers(const SamplerArray &samplers);
-  void set_shader_resources(const TextureArray &resources);
-  void unset_shader_resource(int first_view, int num_views);
+  void set_shader_resources(const TextureArray &resources, ShaderType::Enum type);
+  void set_uavs(const TextureArray &uavs);
+  void unset_uavs(int first, int count);
+  void unset_shader_resource(int first_view, int num_views, ShaderType::Enum type);
+  void unset_render_targets(int first, int count);
   void set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps);
   void set_cbuffer(const CBuffer &vs, const CBuffer &ps);
   void set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen);
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;
   void draw_indexed(int count, int start_index, int base_vertex);
+  void dispatch(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ);
 
 private:
   DeferredContext();

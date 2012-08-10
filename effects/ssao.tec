@@ -92,3 +92,10 @@ technique hblur {
         ];
     };
 };
+
+technique copy_uav inherits quad_base {
+    pixel_shader {
+        file effects/ssao.fx;
+        entry_point ps_copy_uav;
+    };
+};

@@ -108,7 +108,7 @@ void Scene::render(DeferredContext *ctx, GraphicsObjectHandle technique_handle) 
     for (size_t i = 0; i < all_views.size(); ++i) {
       if (all_views[i].is_valid()) {
         has_resources = true;
-        ctx->set_shader_resources(all_views);
+        ctx->set_shader_resources(all_views, ShaderType::kPixelShader);
         break;
       }
     }
@@ -131,6 +131,6 @@ void Scene::render(DeferredContext *ctx, GraphicsObjectHandle technique_handle) 
     }
 
     if (has_resources)
-      ctx->unset_shader_resource(0, MAX_TEXTURES);
+      ctx->unset_shader_resource(0, MAX_TEXTURES, ShaderType::kPixelShader);
   }
 }

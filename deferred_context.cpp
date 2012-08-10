@@ -55,14 +55,14 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   for (size_t i = 0; i < all_views.size(); ++i) {
     if (all_views[i].is_valid()) {
       has_resources = true;
-      set_shader_resources(all_views);
+      set_shader_resources(all_views, ShaderType::kPixelShader);
       break;
     }
   }
 
   // set cbuffers
   auto &vs_s_cbuffer = vs->system_cbuffer();
-  technique->fill_cbuffer(&vs->system_cbuffer());
+  technique->fill_cbuffer(&vs_s_cbuffer);
 
   auto &ps_s_cbuffer = ps->system_cbuffer();
   technique->fill_cbuffer(&ps_s_cbuffer);
@@ -100,7 +100,7 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   }
 
   if (has_resources)
-    unset_shader_resource(0, MAX_TEXTURES);
+    unset_shader_resource(0, MAX_TEXTURES, ShaderType::kPixelShader);
 }
 
 void DeferredContext::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {
@@ -162,6 +162,10 @@ void DeferredContext::set_vs(GraphicsObjectHandle vs) {
     _ctx->VSSetShader(GRAPHICS._vertex_shaders.get(vs), NULL, 0);
     prev_vs = vs;
   }
+}
+
+void DeferredContext::set_cs(GraphicsObjectHandle cs) {
+  _ctx->CSSetShader(GRAPHICS._compute_shaders.get(cs), NULL, 0);
 }
 
 void DeferredContext::set_ps(GraphicsObjectHandle ps) {
@@ -248,7 +252,58 @@ void DeferredContext::set_samplers(const SamplerArray &samplers) {
   }
 }
 
-void DeferredContext::set_shader_resources(const TextureArray &resources) {
+void DeferredContext::unset_uavs(int first, int count) {
+  UINT initialCount = 1;
+  static ID3D11UnorderedAccessView *nullViews[MAX_TEXTURES] = {0, 0, 0, 0, 0, 0, 0, 0};
+  _ctx->CSSetUnorderedAccessViews(first, count, nullViews, &initialCount);
+}
+
+void DeferredContext::set_uavs(const TextureArray &uavs) {
+
+  int size = uavs.size() * sizeof(GraphicsObjectHandle);
+  ID3D11UnorderedAccessView *d3dUavs[MAX_TEXTURES];
+  int first_resource = MAX_TEXTURES, num_resources = 0;
+
+  for (int i = 0; i < MAX_TEXTURES; ++i) {
+
+    if (uavs[i].is_valid()) {
+      GraphicsObjectHandle h = uavs[i];
+      auto type = h.type();
+
+      if (type == GraphicsObjectHandle::kStructuredBuffer) {
+        auto *data = GRAPHICS._structured_buffers.get(h);
+        d3dUavs[i] = data->uav.resource;
+      } else {
+        LOG_ERROR_LN("Trying to set invalid UAV type!");
+      }
+      num_resources++;
+      first_resource = min(first_resource, i);
+    }
+  }
+
+  if (num_resources) {
+    int ofs = first_resource;
+    int num_resources_set = 0;
+    while (ofs < MAX_TEXTURES && num_resources_set < num_resources) {
+      // handle non sequential resources
+      int cur = 0;
+      int tmp = ofs;
+      while (uavs[ofs].is_valid()) {
+        ofs++;
+        cur++;
+        if (ofs == MAX_TEXTURES)
+          break;
+      }
+      UINT initialCount = 1;
+      _ctx->CSSetUnorderedAccessViews(tmp, cur, &d3dUavs[tmp], &initialCount);
+      num_resources_set += cur;
+      while (ofs < MAX_TEXTURES && !uavs[ofs].is_valid())
+        ofs++;
+    }
+  }
+}
+
+void DeferredContext::set_shader_resources(const TextureArray &resources, ShaderType::Enum type) {
   int size = resources.size() * sizeof(GraphicsObjectHandle);
   // force setting the views because we always unset them..
   bool force = true;
@@ -258,14 +313,18 @@ void DeferredContext::set_shader_resources(const TextureArray &resources) {
     for (int i = 0; i < MAX_TEXTURES; ++i) {
       if (resources[i].is_valid()) {
         GraphicsObjectHandle h = resources[i];
-        if (h.type() == GraphicsObjectHandle::kTexture) {
+        auto type = h.type();
+        if (type == GraphicsObjectHandle::kTexture) {
           auto *data = GRAPHICS._textures.get(h);
           d3dresources[i] = data->view.resource;
-        } else if (h.type() == GraphicsObjectHandle::kResource) {
+        } else if (type == GraphicsObjectHandle::kResource) {
           auto *data = GRAPHICS._resources.get(h);
           d3dresources[i] = data->view.resource;
-        } else if (h.type() == GraphicsObjectHandle::kRenderTarget) {
+        } else if (type == GraphicsObjectHandle::kRenderTarget) {
           auto *data = GRAPHICS._render_targets.get(h);
+          d3dresources[i] = data->srv.resource;
+        } else if (type == GraphicsObjectHandle::kStructuredBuffer) {
+          auto *data = GRAPHICS._structured_buffers.get(h);
           d3dresources[i] = data->srv.resource;
         } else {
           LOG_ERROR_LN("Trying to set invalid resource type!");
@@ -288,7 +347,16 @@ void DeferredContext::set_shader_resources(const TextureArray &resources) {
           if (ofs == MAX_TEXTURES)
             break;
         }
-        _ctx->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+
+        if (type == ShaderType::kVertexShader)
+          _ctx->VSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+        else if (type == ShaderType::kPixelShader)
+          _ctx->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+        else if (type == ShaderType::kComputeShader)
+          _ctx->CSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+        else
+          LOG_ERROR_LN("Implement me!");
+
         num_resources_set += cur;
         while (ofs < MAX_TEXTURES && !resources[ofs].is_valid())
           ofs++;
@@ -298,11 +366,24 @@ void DeferredContext::set_shader_resources(const TextureArray &resources) {
   }
 }
 
-void DeferredContext::unset_shader_resource(int first_view, int num_views) {
+void DeferredContext::unset_render_targets(int first, int count) {
+  static ID3D11RenderTargetView *nullViews[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+  _ctx->OMSetRenderTargets(8, nullViews, nullptr);
+}
+
+void DeferredContext::unset_shader_resource(int first_view, int num_views, ShaderType::Enum type) {
   if (!num_views)
     return;
   static ID3D11ShaderResourceView *null_views[MAX_SAMPLERS] = {0, 0, 0, 0, 0, 0, 0, 0};
-  _ctx->PSSetShaderResources(first_view, num_views, null_views);
+  if (type == ShaderType::kVertexShader)
+    _ctx->VSSetShaderResources(first_view, num_views, null_views);
+  else if (type == ShaderType::kPixelShader)
+    _ctx->PSSetShaderResources(first_view, num_views, null_views);
+  else if (type == ShaderType::kComputeShader)
+    _ctx->CSSetShaderResources(first_view, num_views, null_views);
+  else
+    LOG_ERROR_LN("Implement me!");
+
 }
 
 void DeferredContext::set_cbuffer(const CBuffer &vs, const CBuffer &ps) {
@@ -388,6 +469,10 @@ void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType:
 
 void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) {
   _ctx->DrawIndexed(count, start_index, base_vertex);
+}
+
+void DeferredContext::dispatch(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ) {
+  _ctx->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 }
 
 void DeferredContext::begin_frame() {

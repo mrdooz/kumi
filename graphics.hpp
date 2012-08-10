@@ -233,7 +233,7 @@ private:
   SearchableIdBuffer<string, TextureResource *, IdCount> _textures;
   SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
   SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
-  IdBuffer<StructuredBuffer *, IdCount> _structed_buffers;
+  IdBuffer<StructuredBuffer *, IdCount> _structured_buffers;
 #if WITH_GWEN
   SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
 #endif

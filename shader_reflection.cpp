@@ -176,7 +176,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
             }
             CBufferVariable var(ofs, len, id);
 #ifdef _DEBUG
-            var.name = class_id;
+            var.name = class_id.empty() ? name : class_id;
 #endif
             cbuffer.vars.emplace_back(var);
           }
@@ -184,7 +184,13 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
       }
       cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
       cbuffer.staging.resize(size);
-      shader->set_cbuffer(source, cbuffer);
+
+      if (source == PropertySource::kUnknown) {
+        shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
+
+      } else {
+        shader->set_cbuffer(source, cbuffer);
+      }
 
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
@@ -237,36 +243,37 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
 
         } else if (type == "texture") {
           ResourceViewParam *param = shader_template->find_resource_view(name.c_str());
+          // If we can't find a resource, assume it's going to be set by hand
           if (!param) {
-            LOG_ERROR_LN("Resource view %s not found", name.c_str());
-            return false;
-          }
-
-          string qualified_name = PropertySource::qualify_name(param->friendly_name.empty() ? param->name : param->friendly_name, param->source);
-
-          if (param->source == PropertySource::kMaterial) {
-            auto pid = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
-            shader->_resource_views2.material_views.emplace_back(ResourceId<PropertyId>(pid, bind_point, name));
-
-          } else if (param->source == PropertySource::kSystem) {
-            GraphicsObjectHandle h = GRAPHICS.find_resource(name);
-            shader->_resource_views2.system_views.emplace_back(ResourceId<GraphicsObjectHandle>(h, bind_point, name));
-
-          } else if (param->source == PropertySource::kUser) {
-            shader->_resource_views2.user_views.push_back(bind_point);
-
+            LOG_INFO_LN("Found unbound resource: %s", name.c_str());
           } else {
-            LOG_WARNING_LN("Unsupported property source for texture: %s", name.c_str());
-          }
+            string &friendly = param->friendly_name;
+            string qualified_name = PropertySource::qualify_name(friendly.empty() ? param->name : friendly, param->source);
 
-          auto &rv = shader->_resource_views;
-          rv[bind_point].source = param->source;
-          rv[bind_point].used = true;
+            if (param->source == PropertySource::kMaterial) {
+              auto pid = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+              shader->_resource_views2.material_views.emplace_back(ResourceId<PropertyId>(pid, bind_point, name));
 
-          if (param->source == PropertySource::kSystem) {
-            rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
-          } else {
-            rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+            } else if (param->source == PropertySource::kSystem) {
+              GraphicsObjectHandle h = GRAPHICS.find_resource(name);
+              shader->_resource_views2.system_views.emplace_back(ResourceId<GraphicsObjectHandle>(h, bind_point, name));
+
+            } else if (param->source == PropertySource::kUser) {
+              shader->_resource_views2.user_views.push_back(bind_point);
+
+            } else {
+              LOG_WARNING_LN("Unsupported property source for texture: %s", name.c_str());
+            }
+
+            auto &rv = shader->_resource_views;
+            rv[bind_point].source = param->source;
+            rv[bind_point].used = true;
+
+            if (param->source == PropertySource::kSystem) {
+              rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create<GraphicsObjectHandle>(qualified_name);
+            } else {
+              rv[bind_point].class_id = PROPERTY_MANAGER.get_or_create_placeholder(qualified_name);
+            }
           }
 
         } else if (type == "sampler") {

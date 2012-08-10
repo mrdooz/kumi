@@ -79,7 +79,7 @@ Graphics::Graphics()
   , _textures(delete_obj<TextureResource *>)
   , _render_targets(delete_obj<RenderTargetResource *>)
   , _resources(delete_obj<SimpleResource *>)
-  , _structed_buffers(delete_obj<StructuredBuffer *>)
+  , _structured_buffers(delete_obj<StructuredBuffer *>)
 #if WITH_GWEN
   , _font_wrappers(release_obj<IFW1FontWrapper *>)
 #endif
@@ -207,9 +207,9 @@ GraphicsObjectHandle Graphics::create_structured_buffer(const TrackedLocation &l
 
   }
 
-  int idx = _structed_buffers.find_free_index();
+  int idx = _structured_buffers.find_free_index();
   if (idx != -1) {
-    _structed_buffers[idx] = sb.release();
+    _structured_buffers[idx] = sb.release();
     return make_goh(GraphicsObjectHandle::kStructuredBuffer, idx);
   }
 

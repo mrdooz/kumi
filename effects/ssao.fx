@@ -269,3 +269,13 @@ void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
         Output[y*imageW+x] = t * scale;
     }
 }
+
+StructuredBuffer<float4> SBuffer0 : register(t0);
+
+// copy from structured buffer to texture
+float4 ps_copy_uav(float4 pos : SV_POSITION, float2 tex : TEXCOORD0) : SV_TARGET
+{
+    uint2 pixelPos = floor(tex.xy * uint2(imageW, imageH));
+    uint buffIndex = pixelPos.y*imageW + pixelPos.x;
+    return SBuffer0[buffIndex];
+}

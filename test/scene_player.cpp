@@ -96,6 +96,9 @@ bool ScenePlayer::init() {
   _blur_horiz = GRAPHICS.find_technique("blur_horiz");
   _blur_vert = GRAPHICS.find_technique("blur_vert");
 
+  _cs_blur_x = GRAPHICS.find_technique("hblur");
+  _copy_uav = GRAPHICS.find_technique("copy_uav");
+
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
   _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rt_final");
 
@@ -389,6 +392,59 @@ bool ScenePlayer::render() {
     // scale up
     post_process(downscale3, downscale2, _scale);
     post_process(downscale2, downscale1, _scale);
+
+
+    {
+      //cs blur
+      _ctx->set_render_target(_rt_final, true);
+
+      TextureArray arr;
+      arr[1] = downscale1;
+      _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
+      _ctx->unset_render_targets(0, 8);
+    }
+
+    struct blurSettings {
+      int imageW, imageH;
+      int blurRadius[2];
+    } settings;
+    settings.imageW = w;
+    settings.imageH = h;
+    settings.blurRadius[0] = 100;
+    settings.blurRadius[1] = 100;
+
+    {
+      _ctx->unset_render_targets(0, 8);
+
+      Technique *technique = GRAPHICS.get_technique(_cs_blur_x);
+      Shader *cs = technique->compute_shader(0);
+
+      _ctx->set_cs(cs->handle());
+      TextureArray arr;
+      arr[0] = _rt_final;
+      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
+
+      TextureArray uav;
+      uav[0] = _blur_sbuffer;
+      _ctx->set_uavs(uav);
+      auto handle = cs->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
+      _ctx->dispatch((h + 31) / 32, 1, 1);
+
+      _ctx->unset_shader_resource(0, 8, ShaderType::kComputeShader);
+      _ctx->unset_uavs(0, 8);
+
+    }
+
+    {
+      // copy the UAV to a texture
+      //_ctx->set_cbuffer()
+      Technique *technique = GRAPHICS.get_technique(_copy_uav);
+      Shader *ps = technique->pixel_shader(0);
+      auto handle = ps->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
+      post_process(_blur_sbuffer, _rt_final, _copy_uav);
+    }
 
     {
       // gamma correction
