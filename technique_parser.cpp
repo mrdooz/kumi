@@ -679,19 +679,20 @@ void TechniqueParser::parse_material(Scope *scope, Material *material) {
   }
 }
 
+static const char *ext_from_type(ShaderType::Enum type) {
+  switch (type) {
+    case ShaderType::kVertexShader: return ".vso";
+    case ShaderType::kPixelShader: return ".pso";
+    case ShaderType::kComputeShader: return ".cso";
+    default: LOG_ERROR_LN("Implement me!");
+  }
+  __assume(false);
+}
 
 void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, ShaderTemplate *shader) {
 
   auto tmp = list_of(kSymFile)(kSymEntryPoint)(kSymParams)(kSymFlags);
-  string ext;
-  if (shader->_type == ShaderType::kVertexShader) {
-    ext = ".vso";
-    shader->_entry_point = "vs_main";
-  } else {
-    ext = ".pso";
-    shader->_entry_point = "ps_main";
-  }
-
+  string ext = ext_from_type(shader->_type);
   Symbol symbol;
 
   while (scope->consume_in(tmp, &symbol)) {
@@ -737,14 +738,20 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
           int flag_value = GRAPHICS.get_shader_flag(flag);
           if (shader->_type == ShaderType::kVertexShader)
             technique->_vs_flag_mask |= flag_value;
-          else
+          else if (shader->_type == ShaderType::kPixelShader)
             technique->_ps_flag_mask |= flag_value;
+          else if (shader->_type == ShaderType::kComputeShader)
+            technique->_cs_flag_mask |= flag_value;
+          else
+            LOG_ERROR_LN("Implement me!");
         }
         scope->advance(inner).munch(kSymSemicolon);
         break;
       }
     }
   }
+
+  LOG_ERROR_COND_LN(!shader->_entry_point.empty(), "No shader entry point given!");
 }
 
 void TechniqueParser::parse_depth_stencil_desc(Scope *scope, CD3D11_DEPTH_STENCIL_DESC *desc) {
@@ -1108,8 +1115,10 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
           technique->_vs_shader_template.reset(st = new ShaderTemplate(ShaderType::kVertexShader));
         else if (symbol == kSymPixelShader)
           technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader));
-        else
+        else if (symbol == kSymComputeShader)
           technique->_cs_shader_template.reset(st = new ShaderTemplate(ShaderType::kComputeShader));
+        else
+          LOG_ERROR_LN("Implement me!");
 
         scope->munch(kSymBlockOpen);
         parse_shader_template(scope, technique, st);

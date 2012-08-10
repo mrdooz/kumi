@@ -48,6 +48,8 @@ public:
   void set_cbuffer(PropertySource::Enum src, const CBuffer &cbuffer);
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
+  GraphicsObjectHandle find_cbuffer(const char *name);
+  void add_named_cbuffer(const char *name, const CBuffer &cbuffer);
 
 private:
 
@@ -62,6 +64,9 @@ private:
   std::string _obj_filename;
   std::vector<std::string> _flags;
 #endif
+
+  std::map<std::string, CBuffer> _named_cbuffers;
+
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;
 
@@ -72,3 +77,4 @@ private:
 
   SamplerArray _samplers;
 };
+

@@ -86,6 +86,9 @@ technique gamma_correction inherits quad_base {
 technique hblur {
     compute_shader {
         file effects/ssao.fx;
-        entry_point hblur_cs_main;
+        entry_point boxBlurX;
+        params [
+            texture2d Texture0 user;
+        ];
     };
 };

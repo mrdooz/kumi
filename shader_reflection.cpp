@@ -9,13 +9,28 @@
 
 using namespace std;
 using namespace boost::assign;
-/*
+
 struct Substring {
   Substring(const char *start, size_t len) : start(start), len(len) {}
+
+  bool operator==(const char *rhs) {
+    int rhsLen = strlen(rhs);
+    if (len != rhsLen)
+      return false;
+
+    for (size_t i = 0; i < len; ++i) {
+      if (start[i] != rhs[i])
+        return false;
+    }
+    return true;
+  }
+  const char *c_str() { return start; }
+  std::string to_string() { return string(start, len); }
+
   const char* start;
   size_t len;
 };
-*/
+
 static const char *skip_line(const char *start, const char *end) {
   while (start < end && *start != '\r' && *start != '\n')
     ++start;
@@ -26,15 +41,22 @@ static const char *skip_line(const char *start, const char *end) {
   return start;
 }
 
-static vector<string> split(const char *start, const char *end) {
-  vector<string> res;
+static vector<Substring> split(char *start, const char *end) {
+
+  // Note! split will NULL-terminate the string at delimiters
+  vector<Substring> res;
 
   while (start < end) {
-    const char *tmp = start;
+    char *tmp = start;
     while (!isspace((int)*tmp))
       ++tmp;
 
-    res.emplace_back(string(start, tmp));
+    res.emplace_back(Substring(start, tmp-start));
+
+    // NULL-terminate the string.
+    // Note, we must increment the ptr here to skip the first iteration
+    // of the isspace loop below
+    *tmp++ = '\0';
 
     while (tmp < end && isspace((int)*tmp))
       ++tmp;
@@ -45,12 +67,13 @@ static vector<string> split(const char *start, const char *end) {
   return res;
 }
 
-static void trim_input(const vector<char> &input, vector<vector<string>> *res) {
-  const char *start = input.data();
-  const char *end = start + input.size();
+static void trim_input(char *text, int textLen, vector<vector<Substring>> *res) {
+
+  char *start = text;
+  const char *end = text + textLen;
   // extract the relevant text
   if (strstr(start, "#if 0"))
-    start = skip_line(start, end);
+    start = (char *)skip_line(start, end);
 
   while (start < end) {
     // skip leading comments and whitespace
@@ -60,12 +83,12 @@ static void trim_input(const vector<char> &input, vector<vector<string>> *res) {
       ++start;
 
     // read until "\r\n" found
-    const char *tmp = start;
+    char *tmp = start;
     while (*tmp != '\r')
       ++tmp;
     if (tmp - start > 0)
       res->emplace_back(split(start, tmp));
-    while (*tmp == '\r' || *tmp == '\n')
+    while (tmp < end && (*tmp == '\0' || *tmp == '\r' || *tmp == '\n'))
       ++tmp;
     start = tmp;
   }
@@ -91,11 +114,11 @@ static PropertySource::Enum source_from_name(const std::string &cbuffer_name) {
   return PropertySource::kUnknown;
 }
 
-bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const vector<char> &obj) {
+bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, ShaderTemplate *shader_template, const vector<char> &obj) {
 
   // extract the relevant text
-  vector<vector<string>> input;
-  trim_input(text, &input);
+  vector<vector<Substring>> input;
+  trim_input(text, textLen, &input);
 
   set<string> cbuffers_found;
 
@@ -104,7 +127,7 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
     auto &cur_line = input[i];
 
     if (cur_line[0] == "cbuffer") {
-      string cbuffer_name(cur_line[1]);
+      string cbuffer_name(cur_line[1].to_string());
       CBuffer cbuffer;
       auto source = source_from_name(cbuffer_name);
       int size = 0;
@@ -116,7 +139,7 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
         if (row.size() == 7 || row.size() == 8) {
           bool unused = row.size() == 8 && row[7] == "[unused]";
           if (!unused) {
-            string name = string(row[1].c_str(), row[1].size() - 1); // skip trailing ';'
+            string name = string(row[1].start, row[1].len - 1); // skip trailing ';'
             // strip any []
             int bracket = name.find('[');
             if (bracket != name.npos) {
@@ -125,9 +148,12 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
 
             // Get the parameter source from the cbuffer name
             auto source = source_from_name(cbuffer_name);
+
+            // If the cbuffer isn't qualified with a source name, the just assume that
+            // it's going to be filled in by hand
+
             if (source == PropertySource::kUnknown) {
-              LOG_ERROR_LN("Unable to deduce source from cbuffer name: %s", cbuffer_name.c_str());
-              return false;
+              LOG_INFO_LN("Untyped cbuffer found: %s", cbuffer_name.c_str());
             }
 
             if (cbuffers_found.find(cbuffer_name) != cbuffers_found.end()) {
@@ -138,10 +164,16 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
             int ofs = atoi(row[4].c_str());
             int len = atoi(row[6].c_str());
             size = max(size, ofs + len);
-            // The id is either a classifer (for mesh/material), or a real id in the system case
-            string class_id = PropertySource::qualify_name(name, source);
-            int var_size = source == PropertySource::kMesh ? sizeof(int) : len;
-            auto id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
+            PropertyId id = ~0;
+#ifdef _DEBUG
+            string class_id;
+#endif
+            if (source != PropertySource::kUnknown) {
+              // The id is either a classifer (for mesh/material), or a real id in the system case
+              class_id = PropertySource::qualify_name(name, source);
+              int var_size = source == PropertySource::kMesh ? sizeof(int) : len;
+              id = PROPERTY_MANAGER.get_or_create_raw(class_id.c_str(), var_size, nullptr);
+            }
             CBufferVariable var(ofs, len, id);
 #ifdef _DEBUG
             var.name = class_id;
@@ -173,7 +205,7 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
         }
 
         DXGI_FORMAT fmt;
-        if (!lookup<string, DXGI_FORMAT>(row[0], mapping, &fmt)) {
+        if (!lookup<string, DXGI_FORMAT>(row[0].to_string(), mapping, &fmt)) {
           LOG_ERROR_LN("Invalid input semantic found: %s", row[0].c_str());
           return false;
         }
@@ -195,8 +227,8 @@ bool ShaderReflection::do_reflection(const vector<char> &text, Shader *shader, S
           break;
         }
 
-        const string &name = row[0];
-        const string &type = row[1];
+        const string &name = row[0].to_string();
+        const string &type = row[1].to_string();
         int bind_point = atoi(row[4].c_str());
 
         if (type == "cbuffer") {

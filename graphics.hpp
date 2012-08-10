@@ -103,8 +103,9 @@ public:
   void	present();
   void	resize(const int width, const int height);
 
-  const char *vs_profile() const { return _vs_profile.c_str(); }
-  const char *ps_profile() const { return _ps_profile.c_str(); }
+  const char *vs_profile() const { return _vs_profile; }
+  const char *ps_profile() const { return _ps_profile; }
+  const char *cs_profile() const { return _cs_profile; }
 
   void get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count);
 
@@ -116,6 +117,7 @@ public:
 
   GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
   GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
+  GraphicsObjectHandle create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
 
   GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
@@ -184,6 +186,8 @@ public:
   bool vsync() const { return _vsync; }
   void set_vsync(bool value) { _vsync = value; }
 
+  static GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
@@ -195,7 +199,6 @@ private:
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
   void unbind_resource_views(int resource_bitmask);
 
-  GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
 
   bool create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, RenderTargetResource *out);
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureResource *out);
@@ -215,6 +218,7 @@ private:
   enum { IdCount = 1 << GraphicsObjectHandle::cIdBits };
   SearchableIdBuffer<string, ID3D11VertexShader *, IdCount> _vertex_shaders;
   SearchableIdBuffer<string, ID3D11PixelShader *, IdCount> _pixel_shaders;
+  SearchableIdBuffer<string, ID3D11ComputeShader *, IdCount> _compute_shaders;
   IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
@@ -266,8 +270,9 @@ private:
 
   std::map<string, vector<string> > _techniques_by_file;
 
-  string _vs_profile;
-  string _ps_profile;
+  const char *_vs_profile;
+  const char *_ps_profile;
+  const char *_cs_profile;
 
   bool _vsync;
 

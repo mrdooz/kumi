@@ -85,6 +85,7 @@ private:
 #define LOG_WARNING_LN_ONESHOT(fmt, ...) LOGGER.debug_output(true, true, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ );
 #define LOG_ERROR(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
 #define LOG_ERROR_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
+#define LOG_ERROR_COND_LN(cond, fmt, ...) do { if (!(cond)) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ ); } while(false)
 #define LOG_ERROR_DIRECT_LN(file, line, fmt, ...) LOGGER.debug_output(true, false, file, line, Logger::Error, fmt, __VA_ARGS__ );
 #define LOG_ERROR_LN_ONESHOT(fmt, ...) LOGGER.debug_output(true, true, __FILE__, __LINE__, Logger::Error, fmt, __VA_ARGS__ );
 #define LOG_FATAL(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Fatal, fmt, __VA_ARGS__ );

@@ -21,12 +21,17 @@ Technique::Technique()
   , _ps_shader_template(nullptr)
   , _vs_flag_mask(0)
   , _ps_flag_mask(0)
+  , _cs_flag_mask(0)
 {
+  _all_shaders.push_back(&_vertex_shaders);
+  _all_shaders.push_back(&_pixel_shaders);
+  _all_shaders.push_back(&_compute_shaders);
 }
 
 Technique::~Technique() {
-  seq_delete(&_vertex_shaders);
-  seq_delete(&_pixel_shaders);
+  for (size_t i = 0; i < _all_shaders.size(); ++i)
+    seq_delete(_all_shaders[i]);
+  _all_shaders.clear();
 }
 
 void Technique::init_from_parent(const Technique *parent) {
@@ -42,6 +47,7 @@ void Technique::init_from_parent(const Technique *parent) {
 
   _vs_flag_mask = parent->_vs_flag_mask;
   _ps_flag_mask = parent->_ps_flag_mask;
+  _cs_flag_mask = parent->_cs_flag_mask;
   _vs_shader_template = parent->_vs_shader_template;
   _ps_shader_template = parent->_ps_shader_template;
   _cs_shader_template = parent->_cs_shader_template;
@@ -90,7 +96,13 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
   PROCESS_INFORMATION process_info;
   ZeroMemory(&process_info, sizeof(process_info));
 
-  const char *profile = type == ShaderType::kVertexShader ? GRAPHICS.vs_profile() : GRAPHICS.ps_profile();
+  const char *profile = nullptr;
+  switch (type) {
+    case ShaderType::kVertexShader: profile = GRAPHICS.vs_profile(); break;
+    case ShaderType::kPixelShader: profile = GRAPHICS.ps_profile(); break;
+    case ShaderType::kComputeShader: profile = GRAPHICS.cs_profile(); break;
+    default: LOG_ERROR_LN("Implement me!");
+  }
 
   char cmd_line[MAX_PATH];
 
@@ -142,6 +154,7 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
       ReadFile(stdout_read, buf, len, &bytes_read, NULL);
       add_error_msg(buf);
       LOG_WARNING_NAKED_LN(buf);
+      LOG_WARNING_LN("cmd: %s", cmd_line);
     }
   }
   CloseHandle(stdout_read);
@@ -228,19 +241,29 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
       return false;
 
     ShaderReflection ref;
-    if (!ref.do_reflection(text, shader, shader_template, buf))
+    if (!ref.do_reflection(text.data(), text.size(), shader, shader_template, buf))
       return false;
 
     switch (shader->type()) {
+
       case ShaderType::kVertexShader: 
         shader->_handle = GRAPHICS.create_vertex_shader(FROM_HERE, buf, obj);
         _vertex_shaders.push_back(shader);
         break;
+
       case ShaderType::kPixelShader: 
         shader->_handle = GRAPHICS.create_pixel_shader(FROM_HERE, buf, obj);
         _pixel_shaders.push_back(shader);
         break;
-      case ShaderType::kGeometryShader: break;
+
+      case ShaderType::kComputeShader:
+        shader->_handle = GRAPHICS.create_compute_shader(FROM_HERE, buf, obj);
+        _compute_shaders.push_back(shader);
+        break;
+
+      case ShaderType::kGeometryShader: 
+        LOG_ERROR_LN("Implement me");
+        break;
     }
   }
   return true;
@@ -257,24 +280,19 @@ bool Technique::init() {
     _depth_stencil_state = GRAPHICS.default_depth_stencil_state();
 
   // create the shaders from the templates
-  if (_vs_shader_template) {
-    if (!create_shaders(_vs_shader_template.get()))
-      return false;
+  ShaderTemplate *templates[] = { _vs_shader_template.get(), _ps_shader_template.get(), _cs_shader_template.get() };
+  for (int i = 0; i < ELEMS_IN_ARRAY(templates); ++i) {
+    if (templates[i]) {
+      if (!create_shaders(templates[i]))
+        return false;
+    }
   }
 
-  if (_ps_shader_template) {
-    if (!create_shaders(_ps_shader_template.get()))
-      return false;
-  }
-
-  for (size_t i = 0; i < _vertex_shaders.size(); ++i) {
-    if (!_vertex_shaders[i]->on_loaded())
-      return false;
-  }
-
-  for (size_t i = 0; i<  _pixel_shaders.size(); ++i) {
-    if (!_pixel_shaders[i]->on_loaded())
-      return false;
+  for (size_t i = 0; i < _all_shaders.size(); ++i) {
+    for (size_t j = 0; j < _all_shaders[i]->size(); ++j) {
+      if (!(*_all_shaders[i])[j]->on_loaded())
+        return false;
+    }
   }
 
   return true;
@@ -293,5 +311,9 @@ Shader *Technique::vertex_shader(int flags) const {
 
 Shader *Technique::pixel_shader(int flags) const { 
   return _pixel_shaders.empty() ? nullptr : _pixel_shaders[flags & _ps_flag_mask];
+}
+
+Shader *Technique::compute_shader(int flags) const { 
+  return _compute_shaders.empty() ? nullptr : _compute_shaders[flags & _ps_flag_mask];
 }
 

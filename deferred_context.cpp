@@ -334,32 +334,40 @@ void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::
   ID3D11Buffer **ps_cb = (ID3D11Buffer **)_alloca(ps.size() * sizeof(ID3D11Buffer *));
 
   // Copy the vs cbuffers
+  int firstVsSlot = D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT;
   for (size_t i = 0; i < vs.size(); ++i) {
-    auto &cur = vs[i];
-    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
-    D3D11_MAPPED_SUBRESOURCE sub;
-    _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    memcpy(sub.pData, cur->staging.data(), cur->staging.size());
-    _ctx->Unmap(buffer, 0);
-    vs_cb[i] = buffer;
+    if (auto *cur = vs[i]) {
+      int slot = cur->slot;
+      firstVsSlot = min(firstVsSlot, slot);
+      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur->staging.data(), cur->staging.size());
+      _ctx->Unmap(buffer, 0);
+      vs_cb[slot] = buffer;
+    }
   }
 
   // Copy the ps cbuffers
+  int firstPsSlot = D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT;
   for (size_t i = 0; i < ps.size(); ++i) {
-    auto &cur = ps[i];
-    ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
-    D3D11_MAPPED_SUBRESOURCE sub;
-    _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
-    memcpy(sub.pData, cur->staging.data(), cur->staging.size());
-    _ctx->Unmap(buffer, 0);
-    ps_cb[i] = buffer;
+    if (auto *cur = ps[i]) {
+      int slot = cur->slot;
+      firstPsSlot = min(firstPsSlot, slot);
+      ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cur->handle);
+      D3D11_MAPPED_SUBRESOURCE sub;
+      _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+      memcpy(sub.pData, cur->staging.data(), cur->staging.size());
+      _ctx->Unmap(buffer, 0);
+      ps_cb[slot] = buffer;
+    }
   }
 
   if (!vs.empty())
-    _ctx->VSSetConstantBuffers(0, vs.size(), vs_cb);
+    _ctx->VSSetConstantBuffers(firstVsSlot, vs.size() - firstVsSlot, &vs_cb[firstVsSlot]);
 
   if (!ps.empty())
-      _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
+      _ctx->PSSetConstantBuffers(firstPsSlot, ps.size() - firstPsSlot, &ps_cb[firstPsSlot]);
 }
 
 void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen) {

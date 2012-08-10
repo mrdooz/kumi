@@ -20,6 +20,7 @@ public:
     kTechnique,
     kVertexShader,
     kPixelShader,
+    kComputeShader,
     kFontFamily,
     kMaterial,
     kStructuredBuffer,

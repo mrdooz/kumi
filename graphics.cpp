@@ -61,9 +61,11 @@ Graphics::Graphics()
   , _fps(0)
   , _vs_profile("vs_4_0")
   , _ps_profile("ps_4_0")
+  , _cs_profile("cs_4_0")
   , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size"))
   , _vertex_shaders(release_obj<ID3D11VertexShader *>)
   , _pixel_shaders(release_obj<ID3D11PixelShader *>)
+  , _compute_shaders(release_obj<ID3D11ComputeShader *>)
   , _vertex_buffers(release_obj<ID3D11Buffer *>)
   , _index_buffers(release_obj<ID3D11Buffer *>)
   , _constant_buffers(release_obj<ID3D11Buffer *>)
@@ -651,16 +653,21 @@ GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, c
   return emptyGoh;
 }
 
+template<typename T, class Cont>
+int add_shader(const TrackedLocation &loc, int idx, Cont &cont, T *shader, const string &id, GraphicsObjectHandle::Type type) {
+  set_private_data(loc, shader);
+  SAFE_RELEASE(cont[idx]);
+  cont.set_pair(idx, make_pair(id, shader));
+  return Graphics::make_goh(type, idx);
+}
+
 GraphicsObjectHandle Graphics::create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
 
   int idx = _vertex_shaders.idx_from_token(id);
   if (idx != -1 || (idx = _vertex_shaders.find_free_index()) != -1) {
     ID3D11VertexShader *vs = nullptr;
     if (SUCCEEDED(_device->CreateVertexShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &vs))) {
-      set_private_data(loc, vs);
-      SAFE_RELEASE(_vertex_shaders[idx]);
-      _vertex_shaders.set_pair(idx, make_pair(id, vs));
-      return GraphicsObjectHandle(GraphicsObjectHandle::kVertexShader, 0, idx);
+      return add_shader(loc, idx, _vertex_shaders, vs, id, GraphicsObjectHandle::kVertexShader);
     }
   }
   return emptyGoh;
@@ -672,10 +679,19 @@ GraphicsObjectHandle Graphics::create_pixel_shader(const TrackedLocation &loc, c
   if (idx != -1 || (idx = _pixel_shaders.find_free_index()) != -1) {
     ID3D11PixelShader *ps = nullptr;
     if (SUCCEEDED(_device->CreatePixelShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &ps))) {
-      set_private_data(loc, ps);
-      SAFE_RELEASE(_pixel_shaders[idx]);
-      _pixel_shaders.set_pair(idx, make_pair(id, ps));
-      return GraphicsObjectHandle(GraphicsObjectHandle::kPixelShader, 0, idx);
+      return add_shader(loc, idx, _pixel_shaders, ps, id, GraphicsObjectHandle::kPixelShader);
+    }
+  }
+  return emptyGoh;
+}
+
+GraphicsObjectHandle Graphics::create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
+
+  int idx = _compute_shaders.idx_from_token(id);
+  if (idx != -1 || (idx = _compute_shaders.find_free_index()) != -1) {
+    ID3D11ComputeShader *cs = nullptr;
+    if (SUCCEEDED(_device->CreateComputeShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &cs))) {
+      return add_shader(loc, idx, _compute_shaders, cs, id, GraphicsObjectHandle::kComputeShader);
     }
   }
   return emptyGoh;

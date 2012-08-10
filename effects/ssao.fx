@@ -243,15 +243,15 @@ RWStructuredBuffer<float4> Output;
 
 cbuffer blurSettings : register( b0 )
 {
-    uint imageW;
-    uint imageH;
+    int imageW;
+    int imageH;
     int2 blurRadius;
 }
 
 [numthreads(32,1,1)]
 void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
 {
-    uint y = globalThreadID.x;
+    int y = globalThreadID.x;
     if (y >= imageH) 
       return;
     
@@ -261,12 +261,11 @@ void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
     for(int x=-blurRadius.x; x<=blurRadius.x; x++) {
         t += Texture0.Load(int3(x, y, 0));
     }
-    Output[y] = t * scale;
+    Output[y*imageW+0] = t * scale;
 
     for(x=1; x<imageW; x++) {
         t += Texture0.Load(int3(x + blurRadius.x, y, 0));
         t -= Texture0.Load(int3(x - blurRadius.x - 1, y, 0));
         Output[y*imageW+x] = t * scale;
     }
-
 }

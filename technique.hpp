@@ -120,7 +120,6 @@ private:
 
   void add_error_msg(const char *fmt, ...);
   bool compile_shader(ShaderType::Enum type, const char *entry_point, const char *src, const char *obj, const std::vector<std::string> &flags);
-  bool do_reflection(const std::vector<char> &text, Shader *shader, ShaderTemplate *shader_template, const std::vector<char> &obj);
 
   std::vector<CBufferVariable> _cbuffer_vars;
 
@@ -129,6 +128,9 @@ private:
   std::vector<Shader *> _vertex_shaders;
   std::vector<Shader *> _pixel_shaders;
   std::vector<Shader *> _compute_shaders;
+
+  std::vector<std::vector<Shader *> *> _all_shaders;  // yo dawg!
+
 
   int _vertex_size;
   DXGI_FORMAT _index_format;
@@ -142,6 +144,7 @@ private:
 
   int _vs_flag_mask;
   int _ps_flag_mask;
+  int _cs_flag_mask;
   std::shared_ptr<ShaderTemplate> _vs_shader_template;
   std::shared_ptr<ShaderTemplate> _ps_shader_template;
   std::shared_ptr<ShaderTemplate> _cs_shader_template;
