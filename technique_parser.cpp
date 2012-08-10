@@ -91,6 +91,7 @@ enum Symbol {
   kSymId,
   kSymVertexShader,
   kSymPixelShader,
+  kSymComputeShader,
     kSymFile,
     kSymEntryPoint,
     kSymParams,
@@ -178,6 +179,7 @@ struct {
 
   { kSymVertexShader, "vertex_shader" },
   { kSymPixelShader, "pixel_shader" },
+  { kSymComputeShader, "compute_shader" },
     { kSymFile, "file" },
     { kSymEntryPoint, "entry_point" },
     { kSymParams, "params" },
@@ -350,7 +352,7 @@ using namespace technique_parser_details;
 TechniqueParser::TechniqueParser(const std::string &filename, TechniqueFile *result) 
   : _symbol_trie(new Trie()) 
   , _result(result)
-  , _filename(filename)
+  , _filename(RESOURCE_MANAGER.resolve_filename(filename.c_str(), true))
 {
   for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
     _symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
@@ -556,10 +558,9 @@ struct Scope {
       --tmp;
     }
 
-    LOG_ERROR(to_string("Error on line: %d. Looking for \"%s\", found \"%s\"", 
-      line, 
+    LOG_ERROR_DIRECT_LN(_parser->_filename.c_str(), line, "Expected: \"%s\", found \"%s\"", 
       expected_symbol,
-      string(_start, min(_end - _start + 1, 20)).c_str()).c_str());
+      string(_start, min(_end - _start + 1, 20)).c_str());
   }
 
   TechniqueParser *_parser;
@@ -1089,7 +1090,7 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
   auto valid = list_of
-    (kSymVertexShader)(kSymPixelShader)
+    (kSymVertexShader)(kSymPixelShader)(kSymComputeShader)
     (kSymMaterial)
     (kSymVertices)(kSymIndices)
     (kSymGeometry)
@@ -1100,14 +1101,16 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
     switch (symbol) {
 
       case kSymVertexShader:
-      case kSymPixelShader: {
-        bool vs = symbol == kSymVertexShader;
+      case kSymPixelShader:
+      case kSymComputeShader: {
         ShaderTemplate *st = nullptr;
-        if (vs) {
+        if (symbol == kSymVertexShader) 
           technique->_vs_shader_template.reset(st = new ShaderTemplate(ShaderType::kVertexShader));
-        } else {
+        else if (symbol == kSymPixelShader)
           technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader));
-        }
+        else
+          technique->_cs_shader_template.reset(st = new ShaderTemplate(ShaderType::kComputeShader));
+
         scope->munch(kSymBlockOpen);
         parse_shader_template(scope, technique, st);
         scope->munch(kSymBlockClose).munch(kSymSemicolon);

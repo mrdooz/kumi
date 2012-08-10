@@ -19,6 +19,15 @@ bool Shader::on_loaded() {
   return true;
 }
 
+void Shader::set_cbuffer(PropertySource::Enum src, const CBuffer &cbuffer) {
+  switch (src) {
+    case PropertySource::kMesh: _mesh_cbuffer = cbuffer; break;
+    case PropertySource::kMaterial: _material_cbuffer = cbuffer; break;
+    case PropertySource::kSystem: _system_cbuffer = cbuffer; break;
+    case PropertySource::kInstance: _instance_cbuffer = cbuffer; break;
+  }
+}
+
 void Shader::set_cbuffer_slot(PropertySource::Enum src, int slot) {
   if (slot + 1 > (int)_cbuffers.size())
     _cbuffers.resize(slot + 1);

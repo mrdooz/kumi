@@ -209,7 +209,7 @@ float4 light_ps_main(quad_ps_input input) : SV_Target
     }
     
     float3 h = normalize(-pos + ll);
-    float ss = specular * pow(saturate(dot(h, normal)), shininess);
+    float4 ss = float4(specular * pow(saturate(dot(h, normal)), shininess), 1);
 
     float occ = rt_occlusion.Sample(PointSampler, input.tex).r;
     
@@ -229,4 +229,44 @@ float4 gamma_ps_main(quad_ps_input input) : SV_Target
   float4 color = rt_composite.Sample(PointSampler, input.tex);
   float4 bloom = Texture1.Sample(LinearSampler, input.tex);
   return pow(color + 0.25 * bloom, InvGamma);
+}
+
+
+///////////////////////////////////
+// Blurs
+///////////////////////////////////
+
+// horizontal rolling box blur, one thread per row
+// reads from texture, writes to structured buffer
+
+RWStructuredBuffer<float4> Output;
+
+cbuffer blurSettings : register( b0 )
+{
+    uint imageW;
+    uint imageH;
+    int2 blurRadius;
+}
+
+[numthreads(32,1,1)]
+void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
+{
+    uint y = globalThreadID.x;
+    if (y >= imageH) 
+      return;
+    
+    float scale = 1.0f / (2*blurRadius.x+1);
+
+    float4 t = 0.0f;
+    for(int x=-blurRadius.x; x<=blurRadius.x; x++) {
+        t += Texture0.Load(int3(x, y, 0));
+    }
+    Output[y] = t * scale;
+
+    for(x=1; x<imageW; x++) {
+        t += Texture0.Load(int3(x + blurRadius.x, y, 0));
+        t -= Texture0.Load(int3(x - blurRadius.x - 1, y, 0));
+        Output[y*imageW+x] = t * scale;
+    }
+
 }

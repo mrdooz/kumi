@@ -59,9 +59,9 @@ string Path::get_filename_without_ext() const {
   return res;
 }
 
-string Path::get_full_path_name(const string& p) {
+string Path::get_full_path_name(const char *p) {
   char buf[MAX_PATH];
-  GetFullPathNameA(p.c_str(), MAX_PATH, buf, NULL);
+  GetFullPathNameA(p, MAX_PATH, buf, NULL);
   return buf;
 }
 

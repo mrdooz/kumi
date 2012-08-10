@@ -5,6 +5,7 @@
 #include "file_watcher.hpp"
 #include "threading.hpp"
 #include "logger.hpp"
+#include "path_utils.hpp"
 
 using namespace std::tr1::placeholders;
 using namespace std;
@@ -43,26 +44,19 @@ void ResourceManager::add_path(const std::string &path) {
 }
 
 bool ResourceManager::load_file(const char *filename, std::vector<char> *buf) {
-  const string &full_path = resolve_filename(filename);
+  const string &full_path = resolve_filename(filename, false);
   if (full_path.empty()) return false;
 
   return ::load_file(full_path.c_str(), buf);
 }
-/*
-bool ResourceManager::load_file(const char *filename, void **buf, size_t *len) {
-  const string &full_path = resolve_filename(filename);
-  if (full_path.empty()) return false;
 
-  return ::load_file(full_path.c_str(), buf, len);
-}
-*/
 bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len, std::vector<char> *buf) {
   buf->resize(len);
   return load_inplace(filename, ofs, len, buf->data());
 }
 
 bool ResourceManager::load_inplace(const char *filename, size_t ofs, size_t len, void *buf) {
-  const string &full_path = resolve_filename(filename);
+  const string &full_path = resolve_filename(filename, false);
 
   ScopedHandle h(CreateFileA(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 
     FILE_ATTRIBUTE_NORMAL, NULL));
@@ -86,7 +80,7 @@ bool ResourceManager::load_inplace(const char *filename, size_t ofs, size_t len,
 }
 
 bool ResourceManager::file_exists(const char *filename) {
-  return !resolve_filename(filename).empty();
+  return !resolve_filename(filename, false).empty();
 }
 
 __time64_t ResourceManager::mdate(const char *filename) {
@@ -110,10 +104,10 @@ void ResourceManager::copy_on_load(bool enable, const char *dest) {
     _copy_dest;
 }
 
-string ResourceManager::resolve_filename(const char *filename) {
+string ResourceManager::resolve_filename(const char *filename, bool fullPath) {
 
   if (::file_exists(filename)) {
-    return normalize_path(filename, false);
+    return normalize_path(fullPath ? Path::get_full_path_name(filename) : filename, false);
   }
 
   auto it = _resolved_paths.find(filename);

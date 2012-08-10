@@ -17,7 +17,7 @@ public:
   string get_filename_without_ext() const;
 
   static string make_canonical(const string &str);
-  static string get_full_path_name(const string& p);
+  static string get_full_path_name(const char *p);
   static string replace_extension(const string& path, const string& ext);
   static string get_path(const string& p);
 

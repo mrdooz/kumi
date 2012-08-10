@@ -360,7 +360,22 @@ void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::
 
   if (!ps.empty())
       _ctx->PSSetConstantBuffers(0, ps.size(), ps_cb);
+}
 
+void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen) {
+
+  ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cb);
+  D3D11_MAPPED_SUBRESOURCE sub;
+  _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
+  memcpy(sub.pData, data, dataLen);
+  _ctx->Unmap(buffer, 0);
+
+  if (type == ShaderType::kVertexShader)
+    _ctx->VSSetConstantBuffers(slot, 1, &buffer);
+  else if (type == ShaderType::kPixelShader)
+    _ctx->PSSetConstantBuffers(slot, 1, &buffer);
+  else if (type == ShaderType::kComputeShader)
+    _ctx->CSSetConstantBuffers(slot, 1, &buffer);
 }
 
 void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) {

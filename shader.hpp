@@ -8,6 +8,7 @@ namespace ShaderType {
     kVertexShader,
     kPixelShader,
     kGeometryShader,
+    kComputeShader,
   };
 }
 
@@ -23,6 +24,7 @@ typedef std::array<ResourceView, MAX_TEXTURES> ResourceViewArray;
 class Shader {
   friend class TechniqueParser;
   friend class Technique;
+  friend class ShaderReflection;
 public:
 
   Shader(ShaderType::Enum type);
@@ -43,6 +45,7 @@ public:
   bool on_loaded();
 
   void set_cbuffer_slot(PropertySource::Enum src, int slot);
+  void set_cbuffer(PropertySource::Enum src, const CBuffer &cbuffer);
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
 

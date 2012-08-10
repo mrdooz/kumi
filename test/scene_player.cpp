@@ -99,8 +99,8 @@ bool ScenePlayer::init() {
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
   _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rt_final");
 
-  string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi");
-  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json");
+  string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi", true);
+  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
 
   KumiLoader loader;
   if (!loader.load(resolved_name.c_str(), nullptr /*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))

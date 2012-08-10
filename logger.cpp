@@ -100,7 +100,7 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
     one_shot_set_.insert(buf);
   }
 
-  std::string str = _output_line_numbers ? to_string("%s(%d): %s", file, line, buf) : buf;
+  string str = (!file || !_output_line_numbers) ? buf : to_string("%s(%d): %s", file, line, buf);
 
   if ((_output_device & Logger::Debugger) && severity_map_[Logger::Debugger][severity])
     OutputDebugStringA(str.c_str());

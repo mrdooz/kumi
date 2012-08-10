@@ -27,7 +27,7 @@ public:
   void copy_on_load(bool enable, const char *dest);
   void add_path(const std::string &path);
 
-  std::string resolve_filename(const char *filename);
+  std::string resolve_filename(const char *filename, bool fullPath);
 
 private:
   void file_changed(int timeout, void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);

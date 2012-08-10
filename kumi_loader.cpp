@@ -513,7 +513,7 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
 }
 
 bool KumiLoader::load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene) {
-  _filename = resource->resolve_filename(filename);
+  _filename = resource->resolve_filename(filename, true);
   LOG_CONTEXT("%s loading %s", __FUNCTION__, _filename.c_str());
 
   if (material_override) {

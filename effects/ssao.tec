@@ -67,7 +67,7 @@ technique ssao_light inherits quad_base{
             texture2d rt_occlusion system;
         ];
     };
-	blend_desc = BlendOneOne;
+    blend_desc = BlendOneOne;
 };
 
 technique gamma_correction inherits quad_base {
@@ -80,5 +80,12 @@ technique gamma_correction inherits quad_base {
             texture2d rt_luminance system;
             texture2d Texture1 user;
         ];
+    };
+};
+
+technique hblur {
+    compute_shader {
+        file effects/ssao.fx;
+        entry_point hblur_cs_main;
     };
 };

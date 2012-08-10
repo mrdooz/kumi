@@ -43,7 +43,7 @@ struct CBufferParam : public ParamBase {
 };
 
 struct ResourceViewParam : public ParamBase {
-  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name) 
+  ResourceViewParam(const std::string &name, PropertyType::Enum type, PropertySource::Enum source, const std::string &friendly_name)
     : ParamBase(name, type, source)
     , friendly_name(friendly_name)
   {
@@ -92,9 +92,9 @@ public:
   const std::string &name() const { return _name; }
   void init_from_parent(const Technique *parent);
 
-//  GraphicsObjectHandle input_layout() const { return _input_layout; }
   Shader *vertex_shader(int flags) const;
   Shader *pixel_shader(int flags) const;
+  Shader *compute_shader(int flags) const;
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }
@@ -128,8 +128,7 @@ private:
   // we have multiple version of the shaders, one for each permutation of the compilation flags
   std::vector<Shader *> _vertex_shaders;
   std::vector<Shader *> _pixel_shaders;
-
-  //GraphicsObjectHandle _input_layout;
+  std::vector<Shader *> _compute_shaders;
 
   int _vertex_size;
   DXGI_FORMAT _index_format;
@@ -145,6 +144,7 @@ private:
   int _ps_flag_mask;
   std::shared_ptr<ShaderTemplate> _vs_shader_template;
   std::shared_ptr<ShaderTemplate> _ps_shader_template;
+  std::shared_ptr<ShaderTemplate> _cs_shader_template;
 
   std::vector<Material *> _materials;
 

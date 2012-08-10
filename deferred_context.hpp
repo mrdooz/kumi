@@ -71,6 +71,7 @@ public:
   void unset_shader_resource(int first_view, int num_views);
   void set_cbuffers(const std::vector<CBuffer *> &vs, const std::vector<CBuffer *> &ps);
   void set_cbuffer(const CBuffer &vs, const CBuffer &ps);
+  void set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen);
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;
   void draw_indexed(int count, int start_index, int base_vertex);
 
