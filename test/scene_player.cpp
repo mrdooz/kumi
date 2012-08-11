@@ -14,6 +14,7 @@
 #include "../profiler.hpp"
 #include "../deferred_context.hpp"
 #include "../animation_manager.hpp"
+#include "../app.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -118,27 +119,27 @@ bool ScenePlayer::init() {
   // create properties from the materials
   for (auto it = begin(_scene->materials); it != end(_scene->materials); ++it) {
     Material *mat = *it;
-    auto mp = unique_ptr<TweakableParam>(new TweakableParam(mat->name()));
+    auto mp = unique_ptr<AnimatedTweakableParam>(new AnimatedTweakableParam(mat->name()));
 
     for (auto j = begin(mat->properties()); j != end(mat->properties()); ++j) {
       const Material::Property *prop = *j;
       switch (prop->type) {
         case PropertyType::kFloat: {
-          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat, prop->id);
+          AnimatedTweakableParam *p = new AnimatedTweakableParam(prop->name, AnimatedTweakableParam::kTypeFloat, prop->id);
           p->add_key(0, prop->_float4[0]);
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kColor: {
-          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeColor, prop->id);
+          AnimatedTweakableParam *p = new AnimatedTweakableParam(prop->name, AnimatedTweakableParam::kTypeColor, prop->id);
           p->add_key(0, XMFLOAT4(prop->_float4));
           mp->add_child(p);
           break;
         }
 
         case PropertyType::kFloat4: {
-          TweakableParam *p = new TweakableParam(prop->name, TweakableParam::kTypeFloat4, prop->id);
+          AnimatedTweakableParam *p = new AnimatedTweakableParam(prop->name, AnimatedTweakableParam::kTypeFloat4, prop->id);
           p->add_key(0, XMFLOAT4(prop->_float4));
           mp->add_child(p);
           break;
@@ -148,6 +149,16 @@ bool ScenePlayer::init() {
     }
 
     _params.push_back(move(mp));
+
+    TweakableParameterBlock block("blur");
+    block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
+    block._params.push_back(TweakableParameter("blurY", 10.0f));
+
+    APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
+      int a = 10;
+    });
+
+
   }
 
 /*

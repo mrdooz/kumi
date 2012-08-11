@@ -207,11 +207,11 @@ void *AnimationManager::alloc_anim(const std::string &name, AnimationType type, 
   return nullptr;
 }
 
-XMFLOAT3 interpolate(const XMFLOAT3 &a, const XMFLOAT3 &b, float t) {
+static XMFLOAT3 interpolate(const XMFLOAT3 &a, const XMFLOAT3 &b, float t) {
   return lerp(a,b,t);
 }
 
-XMFLOAT4 interpolate(const XMFLOAT4 &a, const XMFLOAT4 &b, float t) {
+static XMFLOAT4 interpolate(const XMFLOAT4 &a, const XMFLOAT4 &b, float t) {
   // When doing quaternian lerp, we have to check the sign of the dot(a,b)
   XMFLOAT4 c = a;
   if (dot(a,b) < 0) {
@@ -221,8 +221,7 @@ XMFLOAT4 interpolate(const XMFLOAT4 &a, const XMFLOAT4 &b, float t) {
 }
 
 template<class T>
-void AnimationManager::update_inner(double time, 
-  vector<KeyFrameCache<T> *> *keyframes) {
+void AnimationManager::update_inner(double time, vector<KeyFrameCache<T> *> *keyframes) {
   for (size_t i = 0; i < keyframes->size(); ++i) {
     auto *p = (*keyframes)[i];
     auto *frames = p->keyframes;

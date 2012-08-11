@@ -128,6 +128,7 @@ var KUMI = (function($, KUMI_LIB) {
             // icons from http://findicons.com/pack/2103/discovery
             $('#connection-status').attr('src', 'assets/gfx/connected.png');
             websocket.send('REQ:DEMO.INFO');
+            websocket.send('REQ:PARAM.INFO');
             fpsSmoothie.start();
             memSmoothie.start();
             initial_open = false;
@@ -224,6 +225,8 @@ var KUMI = (function($, KUMI_LIB) {
                     drawProfile(msg['system.profile']);
             } else if (msg['system.frame']) {
                 drawCharts(msg['system.frame']);
+            } else if (msg.blocks) {
+                console.log(msg.blocks);
             } else if (msg.demo) {
                 // append interpolation functions to the parameters
                 demoInfo = msg.demo;

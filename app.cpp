@@ -215,14 +215,18 @@ static void send_json(SOCKET socket, const JsonValue::JsonValuePtr &json) {
 
 void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 
-  if (strncmp(msg, "REQ:SYSTEM.FPS", len) == 0) {
-    auto obj = JsonValue::create_object();
-    obj->add_key_value("system.fps", JsonValue::create_number(GRAPHICS.fps()));
-    obj->add_key_value("system.ms", JsonValue::create_number(APP.frame_time()));
-    send_json(sender, obj);
-
-  } else if (strncmp(msg, "REQ:DEMO.INFO", len) == 0) {
+  if (strncmp(msg, "REQ:DEMO.INFO", len) == 0) {
     send_json(sender, DEMO_ENGINE.get_info());
+
+  } else if (strncmp(msg, "REQ:PARAM.INFO", len) == 0) {
+    auto root = JsonValue::create_object();
+    auto blocks = JsonValue::create_array();
+    root->add_key_value("blocks", blocks);
+    for (auto it = begin(_parameterBlocks); it != end(_parameterBlocks); ++it) {
+      blocks->add_value(it->second.first);
+    }
+    send_json(sender, root);
+
   } else {
     JsonValue::JsonValuePtr m = parse_json(msg, msg + len);
     if ((*m)["msg"]) {
@@ -246,6 +250,9 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 }
 
 void App::send_stats(const JsonValue::JsonValuePtr &frame) {
+
+  if (WEBSOCKET_SERVER.num_clients_connected() == 0)
+    return;
 
   {
     auto root = JsonValue::create_object();
@@ -460,3 +467,12 @@ void App::find_app_root()
   _app_root = starting_dir;
 }
 
+void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const cbParamChanged &onChanged) {
+
+  // create a json rep for the parameter block
+  auto root = JsonValue::create_object();
+  auto block = JsonValue::create_object();
+  block->add_key_value("name", paramBlock._blockName);
+  root->add_key_value("block", block);
+  _parameterBlocks[paramBlock._blockName] = make_pair(block, onChanged);
+}

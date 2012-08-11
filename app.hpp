@@ -8,9 +8,7 @@
 #include "websocket_server.hpp"
 #endif
 
-using std::string;
-using std::map;
-using std::vector;
+struct TweakableParameterBlock;
 
 /*
 repeat after me: directx is left-handed. z goes into the screen.
@@ -20,22 +18,6 @@ class EffectBase;
 class EffectWrapper;
 
 struct Scene;
-
-struct RenderStates {
-  RenderStates() : blend_state(nullptr), depth_stencil_state(nullptr), 
-                   rasterizer_state(nullptr), sampler_state(nullptr) {}
-  D3D11_BLEND_DESC blend_desc;
-  ID3D11BlendState *blend_state;
-
-  D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
-  ID3D11DepthStencilState *depth_stencil_state;
-
-  D3D11_RASTERIZER_DESC rasterizer_desc;
-  ID3D11RasterizerState *rasterizer_state;
-
-  D3D11_SAMPLER_DESC sampler_desc;
-  ID3D11SamplerState *sampler_state;
-};
 
 #if WITH_GWEN
 namespace Gwen {
@@ -74,6 +56,10 @@ public:
 
   void process_network_msg(SOCKET sender, const char *msg, int len);
 
+  typedef std::function<void (const JsonValue::JsonValuePtr &)> cbParamChanged;
+
+  void add_parameter_block(const TweakableParameterBlock &block, const cbParamChanged &onChanged);
+
 private:
   DISALLOW_COPY_AND_ASSIGN(App);
   App();
@@ -103,6 +89,8 @@ protected:
   bool _draw_plane;
   string _app_root;
   int _ref_count;
+
+  std::map<std::string, std::pair<JsonValue::JsonValuePtr, cbParamChanged>> _parameterBlocks;
 
 #if WITH_GWEN
   std::unique_ptr<Gwen::Controls::StatusBar> _gwen_status_bar;

@@ -170,6 +170,7 @@ UINT WebSocketThread::client_thread(void *param) {
     auto it = std::find(RANGE(cd->self->_client_threads), cd);
     cd->self->_client_threads.erase(it);
     delete cd;
+    LOG_INFO_LN("** WEBSOCKET: client thread exit");
   });
 
   HANDLE events[2];
@@ -178,7 +179,10 @@ UINT WebSocketThread::client_thread(void *param) {
   WSAEventSelect(socket, async_event, FD_READ);
   events[0] = cd->close_event;
   events[1] = async_event;
-  int obj = WaitForMultipleObjects(2, events, FALSE, INFINITE);
+  // If we can't read immediately, then close the socket. This is a hack to
+  // work around the fact that I'm getting multiple accepts when connecting,
+  // which is causing me to spawn threads that just hang here..
+  int obj = WaitForMultipleObjects(2, events, FALSE, 0);
   if (obj == WAIT_OBJECT_0) // cancel event
     return 0;
 
@@ -192,8 +196,10 @@ UINT WebSocketThread::client_thread(void *param) {
     return 1;
 
   int send_result = send(socket, reply.data(), reply.size(), 0);
-  if (send_result < 0)
+  if (send_result < 0) {
+    LOG_INFO_LN("** WEBSOCKET: Error sending handshake reply");
     return WSAGetLastError();
+  }
 
   // create an accept event
   events[0] = cd->close_event;
@@ -291,9 +297,10 @@ UINT WebSocketThread::blocking_run(void *param) {
   ULONG p = 1;
   ioctlsocket(listen_socket, FIONBIO, &p);
 
+
   HANDLE events[] = {
     _cancel_event,
-    CreateEvent(NULL, TRUE, FALSE, NULL),
+    WSACreateEvent(),
     _callbacks_added
   };
 
@@ -303,7 +310,7 @@ UINT WebSocketThread::blocking_run(void *param) {
     if (listen(listen_socket, SOMAXCONN) == SOCKET_ERROR)
       return WSAGetLastError();
 
-    int res = WaitForMultipleObjects(3, events, FALSE, INFINITE);
+    int res = WSAWaitForMultipleEvents(3, events, FALSE, INFINITE, TRUE);
 
     if (res == WAIT_OBJECT_0) {
       // cancel event
@@ -311,8 +318,16 @@ UINT WebSocketThread::blocking_run(void *param) {
 
     } else if (res == WAIT_OBJECT_0 + 1) {
       // accept event
-      SOCKET client_socket = accept(listen_socket, NULL, NULL);
+      LOG_INFO_LN("** WEBSOCKET: Accept");
+
+      WSANETWORKEVENTS networkEvents;
+      WSAEnumNetworkEvents(listen_socket, events[1], &networkEvents); // reset the event
+
+      struct sockaddr connectionAddr;
+      int connectionAddrLen = sizeof(connectionAddr);
+      SOCKET client_socket = WSAAccept(listen_socket, &connectionAddr, &connectionAddrLen, NULL, NULL);
       if (client_socket != INVALID_SOCKET) {
+        LOG_INFO_LN("** WEBSOCKET: Accept inner");
         uint32 thread_id;
         ClientData *cd = new ClientData;
         cd->self = this;
@@ -324,7 +339,6 @@ UINT WebSocketThread::blocking_run(void *param) {
           _client_threads.push_back(cd);
         }
       }
-      ResetEvent(events[1]);
 
     } else if (res == WAIT_OBJECT_0 + 2) {
       process_deferred();
@@ -332,11 +346,19 @@ UINT WebSocketThread::blocking_run(void *param) {
   }
 
   vector<HANDLE> threads;
-  for (size_t i = 0; i < _client_threads.size(); ++i)
-    threads.push_back(_client_threads[i]->thread);
+  {
+    SCOPED_CS(_thread_cs);
+    for (size_t i = 0; i < _client_threads.size(); ++i)
+      threads.push_back(_client_threads[i]->thread);
+  }
 
   WaitForMultipleObjects(threads.size(), threads.data(), TRUE, INFINITE);
   return 0;
+}
+
+int WebSocketThread::num_clients_connected() {
+  SCOPED_CS(_thread_cs);
+  return (int)_client_threads.size();
 }
 
 void WebSocketThread::send_msg(SOCKET receiver, const char *msg, int len) {
@@ -382,6 +404,10 @@ void WebSocketServer::send_msg(SOCKET receiver, const char *msg, int len) {
 WebSocketServer& WebSocketServer::instance() {
   KASSERT(_instance);
   return *_instance;
+}
+
+int WebSocketServer::num_clients_connected() {
+  return _thread.num_clients_connected();
 }
 
 #endif

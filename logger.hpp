@@ -78,7 +78,7 @@ private:
 #define LOG_VERBOSE(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Verbose, fmt, __VA_ARGS__ );
 #define LOG_VERBOSE_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Verbose, fmt, __VA_ARGS__ );
 #define LOG_INFO(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Info, fmt, __VA_ARGS__ );
-#define LOG_INFO_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Info, fmt, __VA_ARGS__ );
+#define LOG_INFO_LN(fmt, ...) do { LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Info, fmt, __VA_ARGS__ ); } while(false)
 #define LOG_WARNING(fmt, ...) do { LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ ); } while(false)
 #define LOG_WARNING_LN(fmt, ...) do { LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Warning, fmt, __VA_ARGS__ ); } while(false)
 #define LOG_WARNING_NAKED_LN(fmt, ...) do { LOGGER.debug_output(true, false, nullptr, -1, Logger::Warning, fmt, __VA_ARGS__ ); } while(false)

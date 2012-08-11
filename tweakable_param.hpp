@@ -3,7 +3,36 @@
 #include "json_utils.hpp"
 #include "property_manager.hpp"
 
-class TweakableParam {
+class TweakableParameter {
+public:
+  enum Type {
+    kTypeFloat,
+  };
+  TweakableParameter(const std::string &name, float value);
+  TweakableParameter(const std::string &name, float value, float minValue, float maxValue);
+private:
+  union Value {
+    float _float4[4];
+    float _float;
+    int _int;
+  };
+
+  Value _value;
+  Value _minValue;
+  Value _maxValue;
+  Type _type;
+  std::string _name;
+  bool _bounded;
+};
+
+struct TweakableParameterBlock {
+  TweakableParameterBlock(const std::string &name) : _blockName(name) {}
+  std::string _blockName;
+  std::vector<TweakableParameter> _params;
+};
+
+
+class AnimatedTweakableParam {
 public:
   enum Type {
     kTypeUnknown,
@@ -27,10 +56,10 @@ public:
     kAnimSpline,
   };
 
-  TweakableParam(const std::string &name);
-  TweakableParam(const std::string &name, Type type, Animation animation);
-  TweakableParam(const std::string &name, Type type, PropertyId id);
-  ~TweakableParam();
+  AnimatedTweakableParam(const std::string &name);
+  AnimatedTweakableParam(const std::string &name, Type type, Animation animation);
+  AnimatedTweakableParam(const std::string &name, Type type, PropertyId id);
+  ~AnimatedTweakableParam();
 
   // TODO: handle strings..
   template<typename T>
@@ -44,7 +73,7 @@ public:
   }
 
   // note, the parent takes ownership of the child
-  void add_child(TweakableParam *child);
+  void add_child(AnimatedTweakableParam *child);
 
   JsonValue::JsonValuePtr to_json();
 
@@ -58,8 +87,8 @@ private:
     T value;
   };
 
-  JsonValue::JsonValuePtr get_keys(const TweakableParam *p);
-  JsonValue::JsonValuePtr add_param(const TweakableParam *param);
+  JsonValue::JsonValuePtr get_keys(const AnimatedTweakableParam *p);
+  JsonValue::JsonValuePtr add_param(const AnimatedTweakableParam *param);
 
   template<typename T> struct Int2Type {};
   std::vector<Key<bool> > *&get_values(Int2Type<bool>) { KASSERT(_type == kTypeBool); return _bool; }
@@ -86,5 +115,5 @@ private:
     std::string *_string;
   };
 
-  std::vector<TweakableParam *> _children;
+  std::vector<AnimatedTweakableParam *> _children;
 };

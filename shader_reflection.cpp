@@ -165,9 +165,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
             int len = atoi(row[6].c_str());
             size = max(size, ofs + len);
             PropertyId id = ~0;
-#ifdef _DEBUG
             string class_id;
-#endif
             if (source != PropertySource::kUnknown) {
               // The id is either a classifer (for mesh/material), or a real id in the system case
               class_id = PropertySource::qualify_name(name, source);

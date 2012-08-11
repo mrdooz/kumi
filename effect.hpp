@@ -3,7 +3,7 @@
 #include "graphics_submit.hpp"
 #include "json_utils.hpp"
 
-class TweakableParam;
+class AnimatedTweakableParam;
 
 class Effect {
 public:
@@ -33,6 +33,6 @@ protected:
   GraphicsObjectHandle _context;
   uint32 _start_time, _end_time;
   bool _running;
-  std::vector<std::unique_ptr<TweakableParam> > _params;
+  std::vector<std::unique_ptr<AnimatedTweakableParam> > _params;
 };
 

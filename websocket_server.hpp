@@ -15,6 +15,7 @@ protected:
   void send_msg(SOCKET receiver, const char *msg, int len);
   virtual void on_idle() {}
   UINT blocking_run(void *data);
+  int num_clients_connected();
 private:
   static UINT __stdcall client_thread(void *param);
 
@@ -37,6 +38,7 @@ public:
   static bool close();
 
   void send_msg(SOCKET receiver, const char *msg, int len);
+  int num_clients_connected();
 
 private:
   static WebSocketServer *_instance;
