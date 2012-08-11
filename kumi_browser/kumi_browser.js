@@ -156,16 +156,34 @@ var KUMI = (function($, KUMI_LIB) {
             memSeries.append(data.timestamp, mem);
         }
 
-        function drawParamblock(paramBlock) {
+        function sendParamblock(paramBlock) {
+            sendJson("STATE:PARAM", paramBlock);
+        }
 
-            $.each(paramBlock, function(i, block) {
-                $.each(block.params, function(j, param) {
+        function drawParamblocks(paramBlocks) {
+
+            $.each(paramBlocks, function(i, block) {
+                var name = block.name;
+                $.each(block.params, function(k, param) {
+                    var paramName = k;
+                    $("<label/>", {
+                        text : paramName
+                    }).appendTo("#tweak-div");
                     if (param.minValue) {
                         $("<div/>", {
-                            id: param.name
+                            id: paramName,
+                            style: "margin: 10px"
                         }).appendTo("#tweak-div");
 
-                        $("#" + param.name).slider();
+                        $("#" + paramName).slider({
+                            value: param.value,
+                            min: param.minValue,
+                            max: param.maxValue,
+                            slide: function( event, ui ) {
+                                param.value = ui.value;
+                                sendParamblock(block);
+                            }
+                        });
                     }
                 });
 
@@ -244,7 +262,7 @@ var KUMI = (function($, KUMI_LIB) {
             } else if (msg['system.frame']) {
                 drawCharts(msg['system.frame']);
             } else if (msg.blocks) {
-                drawParamblock(msg.blocks);
+                drawParamblocks(msg.blocks);
             } else if (msg.demo) {
                 // append interpolation functions to the parameters
                 demoInfo = msg.demo;

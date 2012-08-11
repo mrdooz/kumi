@@ -229,11 +229,11 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 
   } else {
     JsonValue::JsonValuePtr m = parse_json(msg, msg + len);
-    if ((*m)["msg"]) {
+    auto inner = m->get("msg");
+    if (!inner->is_null()) {
       // msg has type and data fields
-      auto d = (*m)["msg"];
-      auto type = (*d)["type"]->to_string();
-      auto data = (*d)["data"];
+      auto type = inner->get("type")->to_string();
+      auto data = inner->get("data");
 
       if (type == "time") {
         bool playing = (*data)["is_playing"]->to_bool();
@@ -242,6 +242,15 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
         DEMO_ENGINE.set_paused(!playing);
       } else if (type == "demo") {
         DEMO_ENGINE.update(data);
+      } else if (type == "STATE:PARAM") {
+        // look up the callback for the given block
+        auto blockName = data->get("name")->to_string();
+        auto it = _parameterBlocks.find(blockName);
+        if (it != _parameterBlocks.end()) {
+          it->second.second(data->get("params"));
+        } else {
+          LOG_WARNING_LN("Unknown param block: %s", blockName.c_str());
+        }
       }
     }
   }
@@ -478,7 +487,7 @@ void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const c
   // create a json rep for the parameter block
   auto root = JsonValue::create_object();
   auto block = JsonValue::create_object();
-  auto params = JsonValue::create_array();
+  auto params = JsonValue::create_object();
   root->add_key_value("block", block);
   block->add_key_value("name", paramBlock._blockName);
   block->add_key_value("params", params);
@@ -487,7 +496,6 @@ void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const c
 
     auto param = *it;
     auto curParam = JsonValue::create_object();
-    curParam->add_key_value("name", param.name());
 
     if (param.type() == TweakableParameter::kTypeFloat) {
       curParam->add_key_value("value", JsonValue::create_number(param.floatValue()));
@@ -499,7 +507,7 @@ void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const c
     } else {
       LOG_ERROR_LN("Implement me");
     }
-    params->add_value(curParam);
+    params->add_key_value(param.name(), curParam);
   }
 
   _parameterBlocks[paramBlock._blockName] = make_pair(block, onChanged);

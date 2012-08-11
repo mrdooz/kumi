@@ -1,4 +1,4 @@
-#include "common.fx"
+#include "common.hlsl"
 
 ///////////////////////////////////
 // Calc luminance map
