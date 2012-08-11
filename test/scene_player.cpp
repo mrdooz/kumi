@@ -415,7 +415,7 @@ bool ScenePlayer::render() {
       _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
       _ctx->unset_render_targets(0, 8);
     }
-
+/*
     struct blurSettings {
       int imageW, imageH;
       int blurRadius[2];
@@ -457,7 +457,7 @@ bool ScenePlayer::render() {
       _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
       post_process(_blur_sbuffer, _rt_final, _copy_uav);
     }
-
+*/
     {
       // gamma correction
       //_ctx->set_render_target(_rt_final, true);

@@ -342,7 +342,13 @@ UINT App::run(void *userdata) {
 
 
       JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
-      send_stats(frame);
+      // limit how often we send the profile data
+      static DWORD lastTime = timeGetTime();
+      DWORD now = timeGetTime();
+      if (now - lastTime > 100) {
+        send_stats(frame);
+        lastTime = now;
+      }
     }
   }
   return 0;
@@ -472,7 +478,29 @@ void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const c
   // create a json rep for the parameter block
   auto root = JsonValue::create_object();
   auto block = JsonValue::create_object();
-  block->add_key_value("name", paramBlock._blockName);
+  auto params = JsonValue::create_array();
   root->add_key_value("block", block);
+  block->add_key_value("name", paramBlock._blockName);
+  block->add_key_value("params", params);
+
+  for (auto it = begin(paramBlock._params); it != end(paramBlock._params); ++it) {
+
+    auto param = *it;
+    auto curParam = JsonValue::create_object();
+    curParam->add_key_value("name", param.name());
+
+    if (param.type() == TweakableParameter::kTypeFloat) {
+      curParam->add_key_value("value", JsonValue::create_number(param.floatValue()));
+      if (param.isBounded()) {
+        curParam->add_key_value("minValue", JsonValue::create_number(param.floatMin()));
+        curParam->add_key_value("maxValue", JsonValue::create_number(param.floatMax()));
+      }
+
+    } else {
+      LOG_ERROR_LN("Implement me");
+    }
+    params->add_value(curParam);
+  }
+
   _parameterBlocks[paramBlock._blockName] = make_pair(block, onChanged);
 }

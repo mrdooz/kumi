@@ -10,6 +10,16 @@ public:
   };
   TweakableParameter(const std::string &name, float value);
   TweakableParameter(const std::string &name, float value, float minValue, float maxValue);
+
+  float floatValue() const { KASSERT(_type == kTypeFloat); return _value._float; }
+  float floatMin() const { KASSERT(_type == kTypeFloat); return _minValue._float; }
+  float floatMax() const { KASSERT(_type == kTypeFloat); return _maxValue._float; }
+  const std::string &name() const { return _name; }
+
+  bool isBounded() const { return _bounded; }
+  Type type() const { return _type; }
+
+
 private:
   union Value {
     float _float4[4];

@@ -19,15 +19,16 @@
         }
     </style>
 
+    <link type="text/css" href="assets/css/ui-lightness/jquery-ui-1.8.22.custom.css" rel="Stylesheet" />
+
     <script type="text/javascript" src="assets/js/jquery-1.7.2.min.js"></script>
+    <script type="text/javascript" src="assets/js/jquery-ui-1.8.22.custom.min.js"></script>
     <!--<script type="application/javascript" src="assets/js/jquery-1.7.2.js"></script>-->
     <script type="application/javascript" src="assets/js/jquery.mousewheel.js"></script>
     <script type="application/javascript" src="assets/js/smoothie.js"></script>
-    <script type="application/javascript" src="assets/js/jquery-impromptu.js"></script>
     <script type="application/javascript" src="assets/js/jquery.jeditable.js"></script>
     <script type="application/javascript" src="assets/js/bootstrap.js"></script>
     <script type="application/javascript" src="assets/js/bootstrap-button.js"></script>
-    <!--<script type="application/javascript" src="assets/js/kinetic-v3.10.3.js"></script>-->
     <script type="application/javascript" src="kumi_lib.js"></script>
     <script type="application/javascript" src="kumi_browser.js"></script>
 
@@ -113,18 +114,18 @@
     <div class="navbar-inner">
         <div class="container-fluid">
             <a class="brand">kumi.browser</a>
+            <ul class="nav nav-pills" id="myTab">
+                <li class="active"><a href="#profile" data-toggle="tab">Profile</a></li>
+                <li><a href="#timeline" data-toggle="tab">Timeline</a></li>
+                <li><a href="#tweak" data-toggle="tab">Tweak</a></li>
+            </ul>
+
             <img id="connection-status" style="padding:5px 0px; float:right;" src="assets/gfx/disconnected.png"/>
         </div>
     </div>
 </div>
 
 <div class="container">
-
-    <ul class="nav nav-tabs" id="myTab">
-        <li class="active"><a href="#profile" data-toggle="tab">Profile</a></li>
-        <li><a href="#timeline" data-toggle="tab">Timeline</a></li>
-        <li><a href="#tweak" data-toggle="tab">Tweak</a></li>
-    </ul>
 
     <div class="tab-content">
         <div class="tab-pane active" id="profile">
@@ -202,6 +203,15 @@
             </div>
 
         </div>
+        <div class="tab-pane" id="tweak">
+            <div class="row-fluid">
+                <div class="span12">
+                    <div id="tweak-div" style="padding: 10px">
+
+                    </div>
+                </div>
+
+            </div>
     </div>
 
     <!-- row -->

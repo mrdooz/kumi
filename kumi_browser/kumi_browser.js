@@ -156,6 +156,24 @@ var KUMI = (function($, KUMI_LIB) {
             memSeries.append(data.timestamp, mem);
         }
 
+        function drawParamblock(paramBlock) {
+
+            $.each(paramBlock, function(i, block) {
+                $.each(block.params, function(j, param) {
+                    if (param.minValue) {
+                        $("<div/>", {
+                            id: param.name
+                        }).appendTo("#tweak-div");
+
+                        $("#" + param.name).slider();
+                    }
+                });
+
+            });
+
+
+        }
+
         function drawProfile(prof) {
             var start = prof.startTime;
             var end = prof.endTime;
@@ -226,7 +244,7 @@ var KUMI = (function($, KUMI_LIB) {
             } else if (msg['system.frame']) {
                 drawCharts(msg['system.frame']);
             } else if (msg.blocks) {
-                console.log(msg.blocks);
+                drawParamblock(msg.blocks);
             } else if (msg.demo) {
                 // append interpolation functions to the parameters
                 demoInfo = msg.demo;
