@@ -3,10 +3,10 @@ var KUMI = (function($, KUMI_LIB) {
     var kumi = {};
     var wsUri = "ws://127.0.0.1:9002";
     var output;
-    var smoothie;
     var websocket;
     var performanceFps = false;
-    var fps_series;
+    var fpsSmoothie, memSmoothie;
+    var fpsSeries, memSeries;
     var demoInfo = { effects :[] };
 
     var controlWidth = 250;
@@ -21,8 +21,8 @@ var KUMI = (function($, KUMI_LIB) {
     var paramHeightSingle = 15;
     var paramHeightContainer = 15;
 
-    var is_playing = false;
-    var cur_time = 0;
+    var isPlaying = false;
+    var curTime = 0;
 
     var playing_id;
 
@@ -128,24 +128,31 @@ var KUMI = (function($, KUMI_LIB) {
             // icons from http://findicons.com/pack/2103/discovery
             $('#connection-status').attr('src', 'assets/gfx/connected.png');
             websocket.send('REQ:DEMO.INFO');
-            smoothie.start();
+            fpsSmoothie.start();
+            memSmoothie.start();
             initial_open = false;
         };
 
         websocket.onclose = function(e) {
             $('#connection-status').attr('src', 'assets/gfx/disconnected.png');
-            smoothie.stop();
+            fpsSmoothie.stop();
+            memSmoothie.stop();
             if (initial_open && retry_count < 10) {
                 ++retry_count;
                 setTimeout(openWebSocket, 2500);
             }
         };
 
-        function drawFps(data) {
-            var value = performanceFps ? data.fps : 1000 * data.ms;
+        function drawCharts(data) {
+            // get fps/ms
+            var fpsOrMs = performanceFps ? data.fps : 1000 * data.ms;
             var suffix = performanceFps ? " fps" : " ms";
-            fps_series.append(data.timestamp, value);
-            $('#cur-fps').text(value.toFixed(2) + suffix);
+            fpsSeries.append(data.timestamp, fpsOrMs);
+            $('#cur-fps').text(fpsOrMs.toFixed(2) + suffix);
+
+            // get memory usage
+            var mem = data.mem;
+            memSeries.append(data.timestamp, mem);
         }
 
         function drawProfile(prof) {
@@ -216,7 +223,7 @@ var KUMI = (function($, KUMI_LIB) {
                 if (profileUpdating)
                     drawProfile(msg['system.profile']);
             } else if (msg['system.frame']) {
-                drawFps(msg['system.frame']);
+                drawCharts(msg['system.frame']);
             } else if (msg.demo) {
                 // append interpolation functions to the parameters
                 demoInfo = msg.demo;
@@ -243,25 +250,25 @@ var KUMI = (function($, KUMI_LIB) {
     kumi.onBtnPrev = function() {
         var canvas = $('#timeline-canvas');
         var delta = rawPixelToTime(canvas.width());
-        cur_time = Math.max(0, cur_time - delta);
+        curTime = Math.max(0, curTime - delta);
         timeline_ofs = Math.max(0, timeline_ofs - delta);
         sendTimeInfo();
     };
 
     kumi.onBtnPrevSkip = function() {
-        cur_time = 0;
+        curTime = 0;
         timeline_ofs = 0;
         sendTimeInfo();
     };
 
 
     kumi.onBtnPlay = function(playing) {
-        is_playing = playing;
-        if (is_playing) {
+        isPlaying = playing;
+        if (isPlaying) {
             var start_time = new Date().getTime();
             playing_id = setInterval(function() {
                 var now = new Date().getTime();
-                cur_time += now - start_time;
+                curTime += now - start_time;
                 start_time = now;
             }, 100);
         } else {
@@ -273,7 +280,7 @@ var KUMI = (function($, KUMI_LIB) {
     kumi.onBtnNext = function() {
         var canvas = $('#timeline-canvas');
         var delta = rawPixelToTime(canvas.width());
-        cur_time = cur_time + delta;
+        curTime = curTime + delta;
         timeline_ofs += delta;
         sendTimeInfo();
     };
@@ -291,7 +298,7 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     function sendTimeInfo() {
-        sendJson("time", { is_playing : !!is_playing, cur_time : cur_time} );
+        sendJson("time", { is_playing : !!isPlaying, cur_time : curTime} );
     }
 
     function sendDemoInfo() {
@@ -500,7 +507,7 @@ var KUMI = (function($, KUMI_LIB) {
         var updateTime = function(pageX) {
             var ofs = that.getCanvas().offset();
             var x = pageX - ofs.left;
-            cur_time = snap(Math.max(0, pixelToTime(x)));
+            curTime = snap(Math.max(0, pixelToTime(x)));
             sendTimeInfo();
         };
 
@@ -550,7 +557,7 @@ var KUMI = (function($, KUMI_LIB) {
         var updateTime = function(pageX) {
             var ofs = that.getCanvas().offset();
             var x = pageX - ofs.left;
-            cur_time = snap(Math.max(0, pixelToTime(x)));
+            curTime = snap(Math.max(0, pixelToTime(x)));
             sendTimeInfo();
         };
 
@@ -632,7 +639,7 @@ var KUMI = (function($, KUMI_LIB) {
     function drawTimeMarker(ctx, canvas) {
         ctx.strokeStyle = '#f33';
         ctx.beginPath();
-        var m = controlWidth + timeToPixel(cur_time);
+        var m = controlWidth + timeToPixel(curTime);
         ctx.moveTo(m, 0);
         ctx.lineTo(m, canvas.height);
         ctx.closePath();
@@ -762,7 +769,7 @@ var KUMI = (function($, KUMI_LIB) {
 
                 // display the current paramter value
                 if (param.evalParam) {
-                    var value = param.evalParam(cur_time);
+                    var value = param.evalParam(curTime);
                     setFont(ctx, "10px Arial", "middle", "right");
                     ctx.fillText(param.valueToString(value), controlWidth - 5, textPos);
                 }
@@ -790,10 +797,10 @@ var KUMI = (function($, KUMI_LIB) {
 
     function drawTimeline() {
 
-        $('#cur-time').text((cur_time/1000).toFixed(2)+'s');
+        $('#cur-time').text((curTime/1000).toFixed(2)+'s');
         var canvas = $('#timeline-canvas').get(0);
         // scroll timeline into view
-        if (timeToPixel(cur_time) > canvas.width) {
+        if (timeToPixel(curTime) > canvas.width) {
             timeline_ofs = pixelToTime(canvas.width);
         }
 
@@ -802,10 +809,16 @@ var KUMI = (function($, KUMI_LIB) {
     }
 
     function initSmoothie() {
-        smoothie = new window.SmoothieChart();
-        fps_series = new window.TimeSeries();
-        smoothie.streamTo(document.getElementById("fps-canvas"), 0, false);
-        smoothie.addTimeSeries(fps_series);
+        fpsSmoothie = new window.SmoothieChart();
+        fpsSeries = new window.TimeSeries();
+        fpsSmoothie.streamTo(document.getElementById("fps-canvas"), 0, false);
+        fpsSmoothie.addTimeSeries(fpsSeries);
+
+        memSmoothie = new window.SmoothieChart();
+        memSeries = new window.TimeSeries();
+        memSmoothie.streamTo(document.getElementById("mem-canvas"), 0, false);
+        memSmoothie.addTimeSeries(memSeries);
+
     }
 
     kumi.setProfileResolution = function(ms) {
@@ -818,7 +831,7 @@ var KUMI = (function($, KUMI_LIB) {
 
     kumi.showFps = function(value) {
         performanceFps = value;
-        fps_series.resetBounds();
+        fpsSeries.resetBounds();
     };
 
     kumi.onEdited = function(idx, value) {

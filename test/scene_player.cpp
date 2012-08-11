@@ -97,13 +97,14 @@ bool ScenePlayer::init() {
   _blur_vert = GRAPHICS.find_technique("blur_vert");
 
   _cs_blur_x = GRAPHICS.find_technique("hblur");
+  _cs_blur_y = GRAPHICS.find_technique("vblur");
   _copy_uav = GRAPHICS.find_technique("copy_uav");
 
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
   _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rt_final");
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi", true);
-  string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
+  //string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
 
   KumiLoader loader;
   if (!loader.load(resolved_name.c_str(), nullptr /*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))
@@ -416,7 +417,7 @@ bool ScenePlayer::render() {
     {
       _ctx->unset_render_targets(0, 8);
 
-      Technique *technique = GRAPHICS.get_technique(_cs_blur_x);
+      Technique *technique = GRAPHICS.get_technique(_cs_blur_y);
       Shader *cs = technique->compute_shader(0);
 
       _ctx->set_cs(cs->handle());
@@ -429,7 +430,7 @@ bool ScenePlayer::render() {
       _ctx->set_uavs(uav);
       auto handle = cs->find_cbuffer("blurSettings");
       _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      _ctx->dispatch((h + 31) / 32, 1, 1);
+      _ctx->dispatch((w + 31) / 32, 1, 1);
 
       _ctx->unset_shader_resource(0, 8, ShaderType::kComputeShader);
       _ctx->unset_uavs(0, 8);

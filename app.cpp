@@ -32,6 +32,8 @@
 #include "gwen/Controls/StatusBar.h"
 #endif
 
+#pragma comment(lib, "psapi.lib")
+
 using std::swap;
 using namespace threading;
 
@@ -254,9 +256,15 @@ void App::send_stats(const JsonValue::JsonValuePtr &frame) {
     int64 now = (LONGLONG)time.dwLowDateTime + ((LONGLONG)(time.dwHighDateTime) << 32LL);
     now = (now / 10000) - 11644473600000;
 
+    PROCESS_MEMORY_COUNTERS counters;
+    ZeroMemory(&counters, sizeof(counters));
+    counters.cb = sizeof(counters);
+    GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters));
+
     obj->add_key_value("timestamp", (double)now);
     obj->add_key_value("fps", JsonValue::create_number(GRAPHICS.fps()));
     obj->add_key_value("ms", JsonValue::create_number(APP.frame_time()));
+    obj->add_key_value("mem", JsonValue::create_int(counters.WorkingSetSize / 1024));
     root->add_key_value("system.frame", obj);
 
     send_json(0, root);

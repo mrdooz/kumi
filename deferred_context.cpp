@@ -294,7 +294,7 @@ void DeferredContext::set_uavs(const TextureArray &uavs) {
         if (ofs == MAX_TEXTURES)
           break;
       }
-      UINT initialCount = 1;
+      UINT initialCount = 0;
       _ctx->CSSetUnorderedAccessViews(tmp, cur, &d3dUavs[tmp], &initialCount);
       num_resources_set += cur;
       while (ofs < MAX_TEXTURES && !uavs[ofs].is_valid())

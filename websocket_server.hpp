@@ -27,7 +27,7 @@ private:
     HANDLE thread;
   };
 
-  std::vector<ClientData> _client_threads;
+  std::vector<ClientData *> _client_threads;
 };
 
 class WebSocketServer {

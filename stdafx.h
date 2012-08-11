@@ -48,6 +48,7 @@
 #include <process.h>
 #include <TlHelp32.h>
 #include <CommCtrl.h>
+#include <Psapi.h>
 
 #include <stdio.h>
 #include <tchar.h>

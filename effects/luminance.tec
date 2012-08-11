@@ -2,7 +2,7 @@ include common.tec;
 
 technique luminance_map inherits quad_base {  
   pixel_shader {
-      file effects/luminance.fx;
+      file effects/luminance.hlsl;
       entry_point luminance_map_ps_main;
       params [
           texture2d Texture0 user;
@@ -12,7 +12,7 @@ technique luminance_map inherits quad_base {
 
 technique scale_cutoff inherits quad_base {
   pixel_shader {
-      file effects/luminance.fx;
+      file effects/luminance.hlsl;
       entry_point scale_cutoff;
       params [
           texture2d Texture0 user;
@@ -24,7 +24,7 @@ technique scale_cutoff inherits quad_base {
 
 technique scale inherits quad_base {
   pixel_shader {
-      file effects/luminance.fx;
+      file effects/luminance.hlsl;
       entry_point scale;
       params [
           texture2d Texture0 user;
@@ -34,7 +34,7 @@ technique scale inherits quad_base {
 
 technique blur_horiz inherits quad_base {
   pixel_shader {
-      file effects/luminance.fx;
+      file effects/luminance.hlsl;
       entry_point blur_horiz;
       params [
           texture2d Texture0 user;
@@ -44,7 +44,7 @@ technique blur_horiz inherits quad_base {
 
 technique blur_vert inherits quad_base {
   pixel_shader {
-      file effects/luminance.fx;
+      file effects/luminance.hlsl;
       entry_point blur_vert;
       params [
           texture2d Texture0 user;

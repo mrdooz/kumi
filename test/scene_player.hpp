@@ -61,7 +61,7 @@ private:
   GraphicsObjectHandle _scale, _scale_cutoff;
   GraphicsObjectHandle _blur_horiz, _blur_vert;
 
-  GraphicsObjectHandle _cs_blur_x;
+  GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
   GraphicsObjectHandle _copy_uav;
 
   GraphicsObjectHandle _luminance_map;

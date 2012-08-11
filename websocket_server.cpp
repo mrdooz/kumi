@@ -160,22 +160,29 @@ UINT WebSocketThread::client_thread(void *param) {
   const int BUF_SIZE = 16 * 1024;
   char *buf = (char *)_alloca(BUF_SIZE);
 
-  ClientData cd = *(ClientData *)param;
+  ClientData *cd = (ClientData *)param;
+  SOCKET socket = cd->socket;
 
   // When we go out of scope, close the socket, and delete ourselves from the thread list
   DEFER([=]() { 
-    closesocket(cd.socket); 
-    SCOPED_CS(cd.self->_thread_cs);
-    auto it = std::find(RANGE(cd.self->_client_threads), cd);
-    cd.self->_client_threads.erase(it);
+    closesocket(socket); 
+    SCOPED_CS(cd->self->_thread_cs);
+    auto it = std::find(RANGE(cd->self->_client_threads), cd);
+    cd->self->_client_threads.erase(it);
+    delete cd;
   });
 
+  HANDLE events[2];
   HANDLE async_event = CreateEvent(NULL, FALSE, FALSE, NULL);
   DEFER([=] { CloseHandle(async_event); });
-  WSAEventSelect(cd.socket, async_event, FD_READ);
-  WaitForSingleObject(async_event, INFINITE);
+  WSAEventSelect(socket, async_event, FD_READ);
+  events[0] = cd->close_event;
+  events[1] = async_event;
+  int obj = WaitForMultipleObjects(2, events, FALSE, INFINITE);
+  if (obj == WAIT_OBJECT_0) // cancel event
+    return 0;
 
-  int ret = recv(cd.socket, buf, BUF_SIZE, 0);
+  int ret = recv(socket, buf, BUF_SIZE, 0);
   if (ret < 0) {
     return WSAGetLastError();
   }
@@ -184,13 +191,12 @@ UINT WebSocketThread::client_thread(void *param) {
   if (reply.empty())
     return 1;
 
-  int send_result = send(cd.socket, reply.data(), reply.size(), 0);
+  int send_result = send(socket, reply.data(), reply.size(), 0);
   if (send_result < 0)
     return WSAGetLastError();
 
   // create an accept event
-  HANDLE events[2];
-  events[0] = cd.close_event;
+  events[0] = cd->close_event;
   events[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
   DEFER([&]() {CloseHandle(events[1]);});
 
@@ -206,7 +212,7 @@ UINT WebSocketThread::client_thread(void *param) {
 
     DWORD bytes_read = 0;
     DWORD flags = 0;
-    if (WSARecv(cd.socket, &wsabuf, 1, &bytes_read, &flags, &overlapped, NULL) == SOCKET_ERROR) {
+    if (WSARecv(socket, &wsabuf, 1, &bytes_read, &flags, &overlapped, NULL) == SOCKET_ERROR) {
       int err = WSAGetLastError();
       if (err != WSA_IO_PENDING)
         return err;
@@ -217,7 +223,7 @@ UINT WebSocketThread::client_thread(void *param) {
     if (idx == WSA_WAIT_EVENT_0)
       break;
 
-    if (WSAGetOverlappedResult(cd.socket, &overlapped, &bytes_read, FALSE, &flags) && bytes_read > 0) {
+    if (WSAGetOverlappedResult(socket, &overlapped, &bytes_read, FALSE, &flags) && bytes_read > 0) {
       WebSocketMessageHeader *header = (WebSocketMessageHeader *)buf;
 
       switch (header->GetOpCode()) {
@@ -233,7 +239,7 @@ UINT WebSocketThread::client_thread(void *param) {
         }
         DISPATCHER.invoke(FROM_HERE, 
           threading::kMainThread, 
-          std::bind(&App::process_network_msg, &App::instance(), cd.socket, decoded, len));
+          std::bind(&App::process_network_msg, &App::instance(), socket, decoded, len));
         break;
       }
 
@@ -308,11 +314,11 @@ UINT WebSocketThread::blocking_run(void *param) {
       SOCKET client_socket = accept(listen_socket, NULL, NULL);
       if (client_socket != INVALID_SOCKET) {
         uint32 thread_id;
-        ClientData cd;
-        cd.self = this;
-        cd.close_event = _cancel_event;
-        cd.socket = client_socket;
-        cd.thread = (HANDLE)_beginthreadex(NULL, 0, client_thread, &cd, 0, &thread_id);
+        ClientData *cd = new ClientData;
+        cd->self = this;
+        cd->close_event = _cancel_event;
+        cd->socket = client_socket;
+        cd->thread = (HANDLE)_beginthreadex(NULL, 0, client_thread, cd, 0, &thread_id);
         {
           SCOPED_CS(_thread_cs);
           _client_threads.push_back(cd);
@@ -327,7 +333,7 @@ UINT WebSocketThread::blocking_run(void *param) {
 
   vector<HANDLE> threads;
   for (size_t i = 0; i < _client_threads.size(); ++i)
-    threads.push_back(_client_threads[i].thread);
+    threads.push_back(_client_threads[i]->thread);
 
   WaitForMultipleObjects(threads.size(), threads.data(), TRUE, INFINITE);
   return 0;
@@ -341,7 +347,7 @@ void WebSocketThread::send_msg(SOCKET receiver, const char *msg, int len) {
     // multicast
     SCOPED_CS(_thread_cs);
     for (size_t i = 0; i < _client_threads.size(); ++i) {
-      int res = send(_client_threads[i].socket, frame.data(), frame.size(), 0);
+      int res = send(_client_threads[i]->socket, frame.data(), frame.size(), 0);
     }
 
   } else {

@@ -1,4 +1,4 @@
-#include "common.fx"
+#include "common.hlsl"
 
 cbuffer PerFrame {
   matrix proj;
@@ -256,17 +256,43 @@ void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
       return;
     
     float scale = 1.0f / (2*blurRadius.x+1);
+    int m = (int)blurRadius.x;      // integer part of radius
+    float alpha = blurRadius.x - m;   // fractional part
 
-    float4 t = 0.0f;
-    for(int x=-blurRadius.x; x<=blurRadius.x; x++) {
-        t += Texture0.Load(int3(x, y, 0));
+    float4 sum = Texture0.Load(int3(0, y, 0));
+    int i;
+    for (i = 1; i <= m; ++i)
+        sum += Texture0.Load(int3(-i, y, 0)) + Texture0.Load(int3(i, y, 0));
+    sum += alpha * (Texture0.Load(int3(-m-1, y, 0)) + Texture0.Load(int3(m+1, y, 0)));
+
+    for (i = 0; i < imageW; ++i) {
+        Output[y*imageW+i] = sum * scale;
+        sum += lerp(Texture0.Load(int3(i+m+1, y, 0)), Texture0.Load(int3(i+m+2, y, 0)), alpha);
+        sum -= lerp(Texture0.Load(int3(i-m, y, 0)), Texture0.Load(int3(i-m-1, y, 0)), alpha);
     }
-    Output[y*imageW+0] = t * scale;
+}
 
-    for(x=1; x<imageW; x++) {
-        t += Texture0.Load(int3(x + blurRadius.x, y, 0));
-        t -= Texture0.Load(int3(x - blurRadius.x - 1, y, 0));
-        Output[y*imageW+x] = t * scale;
+[numthreads(32,1,1)]
+void boxBlurY(uint3 globalThreadID : SV_DispatchThreadID)
+{
+    int x = globalThreadID.x;
+    if (x >= imageW)
+      return;
+    
+    float scale = 1.0f / (2*blurRadius.x+1);
+    int m = (int)blurRadius.y;      // integer part of radius
+    float alpha = blurRadius.y - m;   // fractional part
+
+    float4 sum = Texture0.Load(int3(x, 0, 0));
+    int i;
+    for (i = 1; i <= m; ++i)
+        sum += Texture0.Load(int3(-x, i, 0)) + Texture0.Load(int3(x, i, 0));
+    sum += alpha * (Texture0.Load(int3(x, -m-1, 0)) + Texture0.Load(int3(x, m+1, 0)));
+
+    for (i = 0; i < imageH; ++i) {
+        Output[i*imageW +x] = sum * scale;
+        sum += lerp(Texture0.Load(int3(x, i+m+1, 0)), Texture0.Load(int3(x, i+m+2, 0)), alpha);
+        sum -= lerp(Texture0.Load(int3(x, i-m, 0)), Texture0.Load(int3(x, i-m-1, 0)), alpha);
     }
 }
 

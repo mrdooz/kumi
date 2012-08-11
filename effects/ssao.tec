@@ -3,12 +3,12 @@ include common.tec;
 technique ssao_fill {
     
     vertex_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point fill_vs_main;
     };
     
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point fill_ps_main;
         params [
             texture2d DiffuseTexture Diffuse material;
@@ -23,7 +23,7 @@ technique ssao_fill {
 
 technique ssao_compute inherits quad_base {
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point compute_ps_main;
         params [
             texture2d rt_pos system;
@@ -35,7 +35,7 @@ technique ssao_compute inherits quad_base {
 technique ssao_blur inherits quad_base {
         
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point blur_ps_main;
         params [
             texture2d Texture0 user;
@@ -46,7 +46,7 @@ technique ssao_blur inherits quad_base {
 
 technique ssao_ambient inherits quad_base {
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point ambient_ps_main;
         params [
             texture2d rt_occlusion system;
@@ -57,7 +57,7 @@ technique ssao_ambient inherits quad_base {
 
 technique ssao_light inherits quad_base{
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point light_ps_main;
         params [
             texture2d rt_pos system;
@@ -73,7 +73,7 @@ technique ssao_light inherits quad_base{
 technique gamma_correction inherits quad_base {
     
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point gamma_ps_main;
         params [
             texture2d rt_composite system;
@@ -85,8 +85,18 @@ technique gamma_correction inherits quad_base {
 
 technique hblur {
     compute_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point boxBlurX;
+        params [
+            texture2d Texture0 user;
+        ];
+    };
+};
+
+technique vblur {
+    compute_shader {
+        file effects/ssao.hlsl;
+        entry_point boxBlurY;
         params [
             texture2d Texture0 user;
         ];
@@ -95,7 +105,7 @@ technique hblur {
 
 technique copy_uav inherits quad_base {
     pixel_shader {
-        file effects/ssao.fx;
+        file effects/ssao.hlsl;
         entry_point ps_copy_uav;
     };
 };
