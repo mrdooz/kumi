@@ -74,4 +74,6 @@ private:
   XMFLOAT4X4 _view, _proj;
 
   DeferredContext *_ctx;
+
+  float _blurX, _blurY;
 };

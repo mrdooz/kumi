@@ -245,7 +245,7 @@ cbuffer blurSettings : register( b0 )
 {
     int imageW;
     int imageH;
-    int2 blurRadius;
+    float2 blurRadius;
 }
 
 [numthreads(32,1,1)]
@@ -255,9 +255,10 @@ void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
     if (y >= imageH) 
       return;
     
-    float scale = 1.0f / (2*blurRadius.x+1);
-    int m = (int)blurRadius.x;      // integer part of radius
-    float alpha = blurRadius.x - m;   // fractional part
+    float r = blurRadius.x;
+    float scale = 1.0f / (2*r+1);
+    int m = (int)r;      // integer part of radius
+    float alpha = r - m;   // fractional part
 
     float4 sum = Texture0.Load(int3(0, y, 0));
     int i;
@@ -279,9 +280,10 @@ void boxBlurY(uint3 globalThreadID : SV_DispatchThreadID)
     if (x >= imageW)
       return;
     
-    float scale = 1.0f / (2*blurRadius.x+1);
-    int m = (int)blurRadius.y;      // integer part of radius
-    float alpha = blurRadius.y - m;   // fractional part
+    float r = blurRadius.y;
+    float scale = 1.0f / (2*r+1);
+    int m = (int)r;      // integer part of radius
+    float alpha = r - m;   // fractional part
 
     float4 sum = Texture0.Load(int3(x, 0, 0));
     int i;

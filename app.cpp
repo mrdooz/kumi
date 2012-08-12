@@ -559,7 +559,8 @@ void App::find_app_root()
   _app_root = starting_dir;
 }
 
-void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const cbParamChanged &onChanged) {
+void App::add_parameter_block(const TweakableParameterBlock &paramBlock, bool initialCallback, 
+                              const cbParamChanged &onChanged) {
 
   // create a json rep for the parameter block
   auto root = JsonValue::create_object();
@@ -586,6 +587,9 @@ void App::add_parameter_block(const TweakableParameterBlock &paramBlock, const c
     }
     params->add_key_value(param.name(), curParam);
   }
+
+  if (initialCallback)
+    onChanged(params);
 
   _parameterBlocks[paramBlock._blockName] = make_pair(block, onChanged);
 }

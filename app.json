@@ -1,5 +1,5 @@
 {
-	"curSettings": "settings_2012_08_12_10_58_00",
+	"curSettings": "settings_2012_08_12_11_53_34",
 	"settings_2012_08_12_10_58_00": {
 		"params": [
 			{
@@ -29,6 +29,44 @@
 						"maxValue": 250,
 						"minValue": 1,
 						"value": 10
+					}
+				}
+			}
+		]
+	},
+	"settings_2012_08_12_11_53_33": {
+		"params": [
+			{
+				"name": "blur",
+				"params": {
+					"blurX": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 10
+					},
+					"blurY": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 61
+					}
+				}
+			}
+		]
+	},
+	"settings_2012_08_12_11_53_34": {
+		"params": [
+			{
+				"name": "blur",
+				"params": {
+					"blurX": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 10
+					},
+					"blurY": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 61
 					}
 				}
 			}

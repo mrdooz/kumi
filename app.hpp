@@ -58,7 +58,7 @@ public:
 
   typedef std::function<void (const JsonValue::JsonValuePtr &)> cbParamChanged;
 
-  void add_parameter_block(const TweakableParameterBlock &block, const cbParamChanged &onChanged);
+  void add_parameter_block(const TweakableParameterBlock &block, bool initialCallback, const cbParamChanged &onChanged);
 
 private:
   DISALLOW_COPY_AND_ASSIGN(App);

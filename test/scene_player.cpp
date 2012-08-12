@@ -155,22 +155,9 @@ bool ScenePlayer::init() {
       block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
       block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
 
-      APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
-        auto a = msg->get("blurX")->get("value")->to_number();
-        auto b = msg->get("blurY")->get("value")->to_number();
-        int xx = 10;
-      });
-    }
-
-    {
-      TweakableParameterBlock block("blur2");
-      block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
-      block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
-
-      APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
-        auto a = msg->get("blurX")->get("value")->to_number();
-        auto b = msg->get("blurY")->get("value")->to_number();
-        int xx = 10;
+      APP.add_parameter_block(block, true, [=](const JsonValue::JsonValuePtr &msg) {
+        _blurX = (float)msg->get("blurX")->get("value")->to_number();
+        _blurY = (float)msg->get("blurY")->get("value")->to_number();
       });
     }
 
@@ -366,6 +353,8 @@ bool ScenePlayer::render() {
     post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
 
     {
+      _ctx->set_render_target(rt_composite, false);
+
       DeferredContext::InstanceData data;
       int num_lights = (int)_scene->lights.size();
       data.add_variable(_light_pos_id, sizeof(XMFLOAT4));
@@ -413,75 +402,92 @@ bool ScenePlayer::render() {
     // apply blur
     for (int i = 0; i < 4; ++i) {
       post_process(downscale3, blur_tmp, _blur_horiz);
-      post_process(blur_tmp, downscale3, _blur_horiz);
+      post_process(blur_tmp, downscale3, _blur_vert);
     }
 
     // scale up
     post_process(downscale3, downscale2, _scale);
     post_process(downscale2, downscale1, _scale);
 
+    auto rt_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w, h, false, fmt, false, "rt_tmp");
 
-    {
-      //cs blur
-      _ctx->set_render_target(_rt_final, true);
+    post_process(rt_composite, rt_tmp, _scale);
 
-      TextureArray arr;
-      arr[1] = downscale1;
-      _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
-      _ctx->unset_render_targets(0, 8);
-    }
-/*
     struct blurSettings {
       int imageW, imageH;
-      int blurRadius[2];
-    } settings;
-    settings.imageW = w;
-    settings.imageH = h;
-    settings.blurRadius[0] = 100;
-    settings.blurRadius[1] = 100;
+      float blurRadius[2];
+    } settings = { w, h, _blurX, _blurX };
 
-    {
-      _ctx->unset_render_targets(0, 8);
+    for (int i = 0; i < 3; ++i) {
+      {
+        // blur x
+        Technique *technique = GRAPHICS.get_technique(_cs_blur_x);
+        Shader *cs = technique->compute_shader(0);
 
-      Technique *technique = GRAPHICS.get_technique(_cs_blur_y);
-      Shader *cs = technique->compute_shader(0);
+        _ctx->set_cs(cs->handle());
+        TextureArray arr = { rt_tmp };
+        _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
 
-      _ctx->set_cs(cs->handle());
-      TextureArray arr;
-      arr[0] = _rt_final;
-      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
+        TextureArray uav = { _blur_sbuffer };
+        _ctx->set_uavs(uav);
+        auto handle = cs->find_cbuffer("blurSettings");
+        _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
+        _ctx->dispatch((h + 31) / 32, 1, 1);
 
-      TextureArray uav;
-      uav[0] = _blur_sbuffer;
-      _ctx->set_uavs(uav);
-      auto handle = cs->find_cbuffer("blurSettings");
-      _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      _ctx->dispatch((w + 31) / 32, 1, 1);
+        _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
+        _ctx->unset_uavs(0, 1);
+      }
 
-      _ctx->unset_shader_resource(0, 8, ShaderType::kComputeShader);
-      _ctx->unset_uavs(0, 8);
+      {
+        // copy the UAV to a texture
+        Technique *technique = GRAPHICS.get_technique(_copy_uav);
+        Shader *ps = technique->pixel_shader(0);
+        auto handle = ps->find_cbuffer("blurSettings");
+        _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
+        post_process(_blur_sbuffer, rt_tmp, _copy_uav);
+      }
+
+      {
+        // blur y
+        Technique *technique = GRAPHICS.get_technique(_cs_blur_y);
+        Shader *cs = technique->compute_shader(0);
+
+        _ctx->set_cs(cs->handle());
+        TextureArray arr = { rt_tmp };
+        _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
+
+        TextureArray uav = { _blur_sbuffer };
+        _ctx->set_uavs(uav);
+        auto handle = cs->find_cbuffer("blurSettings");
+        _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
+        _ctx->dispatch((w + 31) / 32, 1, 1);
+
+        _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
+        _ctx->unset_uavs(0, 1);
+      }
+
+      {
+        // copy the UAV to a texture
+        Technique *technique = GRAPHICS.get_technique(_copy_uav);
+        Shader *ps = technique->pixel_shader(0);
+        auto handle = ps->find_cbuffer("blurSettings");
+        _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
+        post_process(_blur_sbuffer, rt_tmp, _copy_uav);
+      }
 
     }
 
-    {
-      // copy the UAV to a texture
-      //_ctx->set_cbuffer()
-      Technique *technique = GRAPHICS.get_technique(_copy_uav);
-      Shader *ps = technique->pixel_shader(0);
-      auto handle = ps->find_cbuffer("blurSettings");
-      _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
-      post_process(_blur_sbuffer, _rt_final, _copy_uav);
-    }
-*/
+    post_process(rt_tmp, GraphicsObjectHandle(), _scale);
+/*
     {
       // gamma correction
-      //_ctx->set_render_target(_rt_final, true);
       _ctx->set_default_render_target();
-
-      TextureArray arr;
-      arr[1] = downscale1;
+      TextureArray arr = { GraphicsObjectHandle(), _rt_final };
       _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
     }
+*/
+
+    GRAPHICS.release_temp_render_target(rt_tmp);
 
     GRAPHICS.release_temp_render_target(blur_tmp);
     GRAPHICS.release_temp_render_target(downscale3);
@@ -505,11 +511,16 @@ bool ScenePlayer::render() {
 }
 
 void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique) {
-  _ctx->set_render_target(output, true);
+  if (output.is_valid())
+    _ctx->set_render_target(output, true);
+  else
+    _ctx->set_default_render_target();
 
-  TextureArray arr;
-  arr[0] = input;
+  TextureArray arr = { input };
   _ctx->render_technique(technique, arr, DeferredContext::InstanceData());
+
+  if (output.is_valid())
+    _ctx->unset_render_targets(0, 1);
 }
 
 bool ScenePlayer::close() {
