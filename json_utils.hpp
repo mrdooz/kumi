@@ -27,14 +27,14 @@ public:
 
   JsonType type() const { return _type; }
 
-  virtual bool add_value(const JsonValuePtr &value) { KASSERT(!"Not an array"); return false; }
-  virtual bool add_key_value(const std::string &key, const JsonValuePtr &value) { KASSERT(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, int value) { KASSERT(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, uint32 value)  { KASSERT(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, double value) { KASSERT(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, const std::string &value) { KASSERT(!"Not an object"); return false; }
-  virtual bool add_key_value(const std::string &key, const char *value) { return add_key_value(key, std::string(value)); }
-  virtual bool add_key_value(const std::string &key, bool value) { KASSERT(!"Not an object"); return false; }
+  virtual JsonValuePtr add_value(const JsonValuePtr &value) { KASSERT(!"Not an array"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, const JsonValuePtr &value) { KASSERT(!"Not an object"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, int value) { KASSERT(!"Not an object"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, uint32 value)  { KASSERT(!"Not an object"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, double value) { KASSERT(!"Not an object"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, const std::string &value) { KASSERT(!"Not an object"); return emptyValue(); }
+  virtual JsonValuePtr add_key_value(const std::string &key, const char *value) { return add_key_value(key, std::string(value)); }
+  virtual JsonValuePtr add_key_value(const std::string &key, bool value) { KASSERT(!"Not an object"); return emptyValue(); }
 
   int to_int() const { KASSERT(_type == JS_INT); return _int; }
   double to_number() const { KASSERT(_type == JS_NUMBER || _type == JS_INT); return _type == JS_NUMBER ? _number : _int; }
@@ -74,12 +74,12 @@ class JsonObject : public JsonValue {
   friend class JsonWriter;
   friend void print_inner(const JsonObject *obj, int indent_level, std::string *res);
 public:
-  virtual bool add_key_value(const std::string &key, const JsonValuePtr &value) override;
-  virtual bool add_key_value(const std::string &key, int value) override;
-  virtual bool add_key_value(const std::string &key, uint32 value) override;
-  virtual bool add_key_value(const std::string &key, double value) override;
-  virtual bool add_key_value(const std::string &key, const std::string &value) override;
-  virtual bool add_key_value(const std::string &key, bool value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, const JsonValuePtr &value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, int value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, uint32 value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, double value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, const std::string &value) override;
+  virtual JsonValuePtr add_key_value(const std::string &key, bool value) override;
 
   virtual JsonValuePtr operator[](const std::string &key) const override;
   virtual bool has_key(const std::string &key) const;
@@ -96,7 +96,7 @@ class JsonArray : public JsonValue {
   friend class JsonWriter;
   friend void print_inner(const JsonArray *obj, int indent_level, std::string *res);
 public:
-  virtual bool add_value(const JsonValuePtr &value);
+  virtual JsonValuePtr add_value(const JsonValuePtr &value) override;
   virtual JsonValuePtr operator[](int idx) const override;
   virtual int count() const override { return (int)_value.size(); }
 

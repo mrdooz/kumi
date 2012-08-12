@@ -44,3 +44,15 @@ bool file_exists(const char *filename)
 
 	return !!(status.st_mode & _S_IFREG);
 }
+
+bool save_file(const char *filename, const void *buf, int len) {
+  FILE *f = fopen(filename, "wb");
+  if (!f)
+    return false;
+
+  DEFER([=]() {
+    fclose(f);
+  });
+
+  return fwrite(buf, len, 1, f) == len;
+}

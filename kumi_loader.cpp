@@ -10,7 +10,7 @@
 #include "file_utils.hpp"
 #include "json_utils.hpp"
 #include "animation_manager.hpp"
-#include "bitutils.hpp"
+#include "bit_utils.hpp"
 
 #define FILE_VERSION 13
 

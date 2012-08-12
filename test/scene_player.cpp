@@ -150,15 +150,29 @@ bool ScenePlayer::init() {
 
     _params.push_back(move(mp));
 
-    TweakableParameterBlock block("blur");
-    block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
-    block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
+    {
+      TweakableParameterBlock block("blur");
+      block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
+      block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
 
-    APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
-      auto a = msg->get("blurX")->get("value")->to_number();
-      auto b = msg->get("blurY")->get("value")->to_number();
-      int xx = 10;
-    });
+      APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
+        auto a = msg->get("blurX")->get("value")->to_number();
+        auto b = msg->get("blurY")->get("value")->to_number();
+        int xx = 10;
+      });
+    }
+
+    {
+      TweakableParameterBlock block("blur2");
+      block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
+      block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
+
+      APP.add_parameter_block(block, [=](const JsonValue::JsonValuePtr &msg) {
+        auto a = msg->get("blurX")->get("value")->to_number();
+        auto b = msg->get("blurY")->get("value")->to_number();
+        int xx = 10;
+      });
+    }
 
   }
 

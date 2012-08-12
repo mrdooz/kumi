@@ -1,0 +1,37 @@
+{
+	"curSettings": "settings_2012_08_12_10_58_00",
+	"settings_2012_08_12_10_58_00": {
+		"params": [
+			{
+				"name": "blur",
+				"params": {
+					"blurX": {
+						"maxValue": 250.000000,
+						"minValue": 1.000000,
+						"value": 10.000000
+					},
+					"blurY": {
+						"maxValue": 250.000000,
+						"minValue": 1.000000,
+						"value": 10.000000
+					}
+				}
+			},
+			{
+				"name": "blur2",
+				"params": {
+					"blurX": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 30
+					},
+					"blurY": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 10
+					}
+				}
+			}
+		]
+	}
+}

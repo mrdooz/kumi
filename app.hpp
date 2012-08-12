@@ -70,6 +70,8 @@ private:
   void set_client_size();
   void find_app_root();
 
+  void save_settings();
+  void load_settings();
 
   static LRESULT CALLBACK wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -85,10 +87,8 @@ protected:
 
   double _frame_time;
 
-  int _cur_camera;
-  bool _draw_plane;
   string _app_root;
-  int _ref_count;
+  string _appRootFilename;
 
   std::map<std::string, std::pair<JsonValue::JsonValuePtr, cbParamChanged>> _parameterBlocks;
 

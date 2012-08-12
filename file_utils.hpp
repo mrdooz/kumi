@@ -7,13 +7,17 @@ bool load_file(const char *filename, std::vector<T> *buf) {
   if (!h) return false;
 
   DWORD size = GetFileSize(h, NULL);
-  buf->resize(size);
-  DWORD res;
-  if (!ReadFile(h, &(*buf)[0], size, &res, NULL)) 
-    return false;
+  if (size > 0) {
+    buf->resize(size);
+    DWORD res;
+    if (!ReadFile(h, &(*buf)[0], size, &res, NULL)) 
+      return false;
+  }
   return true;
 }
 
 bool file_exists(const char *filename);
+
+bool save_file(const char *filename, const void *buf, int len);
 
 #endif

@@ -77,34 +77,28 @@ JsonObject::JsonObject()
 {
 }
 
-bool JsonObject::add_key_value(const string &key, const JsonValuePtr &value) {
-  _key_value[key] = value;
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const string &key, const JsonValuePtr &value) {
+  return _key_value[key] = value;
 }
 
-bool JsonObject::add_key_value(const std::string &key, int value) {
-  _key_value[key] = JsonValue::create_int(value);
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, int value) {
+  return _key_value[key] = JsonValue::create_int(value);
 }
 
-bool JsonObject::add_key_value(const std::string &key, uint32 value) {
-  _key_value[key] = JsonValue::create_int(value);
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, uint32 value) {
+  return _key_value[key] = JsonValue::create_int(value);
 }
 
-bool JsonObject::add_key_value(const std::string &key, double value) {
-  _key_value[key] = JsonValue::create_number(value);
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, double value) {
+  return _key_value[key] = JsonValue::create_number(value);
 }
 
-bool JsonObject::add_key_value(const std::string &key, const std::string &value) {
-  _key_value[key] = JsonValue::create_string(value);
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, const std::string &value) {
+  return _key_value[key] = JsonValue::create_string(value);
 }
 
-bool JsonObject::add_key_value(const std::string &key, bool value) {
-  _key_value[key] = JsonValue::create_bool(value);
-  return true;
+JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, bool value) {
+  return _key_value[key] = JsonValue::create_bool(value);
 }
 
 
@@ -129,9 +123,9 @@ JsonArray::JsonArray()
 {
 }
 
-bool JsonArray::add_value(const JsonValuePtr &value) {
+JsonObject::JsonValuePtr JsonArray::add_value(const JsonValuePtr &value) {
   _value.push_back(value);
-  return true;
+  return value;
 }
 
 
@@ -395,6 +389,8 @@ static bool is_json_digit(char ch) {
 
 static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *end, const char **next) {
   const int len = end - start;
+  if (len == 0)
+    return JsonValue::emptyValue();
   const char *s = skip_whitespace(start, end);
   char ch = *s;
 
@@ -417,6 +413,9 @@ static JsonValue::JsonValuePtr parse_json_inner(const char *start, const char *e
             KASSERT(false);
             break;
           }
+        } else {
+          // no key found (the file can still be valid)
+          break;
         }
       }
       *next = s;

@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "bitutils.hpp"
+#include "bit_utils.hpp"
 
 typedef uint8_t uint8;
 typedef uint32_t uint32;

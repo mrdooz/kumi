@@ -147,10 +147,10 @@
     <ClCompile Include="..\animation_manager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\bitutils.cpp">
+    <ClCompile Include="..\shader_reflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\shader_reflection.cpp">
+    <ClCompile Include="..\bit_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -308,10 +308,10 @@
     <ClInclude Include="..\animation_manager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\bitutils.hpp">
+    <ClInclude Include="..\shader_reflection.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\shader_reflection.hpp">
+    <ClInclude Include="..\bit_utils.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

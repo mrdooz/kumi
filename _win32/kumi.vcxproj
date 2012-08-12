@@ -144,7 +144,7 @@
     </ClCompile>
     <ClCompile Include="..\async_file_loader.cpp" />
     <ClCompile Include="..\bitmap_utils.cpp" />
-    <ClCompile Include="..\bitutils.cpp" />
+    <ClCompile Include="..\bit_utils.cpp" />
     <ClCompile Include="..\deferred_context.cpp" />
     <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
@@ -208,7 +208,7 @@
     <ClInclude Include="..\app.hpp" />
     <ClInclude Include="..\async_file_loader.hpp" />
     <ClInclude Include="..\bitmap_utils.hpp" />
-    <ClInclude Include="..\bitutils.hpp" />
+    <ClInclude Include="..\bit_utils.hpp" />
     <ClInclude Include="..\deferred_context.hpp" />
     <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />

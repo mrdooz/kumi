@@ -15,6 +15,7 @@
 #include "kumi.hpp"
 #include "profiler.hpp"
 #include "animation_manager.hpp"
+#include "bit_utils.hpp"
 
 #include "test/demo.hpp"
 #include "test/path_follow.hpp"
@@ -57,9 +58,6 @@ App::App()
   , _hwnd(NULL)
   , _test_effect(NULL)
   , _dbg_message_count(0)
-  , _cur_camera(1)
-  , _draw_plane(false)
-  , _ref_count(1)
   , _frame_time(0)
 {
   find_app_root();
@@ -136,6 +134,8 @@ bool App::init(HINSTANCE hinstance)
 
   auto effect = new ScenePlayer(GraphicsObjectHandle(), "simple effect");
   DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
+
+  load_settings();
 
   return true;
 }
@@ -220,8 +220,7 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
 
   } else if (strncmp(msg, "REQ:PARAM.INFO", len) == 0) {
     auto root = JsonValue::create_object();
-    auto blocks = JsonValue::create_array();
-    root->add_key_value("blocks", blocks);
+    auto blocks = root->add_key_value("blocks", JsonValue::create_array());
     for (auto it = begin(_parameterBlocks); it != end(_parameterBlocks); ++it) {
       blocks->add_value(it->second.first);
     }
@@ -240,13 +239,17 @@ void App::process_network_msg(SOCKET sender, const char *msg, int len) {
         int cur_time = (*data)["cur_time"]->to_int();
         DEMO_ENGINE.set_pos(cur_time);
         DEMO_ENGINE.set_paused(!playing);
+
       } else if (type == "demo") {
         DEMO_ENGINE.update(data);
+
       } else if (type == "STATE:PARAM") {
         // look up the callback for the given block
         auto blockName = data->get("name")->to_string();
         auto it = _parameterBlocks.find(blockName);
         if (it != _parameterBlocks.end()) {
+          // update the paramblock with the new settings, and invoke the callback
+          it->second.first = data;
           it->second.second(data->get("params"));
         } else {
           LOG_WARNING_LN("Unknown param block: %s", blockName.c_str());
@@ -265,7 +268,7 @@ void App::send_stats(const JsonValue::JsonValuePtr &frame) {
 
   {
     auto root = JsonValue::create_object();
-    auto obj = JsonValue::create_object();
+    auto obj = root->add_key_value("system.frame", JsonValue::create_object());
 
     FILETIME time;
     GetSystemTimeAsFileTime(&time);
@@ -281,7 +284,6 @@ void App::send_stats(const JsonValue::JsonValuePtr &frame) {
     obj->add_key_value("fps", JsonValue::create_number(GRAPHICS.fps()));
     obj->add_key_value("ms", JsonValue::create_number(APP.frame_time()));
     obj->add_key_value("mem", JsonValue::create_int(counters.WorkingSetSize / 1024));
-    root->add_key_value("system.frame", obj);
 
     send_json(0, root);
   }
@@ -363,10 +365,74 @@ UINT App::run(void *userdata) {
   return 0;
 }
 
+void App::load_settings() {
+  if (_appRootFilename.empty())
+    return;
+
+  vector<char> appRoot;
+  if (!load_file(_appRootFilename.c_str(), &appRoot))
+    return;
+
+  auto appSettings = parse_json(appRoot.data(), appRoot.data() + appRoot.size());
+  if (!appSettings->has_key("curSettings"))
+    return;
+
+  string curSettings = appSettings->get("curSettings")->to_string();
+  if (!appSettings->has_key(curSettings))
+    return;
+
+  auto settings = appSettings->get(curSettings);
+
+  // init the params
+  auto params = settings->get("params");
+  for (int i = 0; i < params->count(); ++i) {
+    auto cur = params->get(i);
+    string name = cur->get("name")->to_string();
+    auto it = _parameterBlocks.find(name);
+    if (it != _parameterBlocks.end()) {
+      it->second.second(cur->get("params"));
+    }
+  }
+}
+
+void App::save_settings() {
+
+  if (_appRootFilename.empty())
+    return;
+
+  vector<char> appRoot;
+  if (!load_file(_appRootFilename.c_str(), &appRoot))
+    return;
+
+  auto appSettings = parse_json(appRoot.data(), appRoot.data() + appRoot.size());
+  if (appSettings->is_null())
+    appSettings = JsonValue::create_object();
+
+  // create a timestamp based name for the settings
+  time_t rawTime;
+  tm timeInfo;
+  time(&rawTime);
+  localtime_s(&timeInfo, &rawTime);
+
+  char now[80];
+  strftime(now, sizeof(now), "settings_%Y_%m_%d_%H_%M_%S", &timeInfo);
+
+  auto settings = JsonValue::create_object();
+  auto params = settings->add_key_value("params", JsonValue::create_array());
+
+  for (auto it = begin(_parameterBlocks); it != end(_parameterBlocks); ++it) {
+    params->add_value(it->second.first);
+  }
+
+  appSettings->add_key_value("curSettings", now);
+  appSettings->add_key_value(now, settings);
+
+  string json = print_json(appSettings);
+  save_file(_appRootFilename.c_str(), json.c_str(), json.size());
+}
+
 LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-
-  DEMO_ENGINE.wnd_proc(message, wParam, lParam);
 
   switch( message ) {
 
@@ -416,37 +482,44 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (wParam) {
 
+      case 'S':
+        if (is_bit_set(GetKeyState(VK_CONTROL), 15)) {
+          APP.save_settings();
+          return 0;
+        }
+        break;
+
       case 'V':
         GRAPHICS.set_vsync(!GRAPHICS.vsync());
-        break;
+        return 0;
 
       case VK_ESCAPE:
         PostQuitMessage( 0 );
-        break;
+        return 0;
     
       case VK_SPACE:
         DEMO_ENGINE.set_paused(!DEMO_ENGINE.paused());
-        break;
+        return 0;
 
       case VK_PRIOR:
         DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() - 1000);
-        break;
+        return 0;
 
       case VK_NEXT:
         DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() + 1000);
-        break;
+        return 0;
 
       case VK_LEFT:
         DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() - 100);
-        break;
+        return 0;
 
       case VK_RIGHT:
         DEMO_ENGINE.set_pos(DEMO_ENGINE.pos() + 100);
-        break;
+        return 0;
 
       case VK_HOME:
         DEMO_ENGINE.set_pos(0);
-        break;
+        return 0;
 
       default:
         break;
@@ -454,12 +527,15 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     break;
 
   }
+
+  DEMO_ENGINE.wnd_proc(message, wParam, lParam);
+
   return DefWindowProc( hWnd, message, wParam, lParam );
 }
 
 void App::find_app_root()
 {
-  // keep going up directory levels until we find "app.root", or we hit the bottom..
+  // keep going up directory levels until we find "app.json", or we hit the bottom..
   char starting_dir[MAX_PATH], prev_dir[MAX_PATH], cur_dir[MAX_PATH];
   ZeroMemory(prev_dir, sizeof(prev_dir));
 
@@ -472,8 +548,9 @@ void App::find_app_root()
 
     memcpy(prev_dir, cur_dir, MAX_PATH);
 
-    if (file_exists("app.root")) {
+    if (file_exists("app.json")) {
       _app_root = cur_dir;
+      _appRootFilename = _app_root + "/app.json";
       return;
     }
     if (_chdir("..") == -1)
