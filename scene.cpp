@@ -6,6 +6,7 @@
 #include "animation_manager.hpp"
 #include "deferred_context.hpp"
 #include "material_manager.hpp"
+#include "effect.hpp"
 
 Scene::Scene() {
 }
@@ -64,7 +65,7 @@ void Scene::sort_by_material() {
   }
 }
 
-void Scene::render(DeferredContext *ctx, GraphicsObjectHandle technique_handle) {
+void Scene::render(DeferredContext *ctx, Effect *effect, GraphicsObjectHandle technique_handle) {
 
   Technique *technique = GRAPHICS.get_technique(technique_handle);
   ctx->set_rs(technique->rasterizer_state());
@@ -86,8 +87,8 @@ void Scene::render(DeferredContext *ctx, GraphicsObjectHandle technique_handle) 
     ctx->set_cbuffer(vs->material_cbuffer(), ps->material_cbuffer());
 
 
-    technique->fill_cbuffer(&vs->system_cbuffer());
-    technique->fill_cbuffer(&ps->system_cbuffer());
+    effect->fill_cbuffer(&vs->system_cbuffer());
+    effect->fill_cbuffer(&ps->system_cbuffer());
     ctx->set_cbuffer(vs->system_cbuffer(), ps->system_cbuffer());
 
     ctx->set_vs(vs->handle());

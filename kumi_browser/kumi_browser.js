@@ -162,6 +162,7 @@ var KUMI = (function($, KUMI_LIB) {
 
         function drawParamblocks(paramBlocks) {
 
+            console.log(paramBlocks);
             $.each(paramBlocks, function(i, block) {
                 var name = block.name;
                 $.each(block.params, function(k, param) {
@@ -169,7 +170,7 @@ var KUMI = (function($, KUMI_LIB) {
                     $("<label/>", {
                         text : paramName
                     }).appendTo("#tweak-div");
-                    if (param.minValue) {
+                    if (param.hasOwnProperty("minValue")) {
                         $("<div/>", {
                             id: paramName,
                             style: "margin: 10px"

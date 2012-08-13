@@ -38,6 +38,7 @@ ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name)
   , _mouse_rbutton(false)
   , _mouse_pos_prev(~0)
   , _ctx(nullptr)
+  , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -155,9 +156,21 @@ bool ScenePlayer::init() {
       block._params.push_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
       block._params.push_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
 
+      block._params.push_back(TweakableParameter("nearFocusStart", 10.0f, 1.0f, 2500.0f));
+      block._params.push_back(TweakableParameter("nearFocusEnd", 50.0f, 1.0f, 2500.0f));
+      block._params.push_back(TweakableParameter("farFocusStart", 100.0f, 1.0f, 2500.0f));
+      block._params.push_back(TweakableParameter("farFocusEnd", 150.0f, 1.0f, 2500.0f));
+
       APP.add_parameter_block(block, true, [=](const JsonValue::JsonValuePtr &msg) {
         _blurX = (float)msg->get("blurX")->get("value")->to_number();
         _blurY = (float)msg->get("blurY")->get("value")->to_number();
+
+        if (msg->has_key("nearFocusStart")) {
+          _nearFocusStart = (float)msg->get("nearFocusStart")->get("value")->to_number();
+          _nearFocusEnd = (float)msg->get("nearFocusEnd")->get("value")->to_number();
+          _farFocusStart = (float)msg->get("farFocusStart")->get("value")->to_number();
+          _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
+        }
       });
     }
 
@@ -323,24 +336,24 @@ bool ScenePlayer::render() {
     };
 
     auto rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
-    GraphicsObjectHandle rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
-    GraphicsObjectHandle rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
-    GraphicsObjectHandle rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
+    auto rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
+    auto rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
+    auto rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
 
-    GraphicsObjectHandle rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");
-    GraphicsObjectHandle rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_blur");
+    auto rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");
+    auto rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_blur");
 
-    GraphicsObjectHandle rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion");
-    GraphicsObjectHandle rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion_tmp");
+    auto rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion");
+    auto rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion_tmp");
 
-    GraphicsObjectHandle rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
+    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
 
     {
       ADD_NAMED_PROFILE_SCOPE("render_meshes");
       GraphicsObjectHandle render_targets[] = { rt_pos, rt_normal, rt_diffuse, rt_specular };
       bool clear[] = { true, true, true, true };
       _ctx->set_render_targets(render_targets, clear, 4);
-      _scene->render(_ctx, _ssao_fill);
+      _scene->render(_ctx, this, _ssao_fill);
     }
 
     // Calc the occlusion
@@ -381,7 +394,7 @@ bool ScenePlayer::render() {
         *lightattend = light->far_attenuation_end;
       }
 
-      _ctx->render_technique(_ssao_light, TextureArray(), data);
+      _ctx->render_technique(_ssao_light, bind(&ScenePlayer::fill_cbuffer, this, _1), TextureArray(), data);
     }
 
     // calc luminance
@@ -418,6 +431,8 @@ bool ScenePlayer::render() {
       float blurRadius[2];
     } settings = { w, h, _blurX, _blurX };
 
+    int threadsPerGroup = 64;
+
     for (int i = 0; i < 3; ++i) {
       {
         // blur x
@@ -432,7 +447,7 @@ bool ScenePlayer::render() {
         _ctx->set_uavs(uav);
         auto handle = cs->find_cbuffer("blurSettings");
         _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-        _ctx->dispatch((h + 31) / 32, 1, 1);
+        _ctx->dispatch((h + threadsPerGroup-1) / threadsPerGroup, 1, 1);
 
         _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
         _ctx->unset_uavs(0, 1);
@@ -460,7 +475,7 @@ bool ScenePlayer::render() {
         _ctx->set_uavs(uav);
         auto handle = cs->find_cbuffer("blurSettings");
         _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-        _ctx->dispatch((w + 31) / 32, 1, 1);
+        _ctx->dispatch((w + threadsPerGroup-1) / threadsPerGroup, 1, 1);
 
         _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
         _ctx->unset_uavs(0, 1);
@@ -477,15 +492,15 @@ bool ScenePlayer::render() {
 
     }
 
-    post_process(rt_tmp, GraphicsObjectHandle(), _scale);
-/*
+    //post_process(rt_tmp, GraphicsObjectHandle(), _scale);
+
     {
       // gamma correction
       _ctx->set_default_render_target();
-      TextureArray arr = { GraphicsObjectHandle(), _rt_final };
-      _ctx->render_technique(_gamma_correct, arr, DeferredContext::InstanceData());
+      TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmp, rt_pos };
+      _ctx->render_technique(_gamma_correct, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
     }
-*/
+
 
     GRAPHICS.release_temp_render_target(rt_tmp);
 
@@ -517,7 +532,7 @@ void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle 
     _ctx->set_default_render_target();
 
   TextureArray arr = { input };
-  _ctx->render_technique(technique, arr, DeferredContext::InstanceData());
+  _ctx->render_technique(technique, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
 
   if (output.is_valid())
     _ctx->unset_render_targets(0, 1);
@@ -585,7 +600,18 @@ void ScenePlayer::update_from_json(const JsonValue::JsonValuePtr &state) {
 }
 
 void ScenePlayer::fill_cbuffer(CBuffer *cbuffer) const {
-  int a = 10;
+  for (size_t i = 0; i < cbuffer->vars.size(); ++i) {
+    auto &cur = cbuffer->vars[i];
+    if (cur.id == _DofSettingsId) {
+      float *p = (float *)&cbuffer->staging[cur.ofs];
+      p[0] = _nearFocusStart;
+      p[1] = _nearFocusEnd;
+      p[2] = _farFocusStart;
+      p[3] = _farFocusEnd;
+    } else {
+      PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
+    }
+  }
 }
 
 void ScenePlayer::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {

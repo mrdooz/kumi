@@ -76,4 +76,8 @@ private:
   DeferredContext *_ctx;
 
   float _blurX, _blurY;
+
+  PropertyId _DofSettingsId;
+  float _nearFocusStart, _nearFocusEnd;
+  float _farFocusStart, _farFocusEnd;
 };

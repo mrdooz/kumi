@@ -22,7 +22,8 @@ DeferredContext::~DeferredContext() {
 }
 
 
-void DeferredContext::render_technique(GraphicsObjectHandle technique_handle, 
+void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
+                                       const std::function<void(CBuffer *)> fnSystemCbuffers,
                                        const TextureArray &resources,
                                        const InstanceData &instance_data) {
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
@@ -62,10 +63,10 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 
   // set cbuffers
   auto &vs_s_cbuffer = vs->system_cbuffer();
-  technique->fill_cbuffer(&vs_s_cbuffer);
+  fnSystemCbuffers(&vs_s_cbuffer);
 
   auto &ps_s_cbuffer = ps->system_cbuffer();
-  technique->fill_cbuffer(&ps_s_cbuffer);
+  fnSystemCbuffers(&ps_s_cbuffer);
 
   // Check if we're drawing instanced
   if (instance_data.num_instances) {

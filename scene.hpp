@@ -5,6 +5,7 @@ struct TrackedLocation;
 class Mesh;
 class Material;
 class DeferredContext;
+class Effect;
 
 struct Camera {
   Camera(const std::string &name) : name(name) {}
@@ -47,7 +48,7 @@ struct Scene {
 
   void sort_by_material();
 
-  void render(DeferredContext *ctx, GraphicsObjectHandle technique_handle);
+  void render(DeferredContext *ctx, Effect *effect, GraphicsObjectHandle technique_handle);
 
   XMFLOAT4 ambient;
   std::vector<Mesh *> meshes;

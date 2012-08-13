@@ -3,6 +3,7 @@
 cbuffer PerFrame {
   matrix proj;
   matrix view;
+  float4 DOFDepths;
   float4 kernel[32];
   float4 noise[16];
 };
@@ -31,6 +32,16 @@ static const float InvGamma = 1/Gamma;
 #if DIFFUSE_TEXTURE
 Texture2D DiffuseTexture : register(t0);
 #endif
+
+
+// Computes the depth of field blur factor
+float BlurFactor(in float depth) {
+    float f0 = 1.0f - saturate((depth - DOFDepths.x) / max(DOFDepths.y - DOFDepths.x, 0.01f));
+    float f1 = saturate((depth - DOFDepths.z) / max(DOFDepths.w - DOFDepths.z, 0.01f));
+    float blur = saturate(f0 + f1);
+
+    return blur;
+}
 
 ///////////////////////////////////
 // g-buffer fill
@@ -74,6 +85,7 @@ fill_ps_output fill_ps_main(fill_ps_input input)
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
+    output.rt_pos.w = BlurFactor(input.vs_pos.z);
     output.rt_normal = normalize(input.vs_normal);
   #if DIFFUSE_TEXTURE
     // convert to linear space
@@ -226,9 +238,12 @@ Texture2D rt_composite : register(t0);
 
 float4 gamma_ps_main(quad_ps_input input) : SV_Target
 {
-  float4 color = rt_composite.Sample(PointSampler, input.tex);
-  float4 bloom = Texture1.Sample(LinearSampler, input.tex);
-  return pow(color + 0.25 * bloom, InvGamma);
+    float dof = Texture3.Sample(LinearSampler, input.tex).a;
+    float4 color = rt_composite.Sample(PointSampler, input.tex);
+    float4 bloom = Texture1.Sample(LinearSampler, input.tex);
+    float4 blurred = Texture2.Sample(LinearSampler, input.tex);
+    //return pow(color + 0.25 * bloom, InvGamma);
+    return pow(lerp(color, blurred, dof), InvGamma);
 }
 
 
@@ -248,7 +263,7 @@ cbuffer blurSettings : register( b0 )
     float2 blurRadius;
 }
 
-[numthreads(32,1,1)]
+[numthreads(64,1,1)]
 void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
 {
     int y = globalThreadID.x;
@@ -273,7 +288,7 @@ void boxBlurX(uint3 globalThreadID : SV_DispatchThreadID)
     }
 }
 
-[numthreads(32,1,1)]
+[numthreads(64,1,1)]
 void boxBlurY(uint3 globalThreadID : SV_DispatchThreadID)
 {
     int x = globalThreadID.x;
