@@ -21,11 +21,6 @@ class DeferredContext;
 
 enum FileEvent;
 
-#if WITH_GWEN
-struct IFW1Factory;
-struct IFW1FontWrapper;
-#endif
-
 class Graphics {
   friend DeferredContext;
 public:
@@ -125,11 +120,6 @@ public:
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
   GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
   GraphicsObjectHandle create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc);
-
-#if WITH_GWEN
-  GraphicsObjectHandle get_or_create_font_family(const std::wstring &name);
-  bool measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect);
-#endif
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
@@ -237,9 +227,6 @@ private:
   SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
   SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
   IdBuffer<StructuredBuffer *, IdCount> _structured_buffers;
-#if WITH_GWEN
-  SearchableIdBuffer<std::wstring,  IFW1FontWrapper *, IdCount> _font_wrappers;
-#endif
 
   static Graphics* _instance;
 
@@ -279,10 +266,6 @@ private:
   const char *_gs_profile;
 
   bool _vsync;
-
-#if WITH_GWEN
-  CComPtr<IFW1Factory> _fw1_factory;
-#endif
 
   std::map<PredefinedGeometry, std::pair<GraphicsObjectHandle, GraphicsObjectHandle> > _predefined_geometry;
 

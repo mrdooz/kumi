@@ -116,6 +116,7 @@ bool begins_with(const std::string &str, const std::string &sub_str) {
   return true;
 }
 
+#ifdef WITH_WEBSOCKETS
 string base64encode(const uint8_t *buf, int buf_size) {
   DWORD len;
   string res;
@@ -127,3 +128,4 @@ string base64encode(const uint8_t *buf, int buf_size) {
   }
   return res;
 }
+#endif

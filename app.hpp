@@ -19,24 +19,6 @@ class EffectWrapper;
 
 struct Scene;
 
-#if WITH_GWEN
-namespace Gwen {
-  namespace Renderer {
-    class Base;
-  }
-  namespace Controls {
-    class Canvas;
-    class StatusBar;
-  }
-  namespace Skin {
-    class TexturedBase;
-  }
-  namespace Input {
-    class Windows;
-  }
-}
-#endif
-
 class App : public threading::GreedyThread
 {
 public:
@@ -54,7 +36,9 @@ public:
   void debug_text(const char *fmt, ...);
   double frame_time() const { return _frame_time; }
 
+#ifdef WITH_WEBSOCKETS
   void process_network_msg(SOCKET sender, const char *msg, int len);
+#endif
 
   typedef std::function<void (const JsonValue::JsonValuePtr &)> cbParamChanged;
 
@@ -65,7 +49,9 @@ private:
   App();
   ~App();
 
+#ifdef WITH_WEBSOCKETS
   void send_stats(const JsonValue::JsonValuePtr &frame);
+#endif
   bool create_window();
   void set_client_size();
   void find_app_root();
@@ -91,14 +77,6 @@ protected:
   string _appRootFilename;
 
   std::map<std::string, std::pair<JsonValue::JsonValuePtr, cbParamChanged>> _parameterBlocks;
-
-#if WITH_GWEN
-  std::unique_ptr<Gwen::Controls::StatusBar> _gwen_status_bar;
-  std::unique_ptr<Gwen::Input::Windows> _gwen_input;
-  std::unique_ptr<Gwen::Controls::Canvas> _gwen_canvas;
-  std::unique_ptr<Gwen::Skin::TexturedBase> _gwen_skin;
-  std::unique_ptr<Gwen::Renderer::Base> _gwen_renderer;
-#endif
 
 };
 

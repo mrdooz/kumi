@@ -50,9 +50,6 @@ private:
   ~Logger();
 
   void	init_severity_map();
-#if WITH_ZMQ_LOGSERVER
-  void send_log_message(int scope, Severity severity, const char *msg); // < 0 = leave scope, > 0 = enter scope, 0 = no scope
-#endif
 
   HANDLE _file;
   int   _output_device;
@@ -63,11 +60,6 @@ private:
   std::map<OuputDevice, std::map<Severity, bool> > severity_map_;
   static Logger* _instance;
 
-#if WITH_ZMQ_LOGSERVER
-  void *_context;
-  void *_socket;
-  bool _connected;
-#endif
   CriticalSection _cs_context_id;
   int _next_context_id;
 };

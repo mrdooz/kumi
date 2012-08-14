@@ -82,9 +82,6 @@ Graphics::Graphics()
   , _render_targets(delete_obj<RenderTargetResource *>)
   , _resources(delete_obj<SimpleResource *>)
   , _structured_buffers(delete_obj<StructuredBuffer *>)
-#if WITH_GWEN
-  , _font_wrappers(release_obj<IFW1FontWrapper *>)
-#endif
   , _vsync(false)
 {
 }
@@ -774,34 +771,6 @@ GraphicsObjectHandle Graphics::create_sampler(const TrackedLocation &loc, const 
   }
   return emptyGoh;
 }
-
-#if WITH_GWEN
-GraphicsObjectHandle Graphics::get_or_create_font_family(const wstring &name) {
-  int idx = _font_wrappers.idx_from_token(name);
-  if (idx != -1)
-    return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
-  if (!_fw1_factory)
-    FW1CreateFactory(FW1_VERSION, &_fw1_factory.p);
-  idx = _font_wrappers.find_free_index();
-  if (idx != -1) {
-    IFW1FontWrapper *font = nullptr;
-    _fw1_factory->CreateFontWrapper(_device, name.c_str(), &font);
-    _font_wrappers.set_pair(idx, make_pair(name, font));
-    return GraphicsObjectHandle(GraphicsObjectHandle::kFontFamily, 0, idx);
-  }
-  return emptyGoh;
-}
-
-bool Graphics::measure_text(GraphicsObjectHandle font, const std::wstring &family, const std::wstring &text, float size, uint32 flags, FW1_RECTF *rect) {
-  if (IFW1FontWrapper *wrapper = _font_wrappers.get(font)) {
-    FW1_RECTF layout_rect;
-    layout_rect.Left = layout_rect.Right = layout_rect.Top = layout_rect.Bottom = 0;
-    *rect = wrapper->MeasureString(text.c_str(), family.c_str(), size, &layout_rect, flags | FW1_NOWORDWRAP);
-    return true;
-  }
-  return false;
-}
-#endif
 
 bool Graphics::technique_file_changed(const char *filename, void *token) {
   return true;

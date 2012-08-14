@@ -21,16 +21,6 @@
 #include "test/scene_player.hpp"
 #include "test/particle_test.hpp"
 
-#if WITH_GWEN
-#include "kumi_gwen.hpp"
-#include "gwen/Skins/TexturedBase.h"
-#include "gwen/Controls/Canvas.h"
-#include "gwen/Controls/Button.h"
-#include "gwen/Input/Windows.h"
-#include "gwen/UnitTest/UnitTest.h"
-#include "gwen/Controls/StatusBar.h"
-#endif
-
 #pragma comment(lib, "psapi.lib")
 
 using std::swap;
@@ -63,13 +53,6 @@ App::App()
 
 App::~App()
 {
-#if WITH_GWEN
-  _gwen_status_bar.reset();
-  _gwen_input.reset();
-  _gwen_canvas.reset();
-  _gwen_skin.reset();
-  _gwen_renderer.reset();
-#endif
 }
 
 App& App::instance()
@@ -102,25 +85,11 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(create_window());
 
-#if WITH_GWEN
-  _gwen_renderer.reset(create_kumi_gwen_renderer());
-  _gwen_skin.reset(new Gwen::Skin::TexturedBase(_gwen_renderer.get()));
-  _gwen_skin->Init("gfx/DefaultSkin.png");
-  _gwen_canvas.reset(new Gwen::Controls::Canvas(_gwen_skin.get()));
-  _gwen_canvas->SetSize(GRAPHICS.width(), GRAPHICS.height());
-  _gwen_input.reset(new Gwen::Input::Windows());
-  _gwen_input->Initialize(_gwen_canvas.get());
-  _gwen_status_bar.reset(new Gwen::Controls::StatusBar(_gwen_canvas.get()));
-#endif
-
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
   RESOURCE_MANAGER.add_path("c:\\users\\dooz\\SkyDrive");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
 
-#if WITH_GWEN
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/gwen.tec", true));
-#endif
 /*
   if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
     // log error
@@ -205,6 +174,8 @@ bool App::create_window()
 void App::on_idle() {
 }
 
+#ifdef WITH_WEBSOCKETS
+
 static void send_json(SOCKET socket, const JsonValue::JsonValuePtr &json) {
   string str = print_json2(json);
   char *buf = new char[str.size()];
@@ -288,8 +259,8 @@ void App::send_stats(const JsonValue::JsonValuePtr &frame) {
   }
 
   send_json(0, frame);
-
 }
+#endif
 
 UINT App::run(void *userdata) {
   MSG msg = {0};
@@ -308,9 +279,6 @@ UINT App::run(void *userdata) {
 
   while (WM_QUIT != msg.message) {
     if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) ) {
-#if WITH_GWEN
-      _gwen_input->ProcessMessage(msg);
-#endif
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
@@ -325,12 +293,6 @@ UINT App::run(void *userdata) {
         GRAPHICS.clear(XMFLOAT4(0,0,0,1));
         DEMO_ENGINE.tick();
 
-#if WITH_GWEN
-        XMFLOAT4 tt;
-        PROPERTY_MANAGER.get_system_property("g_time", &tt);
-        _gwen_status_bar->SetText(Gwen::Utility::Format(L"fps: %.2f, %.2f, %.2f", GRAPHICS.fps(), tt.x, tt.y));
-        _gwen_canvas->RenderCanvas();
-#endif
         //GRAPHICS.render();
       }
       {
@@ -352,6 +314,7 @@ UINT App::run(void *userdata) {
 
 
       JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
+#ifdef WITH_WEBSOCKETS
       // limit how often we send the profile data
       static DWORD lastTime = timeGetTime();
       DWORD now = timeGetTime();
@@ -359,6 +322,7 @@ UINT App::run(void *userdata) {
         send_stats(frame);
         lastTime = now;
       }
+#endif
     }
   }
   return 0;

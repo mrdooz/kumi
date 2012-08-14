@@ -3,7 +3,6 @@
 #include "utils.hpp"
 #include "path_utils.hpp"
 #include "string_utils.hpp"
-#include "log_server.hpp"
 
 #pragma comment(lib, "dxerr.lib")
 
@@ -33,11 +32,6 @@ Logger::Logger()
   , _output_device(Debugger | File)
   , _break_on_error(false)
   , _output_line_numbers(true)
-#if WITH_ZMQ_LOGSERVER
-  , _context(zmq_init(1))
-  , _socket(zmq_socket(_context, ZMQ_PUSH))
-  , _connected(false)
-#endif
   , _next_context_id(0)
 {
   init_severity_map();
@@ -49,35 +43,7 @@ Logger::~Logger() {
   if (_file != INVALID_HANDLE_VALUE)
     CloseHandle(_file);
 
-#if WITH_ZMQ_LOGSERVER
-  int zero = 0;
-  zmq_setsockopt(_socket, ZMQ_LINGER, &zero, sizeof (zero));
-  zmq_close(_socket);
-  zmq_term(_context);
-#endif
 }
-
-#if WITH_ZMQ_LOGSERVER
-void Logger::send_log_message(int scope, Severity severity, const char *msg) {
-  if (!_connected)
-    _connected = zmq_connect(_socket, g_client_addr) == 0;
-
-  zmq_msg_t q;
-  int res = 0;
-  int len = msg ? (strlen(msg) + 1) : 0;
-  res = zmq_msg_init_size(&q, sizeof(LogMessageHeader) + len);
-  LogMessageHeader *hdr = (LogMessageHeader *)zmq_msg_data(&q);
-  hdr->severity = severity;
-  hdr->type = scope < 0 ? LogMessageHeader::LeaveScope : 
-              scope > 0 ? LogMessageHeader::EnterScope : 
-              LogMessageHeader::LogMessage;
-  hdr->id = abs(scope);
-  if (len)
-    memcpy((void *)&hdr->data[0], msg, len);
-  res = zmq_send(_socket, &q, 0);
-  res = zmq_msg_close(&q);
-}
-#endif
 
 void Logger::debug_output(bool new_line, bool one_shot, const char *file, int line, Severity severity, const char* const format, ...)
 {
@@ -121,9 +87,6 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
     if (severity >= Error)
       FlushFileBuffers(_file);
   }
-#if WITH_ZMQ_LOGSERVER
-  send_log_message(0, severity, str.c_str());
-#endif
 
   va_end(arg);
 
@@ -228,15 +191,9 @@ int Logger::get_next_context_id() {
 }
 
 void Logger::enter_context(int context_id, const char *msg) {
-#if WITH_ZMQ_LOGSERVER
-  send_log_message(context_id, Unknown, msg);
-#endif
 }
 
 void Logger::leave_context(int context_id) {
-#if WITH_ZMQ_LOGSERVER
-  send_log_message(-context_id, Unknown, NULL);
-#endif
 }
 
 ScopedContext::ScopedContext(int id, bool is_spam, const char *fmt, ...) 

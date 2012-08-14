@@ -1,6 +1,4 @@
 #pragma once
-#if WITH_WEBSOCKETS
-
 #include "threading.hpp"
 
 class WebSocketServer;
@@ -48,4 +46,3 @@ private:
 
 #define WEBSOCKET_SERVER WebSocketServer::instance()
 
-#endif

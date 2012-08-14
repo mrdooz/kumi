@@ -1,5 +1,4 @@
 #include "stdafx.h"
-#if WITH_WEBSOCKETS
 #include "websocket_server.hpp"
 #include "threading.hpp"
 #include "graphics.hpp"
@@ -409,5 +408,3 @@ WebSocketServer& WebSocketServer::instance() {
 int WebSocketServer::num_clients_connected() {
   return _thread.num_clients_connected();
 }
-
-#endif

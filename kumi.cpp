@@ -5,7 +5,6 @@
 #include "logger.hpp"
 #include "app.hpp"
 #include "path_utils.hpp"
-#include "log_server.hpp"
 #include "kumi.hpp"
 #include "websocket_server.hpp"
 
@@ -51,11 +50,6 @@ static int count_instances(const char *name) {
 
 static int run_app(HINSTANCE instance) {
 
-#if WITH_CEF
-  CefSettings settings;
-  settings.multi_threaded_message_loop = false;
-  CefInitialize(settings);
-#endif
   if (!APP.init(instance))
     return 1;
 
@@ -74,11 +68,6 @@ static bool global_init() {
 }
 
 static bool global_close() {
-#if WITH_ZMQ_LOGSERVER
-  HWND h = g_started_as_log_server ? FindWindow(g_app_window_class, g_app_window_title) :
-    FindWindow(g_log_window_class, g_log_window_title);
-  PostMessage(h, WM_APP_CLOSE, 0, 0);
-#endif
   return true;
 }
 
@@ -104,26 +93,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
   if (!global_init())
     return 1;
 
-  int res = 0;
-
-#if WITH_ZMQ_LOGSERVER
-  // hopefully this should save me from killing myself :)
-  Path path(g_module_name);
-  int process_count = count_instances(path.get_filename().c_str());
-  if (process_count > 2)
-    return 1;
-
-  g_started_as_log_server = !strcmp(cmd_line, "--log-server");
-  if (g_started_as_log_server) {
-    start_second_process("");
-    res = run_log_server(instance);
-  } else {
-    start_second_process("--log-server");
-    res = run_app(instance);
-  }
-#else
-  res = run_app(instance);
-#endif
+  int res = run_app(instance);
 
   global_close();
   return res;

@@ -159,10 +159,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">Use</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\kumi_gwen.cpp" />
     <ClCompile Include="..\kumi_loader.cpp" />
     <ClCompile Include="..\logger.cpp" />
-    <ClCompile Include="..\log_server.cpp" />
     <ClCompile Include="..\material.cpp" />
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\mesh.cpp" />
@@ -177,6 +175,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">NotUsing</PrecompiledHeader>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\shader.cpp" />
     <ClCompile Include="..\shader_reflection.cpp" />
@@ -193,14 +192,11 @@
     <ClCompile Include="..\test\scene_player.cpp" />
     <ClCompile Include="..\test\ps3_background.cpp" />
     <ClCompile Include="..\threading.cpp" />
-    <ClCompile Include="..\TreeList.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="..\tweakable_param.cpp" />
     <ClCompile Include="..\utils.cpp" />
-    <ClCompile Include="..\websocket_server.cpp" />
+    <ClCompile Include="..\websocket_server.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\animation_manager.hpp" />
@@ -222,10 +218,8 @@
     <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\json_utils.hpp" />
     <ClInclude Include="..\kumi.hpp" />
-    <ClInclude Include="..\kumi_gwen.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
-    <ClInclude Include="..\log_server.hpp" />
     <ClInclude Include="..\material.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
     <ClInclude Include="..\mesh.hpp" />
@@ -236,7 +230,9 @@
     <ClInclude Include="..\resource_interface.hpp" />
     <ClInclude Include="..\resource_manager.hpp" />
     <ClInclude Include="..\scene.hpp" />
-    <ClInclude Include="..\sha1.h" />
+    <ClInclude Include="..\sha1.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\shader.hpp" />
     <ClInclude Include="..\shader_reflection.hpp" />
     <ClInclude Include="..\stdafx.h" />
@@ -248,12 +244,12 @@
     <ClInclude Include="..\test\scene_player.hpp" />
     <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\tracked_location.hpp" />
-    <ClInclude Include="..\TreeList.h" />
     <ClInclude Include="..\tweakable_param.hpp" />
     <ClInclude Include="..\utils.hpp" />
-    <ClInclude Include="..\v8_handler.hpp" />
     <ClInclude Include="..\vertex_types.hpp" />
-    <ClInclude Include="..\websocket_server.hpp" />
+    <ClInclude Include="..\websocket_server.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">true</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\xmath.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
