@@ -92,6 +92,7 @@ enum Symbol {
   kSymVertexShader,
   kSymPixelShader,
   kSymComputeShader,
+  kSymGeometryShader,
     kSymFile,
     kSymEntryPoint,
     kSymParams,
@@ -180,6 +181,7 @@ struct {
   { kSymVertexShader, "vertex_shader" },
   { kSymPixelShader, "pixel_shader" },
   { kSymComputeShader, "compute_shader" },
+  { kSymGeometryShader, "geometry_shader" },
     { kSymFile, "file" },
     { kSymEntryPoint, "entry_point" },
     { kSymParams, "params" },
@@ -684,6 +686,7 @@ static const char *ext_from_type(ShaderType::Enum type) {
     case ShaderType::kVertexShader: return ".vso";
     case ShaderType::kPixelShader: return ".pso";
     case ShaderType::kComputeShader: return ".cso";
+    case ShaderType::kGeometryShader: return ".gso";
     default: LOG_ERROR_LN("Implement me!");
   }
   __assume(false);
@@ -742,6 +745,8 @@ void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, 
             technique->_ps_flag_mask |= flag_value;
           else if (shader->_type == ShaderType::kComputeShader)
             technique->_cs_flag_mask |= flag_value;
+          else if (shader->_type == ShaderType::kGeometryShader)
+            technique->_gs_flag_mask |= flag_value;
           else
             LOG_ERROR_LN("Implement me!");
         }
@@ -1097,7 +1102,7 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
   auto valid = list_of
-    (kSymVertexShader)(kSymPixelShader)(kSymComputeShader)
+    (kSymVertexShader)(kSymPixelShader)(kSymComputeShader)(kSymGeometryShader)
     (kSymMaterial)
     (kSymVertices)(kSymIndices)
     (kSymGeometry)
@@ -1109,6 +1114,7 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 
       case kSymVertexShader:
       case kSymPixelShader:
+      case kSymGeometryShader:
       case kSymComputeShader: {
         ShaderTemplate *st = nullptr;
         if (symbol == kSymVertexShader) 
@@ -1117,6 +1123,8 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
           technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader));
         else if (symbol == kSymComputeShader)
           technique->_cs_shader_template.reset(st = new ShaderTemplate(ShaderType::kComputeShader));
+        else if (symbol == kSymGeometryShader)
+          technique->_gs_shader_template.reset(st = new ShaderTemplate(ShaderType::kGeometryShader));
         else
           LOG_ERROR_LN("Implement me!");
 

@@ -4,7 +4,7 @@
 
 class Ps3BackgroundEffect : public Effect {
 public:
-  Ps3BackgroundEffect(GraphicsObjectHandle context, const std::string &name) : Effect(context, name) {}
+  Ps3BackgroundEffect(const std::string &name) : Effect(name) {}
   virtual bool init() override;
   virtual bool update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
   virtual bool render() override;

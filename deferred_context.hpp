@@ -61,6 +61,7 @@ public:
   void set_vs(GraphicsObjectHandle vs);
   void set_ps(GraphicsObjectHandle ps);
   void set_cs(GraphicsObjectHandle cs);
+  void set_gs(GraphicsObjectHandle cs);
   void set_layout(GraphicsObjectHandle layout);
   void set_vb(GraphicsObjectHandle vb, int vertex_size);
   void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format);

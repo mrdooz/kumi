@@ -19,6 +19,7 @@ public:
     kDepthStencilState,
     kTechnique,
     kVertexShader,
+    kGeometryShader,
     kPixelShader,
     kComputeShader,
     kFontFamily,

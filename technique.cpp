@@ -18,15 +18,15 @@ Technique::Technique()
   : _vertex_size(-1)
   , _index_format(DXGI_FORMAT_UNKNOWN)
   , _valid(false)
-  , _vs_shader_template(nullptr)
-  , _ps_shader_template(nullptr)
   , _vs_flag_mask(0)
   , _ps_flag_mask(0)
   , _cs_flag_mask(0)
+  , _gs_flag_mask(0)
 {
   _all_shaders.push_back(&_vertex_shaders);
   _all_shaders.push_back(&_pixel_shaders);
   _all_shaders.push_back(&_compute_shaders);
+  _all_shaders.push_back(&_geometry_shaders);
 }
 
 Technique::~Technique() {
@@ -49,9 +49,11 @@ void Technique::init_from_parent(const Technique *parent) {
   _vs_flag_mask = parent->_vs_flag_mask;
   _ps_flag_mask = parent->_ps_flag_mask;
   _cs_flag_mask = parent->_cs_flag_mask;
+  _gs_flag_mask = parent->_gs_flag_mask;
   _vs_shader_template = parent->_vs_shader_template;
   _ps_shader_template = parent->_ps_shader_template;
   _cs_shader_template = parent->_cs_shader_template;
+  _gs_shader_template = parent->_gs_shader_template;
 }
 
 void Technique::add_error_msg(const char *fmt, ...) {
@@ -102,6 +104,7 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
     case ShaderType::kVertexShader: profile = GRAPHICS.vs_profile(); break;
     case ShaderType::kPixelShader: profile = GRAPHICS.ps_profile(); break;
     case ShaderType::kComputeShader: profile = GRAPHICS.cs_profile(); break;
+    case ShaderType::kGeometryShader: profile = GRAPHICS.gs_profile(); break;
     default: LOG_ERROR_LN("Implement me!");
   }
 
@@ -267,7 +270,12 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
         _compute_shaders.push_back(shader);
         break;
 
-      case ShaderType::kGeometryShader: 
+      case ShaderType::kGeometryShader:
+        shader->_handle = GRAPHICS.create_geometry_shader(FROM_HERE, buf, obj);
+        _geometry_shaders.push_back(shader);
+        break;
+
+      default:
         LOG_ERROR_LN("Implement me");
         break;
     }
@@ -320,6 +328,10 @@ Shader *Technique::pixel_shader(int flags) const {
 }
 
 Shader *Technique::compute_shader(int flags) const { 
-  return _compute_shaders.empty() ? nullptr : _compute_shaders[flags & _ps_flag_mask];
+  return _compute_shaders.empty() ? nullptr : _compute_shaders[flags & _cs_flag_mask];
+}
+
+Shader *Technique::geometry_shader(int flags) const { 
+  return _geometry_shaders.empty() ? nullptr : _geometry_shaders[flags & _gs_flag_mask];
 }
 

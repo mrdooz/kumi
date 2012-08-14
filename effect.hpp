@@ -7,7 +7,7 @@ class AnimatedTweakableParam;
 
 class Effect {
 public:
-  Effect(GraphicsObjectHandle context, const std::string &name);
+  Effect(const std::string &name);
   virtual ~Effect();
   virtual bool init();
   virtual bool reset();
@@ -30,7 +30,6 @@ public:
 
 protected:
   std::string _name;
-  GraphicsObjectHandle _context;
   uint32 _start_time, _end_time;
   bool _running;
   std::vector<std::unique_ptr<AnimatedTweakableParam> > _params;

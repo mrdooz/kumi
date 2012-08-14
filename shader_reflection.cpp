@@ -198,6 +198,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
         ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
         ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
         ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
+        ("SIZE", DXGI_FORMAT_R32_FLOAT)
         ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
 
       vector<D3D11_INPUT_ELEMENT_DESC> inputs;

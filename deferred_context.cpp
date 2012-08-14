@@ -169,6 +169,10 @@ void DeferredContext::set_cs(GraphicsObjectHandle cs) {
   _ctx->CSSetShader(GRAPHICS._compute_shaders.get(cs), NULL, 0);
 }
 
+void DeferredContext::set_gs(GraphicsObjectHandle gs) {
+  _ctx->GSSetShader(GRAPHICS._geometry_shaders.get(gs), NULL, 0);
+}
+
 void DeferredContext::set_ps(GraphicsObjectHandle ps) {
   if (prev_ps != ps) {
     _ctx->PSSetShader(GRAPHICS._pixel_shaders.get(ps), NULL, 0);
@@ -355,6 +359,8 @@ void DeferredContext::set_shader_resources(const TextureArray &resources, Shader
           _ctx->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
         else if (type == ShaderType::kComputeShader)
           _ctx->CSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+        else if (type == ShaderType::kGeometryShader)
+          _ctx->GSSetShaderResources(tmp, cur, &d3dresources[tmp]);
         else
           LOG_ERROR_LN("Implement me!");
 
@@ -382,6 +388,8 @@ void DeferredContext::unset_shader_resource(int first_view, int num_views, Shade
     _ctx->PSSetShaderResources(first_view, num_views, null_views);
   else if (type == ShaderType::kComputeShader)
     _ctx->CSSetShaderResources(first_view, num_views, null_views);
+  else if (type == ShaderType::kGeometryShader)
+    _ctx->GSSetShaderResources(first_view, num_views, null_views);
   else
     LOG_ERROR_LN("Implement me!");
 
@@ -466,6 +474,10 @@ void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType:
     _ctx->PSSetConstantBuffers(slot, 1, &buffer);
   else if (type == ShaderType::kComputeShader)
     _ctx->CSSetConstantBuffers(slot, 1, &buffer);
+  else if (type == ShaderType::kGeometryShader)
+    _ctx->GSSetConstantBuffers(slot, 1, &buffer);
+  else
+    LOG_ERROR_LN("Implement me!");
 }
 
 void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) {

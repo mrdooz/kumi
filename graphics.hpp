@@ -106,6 +106,7 @@ public:
   const char *vs_profile() const { return _vs_profile; }
   const char *ps_profile() const { return _ps_profile; }
   const char *cs_profile() const { return _cs_profile; }
+  const char *gs_profile() const { return _gs_profile; }
 
   void get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count);
 
@@ -118,6 +119,7 @@ public:
   GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
   GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
   GraphicsObjectHandle create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
+  GraphicsObjectHandle create_geometry_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
 
   GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
@@ -219,6 +221,7 @@ private:
   SearchableIdBuffer<string, ID3D11VertexShader *, IdCount> _vertex_shaders;
   SearchableIdBuffer<string, ID3D11PixelShader *, IdCount> _pixel_shaders;
   SearchableIdBuffer<string, ID3D11ComputeShader *, IdCount> _compute_shaders;
+  SearchableIdBuffer<string, ID3D11GeometryShader *, IdCount> _geometry_shaders;
   IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
@@ -273,6 +276,7 @@ private:
   const char *_vs_profile;
   const char *_ps_profile;
   const char *_cs_profile;
+  const char *_gs_profile;
 
   bool _vsync;
 

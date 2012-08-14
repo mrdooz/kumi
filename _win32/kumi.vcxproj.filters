@@ -57,9 +57,6 @@
     <ClCompile Include="..\demo_engine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\test\demo.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="..\technique.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -80,12 +77,6 @@
     </ClCompile>
     <ClCompile Include="..\threading.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\test\path_follow.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="..\test\volumetric.cpp">
-      <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="..\resource_manager.cpp">
       <Filter>Source Files</Filter>
@@ -153,6 +144,12 @@
     <ClCompile Include="..\bit_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\test\particle_test.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\camera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -197,9 +194,6 @@
     <ClInclude Include="..\demo_engine.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\test\demo.hpp">
-      <Filter>test</Filter>
-    </ClInclude>
     <ClInclude Include="..\technique.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -220,12 +214,6 @@
     </ClInclude>
     <ClInclude Include="..\threading.hpp">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\test\path_follow.hpp">
-      <Filter>test</Filter>
-    </ClInclude>
-    <ClInclude Include="..\test\volumetric.hpp">
-      <Filter>test</Filter>
     </ClInclude>
     <ClInclude Include="..\id_buffer.hpp">
       <Filter>Header Files</Filter>
@@ -312,6 +300,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\bit_utils.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\particle_test.hpp">
+      <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\camera.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

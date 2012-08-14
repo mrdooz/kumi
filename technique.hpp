@@ -95,6 +95,7 @@ public:
   Shader *vertex_shader(int flags) const;
   Shader *pixel_shader(int flags) const;
   Shader *compute_shader(int flags) const;
+  Shader *geometry_shader(int flags) const;
 
   GraphicsObjectHandle rasterizer_state() const { return _rasterizer_state; }
   GraphicsObjectHandle blend_state() const { return _blend_state; }
@@ -128,6 +129,7 @@ private:
   std::vector<Shader *> _vertex_shaders;
   std::vector<Shader *> _pixel_shaders;
   std::vector<Shader *> _compute_shaders;
+  std::vector<Shader *> _geometry_shaders;
 
   std::vector<std::vector<Shader *> *> _all_shaders;  // yo dawg!
 
@@ -142,12 +144,11 @@ private:
   GraphicsObjectHandle _blend_state;
   GraphicsObjectHandle _depth_stencil_state;
 
-  int _vs_flag_mask;
-  int _ps_flag_mask;
-  int _cs_flag_mask;
+  int _vs_flag_mask, _ps_flag_mask, _cs_flag_mask, _gs_flag_mask;
   std::shared_ptr<ShaderTemplate> _vs_shader_template;
   std::shared_ptr<ShaderTemplate> _ps_shader_template;
   std::shared_ptr<ShaderTemplate> _cs_shader_template;
+  std::shared_ptr<ShaderTemplate> _gs_shader_template;
 
   std::vector<Material *> _materials;
 

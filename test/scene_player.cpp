@@ -22,8 +22,8 @@ using namespace std::tr1::placeholders;
 static const int KERNEL_SIZE = 32;
 static const int NOISE_SIZE = 16;
 
-ScenePlayer::ScenePlayer(GraphicsObjectHandle context, const std::string &name) 
-  : Effect(context, name)
+ScenePlayer::ScenePlayer(const std::string &name) 
+  : Effect(name)
   , _scene(nullptr) 
   , _light_pos_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::LightPos"))
   , _light_color_id(PROPERTY_MANAGER.get_or_create_placeholder("Instance::LightColor"))
@@ -402,10 +402,10 @@ bool ScenePlayer::render() {
     _ctx->generate_mips(rt_luminance);
 
     auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    GraphicsObjectHandle downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, false, fmt, false, "downscale1");
-    GraphicsObjectHandle downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, false, fmt, false, "downscale2");
-    GraphicsObjectHandle downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "downscale3");
-    GraphicsObjectHandle blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "blur_tmp");
+    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, false, fmt, false, "downscale1");
+    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, false, fmt, false, "downscale2");
+    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "downscale3");
+    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "blur_tmp");
 
     // scale down
     post_process(rt_composite, downscale1, _scale_cutoff);
@@ -498,7 +498,8 @@ bool ScenePlayer::render() {
       // gamma correction
       _ctx->set_default_render_target();
       TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmp, rt_pos };
-      _ctx->render_technique(_gamma_correct, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+      _ctx->render_technique(_gamma_correct, 
+        bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
     }
 
 

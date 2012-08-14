@@ -62,10 +62,12 @@ Graphics::Graphics()
   , _vs_profile("vs_4_0")
   , _ps_profile("ps_4_0")
   , _cs_profile("cs_4_0")
+  , _gs_profile("gs_4_0")
   , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size"))
   , _vertex_shaders(release_obj<ID3D11VertexShader *>)
   , _pixel_shaders(release_obj<ID3D11PixelShader *>)
   , _compute_shaders(release_obj<ID3D11ComputeShader *>)
+  , _geometry_shaders(release_obj<ID3D11GeometryShader *>)
   , _vertex_buffers(release_obj<ID3D11Buffer *>)
   , _index_buffers(release_obj<ID3D11Buffer *>)
   , _constant_buffers(release_obj<ID3D11Buffer *>)
@@ -692,6 +694,18 @@ GraphicsObjectHandle Graphics::create_compute_shader(const TrackedLocation &loc,
     ID3D11ComputeShader *cs = nullptr;
     if (SUCCEEDED(_device->CreateComputeShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &cs))) {
       return add_shader(loc, idx, _compute_shaders, cs, id, GraphicsObjectHandle::kComputeShader);
+    }
+  }
+  return emptyGoh;
+}
+
+GraphicsObjectHandle Graphics::create_geometry_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id) {
+
+  int idx = _geometry_shaders.idx_from_token(id);
+  if (idx != -1 || (idx = _geometry_shaders.find_free_index()) != -1) {
+    ID3D11GeometryShader *cs = nullptr;
+    if (SUCCEEDED(_device->CreateGeometryShader(&shader_bytecode[0], shader_bytecode.size(), NULL, &cs))) {
+      return add_shader(loc, idx, _geometry_shaders, cs, id, GraphicsObjectHandle::kGeometryShader);
     }
   }
   return emptyGoh;

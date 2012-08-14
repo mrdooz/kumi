@@ -2,23 +2,15 @@
 
 #include "../effect.hpp"
 #include "../property_manager.hpp"
+#include "../camera.hpp"
 
 struct Scene;
 class DeferredContext;
 
-struct FreeFlyCamera {
-  FreeFlyCamera() : theta(XM_PIDIV2), rho(XM_PIDIV2), roll(0), pos(0,0,0), dir(0,0,1), right(1,0,0), up(0,1,0) {} // points down the z-axis
-  float theta;
-  float rho;
-  float roll;
-  XMFLOAT3 pos;
-  XMFLOAT3 dir, right, up;
-};
-
 class ScenePlayer : public Effect {
 public:
 
-  ScenePlayer(GraphicsObjectHandle context, const std::string &name);
+  ScenePlayer(const std::string &name);
   ~ScenePlayer();
   virtual bool init() override;
   virtual bool update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;

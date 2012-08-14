@@ -2,8 +2,8 @@
 #include "effect.hpp"
 #include "tweakable_param.hpp"
 
-Effect::Effect(GraphicsObjectHandle context, const std::string &name) 
-  : _context(context), _name(name), _running(false), _start_time(~0), _end_time(~0)
+Effect::Effect(const std::string &name) 
+  : _name(name), _running(false), _start_time(~0), _end_time(~0)
 {
 }
 

@@ -17,11 +17,9 @@
 #include "animation_manager.hpp"
 #include "bit_utils.hpp"
 
-#include "test/demo.hpp"
-#include "test/path_follow.hpp"
-#include "test/volumetric.hpp"
 #include "test/ps3_background.hpp"
 #include "test/scene_player.hpp"
+#include "test/particle_test.hpp"
 
 #if WITH_GWEN
 #include "kumi_gwen.hpp"
@@ -132,7 +130,8 @@ bool App::init(HINSTANCE hinstance)
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
 
-  auto effect = new ScenePlayer(GraphicsObjectHandle(), "simple effect");
+  //auto effect = new ScenePlayer("simple effect");
+  auto effect = new ParticleTest("particle test");
   DEMO_ENGINE.add_effect(effect, 0, 100 * 1000);
 
   load_settings();

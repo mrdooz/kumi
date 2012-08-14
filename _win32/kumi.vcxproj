@@ -145,6 +145,7 @@
     <ClCompile Include="..\async_file_loader.cpp" />
     <ClCompile Include="..\bitmap_utils.cpp" />
     <ClCompile Include="..\bit_utils.cpp" />
+    <ClCompile Include="..\camera.cpp" />
     <ClCompile Include="..\deferred_context.cpp" />
     <ClCompile Include="..\demo_engine.cpp" />
     <ClCompile Include="..\dx_utils.cpp" />
@@ -188,11 +189,9 @@
     <ClCompile Include="..\string_utils.cpp" />
     <ClCompile Include="..\technique.cpp" />
     <ClCompile Include="..\technique_parser.cpp" />
-    <ClCompile Include="..\test\demo.cpp" />
+    <ClCompile Include="..\test\particle_test.cpp" />
     <ClCompile Include="..\test\scene_player.cpp" />
-    <ClCompile Include="..\test\path_follow.cpp" />
     <ClCompile Include="..\test\ps3_background.cpp" />
-    <ClCompile Include="..\test\volumetric.cpp" />
     <ClCompile Include="..\threading.cpp" />
     <ClCompile Include="..\TreeList.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -209,6 +208,7 @@
     <ClInclude Include="..\async_file_loader.hpp" />
     <ClInclude Include="..\bitmap_utils.hpp" />
     <ClInclude Include="..\bit_utils.hpp" />
+    <ClInclude Include="..\camera.hpp" />
     <ClInclude Include="..\deferred_context.hpp" />
     <ClInclude Include="..\demo_engine.hpp" />
     <ClInclude Include="..\dx_utils.hpp" />
@@ -243,11 +243,9 @@
     <ClInclude Include="..\string_utils.hpp" />
     <ClInclude Include="..\technique.hpp" />
     <ClInclude Include="..\technique_parser.hpp" />
-    <ClInclude Include="..\test\demo.hpp" />
-    <ClInclude Include="..\test\path_follow.hpp" />
+    <ClInclude Include="..\test\particle_test.hpp" />
     <ClInclude Include="..\test\ps3_background.hpp" />
     <ClInclude Include="..\test\scene_player.hpp" />
-    <ClInclude Include="..\test\volumetric.hpp" />
     <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\tracked_location.hpp" />
     <ClInclude Include="..\TreeList.h" />
