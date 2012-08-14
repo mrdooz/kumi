@@ -2,7 +2,7 @@
 
 cbuffer ParticleBuffer
 {
-  float4  wsCameraPos;
+  float4 cameraPos;
   matrix worldView;
   matrix proj;
 }
@@ -30,11 +30,12 @@ GsInput vs_main(VsInput input)
   return output;
 }
 
-PsInput gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
+[maxvertexcount(4)]
+void gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
 {
   float3 pos = input[0].pos.xyz;
   float r = input[0].radius;
-  float3 camToParticle = pos - wsCameraPos.xyz;
+  float3 camToParticle = pos - cameraPos.xyz;
   float3 rightVec = normalize(cross(float3(0,1,0), camToParticle));
   
   float3 left = pos - r * rightVec;

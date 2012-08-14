@@ -80,6 +80,7 @@ public:
   void set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen);
   void fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const;
   void draw_indexed(int count, int start_index, int base_vertex);
+  void draw(int vertexCount, int startVertexLocation);
   void dispatch(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ);
 
 private:

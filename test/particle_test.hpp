@@ -28,6 +28,8 @@ private:
   PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
 
   GraphicsObjectHandle _particle_technique;
+  GraphicsObjectHandle _particle_texture;
+  GraphicsObjectHandle _vb;
 
   Scene *_scene;
 

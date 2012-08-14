@@ -17,7 +17,7 @@ technique particles {
         entry_point ps_main;
     };
     
-    rasterizer_desc = BackfaceCulling;
-    depth_stencil_desc = DepthEnable;
+    rasterizer_desc = NoCulling;
+    depth_stencil_desc = DepthDisable;
     blend_desc = BlendOneOne;
 };

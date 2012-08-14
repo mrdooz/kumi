@@ -294,7 +294,8 @@ bool Technique::init() {
     _depth_stencil_state = GRAPHICS.default_depth_stencil_state();
 
   // create the shaders from the templates
-  ShaderTemplate *templates[] = { _vs_shader_template.get(), _ps_shader_template.get(), _cs_shader_template.get() };
+  ShaderTemplate *templates[] = { 
+    _vs_shader_template.get(), _ps_shader_template.get(), _cs_shader_template.get(), _gs_shader_template.get() };
   for (int i = 0; i < ELEMS_IN_ARRAY(templates); ++i) {
     if (templates[i]) {
       if (!create_shaders(templates[i]))

@@ -20,8 +20,12 @@
 using namespace std;
 using namespace std::tr1::placeholders;
 
-static const int KERNEL_SIZE = 32;
-static const int NOISE_SIZE = 16;
+struct ParticleVtx {
+  XMFLOAT4 pos;
+  float radius;
+};
+
+static const int numParticles = 10000;
 
 ParticleTest::ParticleTest(const std::string &name) 
   : Effect(name)
@@ -56,7 +60,20 @@ bool ParticleTest::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/particles.tec", true));
   _particle_technique = GRAPHICS.find_technique("particles");
 
+  string t = RESOURCE_MANAGER.resolve_filename("gfx/particle1.png", true);
+  _particle_texture = GRAPHICS.load_texture(t.c_str(), "", false, nullptr);
+
   _ctx = GRAPHICS.create_deferred_context(true);
+
+  vector<ParticleVtx> verts(numParticles);
+
+  for (int i = 0; i < numParticles; ++i) {
+    verts[i].pos = XMFLOAT4(randf(-200.0f, 200.0f), randf(-200.0f, 200.0f), randf(-200.0f, 200.0f), 1);
+    verts[i].radius = randf(10.0f, 20.0f);
+  }
+
+  _vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, numParticles * sizeof(ParticleVtx), verts.data());
+
 /*
     {
       TweakableParameterBlock block("blur");
@@ -111,8 +128,8 @@ void ParticleTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *v
   }
 
   if (_mouse_lbutton) {
-    float dx = _mouse_horiz / 200.0f;
-    float dy = _mouse_vert / 200.0f;
+    float dx = (float)(100 * delta) * _mouse_horiz / 200.0f;
+    float dy = (float)(100 * delta) * _mouse_vert / 200.0f;
     _freefly_camera.rho -= dx;
     _freefly_camera.theta += dy;
   }
@@ -157,6 +174,49 @@ bool ParticleTest::render() {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
+
+  Technique *technique = GRAPHICS.get_technique(_particle_technique);
+  Shader *vs = technique->vertex_shader(0);
+  Shader *gs = technique->geometry_shader(0);
+  Shader *ps = technique->pixel_shader(0);
+
+  _ctx->set_rs(technique->rasterizer_state());
+  _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+  _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+  _ctx->set_vs(vs->handle());
+  _ctx->set_gs(gs->handle());
+  _ctx->set_ps(ps->handle());
+
+  _ctx->set_layout(vs->input_layout());
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+  TextureArray arr = { _particle_texture };
+  _ctx->set_shader_resources(arr, ShaderType::kPixelShader);
+
+  auto &samplers = ps->samplers();
+  if (!samplers.empty()) {
+    _ctx->set_samplers(samplers);
+  }
+
+  struct ParticleCBuffer {
+    XMFLOAT4 cameraPos;
+    XMFLOAT4X4 worldView;
+    XMFLOAT4X4 proj;
+  } cbuffer;
+
+  cbuffer.cameraPos.x = _freefly_camera.pos.x;
+  cbuffer.cameraPos.y = _freefly_camera.pos.y;
+  cbuffer.cameraPos.z = _freefly_camera.pos.z;
+
+  cbuffer.worldView = _view;
+  cbuffer.proj = _proj;
+
+  _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+
+  _ctx->set_vb(_vb, sizeof(ParticleVtx));
+  _ctx->draw(numParticles, 0);
 
   _ctx->end_frame();
 

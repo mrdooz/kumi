@@ -484,6 +484,10 @@ void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) 
   _ctx->DrawIndexed(count, start_index, base_vertex);
 }
 
+void DeferredContext::draw(int vertexCount, int startVertexLocation) {
+  _ctx->Draw(vertexCount, startVertexLocation);
+}
+
 void DeferredContext::dispatch(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ) {
   _ctx->Dispatch(threadGroupCountX, threadGroupCountY, threadGroupCountZ);
 }
