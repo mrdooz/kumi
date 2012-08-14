@@ -17,6 +17,7 @@ bool load_file(const char *filename, std::vector<T> *buf) {
 }
 
 bool file_exists(const char *filename);
+bool directory_exists(const char *name);
 
 bool save_file(const char *filename, const void *buf, int len);
 

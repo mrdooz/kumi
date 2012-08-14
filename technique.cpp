@@ -7,6 +7,7 @@
 #include "graphics.hpp"
 #include "string_utils.hpp"
 #include "shader_reflection.hpp"
+#include "file_utils.hpp"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -181,15 +182,20 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
   const char *src = shader_template->_source_filename.c_str();
   const char *ep = shader_template->_entry_point.c_str();
-  string output_base = strip_extension(shader_template->_obj_filename);
-  string output_ext = get_extension(shader_template->_obj_filename);
+  Path outputPath(shader_template->_obj_filename);
+  string basePath = outputPath.get_path() + "obj/" ;
+  if (!directory_exists(basePath.c_str()))
+    CreateDirectoryA(basePath.c_str(), 0);
+
+  string output_base = basePath + outputPath.get_filename_without_ext();
+  string output_ext = outputPath.get_ext();
   ShaderType::Enum type = shader_template->_type;
 
   vector<ShaderInstance> shaders;
 
   // Create all the shader permutations
   if (shader_template->_flags.empty()) {
-    shaders.push_back(ShaderInstance(shader_template->_obj_filename));
+    shaders.push_back(ShaderInstance(output_base + "." + output_ext));
   } else {
     size_t num_flags = shader_template->_flags.size();
     // generate flags combinations

@@ -35,14 +35,13 @@ bool load_file(const char *filename, void **buf, size_t *size)
 */
 bool file_exists(const char *filename)
 {
-	if (_access(filename, 0) != 0)
-		return false;
+  struct _stat status;
+  return _access(filename, 0) == 0 && _stat(filename, &status) == 0 && (status.st_mode & _S_IFREG);
+}
 
-	struct _stat status;
-	if (_stat(filename, &status) != 0)
-		return false;
-
-	return !!(status.st_mode & _S_IFREG);
+bool directory_exists(const char *name) {
+  struct _stat status;
+  return _access(name, 0) == 0 && _stat(name, &status) == 0 && (status.st_mode & _S_IFDIR);
 }
 
 bool save_file(const char *filename, const void *buf, int len) {
