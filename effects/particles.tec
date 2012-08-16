@@ -1,5 +1,12 @@
 include common.tec;
 
+technique gradient inherits quad_base_simple {
+    pixel_shader {
+        file effects/particles.hlsl;
+        entry_point gradient_ps_main;
+    };
+};
+
 technique particles {
     
     vertex_shader {
@@ -21,3 +28,4 @@ technique particles {
     depth_stencil_desc = DepthDisable;
     blend_desc = BlendOneOne;
 };
+

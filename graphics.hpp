@@ -26,6 +26,7 @@ class Graphics {
 public:
 
   enum PredefinedGeometry {
+    kGeomFsQuadPos,
     kGeomFsQuadPosTex,
   };
 

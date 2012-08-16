@@ -119,7 +119,7 @@ bool Technique::compile_shader(ShaderType::Enum type, const char *entry_point, c
   }
 
 #ifdef _DEBUG
-  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -O1 -Zi -Fo %s -Fh %s %s %s", 
+  sprintf(cmd_line, "fxc.exe -nologo -T%s -E%s -Vi -Od -Zi -Fo %s -Fh %s %s %s", 
     profile,
     entry_point,
     obj,

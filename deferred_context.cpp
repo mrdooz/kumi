@@ -10,7 +10,6 @@ using namespace std;
 
 DeferredContext::DeferredContext() 
   : _ctx(nullptr)
-  , _prev_topology(D3D_PRIMITIVE_TOPOLOGY_UNDEFINED)
   , _is_immediate_context(false)
 {
     _default_stencil_ref = GRAPHICS.default_stencil_ref();
@@ -30,8 +29,10 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 
   Shader *vs = technique->vertex_shader(0);
   Shader *ps = technique->pixel_shader(0);
+  Shader *gs = technique->geometry_shader(0);
   set_vs(vs->handle());
   set_ps(ps->handle());
+  set_gs(gs ? gs->handle() : GraphicsObjectHandle());
 
   set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   set_layout(vs->input_layout());
@@ -159,32 +160,23 @@ void DeferredContext::set_default_render_target() {
 }
 
 void DeferredContext::set_vs(GraphicsObjectHandle vs) {
-  if (prev_vs != vs) {
-    _ctx->VSSetShader(GRAPHICS._vertex_shaders.get(vs), NULL, 0);
-    prev_vs = vs;
-  }
+  _ctx->VSSetShader(GRAPHICS._vertex_shaders.get(vs), NULL, 0);
 }
 
 void DeferredContext::set_cs(GraphicsObjectHandle cs) {
-  _ctx->CSSetShader(GRAPHICS._compute_shaders.get(cs), NULL, 0);
+  _ctx->CSSetShader(cs.is_valid() ? GRAPHICS._compute_shaders.get(cs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_gs(GraphicsObjectHandle gs) {
-  _ctx->GSSetShader(GRAPHICS._geometry_shaders.get(gs), NULL, 0);
+  _ctx->GSSetShader(gs.is_valid() ? GRAPHICS._geometry_shaders.get(gs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_ps(GraphicsObjectHandle ps) {
-  if (prev_ps != ps) {
-    _ctx->PSSetShader(GRAPHICS._pixel_shaders.get(ps), NULL, 0);
-    prev_ps = ps;
-  }
+  _ctx->PSSetShader(ps.is_valid() ? GRAPHICS._pixel_shaders.get(ps) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_layout(GraphicsObjectHandle layout) {
-  if (prev_layout != layout) {
-    _ctx->IASetInputLayout(GRAPHICS._input_layouts.get(layout));
-    prev_layout = layout;
-  }
+  _ctx->IASetInputLayout(GRAPHICS._input_layouts.get(layout));
 }
 
 void DeferredContext::set_vb(ID3D11Buffer *buf, uint32_t stride)
@@ -196,64 +188,43 @@ void DeferredContext::set_vb(ID3D11Buffer *buf, uint32_t stride)
 }
 
 void DeferredContext::set_vb(GraphicsObjectHandle vb, int vertex_size) {
-  if (prev_vb != vb) {
-    set_vb(GRAPHICS._vertex_buffers.get(vb), vertex_size);
-    prev_vb = vb;
-  }
+  set_vb(GRAPHICS._vertex_buffers.get(vb), vertex_size);
 }
 
 void DeferredContext::set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format) {
-  if (prev_ib != ib) {
-    _ctx->IASetIndexBuffer(GRAPHICS._index_buffers.get(ib), format, 0);
-    prev_ib = ib;
-  }
+  _ctx->IASetIndexBuffer(GRAPHICS._index_buffers.get(ib), format, 0);
 }
 
 void DeferredContext::set_topology(D3D11_PRIMITIVE_TOPOLOGY top) {
-  if (_prev_topology != top) {
-    _ctx->IASetPrimitiveTopology(top);
-    _prev_topology = top;
-  }
+  _ctx->IASetPrimitiveTopology(top);
 }
 
 void DeferredContext::set_rs(GraphicsObjectHandle rs) {
-  if (prev_rs != rs) {
-    _ctx->RSSetState(GRAPHICS._rasterizer_states.get(rs));
-    prev_rs = rs;
-  }
+  _ctx->RSSetState(GRAPHICS._rasterizer_states.get(rs));
 }
 
 void DeferredContext::set_dss(GraphicsObjectHandle dss, UINT stencil_ref) {
-  if (prev_dss != dss) {
-    _ctx->OMSetDepthStencilState(GRAPHICS._depth_stencil_states.get(dss), stencil_ref);
-    prev_dss = dss;
-  }
+  _ctx->OMSetDepthStencilState(GRAPHICS._depth_stencil_states.get(dss), stencil_ref);
 }
 
 void DeferredContext::set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask) {
-  if (prev_bs != bs) {
-    _ctx->OMSetBlendState(GRAPHICS._blend_states.get(bs), blend_factors, sample_mask);
-    prev_bs = bs;
-  }
+  _ctx->OMSetBlendState(GRAPHICS._blend_states.get(bs), blend_factors, sample_mask);
 }
 
 void DeferredContext::set_samplers(const SamplerArray &samplers) {
   int size = samplers.size() * sizeof(GraphicsObjectHandle);
-  if (memcmp(samplers.data(), prev_samplers, size) != 0) {
-    int first_sampler = MAX_SAMPLERS, num_samplers = 0;
-    ID3D11SamplerState *d3dsamplers[MAX_SAMPLERS];
-    for (int i = 0; i < MAX_SAMPLERS; ++i) {
-      if (samplers[i].is_valid()) {
-        d3dsamplers[i] = GRAPHICS._sampler_states.get(samplers[i]);
-        first_sampler = min(first_sampler, i);
-        num_samplers++;
-      }
+  int first_sampler = MAX_SAMPLERS, num_samplers = 0;
+  ID3D11SamplerState *d3dsamplers[MAX_SAMPLERS];
+  for (int i = 0; i < MAX_SAMPLERS; ++i) {
+    if (samplers[i].is_valid()) {
+      d3dsamplers[i] = GRAPHICS._sampler_states.get(samplers[i]);
+      first_sampler = min(first_sampler, i);
+      num_samplers++;
     }
+  }
 
-    if (num_samplers) {
-      _ctx->PSSetSamplers(first_sampler, num_samplers, &d3dsamplers[first_sampler]);
-      memcpy(prev_samplers, samplers.data(), size);
-    }
+  if (num_samplers) {
+    _ctx->PSSetSamplers(first_sampler, num_samplers, &d3dsamplers[first_sampler]);
   }
 }
 
@@ -310,65 +281,60 @@ void DeferredContext::set_uavs(const TextureArray &uavs) {
 
 void DeferredContext::set_shader_resources(const TextureArray &resources, ShaderType::Enum type) {
   int size = resources.size() * sizeof(GraphicsObjectHandle);
-  // force setting the views because we always unset them..
-  bool force = true;
-  if (force || memcmp(resources.data(), prev_resources, size) != 0) {
-    ID3D11ShaderResourceView *d3dresources[MAX_TEXTURES];
-    int first_resource = MAX_TEXTURES, num_resources = 0;
-    for (int i = 0; i < MAX_TEXTURES; ++i) {
-      if (resources[i].is_valid()) {
-        GraphicsObjectHandle h = resources[i];
-        auto type = h.type();
-        if (type == GraphicsObjectHandle::kTexture) {
-          auto *data = GRAPHICS._textures.get(h);
-          d3dresources[i] = data->view.resource;
-        } else if (type == GraphicsObjectHandle::kResource) {
-          auto *data = GRAPHICS._resources.get(h);
-          d3dresources[i] = data->view.resource;
-        } else if (type == GraphicsObjectHandle::kRenderTarget) {
-          auto *data = GRAPHICS._render_targets.get(h);
-          d3dresources[i] = data->srv.resource;
-        } else if (type == GraphicsObjectHandle::kStructuredBuffer) {
-          auto *data = GRAPHICS._structured_buffers.get(h);
-          d3dresources[i] = data->srv.resource;
-        } else {
-          LOG_ERROR_LN("Trying to set invalid resource type!");
-        }
-        num_resources++;
-        first_resource = min(first_resource, i);
+  ID3D11ShaderResourceView *d3dresources[MAX_TEXTURES];
+  int first_resource = MAX_TEXTURES, num_resources = 0;
+  for (int i = 0; i < MAX_TEXTURES; ++i) {
+    if (resources[i].is_valid()) {
+      GraphicsObjectHandle h = resources[i];
+      auto type = h.type();
+      if (type == GraphicsObjectHandle::kTexture) {
+        auto *data = GRAPHICS._textures.get(h);
+        d3dresources[i] = data->view.resource;
+      } else if (type == GraphicsObjectHandle::kResource) {
+        auto *data = GRAPHICS._resources.get(h);
+        d3dresources[i] = data->view.resource;
+      } else if (type == GraphicsObjectHandle::kRenderTarget) {
+        auto *data = GRAPHICS._render_targets.get(h);
+        d3dresources[i] = data->srv.resource;
+      } else if (type == GraphicsObjectHandle::kStructuredBuffer) {
+        auto *data = GRAPHICS._structured_buffers.get(h);
+        d3dresources[i] = data->srv.resource;
+      } else {
+        LOG_ERROR_LN("Trying to set invalid resource type!");
       }
+      num_resources++;
+      first_resource = min(first_resource, i);
     }
+  }
 
-    if (num_resources) {
-      int ofs = first_resource;
-      int num_resources_set = 0;
-      while (ofs < MAX_TEXTURES && num_resources_set < num_resources) {
-        // handle non sequential resources
-        int cur = 0;
-        int tmp = ofs;
-        while (resources[ofs].is_valid()) {
-          ofs++;
-          cur++;
-          if (ofs == MAX_TEXTURES)
-            break;
-        }
-
-        if (type == ShaderType::kVertexShader)
-          _ctx->VSSetShaderResources(tmp, cur, &d3dresources[tmp]);
-        else if (type == ShaderType::kPixelShader)
-          _ctx->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
-        else if (type == ShaderType::kComputeShader)
-          _ctx->CSSetShaderResources(tmp, cur, &d3dresources[tmp]);
-        else if (type == ShaderType::kGeometryShader)
-          _ctx->GSSetShaderResources(tmp, cur, &d3dresources[tmp]);
-        else
-          LOG_ERROR_LN("Implement me!");
-
-        num_resources_set += cur;
-        while (ofs < MAX_TEXTURES && !resources[ofs].is_valid())
-          ofs++;
+  if (num_resources) {
+    int ofs = first_resource;
+    int num_resources_set = 0;
+    while (ofs < MAX_TEXTURES && num_resources_set < num_resources) {
+      // handle non sequential resources
+      int cur = 0;
+      int tmp = ofs;
+      while (resources[ofs].is_valid()) {
+        ofs++;
+        cur++;
+        if (ofs == MAX_TEXTURES)
+          break;
       }
-      memcpy(prev_resources, resources.data(), size);
+
+      if (type == ShaderType::kVertexShader)
+        _ctx->VSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+      else if (type == ShaderType::kPixelShader)
+        _ctx->PSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+      else if (type == ShaderType::kComputeShader)
+        _ctx->CSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+      else if (type == ShaderType::kGeometryShader)
+        _ctx->GSSetShaderResources(tmp, cur, &d3dresources[tmp]);
+      else
+        LOG_ERROR_LN("Implement me!");
+
+      num_resources_set += cur;
+      while (ofs < MAX_TEXTURES && !resources[ofs].is_valid())
+        ofs++;
     }
   }
 }
@@ -493,24 +459,6 @@ void DeferredContext::dispatch(int threadGroupCountX, int threadGroupCountY, int
 }
 
 void DeferredContext::begin_frame() {
-
-  prev_vs = prev_ps = prev_layout = GraphicsObjectHandle();
-  prev_rs = prev_bs = prev_dss = GraphicsObjectHandle();
-  prev_ib = prev_vb = GraphicsObjectHandle();
-
-  for (size_t i = 0; i < MAX_SAMPLERS; ++i)
-    prev_samplers[i] = GraphicsObjectHandle();
-
-  for (size_t i = 0; i < MAX_TEXTURES; ++i)
-    prev_resources[i] = GraphicsObjectHandle();
-
-  _prev_topology = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
-/*
-  for (size_t i = 0; i < CBUFFER_CACHE; ++i) {
-    _vs_cbuffer_cache[i].clear();
-    _ps_cbuffer_cache[i].clear();
-  }
-*/
 }
 
 void DeferredContext::end_frame() {

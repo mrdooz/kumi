@@ -19,7 +19,6 @@ public:
   bool isBounded() const { return _bounded; }
   Type type() const { return _type; }
 
-
 private:
   union Value {
     float _float4[4];

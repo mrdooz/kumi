@@ -464,24 +464,40 @@ bool Graphics::create_back_buffers(int width, int height)
 
 bool Graphics::create_default_geometry() {
 
-  // fullscreen pos/tex quad
+  static const uint16 quadIndices[] = {
+    0, 1, 2,
+    2, 1, 3
+  };
+
   {
-    float verts[] = {
+    // fullscreen pos/tex quad
+    static const float verts[] = {
       -1, +1, +1, +0, +0,
       +1, +1, +1, +1, +0,
       -1, -1, +1, +0, +1,
       +1, -1, +1, +1, +1
     };
 
-    uint16 indices[] = {
-      0, 1, 2,
-      2, 1, 3
+
+    auto vb = create_static_vertex_buffer(FROM_HERE, sizeof(verts), verts);
+    auto ib = create_static_index_buffer(FROM_HERE, sizeof(quadIndices), quadIndices);
+    _predefined_geometry.insert(make_pair(kGeomFsQuadPosTex, make_pair(vb, ib)));
+  }
+
+  // fullscreen pos quad
+  {
+    static const float verts[] = {
+      -1, +1, +1,
+      +1, +1, +1,
+      -1, -1, +1,
+      +1, -1, +1,
     };
 
     auto vb = create_static_vertex_buffer(FROM_HERE, sizeof(verts), verts);
-    auto ib = create_static_index_buffer(FROM_HERE, sizeof(indices), indices);
-    _predefined_geometry.insert(make_pair(kGeomFsQuadPosTex, make_pair(vb, ib)));
+    auto ib = create_static_index_buffer(FROM_HERE, sizeof(quadIndices), quadIndices);
+    _predefined_geometry.insert(make_pair(kGeomFsQuadPos, make_pair(vb, ib)));
   }
+
   return true;
 }
 
@@ -1011,6 +1027,13 @@ void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHa
   KASSERT(_predefined_geometry.find(geom) != _predefined_geometry.end());
 
   switch (geom) {
+    case kGeomFsQuadPos:
+      *vb = _predefined_geometry[kGeomFsQuadPos].first;
+      *ib = _predefined_geometry[kGeomFsQuadPos].second;
+      *vertex_size = sizeof(XMFLOAT3);
+      *index_count = 6;
+      break;
+
     case kGeomFsQuadPosTex:
       *vb = _predefined_geometry[kGeomFsQuadPosTex].first;
       *ib = _predefined_geometry[kGeomFsQuadPosTex].second;

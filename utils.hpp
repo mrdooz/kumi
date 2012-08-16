@@ -175,3 +175,5 @@ template <typename T, typename U>
 T lerp(T a, T b, U v) {
   return a + (v * (b-a));
 }
+
+float gaussianRand(float mean, float variance);

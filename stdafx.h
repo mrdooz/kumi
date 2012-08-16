@@ -67,6 +67,7 @@ typedef uint64_t uint64;
 #include <D3Dcompiler.h>
 #include <DxErr.h>
 #include <xnamath.h>
+#include <xmmintrin.h>
 
 
 #include <concurrent_queue.h>

@@ -1,43 +1,43 @@
 rasterizer_desc BackfaceCulling { 
-  cull_mode = back; 
+    cull_mode = back; 
 };
 
 rasterizer_desc NoCulling { 
-  cull_mode = back; 
+    cull_mode = back; 
 };
 
 depth_stencil_desc DepthEnable { 
-  depth_enable = true; 
+    depth_enable = true; 
 };
 
 depth_stencil_desc DepthDisable { 
-  depth_enable = false; 
+    depth_enable = false; 
 };
 
 blend_desc BlendDisable {
-  render_target[0] = {
-    blend_enable = false;
-  };
+    render_target[0] = {
+        blend_enable = false;
+    };
 };
 
 blend_desc BlendOneOne {
-  render_target[0] = {
-    blend_enable = true;
-    src_blend = one;
-    dest_blend = one;
-  };
+    render_target[0] = {
+        blend_enable = true;
+        src_blend = one;
+        dest_blend = one;
+    };
 };
 
 sampler_desc PointSampler {
-  filter = min_mag_mip_point;
-  address_u = clamp;
-  address_v = clamp;
+    filter = min_mag_mip_point;
+    address_u = clamp;
+    address_v = clamp;
 };
 
 sampler_desc LinearSampler {
-  filter = min_mag_mip_linear;
-  address_u = clamp;
-  address_v = clamp;
+    filter = min_mag_mip_linear;
+    address_u = clamp;
+    address_v = clamp;
 };
 
 technique quad_base {
@@ -45,9 +45,21 @@ technique quad_base {
         file effects/common.hlsl;
         entry_point quad_vs_main;
     };
-	
-	geometry = fs_quad_postex;
-	rasterizer_desc = NoCulling;
-	depth_stencil_desc = DepthDisable;
-	blend_desc = BlendDisable;
+
+    geometry = fs_quad_postex;
+    rasterizer_desc = NoCulling;
+    depth_stencil_desc = DepthDisable;
+    blend_desc = BlendDisable;
+};
+
+technique quad_base_simple {
+    vertex_shader {
+        file effects/common.hlsl;
+        entry_point quad_simple_vs_main;
+    };
+
+    geometry = fs_quad_pos;
+    rasterizer_desc = NoCulling;
+    depth_stencil_desc = DepthDisable;
+    blend_desc = BlendDisable;
 };

@@ -7,14 +7,13 @@
 struct Scene;
 class DeferredContext;
 
-
 class ParticleTest : public Effect {
 public:
 
   ParticleTest(const std::string &name);
   ~ParticleTest();
   virtual bool init() override;
-  virtual bool update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
+  virtual bool update(int64 global_time, int64 local_time, int64 delta_ns, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
   virtual bool render() override;
   virtual bool close() override;
   virtual void wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) override;
@@ -22,8 +21,8 @@ public:
 private:
 
   bool file_changed(const char *filename, void *token);
-
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
+
 
   PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
 
@@ -31,9 +30,29 @@ private:
   GraphicsObjectHandle _particle_texture;
   GraphicsObjectHandle _vb;
 
-  Scene *_scene;
+  GraphicsObjectHandle _gradient_technique;
 
-  bool _use_freefly_camera;
+  struct ParticleData {
+    ParticleData(int numParticles);
+    ~ParticleData();
+    void update(float delta);
+    inline void initParticle(int i);
+    int numParticles;
+    float *pos;
+    float *posX;
+    float *posY;
+    float *posZ;
+    float *vel;
+    float *velX;
+    float *velY;
+    float *velZ;
+    float *radius;
+    float *age;
+    float *maxAge;
+    float *factor;
+  } _particle_data;
+
+  bool _useFreeFlyCamera;
   FreeFlyCamera _freefly_camera;
   int _mouse_horiz;
   int _mouse_vert;

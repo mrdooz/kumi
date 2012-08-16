@@ -1242,7 +1242,9 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
         string geom_name = scope->string_until(';');
         Graphics::PredefinedGeometry geom;
         lookup<string, Graphics::PredefinedGeometry>(geom_name,
-          map_list_of("fs_quad_postex", Graphics::kGeomFsQuadPosTex),
+          map_list_of
+          ("fs_quad_postex", Graphics::kGeomFsQuadPosTex)
+          ("fs_quad_pos", Graphics::kGeomFsQuadPos),
           &geom);
         GRAPHICS.get_predefined_geometry(geom, &technique->_vb, &technique->_vertex_size, &technique->_ib, &technique->_index_format, &technique->_index_count);
         scope->munch(kSymSemicolon);

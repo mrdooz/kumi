@@ -88,13 +88,6 @@ private:
   ~DeferredContext();
   ID3D11DeviceContext *_ctx;
 
-  GraphicsObjectHandle prev_vs, prev_ps, prev_layout;
-  GraphicsObjectHandle prev_rs, prev_bs, prev_dss;
-  GraphicsObjectHandle prev_ib, prev_vb;
-  GraphicsObjectHandle prev_samplers[MAX_SAMPLERS];
-  GraphicsObjectHandle prev_resources[MAX_TEXTURES];
-  D3D11_PRIMITIVE_TOPOLOGY _prev_topology;
-
   uint32 _default_stencil_ref;
   float _default_blend_factors[4];
   uint32 _default_sample_mask;

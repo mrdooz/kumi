@@ -42,6 +42,7 @@ bool DemoEngine::create() {
 
 bool DemoEngine::start() {
   QueryPerformanceCounter((LARGE_INTEGER *)&_last_time_ctr);
+  set_paused(false);
   return true;
 }
 
@@ -109,6 +110,7 @@ bool DemoEngine::tick() {
   _running_time_ctr += delta_ctr;
 
   int64 current_time_ns = ctr_to_ns(_active_time_ctr);
+  int64 current_time_ms = current_time_ns / 1000;
 
   // check for any effects that have ended
   while (!_active_effects.empty() && _active_effects.front()->end_time() * 1000 <= current_time_ns) {
@@ -117,28 +119,36 @@ bool DemoEngine::tick() {
     _active_effects.pop_front();
   }
 
+  vector<Effect *> firstTimers;
+
   // check if any effect start now
   while (!_inactive_effects.empty() && _inactive_effects.front()->start_time() * 1000 <= current_time_ns) {
     auto e = _inactive_effects.front();
     _inactive_effects.pop_front();
     e->set_running(true);
     _active_effects.push_back(e);
+    firstTimers.push_back(e);
   }
 
   // calc the number of ticks to step
   const int64 update_freq = 100;
-  const double real_num_ticks = (double)active_delta_ns * update_freq / 1000000;
+  const float real_num_ticks = (float)(active_delta_ns * update_freq / 1e6);
   const int int_num_ticks = (int)real_num_ticks;
-  const float frac_num_ticks = (float)(real_num_ticks - floor(real_num_ticks));
+  const float frac_num_ticks = real_num_ticks - int_num_ticks;
 
   // tick the active effects
   for (size_t i = 0; i < _active_effects.size(); ++i) {
-    auto e = _active_effects[i];
-    float global_time = current_time_ns / 1000000.0f;
-    float local_time = (current_time_ns - e->start_time()) / 1000000.0f;
-    XMFLOAT4 tt(global_time, local_time, 0, 0);
-    PROPERTY_MANAGER.set_property(_time_id, tt);
-    e->update(current_time_ns / 1000 - e->start_time(), delta_ns, _paused, update_freq, int_num_ticks, frac_num_ticks);
+    auto *e = _active_effects[i];
+    float local_time = (current_time_ns - e->start_time()) / 1e6f;
+
+    if (find(begin(firstTimers), end(firstTimers), e) != end(firstTimers)) {
+      e->set_start_time(current_time_ms);
+      e->update(current_time_ms, 0, 0, _paused, update_freq, 1, 0);
+    } else {
+      e->update(current_time_ms, current_time_ms - e->start_time(), delta_ns, _paused, 
+        update_freq, int_num_ticks, frac_num_ticks);
+    }
+
     e->render();
   }
 

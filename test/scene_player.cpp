@@ -274,7 +274,7 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
   }
 }
 
-bool ScenePlayer::update(int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
+bool ScenePlayer::update(int64 global_time, int64 local_time, int64 delta, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
   ADD_PROFILE_SCOPE();
 
   if (!_scene)
