@@ -2,27 +2,21 @@ include common.tec;
 
 technique hblur {
     compute_shader {
-        file effects/blur.hlsl;
+        file blur.hlsl;
         entry_point boxBlurX;
-        params [
-            texture2d Texture0 user;
-        ];
     };
 };
 
 technique vblur {
     compute_shader {
-        file effects/blur.hlsl;
+        file blur.hlsl;
         entry_point boxBlurY;
-        params [
-            texture2d Texture0 user;
-        ];
     };
 };
 
 technique copy_uav inherits quad_base {
     pixel_shader {
-        file effects/blur.hlsl;
+        file blur.hlsl;
         entry_point ps_copy_uav;
     };
 };

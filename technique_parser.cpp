@@ -1118,13 +1118,13 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
       case kSymComputeShader: {
         ShaderTemplate *st = nullptr;
         if (symbol == kSymVertexShader) 
-          technique->_vs_shader_template.reset(st = new ShaderTemplate(ShaderType::kVertexShader));
+          technique->_vs_shader_template.reset(st = new ShaderTemplate(ShaderType::kVertexShader, _filename));
         else if (symbol == kSymPixelShader)
-          technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader));
+          technique->_ps_shader_template.reset(st = new ShaderTemplate(ShaderType::kPixelShader, _filename));
         else if (symbol == kSymComputeShader)
-          technique->_cs_shader_template.reset(st = new ShaderTemplate(ShaderType::kComputeShader));
+          technique->_cs_shader_template.reset(st = new ShaderTemplate(ShaderType::kComputeShader, _filename));
         else if (symbol == kSymGeometryShader)
-          technique->_gs_shader_template.reset(st = new ShaderTemplate(ShaderType::kGeometryShader));
+          technique->_gs_shader_template.reset(st = new ShaderTemplate(ShaderType::kGeometryShader, _filename));
         else
           LOG_ERROR_LN("Implement me!");
 

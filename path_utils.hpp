@@ -20,6 +20,7 @@ public:
   static string get_full_path_name(const char *p);
   static string replace_extension(const string& path, const string& ext);
   static string get_path(const string& p);
+  static string get_ext(const string &p);
 
   static bool is_absolute(const std::string &path);
 
@@ -27,12 +28,13 @@ public:
 
 private:
   string _str;
-  int _filename_ofs;    // points to the last '/'
-  int _ext_ofs;         // points to the '.'
+  int _finalSlashPos;     // points to the last '/'
+  int _extPos;            // points to the '.'
 };
 
 std::string replace_extension(const std::string &org, const std::string &new_ext);
 std::string strip_extension(const std::string &str);
+std::string stripTrailingSlash(const std::string &str);
 std::string get_extension(const std::string &str);
 void split_path(const char *path, std::string *drive, std::string *dir, std::string *fname, std::string *ext);
 

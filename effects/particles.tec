@@ -2,7 +2,7 @@ include common.tec;
 
 technique gradient inherits quad_base_simple {
     pixel_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point gradient_ps_main;
     };
 };
@@ -10,17 +10,17 @@ technique gradient inherits quad_base_simple {
 technique particles {
     
     vertex_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point vs_main;
     };
 
     geometry_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point gs_main;
     };
 
     pixel_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point ps_main;
     };
     
@@ -32,14 +32,14 @@ technique particles {
 
 technique coalesce inherits quad_base {
     pixel_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point ps_coalesce;
     };
 };
 
 technique compose inherits quad_base {
     pixel_shader {
-        file effects/particles.hlsl;
+        file particles.hlsl;
         entry_point ps_compose;
     };
 };

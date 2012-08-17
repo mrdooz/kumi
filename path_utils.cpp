@@ -11,8 +11,8 @@ string Path::make_canonical(const string &str) {
 }
 
 Path::Path()
-  : _ext_ofs(string::npos)
-  , _filename_ofs(string::npos) {
+  : _extPos(string::npos)
+  , _finalSlashPos(string::npos) {
 }
 
 Path::Path(const string& str) {
@@ -21,13 +21,13 @@ Path::Path(const string& str) {
 
 void Path::init(const string &str) {
   _str = make_canonical(str);
-  _ext_ofs = _str.rfind(".");
-  _filename_ofs = str.rfind("/");
+  _extPos = _str.rfind(".");
+  _finalSlashPos = str.rfind("/");
 }
 
 
 Path Path::replace_extension(const string& ext) {
-  return _ext_ofs == string::npos ? Path(_str + "." + ext) : Path(string(_str, _ext_ofs) + "." + ext);
+  return _extPos == string::npos ? Path(_str + "." + ext) : Path(string(_str, _extPos) + "." + ext);
 }
 
 const string& Path::str() const {
@@ -35,28 +35,28 @@ const string& Path::str() const {
 }
 
 string Path::get_path() const {
-  return _filename_ofs == string::npos ? string() : _str.substr(0, _filename_ofs + 1);
+  return _finalSlashPos == string::npos ? string() : _str.substr(0, _finalSlashPos + 1);
 }
 
 string Path::get_ext() const {
-  return _ext_ofs == string::npos ? string() : string(&_str[_ext_ofs+1]);
+  return _extPos == string::npos ? string() : string(&_str[_extPos+1]);
 }
 
 string Path::get_filename() const {
-  return _filename_ofs == string::npos ? string() : string(&_str[_filename_ofs+1]);
+  return _finalSlashPos == string::npos ? _str : string(&_str[_finalSlashPos+1]);
 }
 
 string Path::get_filename_without_ext() const {
-  string res;
-  if (_filename_ofs != string::npos) {
-    // 0123456
-    // /tjong.ext
-    // ^     ^--- _ext_ofs
-    // +--------- _filename_ofs
-    int end = _ext_ofs == string::npos ? _str.size() : _ext_ofs;
-    res = _str.substr(_filename_ofs + 1, end - _filename_ofs - 1);
-  }
-  return res;
+  if (_str.empty())
+    return _str;
+
+  int filenamePos = _finalSlashPos == string::npos ? 0 : _finalSlashPos + 1;
+  // 0123456
+  // /tjong.ext
+  // ^     ^--- _extPos
+  // +--------- _finalSlashPos
+  int end = _extPos == string::npos ? _str.size() : _extPos;
+  return _str.substr(filenamePos, end - filenamePos);
 }
 
 string Path::get_full_path_name(const char *p) {
@@ -80,6 +80,11 @@ string Path::replace_extension(const string& path, const string& ext)
   }
 
   return res;
+}
+
+string Path::get_ext(const string &p) {
+  Path a(p);
+  return a.get_ext();
 }
 
 string Path::get_path(const string& p) {
@@ -134,4 +139,10 @@ std::string Path::concat(const std::string &prefix, const std::string &suffix) {
   boost::replace_all(res, "\\", "/");
   return res;
 
+}
+
+std::string stripTrailingSlash(const std::string &str) {
+  if (str.back() == '\\' || str.back() == '/')
+    return string(str.data(), str.size()-1);
+  return str;
 }

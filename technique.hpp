@@ -55,7 +55,8 @@ struct ResourceViewParam : public ParamBase {
 struct ShaderTemplate {
   friend TechniqueParser;
 
-  ShaderTemplate(ShaderType::Enum type) : _type(type) {}
+  ShaderTemplate(ShaderType::Enum type, const std::string &templateFilename) 
+    : _type(type), _templateFilename(templateFilename) {}
 
   CBufferParam *find_cbuffer_param(const std::string &name) {
     return find_by_name(name, _cbuffer_params);
@@ -75,6 +76,7 @@ struct ShaderTemplate {
   }
 
   ShaderType::Enum _type;
+  std::string _templateFilename;
   std::string _source_filename;
   std::string _obj_filename;
   std::string _entry_point;

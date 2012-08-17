@@ -42,7 +42,7 @@ sampler_desc LinearSampler {
 
 technique quad_base {
     vertex_shader {
-        file effects/common.hlsl;
+        file common.hlsl;
         entry_point quad_vs_main;
     };
 
@@ -54,7 +54,7 @@ technique quad_base {
 
 technique quad_base_simple {
     vertex_shader {
-        file effects/common.hlsl;
+        file common.hlsl;
         entry_point quad_simple_vs_main;
     };
 

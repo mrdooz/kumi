@@ -183,15 +183,16 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
   bool force = false;
   bool ok = true;
 
-  const char *src = shader_template->_source_filename.c_str();
+  Path outputPath(shader_template->_templateFilename);
+  string src = outputPath.get_path() + shader_template->_source_filename;
   const char *ep = shader_template->_entry_point.c_str();
-  Path outputPath(shader_template->_obj_filename);
   string basePath = outputPath.get_path() + "obj/" ;
-  if (!directory_exists(basePath.c_str()))
-    CreateDirectoryA(basePath.c_str(), 0);
+  string outputDir = stripTrailingSlash(basePath);
+  if (!directory_exists(outputDir.c_str()))
+    CreateDirectoryA(outputDir.c_str(), 0);
 
-  string output_base = basePath + outputPath.get_filename_without_ext();
-  string output_ext = outputPath.get_ext();
+  string output_base = basePath + Path(shader_template->_obj_filename).get_filename_without_ext();
+  string output_ext = Path::get_ext(shader_template->_obj_filename);
   ShaderType::Enum type = shader_template->_type;
 
   vector<ShaderInstance> shaders;
@@ -222,8 +223,8 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
     auto &cur = shaders[i];
     const char *obj = cur.obj.c_str();
     // compile the shader if the source is newer, or the object file doesn't exist
-    if (force || RESOURCE_MANAGER.file_exists(src) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src) > RESOURCE_MANAGER.mdate(obj))) {
-      if (!compile_shader(type, ep, src, obj, cur.flags))
+    if (force || RESOURCE_MANAGER.file_exists(src.c_str()) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src.c_str()) > RESOURCE_MANAGER.mdate(obj))) {
+      if (!compile_shader(type, ep, src.c_str(), obj, cur.flags))
         return false;
     } else {
       if (!RESOURCE_MANAGER.file_exists(obj))
