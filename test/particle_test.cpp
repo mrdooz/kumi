@@ -32,7 +32,7 @@ struct ParticleVtx {
   XMFLOAT2 scale;
 };
 
-static const int numParticles = 500;
+static const int numParticles = 5000;
 
 // a bit of a misnomer, as we don't call T's ctor
 template<typename T>
@@ -136,6 +136,7 @@ ParticleTest::ParticleTest(const std::string &name)
   , _ctx(nullptr)
   , _particle_data(numParticles)
   , _useFreeFlyCamera(false)
+  , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -155,11 +156,19 @@ bool ParticleTest::init() {
   int h = GRAPHICS.height();
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/particles.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/blur.tec", true));
   _particle_technique = GRAPHICS.find_technique("particles");
   _gradient_technique = GRAPHICS.find_technique("gradient");
+  _compose_technique = GRAPHICS.find_technique("compose");
 
   string t = RESOURCE_MANAGER.resolve_filename("gfx/particle3.png", true);
   _particle_texture = GRAPHICS.load_texture(t.c_str(), "", false, nullptr);
+
+  _cs_blur_x = GRAPHICS.find_technique("hblur");
+  _cs_blur_y = GRAPHICS.find_technique("vblur");
+  _copy_uav = GRAPHICS.find_technique("copy_uav");
+
+  _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
 
   _ctx = GRAPHICS.create_deferred_context(true);
 
@@ -167,31 +176,28 @@ bool ParticleTest::init() {
 
   _vb = GRAPHICS.create_dynamic_vertex_buffer(FROM_HERE, numParticles * sizeof(ParticleVtx));
 
-/*
-    {
-      TweakableParameterBlock block("blur");
-      block._params.emplace_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
-      block._params.emplace_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
+  {
+    TweakableParameterBlock block("blur");
+    block._params.emplace_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
+    block._params.emplace_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
 
-      block._params.emplace_back(TweakableParameter("nearFocusStart", 10.0f, 1.0f, 2500.0f));
-      block._params.emplace_back(TweakableParameter("nearFocusEnd", 50.0f, 1.0f, 2500.0f));
-      block._params.emplace_back(TweakableParameter("farFocusStart", 100.0f, 1.0f, 2500.0f));
-      block._params.emplace_back(TweakableParameter("farFocusEnd", 150.0f, 1.0f, 2500.0f));
+    block._params.emplace_back(TweakableParameter("nearFocusStart", 10.0f, 1.0f, 2500.0f));
+    block._params.emplace_back(TweakableParameter("nearFocusEnd", 50.0f, 1.0f, 2500.0f));
+    block._params.emplace_back(TweakableParameter("farFocusStart", 100.0f, 1.0f, 2500.0f));
+    block._params.emplace_back(TweakableParameter("farFocusEnd", 150.0f, 1.0f, 2500.0f));
 
-      APP.add_parameter_block(block, true, [=](const JsonValue::JsonValuePtr &msg) {
-        _blurX = (float)msg->get("blurX")->get("value")->to_number();
-        _blurY = (float)msg->get("blurY")->get("value")->to_number();
+    APP.add_parameter_block(block, true, [=](const JsonValue::JsonValuePtr &msg) {
+      _blurX = (float)msg->get("blurX")->get("value")->to_number();
+      _blurY = (float)msg->get("blurY")->get("value")->to_number();
 
-        if (msg->has_key("nearFocusStart")) {
-          _nearFocusStart = (float)msg->get("nearFocusStart")->get("value")->to_number();
-          _nearFocusEnd = (float)msg->get("nearFocusEnd")->get("value")->to_number();
-          _farFocusStart = (float)msg->get("farFocusStart")->get("value")->to_number();
-          _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
-        }
-      });
-    }
-    }
-*/
+      if (msg->has_key("nearFocusStart")) {
+        _nearFocusStart = (float)msg->get("nearFocusStart")->get("value")->to_number();
+        _nearFocusEnd = (float)msg->get("nearFocusEnd")->get("value")->to_number();
+        _farFocusStart = (float)msg->get("farFocusStart")->get("value")->to_number();
+        _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
+      }
+    });
+  }
 
   return true;
 }
@@ -275,6 +281,107 @@ bool ParticleTest::update(int64 global_time, int64 local_time, int64 delta_ns, b
   return true;
 }
 
+void ParticleTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique) {
+  if (output.is_valid())
+    _ctx->set_render_target(output, true);
+  else
+    _ctx->set_default_render_target();
+
+  TextureArray arr = { input };
+  _ctx->render_technique(technique, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+
+  if (output.is_valid())
+    _ctx->unset_render_targets(0, 1);
+}
+
+void ParticleTest::do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture) {
+
+  int w = GRAPHICS.width();
+  int h = GRAPHICS.height();
+
+  struct blurSettings {
+    int imageW, imageH;
+    float blurRadius[2];
+  } settings = { w, h, _blurX, _blurX };
+
+  int threadsPerGroup = 64;
+
+  for (int i = 0; i < 3; ++i) {
+    {
+      // blur x
+      Technique *technique = GRAPHICS.get_technique(_cs_blur_x);
+      Shader *cs = technique->compute_shader(0);
+
+      _ctx->set_cs(cs->handle());
+      TextureArray arr = { i == 0 ? inputTexture : outputTexture };
+      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
+
+      TextureArray uav = { _blur_sbuffer };
+      _ctx->set_uavs(uav);
+      auto handle = cs->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
+      _ctx->dispatch((h + threadsPerGroup-1) / threadsPerGroup, 1, 1);
+
+      _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
+      _ctx->unset_uavs(0, 1);
+    }
+
+    {
+      // copy the UAV to a texture
+      Technique *technique = GRAPHICS.get_technique(_copy_uav);
+      Shader *ps = technique->pixel_shader(0);
+      auto handle = ps->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
+      post_process(_blur_sbuffer, outputTexture, _copy_uav);
+    }
+
+    {
+      // blur y
+      Technique *technique = GRAPHICS.get_technique(_cs_blur_y);
+      Shader *cs = technique->compute_shader(0);
+
+      _ctx->set_cs(cs->handle());
+      TextureArray arr = { outputTexture };
+      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
+
+      TextureArray uav = { _blur_sbuffer };
+      _ctx->set_uavs(uav);
+      auto handle = cs->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
+      _ctx->dispatch((w + threadsPerGroup-1) / threadsPerGroup, 1, 1);
+
+      _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
+      _ctx->unset_uavs(0, 1);
+    }
+
+    {
+      // copy the UAV to a texture
+      Technique *technique = GRAPHICS.get_technique(_copy_uav);
+      Shader *ps = technique->pixel_shader(0);
+      auto handle = ps->find_cbuffer("blurSettings");
+      _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
+      post_process(_blur_sbuffer, outputTexture, _copy_uav);
+    }
+
+  }
+}
+
+struct ScopedRt {
+
+  ScopedRt(int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
+    _handle = GRAPHICS.get_temp_render_target(FROM_HERE, width, height, depth_buffer, format, mip_maps, name);
+  }
+
+  ~ScopedRt() {
+    GRAPHICS.release_temp_render_target(_handle);
+  }
+
+  operator GraphicsObjectHandle() {
+    return _handle;
+  }
+  GraphicsObjectHandle _handle;
+};
+
 bool ParticleTest::render() {
   ADD_PROFILE_SCOPE();
   _ctx->begin_frame();
@@ -302,6 +409,10 @@ bool ParticleTest::render() {
 
   GRAPHICS.unmap(_vb, 0);
 
+  ScopedRt rtTmp(w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rtTmp");
+  ScopedRt rtBlur(w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rtBlur");
+
+  _ctx->set_render_target(rtTmp, true);
 
   Technique *technique = GRAPHICS.get_technique(_particle_technique);
   Shader *vs = technique->vertex_shader(0);
@@ -331,6 +442,7 @@ bool ParticleTest::render() {
     XMFLOAT4 cameraPos;
     XMFLOAT4X4 worldView;
     XMFLOAT4X4 proj;
+    XMFLOAT4 dofSettings;
   } cbuffer;
 
   if (_useFreeFlyCamera) {
@@ -343,12 +455,23 @@ bool ParticleTest::render() {
 
   cbuffer.worldView = _view;
   cbuffer.proj = _proj;
+  cbuffer.dofSettings = XMFLOAT4(_nearFocusStart, _nearFocusEnd, _farFocusStart, _farFocusEnd);
 
   _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
   _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
 
   _ctx->set_vb(_vb, sizeof(ParticleVtx));
   _ctx->draw(numParticles, 0);
+
+  _ctx->unset_render_targets(0, 1);
+  do_blur(rtTmp, rtBlur);
+
+  {
+    TextureArray arr = { rtTmp, rtBlur };
+    _ctx->set_default_render_target();
+    _ctx->render_technique(_compose_technique, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+  }
+
   _ctx->end_frame();
 
   return true;

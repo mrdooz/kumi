@@ -85,6 +85,8 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/default_shaders.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/luminance.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/blur.tec", true));
+
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_ambient = GRAPHICS.find_technique("ssao_ambient");
   _ssao_light = GRAPHICS.find_technique("ssao_light");

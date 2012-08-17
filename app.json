@@ -1,2 +1,42 @@
 {
+	"curSettings": "settings_2012_08_16_17_09_34",
+	"settings_2012_08_16_17_09_34": {
+		"params": [
+			{
+				"name": "blur",
+				"params": {
+					"blurX": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 17
+					},
+					"blurY": {
+						"maxValue": 250,
+						"minValue": 1,
+						"value": 10
+					},
+					"farFocusEnd": {
+						"maxValue": 2500,
+						"minValue": 1,
+						"value": 346
+					},
+					"farFocusStart": {
+						"maxValue": 2500,
+						"minValue": 1,
+						"value": 281
+					},
+					"nearFocusEnd": {
+						"maxValue": 2500,
+						"minValue": 1,
+						"value": 135
+					},
+					"nearFocusStart": {
+						"maxValue": 2500,
+						"minValue": 1,
+						"value": 10
+					}
+				}
+			}
+		]
+	}
 }

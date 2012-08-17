@@ -20,6 +20,9 @@ public:
 
 private:
 
+  void do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture);
+  void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
+
   bool file_changed(const char *filename, void *token);
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
@@ -31,6 +34,18 @@ private:
   GraphicsObjectHandle _vb;
 
   GraphicsObjectHandle _gradient_technique;
+  GraphicsObjectHandle _compose_technique;
+
+  GraphicsObjectHandle _blur_sbuffer;
+  GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
+  GraphicsObjectHandle _copy_uav;
+
+  float _blurX, _blurY;
+
+  PropertyId _DofSettingsId;
+  float _nearFocusStart, _nearFocusEnd;
+  float _farFocusStart, _farFocusEnd;
+
 
   struct ParticleData {
     ParticleData(int numParticles);

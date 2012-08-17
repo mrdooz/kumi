@@ -5,6 +5,15 @@ cbuffer ParticleBuffer
   float4 cameraPos;
   matrix worldView;
   matrix proj;
+  float4 DOFDepths;
+}
+
+// Computes the depth of field blur factor
+float BlurFactor(in float depth) {
+    float f0 = 1.0f - saturate((depth - DOFDepths.x) / max(DOFDepths.y - DOFDepths.x, 0.01f));
+    float f1 = saturate((depth - DOFDepths.z) / max(DOFDepths.w - DOFDepths.z, 0.01f));
+    float blur = saturate(f0 + f1);
+    return blur;
 }
 
 struct VsInput {
@@ -19,7 +28,7 @@ struct GsInput {
 
 struct PsInput {
   float4 pos : SV_POSITION;
-  float2 scale : TEXCOORD0;
+  float3 scale : TEXCOORD0;   // radius, factor, blur
   float2 tex : TEXCOORD1;
 };
 
@@ -51,7 +60,8 @@ void gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
   // 0--2
   
   PsInput output = (PsInput)0;
-  output.scale = input[0].scale;
+  output.scale.xy = input[0].scale;
+  output.scale.z = BlurFactor(camToParticle.z);
   
   output.pos = mul(float4(left, bottom, z, 1), proj);
   output.tex = float2(0, 1);
@@ -70,9 +80,17 @@ void gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
   outputStream.Append(output);
 }
 
-float4 ps_main(PsInput input) : SV_Target
+struct ps_output {
+    float4 diffuse : SV_TARGET0;
+};
+
+ps_output ps_main(PsInput input)
 {
-  return 0.1 * input.scale.y * Texture0.Sample(LinearSampler, input.tex);
+    ps_output output = (ps_output)0;
+    output.diffuse.x = 0.1 * input.scale.y * Texture0.Sample(LinearSampler, input.tex).x;
+    output.diffuse.y = output.diffuse.x > 0.7 ? output.diffuse.x : 0;
+    output.diffuse.z = input.scale.z;
+    return output;
 }
 
 ///////////////////////////////////
@@ -95,4 +113,16 @@ float4 gradient_ps_main(quad_simple_ps_input input) : SV_Target
     float4 inner = float4(41.f/255, 78.f/255, 124.f/255, 255.f/255);
 
     return lerp(outer, inner, c);
+}
+
+///////////////////////////////////
+// Compose
+///////////////////////////////////
+float4 compose_ps_main(quad_ps_input input) : SV_Target
+{
+    // Texture0 = [sample, bloom-sample, dof-value]
+    float4 a = Texture0.Sample(LinearSampler, input.tex);
+    float4 b = Texture1.Sample(LinearSampler, input.tex);
+    float t = b.z;
+    return lerp(b.x, a.x, t) + lerp(b.y, a.y, t);
 }
