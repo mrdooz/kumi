@@ -30,9 +30,16 @@ technique particles {
 };
 
 
+technique coalesce inherits quad_base {
+    pixel_shader {
+        file effects/particles.hlsl;
+        entry_point ps_coalesce;
+    };
+};
+
 technique compose inherits quad_base {
     pixel_shader {
         file effects/particles.hlsl;
-        entry_point compose_ps_main;
+        entry_point ps_compose;
     };
 };

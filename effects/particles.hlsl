@@ -82,15 +82,14 @@ void gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
 
 struct ps_output {
     float4 diffuse : SV_TARGET0;
+    float depth : SV_TARGET1;
 };
 
 ps_output ps_main(PsInput input)
 {
     ps_output output = (ps_output)0;
-    output.diffuse.x = 0.1 * input.scale.y * Texture0.Sample(LinearSampler, input.tex).x;
-    // todo: fix this cutoff thing..
-    output.diffuse.y = 0; // output.diffuse.x > 0.1 ? 2 * output.diffuse.x : 0;
-    output.diffuse.z = input.scale.z;
+    output.diffuse = 0.1 * input.scale.y * Texture0.Sample(LinearSampler, input.tex);
+    output.depth = input.scale.z;
     return output;
 }
 
@@ -117,13 +116,24 @@ float4 gradient_ps_main(quad_simple_ps_input input) : SV_Target
 }
 
 ///////////////////////////////////
+// Coalesce diffuse, cut-off diffuse and depth
+///////////////////////////////////
+float4 ps_coalesce(quad_ps_input input) : SV_Target
+{
+    float diffuse = Texture0.Sample(LinearSampler, input.tex).r;
+    float depth = Texture1.Sample(LinearSampler, input.tex).r;
+    return float4(diffuse, diffuse > 0.5f ? 3 * diffuse : 0, depth, 0);
+}
+
+///////////////////////////////////
 // Compose
 ///////////////////////////////////
-float4 compose_ps_main(quad_ps_input input) : SV_Target
+float4 ps_compose(quad_ps_input input) : SV_Target
 {
     // Texture0 = [sample, bloom-sample, dof-value]
+    float4 background = Texture2.Sample(LinearSampler, input.tex);
     float4 a = Texture0.Sample(LinearSampler, input.tex);
     float4 b = Texture1.Sample(LinearSampler, input.tex);
     float t = b.z;
-    return lerp(b.x, a.x, t);
+    return background + lerp(b.x, a.x, t) + b.y;
 }

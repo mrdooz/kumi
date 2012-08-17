@@ -20,6 +20,8 @@ public:
 
 private:
 
+  void renderParticles();
+
   void do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture, GraphicsObjectHandle outputTexture2, int width, int height);
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 
@@ -35,6 +37,7 @@ private:
 
   GraphicsObjectHandle _gradient_technique;
   GraphicsObjectHandle _compose_technique;
+  GraphicsObjectHandle _coalesce;
 
   GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
   GraphicsObjectHandle _copy_uav;

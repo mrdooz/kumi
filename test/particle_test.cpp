@@ -161,6 +161,7 @@ bool ParticleTest::init() {
   _particle_technique = GRAPHICS.find_technique("particles");
   _gradient_technique = GRAPHICS.find_technique("gradient");
   _compose_technique = GRAPHICS.find_technique("compose");
+  _coalesce = GRAPHICS.find_technique("coalesce");
 
   string t = RESOURCE_MANAGER.resolve_filename("gfx/particle3.png", true);
   _particle_texture = GRAPHICS.load_texture(t.c_str(), "", false, nullptr);
@@ -198,6 +199,11 @@ bool ParticleTest::init() {
         _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
       }
     });
+  }
+
+  // run the simulation for 10 seconds to get an interesting starting position
+  for (int i = 0; i < 1000; ++i) {
+    _particle_data.update(0.01f);
   }
 
   return true;
@@ -384,12 +390,8 @@ struct ScopedRt {
   GraphicsObjectHandle _handle;
 };
 
-bool ParticleTest::render() {
-  ADD_PROFILE_SCOPE();
-  _ctx->begin_frame();
+void ParticleTest::renderParticles() {
 
-  //_ctx->render_technique(_gradient_technique, 
-    //bind(&ParticleTest::fill_cbuffer, this, _1), TextureArray(), DeferredContext::InstanceData());
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
@@ -412,9 +414,6 @@ bool ParticleTest::render() {
   GRAPHICS.unmap(_vb, 0);
 
   //auto fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
-  auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-  ScopedRt rtTmp(w, h, fmt, Graphics::kCreateSrv, "rtTmp");
-  _ctx->set_render_target(rtTmp, true);
 
   Technique *technique = GRAPHICS.get_technique(_particle_technique);
   Shader *vs = technique->vertex_shader(0);
@@ -467,8 +466,44 @@ bool ParticleTest::render() {
 
   _ctx->unset_render_targets(0, 1);
 
+}
+
+bool ParticleTest::render() {
+  ADD_PROFILE_SCOPE();
+  _ctx->begin_frame();
+
+  int w = GRAPHICS.width();
+  int h = GRAPHICS.height();
+
+  ScopedRt rtBackground(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtBackground");
+
+  _ctx->set_render_target(rtBackground, true);
+  _ctx->render_technique(_gradient_technique, 
+    bind(&ParticleTest::fill_cbuffer, this, _1), TextureArray(), DeferredContext::InstanceData());
+  _ctx->unset_render_targets(0, 1);
+
+  auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
+  ScopedRt rtTmp(w, h, fmt, Graphics::kCreateSrv, "rtTmp");
+  ScopedRt rtDepth(w, h, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "rtDepth");
+
+  GraphicsObjectHandle targets[] = { rtTmp, rtDepth };
+  bool clears[] = { true, true };
+  _ctx->set_render_targets(targets, clears, 2);
+
+  renderParticles();
+
+  // coalesce the diffuse, cut-off diffuse and depth into a single texture
+  ScopedRt rtCoalesce(w, h, fmt, Graphics::kCreateSrv, "rtCoalesce");
+  {
+    _ctx->set_render_target(rtCoalesce, true);
+    TextureArray arr = { rtTmp, rtDepth };
+    _ctx->render_technique(_coalesce, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+    _ctx->unset_render_targets(0, 1);
+  }
+
+
   ScopedRt rtDownscaled(w/4, h/4, fmt, Graphics::kCreateSrv, "rtDownscale");
-  post_process(rtTmp, rtDownscaled, _scale);
+  post_process(rtCoalesce, rtDownscaled, _scale);
 
 
   ScopedRt rtBlur(w/4, h/4, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rtBlur");
@@ -476,7 +511,7 @@ bool ParticleTest::render() {
   do_blur(rtDownscaled, rtBlur, rtBlur2, w/4, h/4);
 
   {
-    TextureArray arr = { rtTmp, rtBlur2 };
+    TextureArray arr = { rtCoalesce, rtBlur2, rtBackground };
     _ctx->set_default_render_target();
     _ctx->render_technique(_compose_technique, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
   }
