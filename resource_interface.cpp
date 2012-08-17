@@ -3,9 +3,6 @@
 #include "resource_manager.hpp"
 #include "utils.hpp"
 
-#if DISTRIBUTION
-#else
-
 ResourceManager *g_instance;
 
 ResourceInterface &ResourceInterface::instance() {
@@ -13,9 +10,9 @@ ResourceInterface &ResourceInterface::instance() {
   return *g_instance;
 }
 
-bool ResourceInterface::create() {
+bool ResourceInterface::create(const char *outputFilename) {
   KASSERT(!g_instance);
-  g_instance = new ResourceManager();
+  g_instance = new ResourceManager(outputFilename);
   return true;
 }
 
@@ -23,4 +20,13 @@ bool ResourceInterface::close() {
   delete exch_null(g_instance);
   return true;
 }
-#endif
+
+void ResourceInterface::add_file_watch(const char *filename, void *token, const cbFileChanged &cb, 
+                                       bool initial_callback, bool *initial_result, int timeout) {
+  if (initial_callback) {
+    bool res = cb(filename, token);
+    if (initial_result)
+      *initial_result = res;
+  }
+}
+

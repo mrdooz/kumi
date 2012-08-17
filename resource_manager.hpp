@@ -1,9 +1,5 @@
 #pragma once
 
-// The resource manager is a file system abstraction, allowing
-// easy use of dropbox etc while developing, and a zipfile or something
-// for the final release
-
 #include "resource_interface.hpp"
 #include "file_watcher.hpp"
 
@@ -12,7 +8,8 @@ using std::string;
 
 class ResourceManager : public ResourceInterface {
 public:
-  ResourceManager();
+  ResourceManager(const char *outputFilename);
+  ~ResourceManager();
 
   bool file_exists(const char *filename);
   __time64_t mdate(const char *filename);
@@ -42,5 +39,8 @@ private:
   std::map<std::string, vector<std::pair<cbFileChanged, void*>>> _watched_files;
 
   std::map<std::string, int> _file_change_ref_count;
+
+  std::string _outputFilename;
+  std::set<std::string> _readFiles;
 };
 

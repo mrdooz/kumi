@@ -864,14 +864,12 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
   for (auto i = begin(tmp); i != end(tmp); ++i) {
     Technique *t = *i;
 
-    if (RESOURCE_MANAGER.supports_file_watch()) {
-      auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
-      if (Shader *vs = t->vertex_shader(0)) {
-        RESOURCE_MANAGER.add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
-      }
-      if (Shader *ps = t->pixel_shader(0)) {
-        RESOURCE_MANAGER.add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
-      }
+    auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
+    if (Shader *vs = t->vertex_shader(0)) {
+      RESOURCE_MANAGER.add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
+    }
+    if (Shader *ps = t->pixel_shader(0)) {
+      RESOURCE_MANAGER.add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
     }
 
     int idx = _techniques.idx_from_token(t->name());
@@ -884,9 +882,8 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     }
   }
 
-  if (RESOURCE_MANAGER.supports_file_watch()) {
-    RESOURCE_MANAGER.add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), false, nullptr, -1);
-  }
+  RESOURCE_MANAGER.add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), 
+    false, nullptr, -1);
 
   return res;
 }

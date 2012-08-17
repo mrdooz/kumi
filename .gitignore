@@ -17,7 +17,6 @@ ipch/
 *.*~
 *.zip
 *.obj
-*.exe
 *.opensdf
 *.psess
 *.sdf

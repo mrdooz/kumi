@@ -33,19 +33,32 @@ static string normalize_path(const std::string &path, bool add_trailing_slash) {
   return res;
 }
 
-ResourceManager::ResourceManager() 
+ResourceManager::ResourceManager(const char *outputFilename) 
   : _copy_on_load(false)
+  , _outputFilename(outputFilename)
 {
   _paths.push_back("./");
 }
+
+ResourceManager::~ResourceManager() {
+  if (!_outputFilename.empty()) {
+    FILE *f = fopen(_outputFilename.c_str(), "wt");
+    for (auto it = begin(_readFiles); it != end(_readFiles); ++it) {
+      fprintf(f, "%s\n", it->c_str());
+    }
+    fclose(f);
+  }
+}
+
 
 void ResourceManager::add_path(const std::string &path) {
   _paths.push_back(normalize_path(path, true));
 }
 
 bool ResourceManager::load_file(const char *filename, std::vector<char> *buf) {
-  const string &full_path = resolve_filename(filename, false);
+  const string &full_path = resolve_filename(filename, true);
   if (full_path.empty()) return false;
+  _readFiles.insert(full_path);
 
   return ::load_file(full_path.c_str(), buf);
 }
@@ -56,7 +69,8 @@ bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len,
 }
 
 bool ResourceManager::load_inplace(const char *filename, size_t ofs, size_t len, void *buf) {
-  const string &full_path = resolve_filename(filename, false);
+  const string &full_path = resolve_filename(filename, true);
+  _readFiles.insert(full_path);
 
   ScopedHandle h(CreateFileA(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 
     FILE_ATTRIBUTE_NORMAL, NULL));

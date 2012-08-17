@@ -74,7 +74,7 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(ProfileManager::create());
   B_ERR_BOOL(PropertyManager::create());
-  B_ERR_BOOL(ResourceManager::create());
+  B_ERR_BOOL(ResourceManager::create("resources.log"));
   B_ERR_BOOL(Graphics::create());
   B_ERR_BOOL(MaterialManager::create());
   B_ERR_BOOL(DemoEngine::create());
@@ -174,7 +174,7 @@ bool App::create_window()
 void App::on_idle() {
 }
 
-#ifdef WITH_WEBSOCKETS
+#if WITH_WEBSOCKETS
 
 static void send_json(SOCKET socket, const JsonValue::JsonValuePtr &json) {
   string str = print_json2(json);
@@ -308,7 +308,7 @@ UINT App::run(void *userdata) {
       _frame_time = lerp(cur_frame, _frame_time, 0.6);
 
       JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
-#ifdef WITH_WEBSOCKETS
+#if WITH_WEBSOCKETS
       // limit how often we send the profile data
       static DWORD lastTime = timeGetTime();
       DWORD now = timeGetTime();

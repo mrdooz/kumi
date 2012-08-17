@@ -36,7 +36,7 @@ public:
   void debug_text(const char *fmt, ...);
   double frame_time() const { return _frame_time; }
 
-#ifdef WITH_WEBSOCKETS
+#if WITH_WEBSOCKETS
   void process_network_msg(SOCKET sender, const char *msg, int len);
 #endif
 
@@ -49,7 +49,7 @@ private:
   App();
   ~App();
 
-#ifdef WITH_WEBSOCKETS
+#if WITH_WEBSOCKETS
   void send_stats(const JsonValue::JsonValuePtr &frame);
 #endif
   bool create_window();
