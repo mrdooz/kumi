@@ -22,7 +22,7 @@ DeferredContext::~DeferredContext() {
 
 
 void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
-                                       const std::function<void(CBuffer *)> fnSystemCbuffers,
+                                       const std::function<void(CBuffer *)> &fnSystemCbuffers,
                                        const TextureArray &resources,
                                        const InstanceData &instance_data) {
   Technique *technique = GRAPHICS._techniques.get(technique_handle);
@@ -229,7 +229,7 @@ void DeferredContext::set_samplers(const SamplerArray &samplers) {
 }
 
 void DeferredContext::unset_uavs(int first, int count) {
-  UINT initialCount = 1;
+  UINT initialCount = -1;
   static ID3D11UnorderedAccessView *nullViews[MAX_TEXTURES] = {0, 0, 0, 0, 0, 0, 0, 0};
   _ctx->CSSetUnorderedAccessViews(first, count, nullViews, &initialCount);
 }
@@ -249,8 +249,11 @@ void DeferredContext::set_uavs(const TextureArray &uavs) {
       if (type == GraphicsObjectHandle::kStructuredBuffer) {
         auto *data = GRAPHICS._structured_buffers.get(h);
         d3dUavs[i] = data->uav.resource;
+      } else if (type == GraphicsObjectHandle::kRenderTarget) {
+        auto *data = GRAPHICS._render_targets.get(h);
+        d3dUavs[i] = data->uav.resource;
       } else {
-        LOG_ERROR_LN("Trying to set invalid UAV type!");
+        LOG_ERROR_LN("Trying to set an unsupported UAV type!");
       }
       num_resources++;
       first_resource = min(first_resource, i);

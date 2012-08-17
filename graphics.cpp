@@ -59,10 +59,10 @@ Graphics::Graphics()
   , _start_fps_time(0xffffffff)
   , _frame_count(0)
   , _fps(0)
-  , _vs_profile("vs_4_0")
-  , _ps_profile("ps_4_0")
-  , _cs_profile("cs_4_0")
-  , _gs_profile("gs_4_0")
+  , _vs_profile("vs_5_0")
+  , _ps_profile("ps_5_0")
+  , _cs_profile("cs_5_0")
+  , _gs_profile("gs_5_0")
   , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size"))
   , _vertex_shaders(release_obj<ID3D11VertexShader *>)
   , _pixel_shaders(release_obj<ID3D11PixelShader *>)
@@ -120,13 +120,12 @@ void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
 }
 
 GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc, 
-    int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
+    int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) {
 
   KASSERT(_render_targets._key_to_idx.find(name) == _render_targets._key_to_idx.end());
 
   // look for a free render target with the wanted properties
-  // TODO: make betterer
-  UINT flags = mip_maps ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+  UINT flags = (bufferFlags & kCreateMipMaps) ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
 
   auto cmp_desc = [&](const D3D11_TEXTURE2D_DESC &desc) {
     return desc.Width == width && desc.Height == height && desc.Format == format && desc.MiscFlags == flags;
@@ -135,7 +134,7 @@ GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc
   for (int idx = 0; idx < _render_targets.Size; ++idx) {
     if (auto rt = _render_targets[idx]) {
       auto &desc = rt->texture.desc;
-      if (!rt->in_use && cmp_desc(desc) && depth_buffer == !!rt->depth_stencil.resource.p) {
+      if (!rt->in_use && cmp_desc(desc) && !!(bufferFlags & kCreateDepthBuffer) == !!rt->depth_stencil.resource.p) {
         rt->in_use = true;
         _render_targets._key_to_idx[name] = idx;
         _render_targets._idx_to_key[idx] = name;
@@ -147,7 +146,7 @@ GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc
     }
   }
   // nothing suitable found, so we create a render target
-  return create_render_target(loc, width, height, depth_buffer, format, mip_maps, name);
+  return create_render_target(loc, width, height, format, bufferFlags, name);
 }
 
 void Graphics::release_temp_render_target(GraphicsObjectHandle h) {
@@ -215,10 +214,10 @@ GraphicsObjectHandle Graphics::create_structured_buffer(const TrackedLocation &l
   return emptyGoh;
 }
 
-GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name) {
+GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) {
 
     unique_ptr<RenderTargetResource> data(new RenderTargetResource);
-    if (create_render_target(loc, width, height, depth_buffer, format, mip_maps, data.get())) {
+    if (create_render_target(loc, width, height, format, bufferFlags, data.get())) {
       int idx = !name.empty() ? _render_targets.idx_from_token(name) : -1;
       if (idx != -1 || (idx = _render_targets.find_free_index()) != -1) {
         if (_render_targets[idx])
@@ -233,42 +232,52 @@ GraphicsObjectHandle Graphics::create_render_target(const TrackedLocation &loc, 
     return emptyGoh;
 }
 
-bool Graphics::create_render_target(
-  const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, RenderTargetResource *out)
+bool Graphics::create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, RenderTargetResource *out)
 {
   out->reset();
 
   // create the render target
-  int mip_levels = mip_maps ? 0 : 1;
-  out->texture.desc = CD3D11_TEXTURE2D_DESC(format, width, height, 1, mip_levels,
-    D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE);
-  out->texture.desc.MiscFlags = mip_maps ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
-  B_WRN_HR(_device->CreateTexture2D(&out->texture.desc, NULL, &out->texture.resource.p));
+  int mip_levels = (bufferFlags & kCreateMipMaps) ? 0 : 1;
+  uint32 flags = D3D11_BIND_RENDER_TARGET 
+    | (bufferFlags & kCreateSrv ? D3D11_BIND_SHADER_RESOURCE : 0)
+    | (bufferFlags & kCreateUav ? D3D11_BIND_UNORDERED_ACCESS : 0);
+
+  out->texture.desc = CD3D11_TEXTURE2D_DESC(format, width, height, 1, mip_levels, flags);
+  out->texture.desc.MiscFlags = (bufferFlags & kCreateMipMaps) ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+  B_ERR_HR(_device->CreateTexture2D(&out->texture.desc, NULL, &out->texture.resource.p));
   set_private_data(loc, out->texture.resource.p);
 
   // create the render target view
   out->rtv.desc = CD3D11_RENDER_TARGET_VIEW_DESC(D3D11_RTV_DIMENSION_TEXTURE2D, out->texture.desc.Format);
-  B_WRN_HR(_device->CreateRenderTargetView(out->texture.resource, &out->rtv.desc, &out->rtv.resource.p));
+  B_ERR_HR(_device->CreateRenderTargetView(out->texture.resource, &out->rtv.desc, &out->rtv.resource.p));
   set_private_data(loc, out->rtv.resource.p);
   float color[4] = { 0 };
   _immediate_context->ClearRenderTargetView(out->rtv.resource.p, color);
 
-  if (depth_buffer) {
+  if (bufferFlags & kCreateDepthBuffer) {
     // create the depth stencil texture
     out->depth_stencil.desc = CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL);
-    B_WRN_HR(_device->CreateTexture2D(&out->depth_stencil.desc, NULL, &out->depth_stencil.resource.p));
+    B_ERR_HR(_device->CreateTexture2D(&out->depth_stencil.desc, NULL, &out->depth_stencil.resource.p));
     set_private_data(loc, out->depth_stencil.resource.p);
 
     // create depth stencil view
     out->dsv.desc = CD3D11_DEPTH_STENCIL_VIEW_DESC(D3D11_DSV_DIMENSION_TEXTURE2D, DXGI_FORMAT_D24_UNORM_S8_UINT);
-    B_WRN_HR(_device->CreateDepthStencilView(out->depth_stencil.resource, &out->dsv.desc, &out->dsv.resource.p));
+    B_ERR_HR(_device->CreateDepthStencilView(out->depth_stencil.resource, &out->dsv.desc, &out->dsv.resource.p));
     set_private_data(loc, out->dsv.resource.p);
   }
 
-  // create the shader resource view
-  out->srv.desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture.desc.Format);
-  B_WRN_HR(_device->CreateShaderResourceView(out->texture.resource, &out->srv.desc, &out->srv.resource.p));
-  set_private_data(loc, out->srv.resource.p);
+  if (bufferFlags & kCreateSrv) {
+    // create the shader resource view
+    out->srv.desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, out->texture.desc.Format);
+    B_ERR_HR(_device->CreateShaderResourceView(out->texture.resource, &out->srv.desc, &out->srv.resource.p));
+    set_private_data(loc, out->srv.resource.p);
+  }
+
+
+  if (bufferFlags & kCreateUav) {
+    out->uav.desc = CD3D11_UNORDERED_ACCESS_VIEW_DESC(D3D11_UAV_DIMENSION_TEXTURE2D, format, 0, 0, width*height);
+    B_ERR_HR(_device->CreateUnorderedAccessView(out->texture.resource, &out->uav.desc, &out->uav.resource));
+  }
 
   return true;
 }
@@ -795,7 +804,7 @@ bool Graphics::technique_file_changed(const char *filename, void *token) {
 bool Graphics::shader_file_changed(const char *filename, void *token) {
   // TODO
 /*
-  LOG_CONTEXT("%s loading: %s", __FUNCTION__, filename);
+  LOG_CONTEXT("%st loading: %s", __FUNCTION__, filename);
 
   Technique *t = (Technique *)token;
   for (int i = 0; i < t->vertex_shader_count(); ++i) {

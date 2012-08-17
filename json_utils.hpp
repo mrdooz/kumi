@@ -41,11 +41,11 @@ public:
   bool to_bool() const { KASSERT(_type == JS_BOOL); return _bool; }
   std::string to_string() const { KASSERT(_type == JS_STRING); return _string; }
 
-  virtual JsonValuePtr operator[](int idx) const { KASSERT(!"Not an array"); return _empty_value; }
+  virtual JsonValuePtr operator[](int idx) const { KASSERT(!"Not an array"); return emptyValue(); }
   virtual JsonValuePtr get(int idx) const { return (*this)[idx]; }
   virtual int count() const { KASSERT(!"Not an array"); return -1; }
 
-  virtual JsonValuePtr operator[](const std::string &key) const { KASSERT(!"Not an object"); return _empty_value; }
+  virtual JsonValuePtr operator[](const std::string &key) const { KASSERT(!"Not an object"); return emptyValue(); }
   virtual JsonValuePtr get(const std::string &key) const { return (*this)[key]; }
   virtual bool has_key(const std::string &key) const { KASSERT(!"Not an object"); return false; }
 
@@ -55,7 +55,7 @@ public:
 
 protected:
 
-  static JsonValuePtr _empty_value;
+  //static JsonValuePtr _empty_value;
 
   JsonValue();
   JsonValue(JsonType type);

@@ -180,14 +180,17 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
           }
         }
       }
-      cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
-      cbuffer.staging.resize(size);
 
-      if (source == PropertySource::kUnknown) {
-        shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
+      if (size > 0) {
+        cbuffer.handle = GRAPHICS.create_constant_buffer(FROM_HERE, size, true);
+        cbuffer.staging.resize(size);
 
-      } else {
-        shader->set_cbuffer(source, cbuffer);
+        if (source == PropertySource::kUnknown) {
+          shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
+
+        } else {
+          shader->set_cbuffer(source, cbuffer);
+        }
       }
 
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {

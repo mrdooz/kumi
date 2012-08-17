@@ -25,6 +25,13 @@ class Graphics {
   friend DeferredContext;
 public:
 
+  enum BufferFlags {
+    kCreateMipMaps        = 1 << 0,
+    kCreateDepthBuffer    = 1 << 1,
+    kCreateSrv            = 1 << 2,
+    kCreateUav            = 1 << 3,
+  };
+
   enum PredefinedGeometry {
     kGeomFsQuadPos,
     kGeomFsQuadPosTex,
@@ -50,6 +57,7 @@ public:
       rtv.release();
       dsv.release();
       srv.release();
+      uav.release();
     }
 
     bool in_use;
@@ -58,6 +66,7 @@ public:
     ResourceAndDesc<ID3D11RenderTargetView, D3D11_RENDER_TARGET_VIEW_DESC> rtv;
     ResourceAndDesc<ID3D11DepthStencilView, D3D11_DEPTH_STENCIL_VIEW_DESC> dsv;
     ResourceAndDesc<ID3D11ShaderResourceView, D3D11_SHADER_RESOURCE_VIEW_DESC> srv;
+    ResourceAndDesc<ID3D11UnorderedAccessView, D3D11_UNORDERED_ACCESS_VIEW_DESC> uav;
   };
 
   struct TextureResource {
@@ -124,10 +133,10 @@ public:
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 
-  GraphicsObjectHandle get_temp_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);
+  GraphicsObjectHandle get_temp_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name);
   void release_temp_render_target(GraphicsObjectHandle h);
 
-  GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, const std::string &name);
+  GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name);
   GraphicsObjectHandle create_structured_buffer(const TrackedLocation &loc, int elemSize, int numElems, bool createSrv);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
   GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
@@ -193,7 +202,7 @@ private:
   void unbind_resource_views(int resource_bitmask);
 
 
-  bool create_render_target(const TrackedLocation &loc, int width, int height, bool depth_buffer, DXGI_FORMAT format, bool mip_maps, RenderTargetResource *out);
+  bool create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, RenderTargetResource *out);
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureResource *out);
 
   bool create_back_buffers(int width, int height);

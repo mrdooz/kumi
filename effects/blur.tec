@@ -26,3 +26,4 @@ technique copy_uav inherits quad_base {
         entry_point ps_copy_uav;
     };
 };
+

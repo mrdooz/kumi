@@ -105,7 +105,7 @@ bool ScenePlayer::init() {
   _copy_uav = GRAPHICS.find_technique("copy_uav");
 
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
-  _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, false, DXGI_FORMAT_R32G32B32A32_FLOAT, false, "rt_final");
+  _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, "rt_final");
 
   string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi", true);
   //string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
@@ -333,22 +333,22 @@ bool ScenePlayer::render() {
     int w = GRAPHICS.width();
     int h = GRAPHICS.height();
 
-    auto tmp_rt = [&](bool depth, DXGI_FORMAT fmt, const string& name) {
-      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, depth, fmt, false, name);
+    auto tmp_rt = [&](DXGI_FORMAT fmt, uint32 bufferFlags, const string& name) {
+      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, fmt, bufferFlags, name);
     };
 
-    auto rt_pos = tmp_rt(true, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_pos");
-    auto rt_normal = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_normal");
-    auto rt_diffuse = tmp_rt(false, DXGI_FORMAT_R8G8B8A8_UNORM, "System::rt_diffuse");
-    auto rt_specular = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_specular");
+    auto rt_pos = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateDepthBuffer, "System::rt_pos");
+    auto rt_normal = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_normal");
+    auto rt_diffuse = tmp_rt(DXGI_FORMAT_R8G8B8A8_UNORM, 0, "System::rt_diffuse");
+    auto rt_specular = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_specular");
 
-    auto rt_composite = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_composite");
-    auto rt_blur = tmp_rt(false, DXGI_FORMAT_R16G16B16A16_FLOAT, "System::rt_blur");
+    auto rt_composite = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_composite");
+    auto rt_blur = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_blur");
 
-    auto rt_occlusion = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion");
-    auto rt_occlusion_tmp = tmp_rt(false, DXGI_FORMAT_R16_FLOAT, "System::rt_occlusion_tmp");
+    auto rt_occlusion = tmp_rt(DXGI_FORMAT_R16_FLOAT, 0, "System::rt_occlusion");
+    auto rt_occlusion_tmp = tmp_rt(DXGI_FORMAT_R16_FLOAT, 0, "System::rt_occlusion_tmp");
 
-    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, false, DXGI_FORMAT_R16_FLOAT, true, "System::rt_luminance");
+    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateMipMaps, "System::rt_luminance");
 
     {
       ADD_NAMED_PROFILE_SCOPE("render_meshes");
@@ -404,10 +404,10 @@ bool ScenePlayer::render() {
     _ctx->generate_mips(rt_luminance);
 
     auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, false, fmt, false, "downscale1");
-    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, false, fmt, false, "downscale2");
-    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "downscale3");
-    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, false, fmt, false, "blur_tmp");
+    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, fmt, 0, "downscale1");
+    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, fmt, 0, "downscale2");
+    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, 0, "downscale3");
+    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, 0, "blur_tmp");
 
     // scale down
     post_process(rt_composite, downscale1, _scale_cutoff);
@@ -424,7 +424,7 @@ bool ScenePlayer::render() {
     post_process(downscale3, downscale2, _scale);
     post_process(downscale2, downscale1, _scale);
 
-    auto rt_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w, h, false, fmt, false, "rt_tmp");
+    auto rt_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w, h, fmt, 0, "rt_tmp");
 
     post_process(rt_composite, rt_tmp, _scale);
 

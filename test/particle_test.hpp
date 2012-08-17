@@ -20,7 +20,7 @@ public:
 
 private:
 
-  void do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture);
+  void do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture, GraphicsObjectHandle outputTexture2, int width, int height);
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 
   bool file_changed(const char *filename, void *token);
@@ -36,9 +36,9 @@ private:
   GraphicsObjectHandle _gradient_technique;
   GraphicsObjectHandle _compose_technique;
 
-  GraphicsObjectHandle _blur_sbuffer;
   GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
   GraphicsObjectHandle _copy_uav;
+  GraphicsObjectHandle _scale;
 
   float _blurX, _blurY;
 

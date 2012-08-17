@@ -1,0 +1,8 @@
+include common.tec;
+
+technique scale inherits quad_base {
+  pixel_shader {
+      file effects/scale.hlsl;
+      entry_point ps_scale;
+  };
+};

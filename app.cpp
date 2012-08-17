@@ -240,6 +240,7 @@ void App::send_stats(const JsonValue::JsonValuePtr &frame) {
     auto root = JsonValue::create_object();
     auto obj = root->add_key_value("system.frame", JsonValue::create_object());
 
+    // convert UTC time to Unix epoch
     FILETIME time;
     GetSystemTimeAsFileTime(&time);
     int64 now = (LONGLONG)time.dwLowDateTime + ((LONGLONG)(time.dwHighDateTime) << 32LL);
@@ -282,36 +283,29 @@ UINT App::run(void *userdata) {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
     } else {
+
       PROFILE_MANAGER.start_frame();
       LARGE_INTEGER start, end;
+      QueryPerformanceCounter(&start);
       {
         ADD_PROFILE_SCOPE();
-        QueryPerformanceCounter(&start);
 
         process_deferred();
 
         GRAPHICS.clear(XMFLOAT4(0,0,0,1));
         DEMO_ENGINE.tick();
-
-        //GRAPHICS.render();
       }
       {
         ADD_PROFILE_SCOPE();
         GRAPHICS.present();
 
-        QueryPerformanceCounter(&end);
-        int64 delta = end.QuadPart - start.QuadPart;
-        double cur_frame = delta / (double)freq.QuadPart;
-        if (_frame_time > 0) {
-          double p = 0.4;
-          _frame_time = p * _frame_time + (1-p) * cur_frame;
-        } else {
-          _frame_time = cur_frame;
-        }
-
         on_idle();
       }
 
+      QueryPerformanceCounter(&end);
+      int64 delta = end.QuadPart - start.QuadPart;
+      double cur_frame = delta / (double)freq.QuadPart;
+      _frame_time = lerp(cur_frame, _frame_time, 0.6);
 
       JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
 #ifdef WITH_WEBSOCKETS
@@ -323,6 +317,7 @@ UINT App::run(void *userdata) {
         lastTime = now;
       }
 #endif
+
     }
   }
   return 0;
@@ -455,6 +450,28 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
       case 'V':
         GRAPHICS.set_vsync(!GRAPHICS.vsync());
         return 0;
+
+      case 'M': {
+#if _DEBUG
+        static _CrtMemState prevState;
+        static bool firstTime = true;
+        _CrtMemState curState;
+        _CrtMemCheckpoint(&curState);
+
+        if (!firstTime) {
+          _CrtMemState stateDiff;
+          OutputDebugStringA("*** MEM DIFF ***\n");
+          _CrtMemDifference(&stateDiff, &prevState, &curState);
+          _CrtMemDumpStatistics(&stateDiff);
+
+        }
+        firstTime = false;
+        OutputDebugStringA("*** MEM STATS ***\n");
+        _CrtMemDumpStatistics(&curState);
+        prevState = curState;
+#endif
+        return 0;
+      }
 
       case VK_ESCAPE:
         PostQuitMessage( 0 );

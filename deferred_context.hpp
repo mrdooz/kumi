@@ -50,7 +50,7 @@ public:
   void generate_mips(GraphicsObjectHandle h);
 
   void render_technique(GraphicsObjectHandle technique_handle,
-    const std::function<void(CBuffer *)> fnSystemCbuffers,
+    const std::function<void(CBuffer *)> &fnSystemCbuffers,
     const TextureArray &resources,
     const InstanceData &instance_data);
 

@@ -88,7 +88,8 @@ ps_output ps_main(PsInput input)
 {
     ps_output output = (ps_output)0;
     output.diffuse.x = 0.1 * input.scale.y * Texture0.Sample(LinearSampler, input.tex).x;
-    output.diffuse.y = output.diffuse.x > 0.7 ? output.diffuse.x : 0;
+    // todo: fix this cutoff thing..
+    output.diffuse.y = 0; // output.diffuse.x > 0.1 ? 2 * output.diffuse.x : 0;
     output.diffuse.z = input.scale.z;
     return output;
 }
@@ -124,5 +125,5 @@ float4 compose_ps_main(quad_ps_input input) : SV_Target
     float4 a = Texture0.Sample(LinearSampler, input.tex);
     float4 b = Texture1.Sample(LinearSampler, input.tex);
     float t = b.z;
-    return lerp(b.x, a.x, t) + lerp(b.y, a.y, t);
+    return lerp(b.x, a.x, t);
 }

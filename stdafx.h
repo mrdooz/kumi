@@ -1,5 +1,6 @@
 #pragma once
 
+
 #ifdef DISTRIBUTION
 #define WITH_WEBSOCKETS 0
 #define WITH_TRACKED_LOCATION 0
@@ -82,4 +83,15 @@ typedef uint64_t uint64;
 #endif
 
 typedef std::basic_string<TCHAR> ustring;
+
+
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+#define DEBUG_NEW new(_CLIENT_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#else
+#include <stdlib.h>
+#endif
 

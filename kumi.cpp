@@ -10,7 +10,7 @@
 
 #pragma comment(lib, "Ws2_32.lib")
 
-static string g_module_name;
+static char g_module_name[MAX_PATH];
 static bool g_started_as_log_server;
 
 static bool start_second_process(const char *cmd_args) {
@@ -61,9 +61,7 @@ static int run_app(HINSTANCE instance) {
 }
 
 static bool global_init() {
-  char filename[MAX_PATH];
-  GetModuleFileNameA(NULL, filename, MAX_PATH);
-  g_module_name = filename;
+  GetModuleFileNameA(NULL, g_module_name, MAX_PATH);
   return true;
 }
 
@@ -79,16 +77,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prev_instance, LPSTR cmd_line
   _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_DEBUG);
   _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_DEBUG);
 #endif
-
-  struct Tjong {
-    pair<string, int> buf[1000];
-  };
-
-  auto a = new Tjong();
-  delete a;
-  string str;
-
-  //return 0;
 
   if (!global_init())
     return 1;

@@ -5,8 +5,6 @@
 
 using namespace std;
 
-JsonValue::JsonValuePtr JsonValue::_empty_value = JsonValuePtr(new JsonValue);
-
 //////////////////////////////////////////////////////////////////////////
 // 
 // JsonValue
@@ -14,7 +12,8 @@ JsonValue::JsonValuePtr JsonValue::_empty_value = JsonValuePtr(new JsonValue);
 //////////////////////////////////////////////////////////////////////////
 
 JsonValue::JsonValuePtr JsonValue::emptyValue() {
-  return _empty_value;
+  static JsonValue::JsonValuePtr obj;
+  return obj;
 }
 
 JsonValue::JsonValue() : _type(JS_NULL) {}
@@ -104,7 +103,7 @@ JsonObject::JsonValuePtr JsonObject::add_key_value(const std::string &key, bool 
 
 JsonObject::JsonValuePtr JsonObject::operator[](const std::string &key) const { 
   auto it = _key_value.find(key);
-  return it == _key_value.end() ? _empty_value : it->second;
+  return it == _key_value.end() ? emptyValue() : it->second;
 }
 
 bool JsonObject::has_key(const std::string &key) const

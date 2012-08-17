@@ -175,7 +175,7 @@ void BitWriter::write(uint32 value, uint32 count) {
 
   // Because we're working on LE, we left shift to get zeros in the
   // bits that are already used.
-  const uint64 prefix = value << bit_ofs;
+  const uint64 prefix = (uint64)value << bit_ofs;
   buf[0] = (buf[0] & read_mask[bit_ofs]) | prefix;
 }
 

@@ -541,7 +541,7 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
         if (!properties->is_null()) {
           for (int j = 0; j < properties->count(); ++j) {
             auto &property = properties->get(j);
-            auto &name = property->get("name")->to_string();
+            //auto &name = property->get("name")->to_string();
             auto &type = property->get("type")->to_string();
             auto &value = property->get("value");
             XMFLOAT4 v;
