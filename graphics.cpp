@@ -330,6 +330,7 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
     if (FAILED(hr))
       return emptyGoh;
   }
+  RESOURCE_MANAGER.add_external_file(filename);
 
   auto *data = new SimpleResource();
   HRESULT hr;

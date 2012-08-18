@@ -13,16 +13,15 @@ public:
 
   bool file_exists(const char *filename);
   __time64_t mdate(const char *filename);
-  virtual bool load_file(const char *filename, std::vector<char> *buf);
-  virtual bool load_partial(const char *filename, size_t ofs, size_t len, std::vector<char> *buf);
-  virtual bool load_inplace(const char *filename, size_t ofs, size_t len, void *buf);
+  virtual bool load_file(const char *filename, std::vector<char> *buf) override;
+  virtual bool load_partial(const char *filename, size_t ofs, size_t len, std::vector<char> *buf) override;
+  virtual bool load_inplace(const char *filename, size_t ofs, size_t len, void *buf) override;
 
-  virtual bool supports_file_watch() const;
   virtual void add_file_watch(const char *filename, void *token, const cbFileChanged &cb, bool initial_callback, bool *initial_result, int timeout) override;
-  virtual void remove_file_watch(const cbFileChanged &cb);
+  virtual void remove_file_watch(const cbFileChanged &cb) override;
 
-  void copy_on_load(bool enable, const char *dest);
-  void add_path(const std::string &path);
+  virtual void add_path(const std::string &path) override;
+  virtual void add_external_file(const std::string &filename) override;
 
   std::string resolve_filename(const char *filename, bool fullPath);
 
@@ -31,8 +30,6 @@ private:
   void deferred_file_changed(void *token, FileWatcher::FileEvent, const std::string &old_name, const std::string &new_name);
 
   static ResourceManager *_instance;
-  bool _copy_on_load;
-  std::string _copy_dest;
   std::vector<std::string> _paths;
   std::map<std::string, std::string> _resolved_paths;
 

@@ -34,8 +34,7 @@ static string normalize_path(const std::string &path, bool add_trailing_slash) {
 }
 
 ResourceManager::ResourceManager(const char *outputFilename) 
-  : _copy_on_load(false)
-  , _outputFilename(outputFilename)
+  : _outputFilename(outputFilename)
 {
   _paths.push_back("./");
 }
@@ -48,6 +47,10 @@ ResourceManager::~ResourceManager() {
     }
     fclose(f);
   }
+}
+
+void ResourceManager::add_external_file(const std::string &filename) {
+  _readFiles.insert(filename);
 }
 
 
@@ -102,20 +105,6 @@ __time64_t ResourceManager::mdate(const char *filename) {
   _stat(filename, &s);
   return s.st_mtime;
 
-}
-
-bool ResourceManager::supports_file_watch() const {
-#ifdef _DISTRIBUTION_
-  return false;
-#else
-  return true;
-#endif
-}
-
-void ResourceManager::copy_on_load(bool enable, const char *dest) {
-  _copy_on_load = enable;
-  if (enable)
-    _copy_dest;
 }
 
 string ResourceManager::resolve_filename(const char *filename, bool fullPath) {

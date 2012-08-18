@@ -24,6 +24,7 @@ ipch/
 *.log
 *.user
 *.swp
+*.dat
 *.filters
 _win32/My Inspector XE Results - kumi/*
 _win32/My Amplifier XE Results - kumi/*

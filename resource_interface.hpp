@@ -12,6 +12,7 @@ struct ResourceInterface {
   typedef std::function<bool (const char *, void *)> cbFileChanged;
 
   virtual void add_path(const std::string &path) {}
+  virtual void add_external_file(const std::string &filename) {}
 
   virtual bool file_exists(const char *filename) = 0;
   virtual __time64_t mdate(const char *filename) = 0;
