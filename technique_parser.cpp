@@ -354,7 +354,7 @@ using namespace technique_parser_details;
 TechniqueParser::TechniqueParser(const std::string &filename, TechniqueFile *result) 
   : _symbol_trie(new Trie()) 
   , _result(result)
-  , _filename(RESOURCE_MANAGER.resolve_filename(filename.c_str(), true))
+  , _filename(filename)
 {
   for (int i = 0; i < ELEMS_IN_ARRAY(g_symbols); ++i) {
     _symbol_trie->add_symbol(g_symbols[i].str, strlen(g_symbols[i].str), g_symbols[i].symbol);
@@ -1294,7 +1294,8 @@ bool TechniqueParser::parse() {
 
         case kSymInclude: {
           string filename = scope.string_until(';');
-          string path;
+          string path = Path::get_path(_filename);
+/*
           if (Path::is_absolute(_filename)) {
             path = Path::get_path(_filename);
           } else {
@@ -1302,10 +1303,10 @@ bool TechniqueParser::parse() {
             string cwd(_getcwd(buf, MAX_PATH));
             path = Path::concat(cwd, Path::get_path(_filename));
           }
+*/
           scope.munch(kSymSemicolon);
           TechniqueParser inner(Path::concat(path, filename), _result);
-          if (!inner.parse())
-            return false;
+          B_ERR_BOOL(inner.parse());
           break;
         }
        

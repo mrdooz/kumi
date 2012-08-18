@@ -2,7 +2,7 @@
 #include "scene_player.hpp"
 #include "../logger.hpp"
 #include "../kumi_loader.hpp"
-#include "../resource_manager.hpp"
+#include "../resource_interface.hpp"
 #include "../scene.hpp"
 #include "../threading.hpp"
 #include "../mesh.hpp"
@@ -107,11 +107,10 @@ bool ScenePlayer::init() {
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
   _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, "rt_final");
 
-  string resolved_name = RESOURCE_MANAGER.resolve_filename("meshes/torus.kumi", true);
   //string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
 
   KumiLoader loader;
-  if (!loader.load(resolved_name.c_str(), nullptr /*material_connections.c_str()*/, &RESOURCE_MANAGER, &_scene))
+  if (!loader.load("meshes/torus.kumi", nullptr /*material_connections.c_str()*/, &_scene))
     return false;
 
   _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);

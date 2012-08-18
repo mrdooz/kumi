@@ -12,6 +12,8 @@
 #include "animation_manager.hpp"
 #include "bit_utils.hpp"
 
+using namespace std;
+
 #define FILE_VERSION 13
 
 #pragma pack(push, 1)
@@ -469,7 +471,8 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
         if (!Path::is_absolute(filename)) {
           filename = Path::get_path(_filename) + filename;
         }
-        resource = GRAPHICS.load_texture(filename.c_str(), name, true, &info);
+
+        resource = RESOURCE_MANAGER.load_texture(filename.c_str(), name, true, &info);
         material->add_flag(GRAPHICS.get_shader_flag("DIFFUSE_TEXTURE"));
         if (!resource.is_valid())
           LOG_WARNING_LN("Unable to load texture: %s", filename.c_str());
@@ -512,8 +515,8 @@ bool KumiLoader::load_materials(const char *buf, Scene *scene) {
   return true;
 }
 
-bool KumiLoader::load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene) {
-  _filename = resource->resolve_filename(filename, true);
+bool KumiLoader::load(const char *filename, const char *material_override, Scene **scene) {
+  _filename = filename;
   LOG_CONTEXT("%s loading %s", __FUNCTION__, _filename.c_str());
 
   if (material_override) {
@@ -559,7 +562,7 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
     }
   }
 
-  if (!resource->load_inplace(filename, 0, sizeof(_header), (void *)&_header))
+  if (!RESOURCE_MANAGER.load_inplace(filename, 0, sizeof(_header), (void *)&_header))
     return false;
   if (_header.version != FILE_VERSION) {
     LOG_ERROR_LN("Incompatible kumi file version: want: %d, got: %d", FILE_VERSION, _header.version);
@@ -568,11 +571,11 @@ bool KumiLoader::load(const char *filename, const char *material_override, Resou
 
   const int scene_data_size = _header.binary_ofs;
   vector<char> scene_data;
-  B_ERR_BOOL(resource->load_partial(filename, 0, scene_data_size, &scene_data));
+  B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, 0, scene_data_size, &scene_data));
 
   const int buffer_data_size = _header.total_size - _header.binary_ofs;
   vector<char> buffer_data;
-  B_ERR_BOOL(resource->load_partial(filename, _header.binary_ofs, buffer_data_size, &buffer_data));
+  B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, _header.binary_ofs, buffer_data_size, &buffer_data));
 
   // apply the binary fixup
   apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);

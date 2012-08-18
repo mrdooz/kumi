@@ -73,8 +73,8 @@ protected:
 
   double _frame_time;
 
-  string _app_root;
-  string _appRootFilename;
+  std::string _app_root;
+  std::string _appRootFilename;
 
   std::map<std::string, std::pair<JsonValue::JsonValuePtr, cbParamChanged>> _parameterBlocks;
 

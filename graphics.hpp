@@ -12,17 +12,12 @@ struct Io;
 class Shader;
 class Material;
 
-using std::map;
-using std::string;
-using std::vector;
-using std::pair;
-
-class DeferredContext;
-
 enum FileEvent;
 
 class Graphics {
-  friend DeferredContext;
+  friend class DeferredContext;
+  friend class PackedResourceManager;
+  friend class ResourceManager;
 public:
 
   enum BufferFlags {
@@ -121,10 +116,10 @@ public:
   GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
   GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);
 
-  GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
-  GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
-  GraphicsObjectHandle create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
-  GraphicsObjectHandle create_geometry_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const string &id);
+  GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
+  GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
+  GraphicsObjectHandle create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
+  GraphicsObjectHandle create_geometry_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
 
   GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
@@ -139,7 +134,6 @@ public:
   GraphicsObjectHandle create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name);
   GraphicsObjectHandle create_structured_buffer(const TrackedLocation &loc, int elemSize, int numElems, bool createSrv);
   GraphicsObjectHandle create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, const char *name);
-  GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle get_texture(const char *filename);
 
   bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
@@ -216,26 +210,30 @@ private:
 
   void fill_system_resource_views(const ResourceViewArray &props, TextureArray *out) const;
 
+  GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
+  GraphicsObjectHandle load_texture_from_memory(const void *buf, size_t len, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
+
+
   // resources
   enum { IdCount = 1 << GraphicsObjectHandle::cIdBits };
-  SearchableIdBuffer<string, ID3D11VertexShader *, IdCount> _vertex_shaders;
-  SearchableIdBuffer<string, ID3D11PixelShader *, IdCount> _pixel_shaders;
-  SearchableIdBuffer<string, ID3D11ComputeShader *, IdCount> _compute_shaders;
-  SearchableIdBuffer<string, ID3D11GeometryShader *, IdCount> _geometry_shaders;
+  SearchableIdBuffer<std::string, ID3D11VertexShader *, IdCount> _vertex_shaders;
+  SearchableIdBuffer<std::string, ID3D11PixelShader *, IdCount> _pixel_shaders;
+  SearchableIdBuffer<std::string, ID3D11ComputeShader *, IdCount> _compute_shaders;
+  SearchableIdBuffer<std::string, ID3D11GeometryShader *, IdCount> _geometry_shaders;
   IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
-  SearchableIdBuffer<string, Technique *, IdCount> _techniques;
+  SearchableIdBuffer<std::string, Technique *, IdCount> _techniques;
   IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
 
   IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
   IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
   IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
   IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
-  SearchableIdBuffer<string, ID3D11SamplerState *, IdCount> _sampler_states;
-  SearchableIdBuffer<string, TextureResource *, IdCount> _textures;
-  SearchableIdBuffer<string, RenderTargetResource *, IdCount> _render_targets;
-  SearchableIdBuffer<string, SimpleResource *, IdCount> _resources;
+  SearchableIdBuffer<std::string, ID3D11SamplerState *, IdCount> _sampler_states;
+  SearchableIdBuffer<std::string, TextureResource *, IdCount> _textures;
+  SearchableIdBuffer<std::string, RenderTargetResource *, IdCount> _render_targets;
+  SearchableIdBuffer<std::string, SimpleResource *, IdCount> _resources;
   IdBuffer<StructuredBuffer *, IdCount> _structured_buffers;
 
   static Graphics* _instance;
@@ -268,7 +266,7 @@ private:
 
   CComPtr<ID3D11ClassLinkage> _class_linkage;
 
-  std::map<string, vector<string> > _techniques_by_file;
+  std::map<std::string, std::vector<std::string> > _techniques_by_file;
 
   const char *_vs_profile;
   const char *_ps_profile;

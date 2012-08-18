@@ -2,7 +2,7 @@
 #include "particle_test.hpp"
 #include "../logger.hpp"
 #include "../kumi_loader.hpp"
-#include "../resource_manager.hpp"
+#include "../resource_interface.hpp"
 #include "../scene.hpp"
 #include "../threading.hpp"
 #include "../mesh.hpp"
@@ -163,8 +163,7 @@ bool ParticleTest::init() {
   _compose_technique = GRAPHICS.find_technique("compose");
   _coalesce = GRAPHICS.find_technique("coalesce");
 
-  string t = RESOURCE_MANAGER.resolve_filename("gfx/particle3.png", true);
-  _particle_texture = GRAPHICS.load_texture(t.c_str(), "", false, nullptr);
+  _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "", false, nullptr);
 
   _cs_blur_x = GRAPHICS.find_technique("hblur");
   _cs_blur_y = GRAPHICS.find_technique("vblur");

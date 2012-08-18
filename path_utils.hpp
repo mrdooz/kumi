@@ -1,33 +1,31 @@
 #ifndef _PATH_UTILS_HPP_
 #define _PATH_UTILS_HPP_
 
-using std::string;
-
 class Path
 {
 public:
   Path();
-  Path(const string& str);
-  void init(const string &str);
-  Path replace_extension(const string& ext);
-  const string& str() const;
-  string get_path() const;
-  string get_ext() const;
-  string get_filename() const;
-  string get_filename_without_ext() const;
+  Path(const std::string& str);
+  void init(const std::string &str);
+  Path replace_extension(const std::string& ext);
+  const std::string& str() const;
+  std::string get_path() const;
+  std::string get_ext() const;
+  std::string get_filename() const;
+  std::string get_filename_without_ext() const;
 
-  static string make_canonical(const string &str);
-  static string get_full_path_name(const char *p);
-  static string replace_extension(const string& path, const string& ext);
-  static string get_path(const string& p);
-  static string get_ext(const string &p);
+  static std::string make_canonical(const std::string &str);
+  static std::string get_full_path_name(const char *p);
+  static std::string replace_extension(const std::string& path, const std::string& ext);
+  static std::string get_path(const std::string& p);
+  static std::string get_ext(const std::string &p);
 
   static bool is_absolute(const std::string &path);
 
   static std::string concat(const std::string &prefix, const std::string &suffix);
 
 private:
-  string _str;
+  std::string _str;
   int _finalSlashPos;     // points to the last '/'
   int _extPos;            // points to the '.'
 };

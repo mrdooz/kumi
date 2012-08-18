@@ -122,16 +122,17 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;DISTRIBUTION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalOptions>/Zm250 %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
       <OpenMPSupport>true</OpenMPSupport>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -161,14 +162,19 @@
     </ClCompile>
     <ClCompile Include="..\kumi_loader.cpp" />
     <ClCompile Include="..\logger.cpp" />
+    <ClCompile Include="..\lz4\lz4.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Distribution|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\material.cpp" />
     <ClCompile Include="..\material_manager.cpp" />
     <ClCompile Include="..\mesh.cpp" />
+    <ClCompile Include="..\packed_resource_manager.cpp" />
     <ClCompile Include="..\path_utils.cpp" />
     <ClCompile Include="..\profiler.cpp" />
     <ClCompile Include="..\property.cpp" />
     <ClCompile Include="..\property_manager.cpp" />
-    <ClCompile Include="..\resource_interface.cpp" />
     <ClCompile Include="..\resource_manager.cpp" />
     <ClCompile Include="..\scene.cpp" />
     <ClCompile Include="..\sha1.c">
@@ -220,9 +226,11 @@
     <ClInclude Include="..\kumi.hpp" />
     <ClInclude Include="..\kumi_loader.hpp" />
     <ClInclude Include="..\logger.hpp" />
+    <ClInclude Include="..\lz4\lz4.h" />
     <ClInclude Include="..\material.hpp" />
     <ClInclude Include="..\material_manager.hpp" />
     <ClInclude Include="..\mesh.hpp" />
+    <ClInclude Include="..\packed_resource_manager.hpp" />
     <ClInclude Include="..\path_utils.hpp" />
     <ClInclude Include="..\profiler.hpp" />
     <ClInclude Include="..\property.hpp" />

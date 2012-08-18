@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "string_utils.hpp"
 
+using namespace std;
+
 string to_string(char const * const format, ... ) 
 {
 	va_list arg;

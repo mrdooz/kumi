@@ -83,14 +83,10 @@ private:
 #define LOG_FATAL(fmt, ...) LOGGER.debug_output(false, false, __FILE__, __LINE__, Logger::Fatal, fmt, __VA_ARGS__ );
 #define LOG_FATAL_LN(fmt, ...) LOGGER.debug_output(true, false, __FILE__, __LINE__, Logger::Fatal, fmt, __VA_ARGS__ );
 
-using std::set;
-using std::map;
-using std::string;
+bool check_bool(bool value, const char *exp, std::string *out);
+bool check_hr(HRESULT hr, const char *exp, std::string *out);
 
-bool check_bool(bool value, const char *exp, string *out);
-bool check_hr(HRESULT hr, const char *exp, string *out);
-
-#define LOG_INNER(x, chk, sev, ok) decltype((x)) res__ = (x); string err; if (!(ok = chk(res__, #x, &err))) sev(err.c_str());
+#define LOG_INNER(x, chk, sev, ok) decltype((x)) res__ = (x); std::string err; if (!(ok = chk(res__, #x, &err))) sev(err.c_str());
 #define LOG(x, chk, sev) { bool ok; LOG_INNER(x, chk, sev, ok) }
 #define RET(x, chk, sev) { bool ok; LOG_INNER(x, chk, sev, ok); if (!ok) return res; }
 

@@ -111,15 +111,18 @@ args = parser.parse_args()
 
 tmpdir = tempfile.gettempdir()
 
+# input files consist of a tab-separated tuple (given-file resolved-file)
 input_files = [x.strip() for x in open(args.input_file).readlines()]
+given_files = [x.split('\t')[0] for x in input_files]
+resolved_files = [x.split('\t')[1] for x in input_files]
 num_files = len(input_files)
-(G, V) = CreateMinimalPerfectHash(dict(zip(input_files, [x for x in range(num_files)])))
+(G, V) = CreateMinimalPerfectHash(dict(zip(given_files, [x for x in range(num_files)])))
 
 g = array.array('i', G)
 v = array.array('i', V)
 
 header_format = 'i i'   # header_size num_files
-file_header = 'i i i' # offset compressed_size original_size
+file_header = 'i i i'   # offset compressed_size original_size
 header_size = struct.calcsize(header_format) + len(g) + len(v) + \
     struct.calcsize(file_header) * num_files
 
@@ -133,16 +136,16 @@ file_offset = 0
 org_size, final_size = 0, 0
 
 # compress each file
-for src in input_files:
+for src in resolved_files:
     (head, tail) = os.path.split(src)
-    src_size = os.path.getsize(src)
 
     # strip all the unimportant cruft from .h files
     if tail.endswith('.h'):
         src = strip_header_file(src)
 
     dst = os.path.join(tmpdir, tail + '.lz4')
-    subprocess.call(['lz4', '-c2', src, dst])
+    subprocess.call(['lz4compr', src, dst])
+    src_size = os.path.getsize(src)
     dst_size = os.path.getsize(dst)
     
     org_size += src_size
@@ -159,8 +162,8 @@ for f in files:
 for f in files:
     out_file.write(open(f.output_file, 'rb').read())
 
-for f in files:
-    os.remove(f.output_file)
+#for f in files:
+#    os.remove(f.output_file)
 
 print "tmp dir:", tmpdir
 print "org size: ", org_size, "final size: ", final_size

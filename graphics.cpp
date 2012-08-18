@@ -324,20 +324,12 @@ GraphicsObjectHandle Graphics::get_texture(const char *filename) {
 
 GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info) {
 
-  if (info) {
-    HRESULT hr;
-    D3DX11GetImageInfoFromFile(filename, NULL, info, &hr);
-    if (FAILED(hr))
-      return emptyGoh;
-  }
-  RESOURCE_MANAGER.add_external_file(filename);
-
-  auto *data = new SimpleResource();
-  HRESULT hr;
-  D3DX11CreateTextureFromFile(_device, filename, NULL, NULL, &data->resource, &hr);
-  if (FAILED(hr)) {
+  if (info && FAILED(D3DX11GetImageInfoFromFile(filename, NULL, info, NULL)))
     return emptyGoh;
-  }
+
+  auto data = unique_ptr<SimpleResource>(new SimpleResource());
+  if (FAILED(D3DX11CreateTextureFromFile(_device, filename, NULL, NULL, &data->resource, NULL)))
+    return emptyGoh;
 
   // TODO: allow for srgb loading
   auto fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -349,7 +341,31 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
   if (idx != -1 || (idx = _resources.find_free_index()) != -1) {
     if (_resources[idx])
       _resources[idx]->reset();
-    _resources.set_pair(idx, make_pair(friendly_name, data));
+    _resources.set_pair(idx, make_pair(friendly_name, data.release()));
+  }
+  return make_goh(GraphicsObjectHandle::kResource, idx);
+}
+
+GraphicsObjectHandle Graphics::load_texture_from_memory(const void *buf, size_t len, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info) {
+
+  if (info && FAILED(D3DX11GetImageInfoFromMemory(buf, len, NULL, info, NULL)))
+    return emptyGoh;
+
+  auto data = unique_ptr<SimpleResource>(new SimpleResource());
+  if (FAILED(D3DX11CreateTextureFromMemory(_device, buf, len, NULL, NULL, &data->resource, NULL)))
+    return emptyGoh;
+
+  // TODO: allow for srgb loading
+  auto fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
+  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, fmt);
+  if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->view.resource)))
+    return emptyGoh;
+
+  int idx = _resources.idx_from_token(friendly_name);
+  if (idx != -1 || (idx = _resources.find_free_index()) != -1) {
+    if (_resources[idx])
+      _resources[idx]->reset();
+    _resources.set_pair(idx, make_pair(friendly_name, data.release()));
   }
   return make_goh(GraphicsObjectHandle::kResource, idx);
 }
@@ -867,10 +883,14 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
 
     auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
     if (Shader *vs = t->vertex_shader(0)) {
+#if WITH_UNPACKED_RESOUCES
       RESOURCE_MANAGER.add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
+#endif
     }
     if (Shader *ps = t->pixel_shader(0)) {
+#if WITH_UNPACKED_RESOUCES
       RESOURCE_MANAGER.add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
+#endif
     }
 
     int idx = _techniques.idx_from_token(t->name());
@@ -883,8 +903,9 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
     }
   }
 
-  RESOURCE_MANAGER.add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), 
-    false, nullptr, -1);
+#if WITH_UNPACKED_RESOUCES
+  RESOURCE_MANAGER.add_file_watch(filename, NULL, bind(&Graphics::technique_file_changed, this, _1, _2), false, nullptr, -1);
+#endif
 
   return res;
 }

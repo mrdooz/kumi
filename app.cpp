@@ -9,7 +9,7 @@
 #include "kumi_loader.hpp"
 #include "scene.hpp"
 #include "property_manager.hpp"
-#include "resource_manager.hpp"
+#include "resource_interface.hpp"
 #include "material_manager.hpp"
 #include "threading.hpp"
 #include "kumi.hpp"
@@ -23,7 +23,7 @@
 
 #pragma comment(lib, "psapi.lib")
 
-using std::swap;
+using namespace std;
 using namespace threading;
 
 App* App::_instance = nullptr;
@@ -64,8 +64,15 @@ App& App::instance()
 
 bool App::init(HINSTANCE hinstance)
 {
+  if (_appRootFilename.empty()) {
+    MessageBoxA(0, "Unable to find resource.dat", "Error", MB_ICONEXCLAMATION);
+    return false;
+  }
+
   LOGGER.
+#if WITH_UNPACKED_RESOURCES
     open_output_file(_T("kumi.log")).
+#endif
     break_on_error(true);
 
   _hinstance = hinstance;
@@ -74,7 +81,11 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(ProfileManager::create());
   B_ERR_BOOL(PropertyManager::create());
+#if WITH_UNPACKED_RESOUCES
   B_ERR_BOOL(ResourceManager::create("resources.log"));
+#else
+  B_ERR_BOOL(PackedResourceManager::create("resources.dat"));
+#endif
   B_ERR_BOOL(Graphics::create());
   B_ERR_BOOL(MaterialManager::create());
   B_ERR_BOOL(DemoEngine::create());
@@ -85,16 +96,13 @@ bool App::init(HINSTANCE hinstance)
 
   B_ERR_BOOL(create_window());
 
+#if WITH_UNPACKED_RESOUCES
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
   RESOURCE_MANAGER.add_path("c:\\users\\dooz\\SkyDrive");
   RESOURCE_MANAGER.add_path("C:\\Users\\dooz\\Dropbox");
   RESOURCE_MANAGER.add_path("D:\\Dropbox");
+#endif
 
-/*
-  if (!GRAPHICS.load_techniques("effects/cef.tec", true)) {
-    // log error
-  }
-*/
   //VolumetricEffect *effect = new VolumetricEffect(GraphicsObjectHandle(), "simple effect");
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
@@ -115,11 +123,17 @@ bool App::close() {
 #if WITH_WEBSOCKETS
   B_ERR_BOOL(WebSocketServer::close());
 #endif
+#if WITH_UNPACKED_RESOUCES
   B_ERR_BOOL(FileWatcher::close());
+#endif
   B_ERR_BOOL(DemoEngine::close());
   B_ERR_BOOL(Graphics::close());
   B_ERR_BOOL(MaterialManager::close());
+#if WITH_UNPACKED_RESOUCES
   B_ERR_BOOL(ResourceManager::close());
+#else
+  B_ERR_BOOL(PackedResourceManager::close());
+#endif
   B_ERR_BOOL(PropertyManager::close());
   B_ERR_BOOL(ProfileManager::close());
 
@@ -328,7 +342,7 @@ void App::load_settings() {
     return;
 
   vector<char> appRoot;
-  if (!load_file(_appRootFilename.c_str(), &appRoot))
+  if (!RESOURCE_MANAGER.load_file(_appRootFilename.c_str(), &appRoot))
     return;
 
   auto appSettings = parse_json(appRoot.data(), appRoot.data() + appRoot.size());
@@ -359,7 +373,7 @@ void App::save_settings() {
     return;
 
   vector<char> appRoot;
-  if (!load_file(_appRootFilename.c_str(), &appRoot))
+  if (!RESOURCE_MANAGER.load_file(_appRootFilename.c_str(), &appRoot))
     return;
 
   auto appSettings = parse_json(appRoot.data(), appRoot.data() + appRoot.size());
@@ -442,7 +456,9 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
       case 'S':
         if (is_bit_set(GetKeyState(VK_CONTROL), 15)) {
+#if WITH_UNPACKED_RESOUCES
           APP.save_settings();
+#endif
           return 0;
         }
         break;
@@ -515,11 +531,13 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 void App::find_app_root()
 {
+  char starting_dir[MAX_PATH];
+  _getcwd(starting_dir, MAX_PATH);
+
   // keep going up directory levels until we find "app.json", or we hit the bottom..
-  char starting_dir[MAX_PATH], prev_dir[MAX_PATH], cur_dir[MAX_PATH];
+  char prev_dir[MAX_PATH], cur_dir[MAX_PATH];
   ZeroMemory(prev_dir, sizeof(prev_dir));
 
-  _getcwd(starting_dir, MAX_PATH);
   while (true) {
     _getcwd(cur_dir, MAX_PATH);
     // check if we haven't moved
@@ -528,11 +546,19 @@ void App::find_app_root()
 
     memcpy(prev_dir, cur_dir, MAX_PATH);
 
+#if WITH_UNPACKED_RESOUCES
     if (file_exists("app.json")) {
       _app_root = cur_dir;
-      _appRootFilename = _app_root + "/app.json";
+      _appRootFilename = "app.json";
       return;
     }
+#else
+    if (file_exists("resources.dat")) {
+      _app_root = cur_dir;
+      _appRootFilename = "app.json";
+      return;
+    }
+#endif
     if (_chdir("..") == -1)
       break;
   }
@@ -540,7 +566,6 @@ void App::find_app_root()
 }
 
 void App::add_parameter_block(const TweakableParameterBlock &paramBlock, bool initialCallback, const cbParamChanged &onChanged) {
-
   // create a json rep for the parameter block
   auto root = JsonValue::create_object();
   auto block = JsonValue::create_object();

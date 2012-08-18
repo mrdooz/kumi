@@ -1,4 +1,7 @@
 #include "stdafx.h"
+
+#if WITH_UNPACKED_RESOUCES
+
 #include "utils.hpp"
 #include "file_utils.hpp"
 #include "resource_manager.hpp"
@@ -6,6 +9,7 @@
 #include "threading.hpp"
 #include "logger.hpp"
 #include "path_utils.hpp"
+#include "graphics.hpp"
 
 using namespace std::tr1::placeholders;
 using namespace std;
@@ -33,6 +37,24 @@ static string normalize_path(const std::string &path, bool add_trailing_slash) {
   return res;
 }
 
+static ResourceManager *g_instance;
+
+ResourceManager &ResourceManager::instance() {
+  KASSERT(g_instance);
+  return *g_instance;
+}
+
+bool ResourceManager::create(const char *outputFilename) {
+  KASSERT(!g_instance);
+  g_instance = new ResourceManager(outputFilename);
+  return true;
+}
+
+bool ResourceManager::close() {
+  delete exch_null(g_instance);
+  return true;
+}
+
 ResourceManager::ResourceManager(const char *outputFilename) 
   : _outputFilename(outputFilename)
 {
@@ -43,16 +65,11 @@ ResourceManager::~ResourceManager() {
   if (!_outputFilename.empty()) {
     FILE *f = fopen(_outputFilename.c_str(), "wt");
     for (auto it = begin(_readFiles); it != end(_readFiles); ++it) {
-      fprintf(f, "%s\n", it->c_str());
+      fprintf(f, "%s\t%s\n", it->orgName.c_str(), it->resolvedName.c_str());
     }
     fclose(f);
   }
 }
-
-void ResourceManager::add_external_file(const std::string &filename) {
-  _readFiles.insert(filename);
-}
-
 
 void ResourceManager::add_path(const std::string &path) {
   _paths.push_back(normalize_path(path, true));
@@ -61,7 +78,7 @@ void ResourceManager::add_path(const std::string &path) {
 bool ResourceManager::load_file(const char *filename, std::vector<char> *buf) {
   const string &full_path = resolve_filename(filename, true);
   if (full_path.empty()) return false;
-  _readFiles.insert(full_path);
+  _readFiles.insert(FileInfo(filename, full_path));
 
   return ::load_file(full_path.c_str(), buf);
 }
@@ -73,7 +90,7 @@ bool ResourceManager::load_partial(const char *filename, size_t ofs, size_t len,
 
 bool ResourceManager::load_inplace(const char *filename, size_t ofs, size_t len, void *buf) {
   const string &full_path = resolve_filename(filename, true);
-  _readFiles.insert(full_path);
+  _readFiles.insert(FileInfo(filename, full_path));
 
   ScopedHandle h(CreateFileA(full_path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 
     FILE_ATTRIBUTE_NORMAL, NULL));
@@ -187,3 +204,12 @@ void ResourceManager::file_changed(int timeout, void *token, FileWatcher::FileEv
   DISPATCHER.invoke_in(FROM_HERE, threading::kMainThread, timeout,
     bind(&ResourceManager::deferred_file_changed, this, token, event, old_name, new_name));
 }
+
+GraphicsObjectHandle ResourceManager::load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info) {
+  string fullPath = resolve_filename(filename, true);
+  _readFiles.insert(FileInfo(filename, fullPath));
+
+  return GRAPHICS.load_texture(fullPath.c_str(), friendly_name, srgb, info);
+}
+
+#endif

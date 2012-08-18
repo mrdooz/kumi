@@ -10,7 +10,7 @@ class BitReader;
 
 class KumiLoader {
 public:
-  bool load(const char *filename, const char *material_override, ResourceInterface *resource, Scene **scene);
+  bool load(const char *filename, const char *material_override, Scene **scene);
 private:
 
 #pragma pack(push, 1)
@@ -47,5 +47,5 @@ private:
 
   MainHeader _header;
   std::map<std::string, std::pair<std::string, std::string> > _material_overrides;
-  string _filename;
+  std::string _filename;
 };

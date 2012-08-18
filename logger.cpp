@@ -6,7 +6,7 @@
 
 #pragma comment(lib, "dxerr.lib")
 
-static const char *g_client_addr = "tcp://127.0.0.1:5555";
+using namespace std;
 
 bool check_bool(bool value, const char *exp, string *out) {
   *out = exp;
@@ -70,7 +70,7 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
 
   if ((_output_device & Logger::Debugger) && severity_map_[Logger::Debugger][severity])
     OutputDebugStringA(str.c_str());
-
+#if WITH_LOGGER
   if (_output_device & File) {
     if (_file == INVALID_HANDLE_VALUE) {
       // no output file has been specified, so we use the current module as name
@@ -80,6 +80,7 @@ void Logger::debug_output(bool new_line, bool one_shot, const char *file, int li
       open_output_file(ansi_to_host(Path::replace_extension(module, "log").c_str()).c_str());
     }
   }
+#endif
 
   if (_file != INVALID_HANDLE_VALUE && (_output_device & Logger::File) && severity_map_[Logger::File][severity]) {
     DWORD bytes_written;

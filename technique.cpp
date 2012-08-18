@@ -187,9 +187,11 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
   string src = outputPath.get_path() + shader_template->_source_filename;
   const char *ep = shader_template->_entry_point.c_str();
   string basePath = outputPath.get_path() + "obj/" ;
+#if WITH_UNPACKED_RESOUCES
   string outputDir = stripTrailingSlash(basePath);
   if (!directory_exists(outputDir.c_str()))
     CreateDirectoryA(outputDir.c_str(), 0);
+#endif
 
   string output_base = basePath + Path(shader_template->_obj_filename).get_filename_without_ext();
   string output_ext = Path::get_ext(shader_template->_obj_filename);
@@ -222,6 +224,8 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
     auto &cur = shaders[i];
     const char *obj = cur.obj.c_str();
+
+#if WITH_UNPACKED_RESOUCES
     // compile the shader if the source is newer, or the object file doesn't exist
     if (force || RESOURCE_MANAGER.file_exists(src.c_str()) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src.c_str()) > RESOURCE_MANAGER.mdate(obj))) {
       if (!compile_shader(type, ep, src.c_str(), obj, cur.flags))
@@ -234,6 +238,10 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
     vector<char> buf;
     if (!RESOURCE_MANAGER.load_file(obj, &buf))
       return false;
+#else
+    vector<char> buf;
+    RESOURCE_MANAGER.load_file(obj, &buf);
+#endif
 
     int len = (int)buf.size();
 
