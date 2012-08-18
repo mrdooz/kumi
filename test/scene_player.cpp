@@ -105,7 +105,7 @@ bool ScenePlayer::init() {
   _copy_uav = GRAPHICS.find_technique("copy_uav");
 
   _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
-  _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, "rt_final");
+  _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, DXGI_FORMAT_R32G32B32A32_FLOAT, Graphics::kCreateSrv, "rt_final");
 
   //string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
 
@@ -336,18 +336,18 @@ bool ScenePlayer::render() {
       return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, fmt, bufferFlags, name);
     };
 
-    auto rt_pos = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateDepthBuffer, "System::rt_pos");
-    auto rt_normal = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_normal");
-    auto rt_diffuse = tmp_rt(DXGI_FORMAT_R8G8B8A8_UNORM, 0, "System::rt_diffuse");
-    auto rt_specular = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_specular");
+    auto rt_pos = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "System::rt_pos");
+    auto rt_normal = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_normal");
+    auto rt_diffuse = tmp_rt(DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "System::rt_diffuse");
+    auto rt_specular = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_specular");
 
-    auto rt_composite = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_composite");
-    auto rt_blur = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, 0, "System::rt_blur");
+    auto rt_composite = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_composite");
+    auto rt_blur = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_blur");
 
-    auto rt_occlusion = tmp_rt(DXGI_FORMAT_R16_FLOAT, 0, "System::rt_occlusion");
-    auto rt_occlusion_tmp = tmp_rt(DXGI_FORMAT_R16_FLOAT, 0, "System::rt_occlusion_tmp");
+    auto rt_occlusion = tmp_rt(DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion");
+    auto rt_occlusion_tmp = tmp_rt(DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion_tmp");
 
-    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateMipMaps, "System::rt_luminance");
+    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateMipMaps | Graphics::kCreateSrv, "System::rt_luminance");
 
     {
       ADD_NAMED_PROFILE_SCOPE("render_meshes");

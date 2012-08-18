@@ -255,12 +255,17 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 
     // load corresponding .h file
     vector<char> text;
-    if (!RESOURCE_MANAGER.load_file(Path::replace_extension(obj, "h").c_str(), &text))
+    string headerFile = Path::replace_extension(obj, "h");
+    if (!RESOURCE_MANAGER.load_file(headerFile.c_str(), &text)) {
+      add_error_msg("Unable to load .h file: %s", headerFile.c_str());
       return false;
+    }
 
     ShaderReflection ref;
-    if (!ref.do_reflection(text.data(), text.size(), shader, shader_template, buf))
+    if (!ref.do_reflection(text.data(), text.size(), shader, shader_template, buf)) {
+      add_error_msg("Reflection failed");
       return false;
+    }
 
     switch (shader->type()) {
 
@@ -306,9 +311,9 @@ bool Technique::init() {
   ShaderTemplate *templates[] = { 
     _vs_shader_template.get(), _ps_shader_template.get(), _cs_shader_template.get(), _gs_shader_template.get() };
   for (int i = 0; i < ELEMS_IN_ARRAY(templates); ++i) {
-    if (templates[i]) {
-      if (!create_shaders(templates[i]))
-        return false;
+    if (templates[i] && !create_shaders(templates[i])) {
+      add_error_msg("Error creating shader: %s", templates[i]->_source_filename.c_str());
+      return false;
     }
   }
 
