@@ -147,6 +147,9 @@
     <ClCompile Include="..\lz4\lz4.c">
       <Filter>lz4</Filter>
     </ClCompile>
+    <ClCompile Include="..\gaussian_blur.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -298,6 +301,9 @@
     </ClInclude>
     <ClInclude Include="..\lz4\lz4.h">
       <Filter>lz4</Filter>
+    </ClInclude>
+    <ClInclude Include="..\gaussian_blur.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

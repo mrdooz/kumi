@@ -2,6 +2,7 @@
 #define _DX_UTILS_HPP_
 
 #include "logger.hpp"
+#include "graphics_object_handle.hpp"
 
 struct CD3D11_INPUT_ELEMENT_DESC : public D3D11_INPUT_ELEMENT_DESC
 {
@@ -45,5 +46,14 @@ inline int index_format_to_size(DXGI_FORMAT fmt) {
 	LOG_WARNING("unknown index format");
 	return 0;
 }
+
+class ScopedRt {
+public:
+  ScopedRt(int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name);
+  ~ScopedRt();
+  operator GraphicsObjectHandle();
+private:
+  GraphicsObjectHandle _handle;
+};
 
 #endif

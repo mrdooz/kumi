@@ -3,6 +3,7 @@
 #include "../effect.hpp"
 #include "../property_manager.hpp"
 #include "../camera.hpp"
+#include "../gaussian_blur.hpp"
 
 struct Scene;
 class DeferredContext;
@@ -60,6 +61,8 @@ private:
 
   GraphicsObjectHandle _blur_sbuffer;
   GraphicsObjectHandle _rt_final;
+
+  GaussianBlur _blur;
 
   PropertyId _kernel_id, _noise_id, _ambient_id;
 

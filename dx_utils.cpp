@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "dx_utils.hpp"
 #include "vertex_types.hpp"
+#include "graphics.hpp"
 
 void screen_to_clip(float x, float y, float w, float h, float *ox, float *oy)
 {
@@ -60,3 +61,15 @@ void make_quad_clip_space_unindexed(float *x, float *y, float *tx, float *ty, in
 
 }
 
+
+ScopedRt::ScopedRt(int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) {
+  _handle = GRAPHICS.get_temp_render_target(FROM_HERE, width, height, format, bufferFlags, name);
+}
+
+ScopedRt::~ScopedRt() {
+  GRAPHICS.release_temp_render_target(_handle);
+}
+
+ScopedRt::operator GraphicsObjectHandle() {
+  return _handle;
+}

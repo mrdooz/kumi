@@ -15,6 +15,7 @@
 #include "../deferred_context.hpp"
 #include "../animation_manager.hpp"
 #include "../app.hpp"
+#include "../dx_utils.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -86,6 +87,8 @@ bool ScenePlayer::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/ssao.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/luminance.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/blur.tec", true));
+
+  B_ERR_BOOL(_blur.init());
 
   _ssao_fill = GRAPHICS.find_technique("ssao_fill");
   _ssao_ambient = GRAPHICS.find_technique("ssao_ambient");
@@ -403,10 +406,10 @@ bool ScenePlayer::render() {
     _ctx->generate_mips(rt_luminance);
 
     auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, fmt, 0, "downscale1");
-    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, fmt, 0, "downscale2");
-    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, 0, "downscale3");
-    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, 0, "blur_tmp");
+    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, fmt, Graphics::kCreateSrv, "downscale1");
+    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, fmt, Graphics::kCreateSrv, "downscale2");
+    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, Graphics::kCreateSrv, "downscale3");
+    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, Graphics::kCreateSrv, "blur_tmp");
 
     // scale down
     post_process(rt_composite, downscale1, _scale_cutoff);
@@ -423,88 +426,24 @@ bool ScenePlayer::render() {
     post_process(downscale3, downscale2, _scale);
     post_process(downscale2, downscale1, _scale);
 
-    auto rt_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w, h, fmt, 0, "rt_tmp");
-
+    ScopedRt rt_tmp(w, h, fmt, Graphics::kCreateSrv | Graphics::kCreateSrv, "rt_tmp");
     post_process(rt_composite, rt_tmp, _scale);
 
-    struct blurSettings {
-      int imageW, imageH;
-      float blurRadius[2];
-    } settings = { w, h, _blurX, _blurX };
+    ScopedRt rt_tmpa(w, h, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpa");
+    ScopedRt rt_tmpb(w, h, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpb");
 
-    int threadsPerGroup = 64;
-
-    for (int i = 0; i < 3; ++i) {
-      {
-        // blur x
-        Technique *technique = GRAPHICS.get_technique(_cs_blur_x);
-        Shader *cs = technique->compute_shader(0);
-
-        _ctx->set_cs(cs->handle());
-        TextureArray arr = { rt_tmp };
-        _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
-
-        TextureArray uav = { _blur_sbuffer };
-        _ctx->set_uavs(uav);
-        auto handle = cs->find_cbuffer("blurSettings");
-        _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-        _ctx->dispatch((h + threadsPerGroup-1) / threadsPerGroup, 1, 1);
-
-        _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
-        _ctx->unset_uavs(0, 1);
-      }
-
-      {
-        // copy the UAV to a texture
-        Technique *technique = GRAPHICS.get_technique(_copy_uav);
-        Shader *ps = technique->pixel_shader(0);
-        auto handle = ps->find_cbuffer("blurSettings");
-        _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
-        post_process(_blur_sbuffer, rt_tmp, _copy_uav);
-      }
-
-      {
-        // blur y
-        Technique *technique = GRAPHICS.get_technique(_cs_blur_y);
-        Shader *cs = technique->compute_shader(0);
-
-        _ctx->set_cs(cs->handle());
-        TextureArray arr = { rt_tmp };
-        _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
-
-        TextureArray uav = { _blur_sbuffer };
-        _ctx->set_uavs(uav);
-        auto handle = cs->find_cbuffer("blurSettings");
-        _ctx->set_cbuffer(handle, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-        _ctx->dispatch((w + threadsPerGroup-1) / threadsPerGroup, 1, 1);
-
-        _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
-        _ctx->unset_uavs(0, 1);
-      }
-
-      {
-        // copy the UAV to a texture
-        Technique *technique = GRAPHICS.get_technique(_copy_uav);
-        Shader *ps = technique->pixel_shader(0);
-        auto handle = ps->find_cbuffer("blurSettings");
-        _ctx->set_cbuffer(handle, 0, ShaderType::kPixelShader, &settings, sizeof(settings));
-        post_process(_blur_sbuffer, rt_tmp, _copy_uav);
-      }
-
-    }
+    _blur.do_blur(_blurX, rt_tmp, rt_tmpa, rt_tmpb, w, h, _ctx);
 
     //post_process(rt_tmp, GraphicsObjectHandle(), _scale);
 
     {
       // gamma correction
       _ctx->set_default_render_target();
-      TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmp, rt_pos };
+      TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmpb, rt_pos };
       _ctx->render_technique(_gamma_correct, 
         bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
     }
 
-
-    GRAPHICS.release_temp_render_target(rt_tmp);
 
     GRAPHICS.release_temp_render_target(blur_tmp);
     GRAPHICS.release_temp_render_target(downscale3);

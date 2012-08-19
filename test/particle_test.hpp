@@ -3,6 +3,7 @@
 #include "../effect.hpp"
 #include "../property.hpp"
 #include "../camera.hpp"
+#include "../gaussian_blur.hpp"
 
 struct Scene;
 class DeferredContext;
@@ -22,7 +23,6 @@ private:
 
   void renderParticles();
 
-  void do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture, GraphicsObjectHandle outputTexture2, int width, int height);
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 
   bool file_changed(const char *filename, void *token);
@@ -39,9 +39,9 @@ private:
   GraphicsObjectHandle _compose_technique;
   GraphicsObjectHandle _coalesce;
 
-  GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
-  GraphicsObjectHandle _copy_uav;
   GraphicsObjectHandle _scale;
+  
+  GaussianBlur _blur;
 
   float _blurX, _blurY;
 

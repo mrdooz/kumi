@@ -16,6 +16,7 @@
 #include "../animation_manager.hpp"
 #include "../app.hpp"
 #include "../bit_utils.hpp"
+#include "../dx_utils.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -156,7 +157,6 @@ bool ParticleTest::init() {
   int h = GRAPHICS.height();
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/particles.tec", true));
-  B_ERR_BOOL(GRAPHICS.load_techniques("effects/blur.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/scale.tec", true));
   _particle_technique = GRAPHICS.find_technique("particles");
   _gradient_technique = GRAPHICS.find_technique("gradient");
@@ -165,13 +165,13 @@ bool ParticleTest::init() {
 
   _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "", false, nullptr);
 
-  _cs_blur_x = GRAPHICS.find_technique("hblur");
-  _cs_blur_y = GRAPHICS.find_technique("vblur");
-  _copy_uav = GRAPHICS.find_technique("copy_uav");
-
   _scale = GRAPHICS.find_technique("scale");
 
   _ctx = GRAPHICS.create_deferred_context(true);
+
+  if (!_blur.init()) {
+    return false;
+  }
 
   _freefly_camera.pos.z = -50;
 
@@ -300,95 +300,6 @@ void ParticleTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle
     _ctx->unset_render_targets(0, 1);
 }
 
-void ParticleTest::do_blur(GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture, GraphicsObjectHandle outputTexture2,
-                           int width, int height) {
-
-  struct blurSettings {
-    int dstWidth, dstHeight;
-    float radius;
-  } settings = { width, height, _blurX };
-
-  int threadsPerGroup = 64;
-
-  Technique *techniqueX = GRAPHICS.get_technique(_cs_blur_x);
-  Shader *csX = techniqueX->compute_shader(0);
-  auto cbufferX = csX->find_cbuffer("blurSettings");
-
-  Technique *techniqueY = GRAPHICS.get_technique(_cs_blur_y);
-  Shader *csY = techniqueY->compute_shader(0);
-  auto cbufferY = csY->find_cbuffer("blurSettings");
-
-  Technique *copyUav = GRAPHICS.get_technique(_copy_uav);
-  Shader *psCopy = copyUav->pixel_shader(0);
-  auto cbufferCopy = psCopy->find_cbuffer("blurSettings");
-
-  GraphicsObjectHandle src = inputTexture;
-  GraphicsObjectHandle dst = outputTexture;
-
-  auto swapBuffers = [&] {
-    if (dst == outputTexture) {
-      src = outputTexture;
-      dst = outputTexture2;
-    } else {
-      src = outputTexture2;
-      dst = outputTexture;
-    }
-  };
-
-  for (int i = 0; i < 3; ++i) {
-    {
-      // blur x
-      _ctx->set_cs(csX->handle());
-      TextureArray arr = { src };
-      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
-
-      TextureArray uav = { dst };
-      _ctx->set_uavs(uav);
-
-      _ctx->set_cbuffer(cbufferX, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      _ctx->dispatch((settings.dstHeight + threadsPerGroup-1) / threadsPerGroup, 1, 1);
-
-      _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
-      _ctx->unset_uavs(0, 1);
-    }
-
-    swapBuffers();
-
-    {
-      // blur y
-      _ctx->set_cs(csY->handle());
-      TextureArray arr = { src };
-      _ctx->set_shader_resources(arr, ShaderType::kComputeShader);
-
-      TextureArray uav = { dst };
-      _ctx->set_uavs(uav);
-      _ctx->set_cbuffer(cbufferY, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      _ctx->dispatch((settings.dstWidth + threadsPerGroup-1) / threadsPerGroup, 1, 1);
-
-      _ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
-      _ctx->unset_uavs(0, 1);
-    }
-
-    swapBuffers();
-  }
-}
-
-struct ScopedRt {
-
-  ScopedRt(int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) {
-    _handle = GRAPHICS.get_temp_render_target(FROM_HERE, width, height, format, bufferFlags, name);
-  }
-
-  ~ScopedRt() {
-    GRAPHICS.release_temp_render_target(_handle);
-  }
-
-  operator GraphicsObjectHandle() {
-    return _handle;
-  }
-  GraphicsObjectHandle _handle;
-};
-
 void ParticleTest::renderParticles() {
 
   int w = GRAPHICS.width();
@@ -504,10 +415,9 @@ bool ParticleTest::render() {
   ScopedRt rtDownscaled(w/4, h/4, fmt, Graphics::kCreateSrv, "rtDownscale");
   post_process(rtCoalesce, rtDownscaled, _scale);
 
-
   ScopedRt rtBlur(w/4, h/4, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rtBlur");
   ScopedRt rtBlur2(w/4, h/4, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rtBlur2");
-  do_blur(rtDownscaled, rtBlur, rtBlur2, w/4, h/4);
+  _blur.do_blur(_blurX, rtDownscaled, rtBlur, rtBlur2, w/4, h/4, _ctx);
 
   {
     TextureArray arr = { rtCoalesce, rtBlur2, rtBackground };
