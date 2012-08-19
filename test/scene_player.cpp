@@ -434,8 +434,6 @@ bool ScenePlayer::render() {
 
     _blur.do_blur(_blurX, rt_tmp, rt_tmpa, rt_tmpb, w, h, _ctx);
 
-    //post_process(rt_tmp, GraphicsObjectHandle(), _scale);
-
     {
       // gamma correction
       _ctx->set_default_render_target();

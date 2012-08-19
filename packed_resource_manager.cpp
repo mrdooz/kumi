@@ -115,7 +115,6 @@ bool PackedResourceManager::load_partial(const char *filename, size_t ofs, size_
   buf->resize(len);
   copy(begin(tmp) + ofs, begin(tmp) + ofs + len, begin(*buf));
   return true;
-  //return load_inplace(filename, ofs, len, buf->data());
 }
 
 bool PackedResourceManager::load_inplace(const char *filename, size_t ofs, size_t len, void *buf) {

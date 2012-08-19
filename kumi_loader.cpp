@@ -37,13 +37,15 @@ static XMFLOAT4 expand_float3(const XMFLOAT3 &v, float w) {
   return XMFLOAT4(v.x, v.y, v.z, w);
 }
 
-static void apply_fixup(int *data, const void *ptr_base, const void *data_base) {
-  // the data is stored as a int count followed by #count int offsets
+static void apply_fixup(const void *data, const void *ptr_base, const void *data_base) {
+  struct FixupData {
+    int count;
+    int offsets[0];
+  } *fixup = (FixupData *)data;
   int b = (int)data_base;
   int p = (int)ptr_base;
-  const int count = *data++;
-  for (int i = 0; i < count; ++i) {
-    int ofs = *data++;
+  for (int i = 0; i < fixup->count; ++i) {
+    int ofs = fixup->offsets[i];
     *(int *)(p + ofs) += b;
   }
 }
@@ -562,32 +564,27 @@ bool KumiLoader::load(const char *filename, const char *material_override, Scene
     }
   }
 
-  if (!RESOURCE_MANAGER.load_inplace(filename, 0, sizeof(_header), (void *)&_header))
-    return false;
+  vector<char> buffer;
+  B_ERR_BOOL(RESOURCE_MANAGER.load_file(filename, &buffer));
+  _header = *(MainHeader *)buffer.data();
   if (_header.version != FILE_VERSION) {
     LOG_ERROR_LN("Incompatible kumi file version: want: %d, got: %d", FILE_VERSION, _header.version);
     return false;
   }
 
-  const int scene_data_size = _header.binary_ofs;
-  vector<char> scene_data;
-  B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, 0, scene_data_size, &scene_data));
-
-  const int buffer_data_size = _header.total_size - _header.binary_ofs;
-  vector<char> buffer_data;
-  B_ERR_BOOL(RESOURCE_MANAGER.load_partial(filename, _header.binary_ofs, buffer_data_size, &buffer_data));
-
-  // apply the binary fixup
-  apply_fixup((int *)&buffer_data[0], &scene_data[0], &buffer_data[0]);
+  // We save offsets to binary data (like strings) in the .kumi file, as well as the location of the offsets,
+  // so now we convert those offsets to real pointers into the buffer data.
+  const void *binaryData = &buffer[_header.binary_ofs];
+  apply_fixup(binaryData, buffer.data(), binaryData);
 
   Scene *s = *scene = new Scene;
 
-  B_ERR_BOOL(load_globals(&scene_data[0] + _header.global_ofs, s));
-  B_ERR_BOOL(load_materials(&scene_data[0] + _header.material_ofs, s));
-  B_ERR_BOOL(load_meshes(&scene_data[0] + _header.mesh_ofs, s));
-  B_ERR_BOOL(load_cameras(&scene_data[0] + _header.camera_ofs, s));
-  B_ERR_BOOL(load_lights(&scene_data[0] + _header.light_ofs, s));
-  B_ERR_BOOL(load_animation3(&scene_data[0] + _header.animation_ofs, s));
+  B_ERR_BOOL(load_globals(buffer.data() + _header.global_ofs, s));
+  B_ERR_BOOL(load_materials(buffer.data() + _header.material_ofs, s));
+  B_ERR_BOOL(load_meshes(buffer.data() + _header.mesh_ofs, s));
+  B_ERR_BOOL(load_cameras(buffer.data() + _header.camera_ofs, s));
+  B_ERR_BOOL(load_lights(buffer.data() + _header.light_ofs, s));
+  B_ERR_BOOL(load_animation3(buffer.data() + _header.animation_ofs, s));
 
   B_ERR_BOOL(s->on_loaded());
 
