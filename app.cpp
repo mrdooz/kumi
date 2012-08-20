@@ -20,6 +20,7 @@
 #include "test/ps3_background.hpp"
 #include "test/scene_player.hpp"
 #include "test/particle_test.hpp"
+#include "test/spline_test.hpp"
 
 #pragma comment(lib, "psapi.lib")
 
@@ -107,8 +108,9 @@ bool App::init(HINSTANCE hinstance)
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
 
-  auto effect = new ScenePlayer("simple effect");
-  //auto effect = new ParticleTest("particle test");
+  //auto effect = new ScenePlayer("simple effect");
+  auto effect = new ParticleTest("particle test");
+  //auto effect = new SplineTest("spline test");
   DEMO_ENGINE.add_effect(effect, 0, 10000 * 1000);
 
   load_settings();

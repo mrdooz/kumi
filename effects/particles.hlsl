@@ -46,11 +46,11 @@ void gs_main(point GsInput input[1], inout TriangleStream<PsInput> outputStream)
   float3 pos = input[0].pos.xyz;
   float f = input[0].scale.y;
   float r = input[0].scale.x;
-  float3 camToParticle = pos - cameraPos.xyz;
-  float3 rightVec = normalize(cross(float3(0,1,0), camToParticle));
   
-  float left = (pos - r * rightVec).x;
-  float right = (pos + r * rightVec).x;
+  // We're in camera space right now, so our up and right vectors
+  // correspond to the cardinal axis. Doh :)
+  float left = pos - r;
+  float right = pos + r;
   float top = pos.y + r;
   float bottom = pos.y - r;
   float z = pos.z;

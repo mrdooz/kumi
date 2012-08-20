@@ -198,6 +198,7 @@
     <ClCompile Include="..\test\particle_test.cpp" />
     <ClCompile Include="..\test\scene_player.cpp" />
     <ClCompile Include="..\test\ps3_background.cpp" />
+    <ClCompile Include="..\test\spline_test.cpp" />
     <ClCompile Include="..\threading.cpp" />
     <ClCompile Include="..\tweakable_param.cpp" />
     <ClCompile Include="..\utils.cpp" />
@@ -252,6 +253,7 @@
     <ClInclude Include="..\test\particle_test.hpp" />
     <ClInclude Include="..\test\ps3_background.hpp" />
     <ClInclude Include="..\test\scene_player.hpp" />
+    <ClInclude Include="..\test\spline_test.hpp" />
     <ClInclude Include="..\threading.hpp" />
     <ClInclude Include="..\tracked_location.hpp" />
     <ClInclude Include="..\tweakable_param.hpp" />

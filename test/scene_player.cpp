@@ -201,11 +201,7 @@ static T value_at_time(const vector<KeyFrame<T>> &frames, double time) {
 void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj) {
 
   if (_use_freefly_camera || _scene->cameras.empty()) {
-    float fov = 45 * 3.1415f / 180;
-    float aspect = 1.6f;
-    float zn = 1;
-    float zf = 2500;
-    *proj = transpose(perspective_foh(fov, aspect, zn, zf));
+    *proj = transpose(_freefly_camera.projectionMatrix());
 
     if (_keystate['W'])
       _freefly_camera.move(FreeFlyCamera::kForward, (float)(100 * delta));

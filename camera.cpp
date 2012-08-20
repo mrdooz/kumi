@@ -7,7 +7,11 @@ FreeFlyCamera::FreeFlyCamera()
   , _pos(0,0,0)
   , _dir(0,0,1)
   , _right(1,0,0)
-  , _up(0,1,0) 
+  , _up(0,1,0)
+  , _fov(45 * XM_PI / 180)
+  , _aspectRatio(1.6f)
+  , _zNear(1)
+  , _zFar(2500)
 {
   // points down the z-axis
 } 
@@ -45,6 +49,9 @@ void FreeFlyCamera::rotate(Axis axis, float amount) {
   }
 }
 
+XMFLOAT4X4 FreeFlyCamera::projectionMatrix() {
+  return perspective_foh(_fov, _aspectRatio, _zNear, _zFar);
+}
 
 XMFLOAT4X4 FreeFlyCamera::viewMatrix() {
 
@@ -72,4 +79,14 @@ XMFLOAT4X4 FreeFlyCamera::viewMatrix() {
   view._43 = -dot(_dir, _pos);
 
   return view;
+}
+
+void FreeFlyCamera::setPos(const XMFLOAT3 &pos) {
+  _pos = pos;
+}
+
+void FreeFlyCamera::setPos(float x, float y, float z) {
+  _pos.x = x;
+  _pos.y = y;
+  _pos.z = z;
 }

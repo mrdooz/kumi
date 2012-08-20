@@ -150,6 +150,9 @@
     <ClCompile Include="..\gaussian_blur.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\test\spline_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -303,6 +306,9 @@
       <Filter>lz4</Filter>
     </ClInclude>
     <ClInclude Include="..\gaussian_blur.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\spline_test.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
