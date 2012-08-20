@@ -175,7 +175,7 @@ bool ParticleTest::init() {
 
   _freefly_camera.setPos(0, 0, -50);
 
-  _vb = GRAPHICS.create_dynamic_vertex_buffer(FROM_HERE, numParticles * sizeof(ParticleVtx));
+  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, numParticles * sizeof(ParticleVtx), true, nullptr);
 
   {
     TweakableParameterBlock block("blur");

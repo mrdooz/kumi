@@ -110,11 +110,9 @@ public:
 
   void get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHandle *vb, int *vertex_size, GraphicsObjectHandle *ib, DXGI_FORMAT *index_format, int *index_count);
 
-  GraphicsObjectHandle create_constant_buffer(const TrackedLocation &loc, int size, bool dynamic);
   GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode);
-  GraphicsObjectHandle create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
-  GraphicsObjectHandle create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data);
-  GraphicsObjectHandle create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size);
+
+  GraphicsObjectHandle create_buffer(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data);
 
   GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
   GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
@@ -157,10 +155,6 @@ public:
   GraphicsObjectHandle find_resource(const std::string &name);
   GraphicsObjectHandle find_sampler(const std::string &name);
 
-  HRESULT create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer);
-  HRESULT create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer);
-  HRESULT create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer);
-
   GraphicsObjectHandle default_render_target() const { return _default_render_target; }
 
   ID3D11ClassLinkage *get_class_linkage();
@@ -195,6 +189,7 @@ private:
   void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
   void unbind_resource_views(int resource_bitmask);
 
+  bool create_buffer_inner(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data, ID3D11Buffer** buffer);
 
   bool create_render_target(const TrackedLocation &loc, int width, int height, DXGI_FORMAT format, uint32 bufferFlags, RenderTargetResource *out);
   bool create_texture(const TrackedLocation &loc, const D3D11_TEXTURE2D_DESC &desc, TextureResource *out);

@@ -108,8 +108,8 @@ bool App::init(HINSTANCE hinstance)
   //auto effect = new Ps3BackgroundEffect(GraphicsObjectHandle(), "funky background");
   //auto effect = new ScenePlayer(GraphicsObjectHandle(), "funky background");
 
-  //auto effect = new ScenePlayer("simple effect");
-  auto effect = new ParticleTest("particle test");
+  auto effect = new ScenePlayer("simple effect");
+  //auto effect = new ParticleTest("particle test");
   //auto effect = new SplineTest("spline test");
   DEMO_ENGINE.add_effect(effect, 0, 10000 * 1000);
 

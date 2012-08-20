@@ -32,21 +32,9 @@ namespace
 #endif
   }
 
-  HRESULT create_buffer_inner(const TrackedLocation &loc, ID3D11Device* device, const D3D11_BUFFER_DESC& desc, const void* data, ID3D11Buffer** buffer)
-  {
-    D3D11_SUBRESOURCE_DATA init_data;
-    ZeroMemory(&init_data, sizeof(init_data));
-    init_data.pSysMem = data;
-    HRESULT hr = device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
-    set_private_data(loc, *buffer);
-    return hr;
-  }
-
   uint32 multiple_of_16(uint32 a) {
     return (a + 15) & ~0xf;
   }
-
-  static const int cEffectDataSize = 1024 * 1024;
 }
 
 static GraphicsObjectHandle emptyGoh;
@@ -92,23 +80,43 @@ bool Graphics::create() {
   return true;
 }
 
+GraphicsObjectHandle Graphics::create_buffer(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data) {
 
-HRESULT Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** vertex_buffer) 
-{
-  return create_buffer_inner(loc, _device, 
-    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, vertex_buffer);
+  if (bind == D3D11_BIND_INDEX_BUFFER) {
+    const int idx = _index_buffers.find_free_index();
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_index_buffers[idx]))
+      return make_goh(GraphicsObjectHandle::kIndexBuffer, idx);
+
+  } else if (bind == D3D11_BIND_VERTEX_BUFFER) {
+    const int idx = _vertex_buffers.find_free_index();
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_vertex_buffers[idx]))
+      return make_goh(GraphicsObjectHandle::kVertexBuffer, idx);
+
+  } else if (bind == D3D11_BIND_CONSTANT_BUFFER) {
+    const int idx = _constant_buffers.find_free_index();
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_constant_buffers[idx]))
+      return make_goh(GraphicsObjectHandle::kConstantBuffer, idx);
+
+  } else {
+    LOG_ERROR_LN("Implement me!");
+  }
+  return emptyGoh;
+
 }
 
-HRESULT Graphics::create_static_index_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data, ID3D11Buffer** index_buffer) {
-  return create_buffer_inner(loc, _device, 
-    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_INDEX_BUFFER, D3D11_USAGE_IMMUTABLE), data, index_buffer);
-}
 
-HRESULT Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, ID3D11Buffer** vertex_buffer)
+bool Graphics::create_buffer_inner(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data, ID3D11Buffer** buffer)
 {
-  return create_buffer_inner(loc, _device, 
-    CD3D11_BUFFER_DESC(multiple_of_16(buffer_size), D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, D3D11_CPU_ACCESS_WRITE), 
-    NULL, vertex_buffer);
+  CD3D11_BUFFER_DESC desc(multiple_of_16(size), bind, 
+    dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, 
+    dynamic ? D3D11_CPU_ACCESS_WRITE : 0);
+
+  D3D11_SUBRESOURCE_DATA init_data;
+  ZeroMemory(&init_data, sizeof(init_data));
+  init_data.pSysMem = data;
+  HRESULT hr = _device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
+  set_private_data(loc, *buffer);
+  return SUCCEEDED(hr);
 }
 
 void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
@@ -505,8 +513,8 @@ bool Graphics::create_default_geometry() {
     };
 
 
-    auto vb = create_static_vertex_buffer(FROM_HERE, sizeof(verts), verts);
-    auto ib = create_static_index_buffer(FROM_HERE, sizeof(quadIndices), quadIndices);
+    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
+    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices);
     _predefined_geometry.insert(make_pair(kGeomFsQuadPosTex, make_pair(vb, ib)));
   }
 
@@ -519,8 +527,8 @@ bool Graphics::create_default_geometry() {
       +1, -1, +1,
     };
 
-    auto vb = create_static_vertex_buffer(FROM_HERE, sizeof(verts), verts);
-    auto ib = create_static_index_buffer(FROM_HERE, sizeof(quadIndices), quadIndices);
+    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
+    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices);
     _predefined_geometry.insert(make_pair(kGeomFsQuadPos, make_pair(vb, ib)));
   }
 
@@ -652,39 +660,6 @@ void Graphics::resize(const int width, const int height)
     return;
   PROPERTY_MANAGER.set_property(_screen_size_id, XMFLOAT4((float)width, (float)height, 0, 0));
   create_back_buffers(width, height);
-}
-
-GraphicsObjectHandle Graphics::create_constant_buffer(const TrackedLocation &loc, int buffer_size, bool dynamic) {
-  CD3D11_BUFFER_DESC desc(multiple_of_16(buffer_size), D3D11_BIND_CONSTANT_BUFFER, 
-    dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT, 
-    dynamic ? D3D11_CPU_ACCESS_WRITE : 0);
-
-  const int idx = _constant_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_buffer_inner(loc, _device, desc, NULL, &_constant_buffers[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kConstantBuffer, 0, idx);
-  return emptyGoh;
-}
-
-GraphicsObjectHandle Graphics::create_static_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size, const void* data) {
-  const int idx = _vertex_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_vertex_buffer(loc, buffer_size, data, &_vertex_buffers[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-  return emptyGoh;
-}
-
-GraphicsObjectHandle Graphics::create_dynamic_vertex_buffer(const TrackedLocation &loc, uint32_t buffer_size) {
-  const int idx = _vertex_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_dynamic_vertex_buffer(loc, buffer_size, &_vertex_buffers[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kVertexBuffer, 0, idx);
-  return emptyGoh;
-}
-
-
-GraphicsObjectHandle Graphics::create_static_index_buffer(const TrackedLocation &loc, uint32_t data_size, const void* data) {
-  const int idx = _index_buffers.find_free_index();
-  if (idx != -1 && SUCCEEDED(create_static_index_buffer(loc, data_size, data, &_index_buffers[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kIndexBuffer, 0, idx);
-  return emptyGoh;
 }
 
 GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode) {

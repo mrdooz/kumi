@@ -213,7 +213,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
       decompress_vb(mesh, &vb_reader, num_verts, vertex_size, vb_flags, &decompressed_vb);
 
       submesh->_geometry.vertex_count = num_verts;
-      submesh->_geometry.vb = GRAPHICS.create_static_vertex_buffer(FROM_HERE, decompressed_vb.size(), decompressed_vb.data());
+      submesh->_geometry.vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, decompressed_vb.size(), false, decompressed_vb.data());
 
 
       const int *ib = read_and_advance<const int*>(&buf);
@@ -223,7 +223,7 @@ bool KumiLoader::load_meshes(const char *buf, Scene *scene) {
       decompress_ib(&ib_reader, num_indices, index_size, &decompressed_ib);
 
       submesh->_geometry.index_count = num_indices;
-      submesh->_geometry.ib = GRAPHICS.create_static_index_buffer(FROM_HERE, decompressed_ib.size(), decompressed_ib.data());
+      submesh->_geometry.ib = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, decompressed_ib.size(), false, decompressed_ib.data());
     }
   }
 
