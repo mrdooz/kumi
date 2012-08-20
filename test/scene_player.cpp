@@ -208,44 +208,26 @@ void ScenePlayer::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vi
     *proj = transpose(perspective_foh(fov, aspect, zn, zf));
 
     if (_keystate['W'])
-      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.dir;
+      _freefly_camera.move(FreeFlyCamera::kForward, (float)(100 * delta));
     if (_keystate['S'])
-      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.dir;
+      _freefly_camera.move(FreeFlyCamera::kForward, (float)(-100 * delta));
     if (_keystate['A'])
-      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.right;
+      _freefly_camera.move(FreeFlyCamera::kRight, (float)(-100 * delta));
     if (_keystate['D'])
-      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.right;
+      _freefly_camera.move(FreeFlyCamera::kRight, (float)(100 * delta));
     if (_keystate['Q'])
-      _freefly_camera.pos += (float)(100 * delta) * _freefly_camera.up;
+      _freefly_camera.move(FreeFlyCamera::kUp, (float)(100 * delta));
     if (_keystate['E'])
-      _freefly_camera.pos -= (float)(100 * delta) * _freefly_camera.up;
+      _freefly_camera.move(FreeFlyCamera::kUp, (float)(-100 * delta));
 
     if (_mouse_lbutton) {
-      float dx = _mouse_horiz / 200.0f;
-      float dy = _mouse_vert / 200.0f;
-      _freefly_camera.rho -= dx;
-      _freefly_camera.theta += dy;
+      float dx = (float)(100 * delta) * _mouse_horiz / 200.0f;
+      float dy = (float)(100 * delta) * _mouse_vert / 200.0f;
+      _freefly_camera.rotate(FreeFlyCamera::kXAxis, dx);
+      _freefly_camera.rotate(FreeFlyCamera::kYAxis, dy);
     }
 
-    _freefly_camera.dir = vec3_from_spherical(_freefly_camera.theta, _freefly_camera.rho);
-    //_freefly_camera.up = drop(XMFLOAT4(0,1,0,0) * mtx_from_axis_angle(_freefly_camera.dir, _freefly_camera.roll));
-    _freefly_camera.right = cross(_freefly_camera.up, _freefly_camera.dir);
-    _freefly_camera.up = cross(_freefly_camera.dir, _freefly_camera.right);
-
-    // Camera mtx = inverse of camera -> world mtx
-    // R^-1         0
-    // -R^-1 * t    1
-
-    XMFLOAT4X4 tmp(mtx_identity());
-    set_col(_freefly_camera.right, 0, &tmp);
-    set_col(_freefly_camera.up, 1, &tmp);
-    set_col(_freefly_camera.dir, 2, &tmp);
-
-    tmp._41 = -dot(_freefly_camera.right, _freefly_camera.pos);
-    tmp._42 = -dot(_freefly_camera.up, _freefly_camera.pos);
-    tmp._43 = -dot(_freefly_camera.dir, _freefly_camera.pos);
-
-    *view = transpose(tmp);
+    *view = transpose(_freefly_camera.viewMatrix());
 
   } else {
     Camera *camera = _scene->cameras[0];

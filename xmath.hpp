@@ -69,7 +69,7 @@ inline XMFLOAT4X4 mtx_identity() {
 }
 
 inline XMFLOAT3 vec3_from_spherical(float theta, float rho) {
-  // theta is angle around the x-axis
+  // theta is angle around the z-axis
   // rho is angle around the y-axis
   float st = sinf(theta);
   float sr = sinf(rho);
@@ -144,17 +144,35 @@ inline XMFLOAT4 operator*(const XMFLOAT4 &v, const XMFLOAT4X4 &m) {
 }
 
 inline XMFLOAT4X4 mtx_from_axis_angle(const XMFLOAT3 &v, float angle) {
+  // NOTE: rotations are counter clockwise around the axis
 
-  XMFLOAT4X4 res(mtx_identity());
-  res.m[0][0] = (1.0f - cos(angle)) * v.x * v.x + cos(angle);
-  res.m[1][0] = (1.0f - cos(angle)) * v.x * v.y - sin(angle) * v.z;
-  res.m[2][0] = (1.0f - cos(angle)) * v.x * v.z + sin(angle) * v.y;
-  res.m[0][1] = (1.0f - cos(angle)) * v.y * v.x + sin(angle) * v.z;
-  res.m[1][1] = (1.0f - cos(angle)) * v.y * v.y + cos(angle);
-  res.m[2][1] = (1.0f - cos(angle)) * v.y * v.z - sin(angle) * v.x;
-  res.m[0][2] = (1.0f - cos(angle)) * v.z * v.x - sin(angle) * v.y;
-  res.m[1][2] = (1.0f - cos(angle)) * v.z * v.y + sin(angle) * v.x;
-  res.m[2][2] = (1.0f - cos(angle)) * v.z * v.z + cos(angle);
+  XMFLOAT4X4 res;
+  float c = cos(angle);
+  float s = sin(angle);
+
+  float x = v.x;
+  float y = v.y;
+  float z = v.z;
+
+  res.m[0][0] = (1 - c) * x * x + c;
+  res.m[1][0] = (1 - c) * x * y - s * z;
+  res.m[2][0] = (1 - c) * x * z + s * y;
+  res.m[3][0] = 0;
+
+  res.m[0][1] = (1 - c) * x * y + s * z;
+  res.m[1][1] = (1 - c) * y * y + c;
+  res.m[2][1] = (1 - c) * y * z - s * x;
+  res.m[3][1] = 0;
+
+  res.m[0][2] = (1 - c) * x * z - s * y;
+  res.m[1][2] = (1 - c) * y * z + s * x;
+  res.m[2][2] = (1 - c) * z * z + c;
+  res.m[3][2] = 0;
+
+  res.m[0][3] = 0;
+  res.m[1][3] = 0;
+  res.m[2][3] = 0;
+  res.m[3][3] = 1;
 
   return res;
 }
