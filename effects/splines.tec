@@ -1,0 +1,19 @@
+include common.tec;
+
+technique SplineRender {
+
+    vertex_shader {
+        file splines.hlsl;
+        entry_point vs_main;
+    };
+
+    pixel_shader {
+        file splines.hlsl;
+        entry_point ps_main;
+    };
+    
+    rasterizer_desc = BackfaceCulling;
+    depth_stencil_desc = DepthEnable;
+    blend_desc = BlendDisable;
+
+};

@@ -17,6 +17,7 @@
 #include "../app.hpp"
 #include "../bit_utils.hpp"
 #include "../dx_utils.hpp"
+#include "../vertex_types.hpp"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -77,34 +78,95 @@ void stepBSpline(int pointsPerSegment, const vector<XMFLOAT3> &controlPoints, ve
 }
 
 
+
 struct DynamicSpline {
 
   static const int cSegmentsPerSpline = 20;
-  static const int VertsPerSlice = 20;
+  static const int cVertsPerRing = 20;
+  static const int numPts = 100;
 
   DynamicSpline()
     : _curTime(0)
     , _curTop(0,0,0) 
   {
-    for (int i = 0; i < 4; ++i) {
-      _curTop.x += gaussianRand(0, 20);
-      _curTop.y += gaussianRand(0, 20);
-      _curTop.z += gaussianRand(0, 20);
+    _controlPoints.push_back(_curTop);
+    for (int i = 0; i < numPts-1; ++i) {
+      _curTop.x += gaussianRand(0, 15);
+      _curTop.y += gaussianRand(10, 2);
+      _curTop.z += gaussianRand(0, 15);
       _controlPoints.push_back(_curTop);
     }
 
     // calc initial reference frame
     XMFLOAT3 p0 = evalBSpline(0, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
-    XMFLOAT3 p1 = evalBSpline(0.01f, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
+    XMFLOAT3 p1 = evalBSpline(0.1f, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
 
     XMFLOAT3 t = normalize(p1 - p0);
     XMFLOAT3 n = perpVector(t);
     XMFLOAT3 b = cross(t, n);
     _prevB = b;
+
+    for (int i = 0; i < numPts-1; ++i) {
+      auto &p0 = _controlPoints[max(0, i-1)];
+      auto &p1 = _controlPoints[max(0, i-0)];
+      auto &p2 = _controlPoints[max(0, i+1)];
+      auto &p3 = _controlPoints[min(numPts-1, i+2)];
+
+      for (int j = 0; j < cSegmentsPerSpline; ++j) {
+        float t = j / (float)cSegmentsPerSpline;
+        auto a = evalBSpline(t, p0, p1, p2, p3);
+        auto b = evalBSpline(t + 0.1f, p0, p1, p2, p3);
+
+        auto dir = normalize(b-a);
+        n = cross(dir, _prevB);
+        b = cross(n, dir);
+        addRing(a, n, dir, b, 10);
+        _prevB = b;
+      }
+    }
+
+    createIndices();
   }
 
-  void addRing(XMFLOAT3 p, XMFLOAT3 n, float r) {
+  void createIndices() {
+    for (int i = 0; i < (cSegmentsPerSpline - 1) * (numPts - 1); ++i) {
 
+      for (int j = 0; j < cVertsPerRing; ++j) {
+
+        int prev = j == 0 ? cVertsPerRing - 1 : j - 1;
+
+        int v0 = i*cVertsPerRing + j;
+        int v1 = (i+1)*cVertsPerRing + j;
+        int v2 = (i+1)*cVertsPerRing + prev;
+        int v3 = i*cVertsPerRing + prev;
+
+        _dynamicIndices.push_back(v0);
+        _dynamicIndices.push_back(v1);
+        _dynamicIndices.push_back(v2);
+
+        _dynamicIndices.push_back(v0);
+        _dynamicIndices.push_back(v2);
+        _dynamicIndices.push_back(v3);
+      }
+    }
+  }
+
+  void addRing(const XMFLOAT3 &p, const XMFLOAT3 &x, const XMFLOAT3 &y, const XMFLOAT3 &z, float r) {
+
+    XMFLOAT4X4 mtx;
+    // Create transform from reference frame to world
+    set_row(expand(x, 0), 0, &mtx);
+    set_row(expand(y, 0), 1, &mtx);
+    set_row(expand(z, 0), 2, &mtx);
+    set_row(expand(p, 1), 3, &mtx);
+
+    for (int i = 0; i < cVertsPerRing; ++i) {
+      float x = sinf(2*XM_PI*i/cVertsPerRing);
+      float y = 0;
+      float z = cosf(2*XM_PI*i/cVertsPerRing);
+      _dynamicVerts.push_back(drop(XMFLOAT4(x,y,z,1) * mtx));
+      _dynamicNormals.push_back(drop(XMFLOAT4(x,y,z,0) * mtx));
+    }
   }
 
   bool init() {
@@ -138,7 +200,9 @@ struct DynamicSpline {
 
   }
 
+  vector<int> _dynamicIndices;
   vector<XMFLOAT3> _dynamicVerts;
+  vector<XMFLOAT3> _dynamicNormals;
   vector<GraphicsObjectHandle> _staticSplines;
   GraphicsObjectHandle _dynamicSplineVb;
   GraphicsObjectHandle _dynamicSplineIb;
@@ -229,62 +293,6 @@ SplineTest::ParticleData::~ParticleData() {
   _aligned_free(factor);
 }
 
-inline void SplineTest::ParticleData::initParticle(int i) {
-  float v = 5;
-  velX[i] = gaussianRand(0, v);
-  velY[i] = gaussianRand(0, v);
-  velZ[i] = gaussianRand(0, v);
-
-  float s = 20;
-  posX[i] = gaussianRand(0, s);
-  posY[i] = gaussianRand(0, s);
-  posZ[i] = gaussianRand(0, s);
-
-  radius[i] = gaussianRand(2.0f, 1.0f);
-  age[i] = 0;
-  maxAge[i] = randf(15.0f, 45.0f);
-}
-
-void SplineTest::ParticleData::update(float delta) {
-  return;
-
-  KASSERT((numParticles % 4) == 0);
-
-  __m128 d = _mm_set_ps1(delta);
-
-  // check if any particles have expired
-  for (int i = 0; i < numParticles; i += 4) {
-    __m128 newAge = _mm_add_ps(d, _mm_load_ps(&age[i]));
-    _mm_store_ps(&age[i], newAge);
-
-    for (int j = 0; j < 4; ++j) {
-      if (age[i+j] >= maxAge[i+j]) {
-        initParticle(i+j);
-        age[i+j] = 0;
-      }
-    }
-  }
-
-  // update factors
-  for (int i = 0; i < numParticles; ++i) {
-    float f = ELEMS_IN_ARRAY(particleFade)*age[i]/maxAge[i];
-    int m = (int)f;
-    float a = particleFade[m];
-    float b = particleFade[min(ELEMS_IN_ARRAY(particleFade)-1,m+1)];
-    factor[i] = lerp(a, b, f-m);
-  }
-
-  // update position
-  float *src = pos;
-  float *v = vel;
-
-  for (int i = 0; i < 3 * numParticles; i += 4) {
-    _mm_store_ps(src, _mm_add_ps(_mm_load_ps(src),_mm_mul_ps(d, _mm_load_ps(v))));
-    src += 4;
-    v += 4;
-  }
-
-}
 
 SplineTest::SplineTest(const std::string &name) 
   : Effect(name)
@@ -319,10 +327,14 @@ bool SplineTest::init() {
 
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/particles.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/scale.tec", true));
+  B_ERR_BOOL(GRAPHICS.load_techniques("effects/splines.tec", true));
+
   _particle_technique = GRAPHICS.find_technique("particles");
   _gradient_technique = GRAPHICS.find_technique("gradient");
   _compose_technique = GRAPHICS.find_technique("compose");
   _coalesce = GRAPHICS.find_technique("coalesce");
+
+  _splineTechnique = GRAPHICS.find_technique("SplineRender");
 
   _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "", false, nullptr);
 
@@ -336,7 +348,8 @@ bool SplineTest::init() {
 
   _freefly_camera.setPos(XMFLOAT3(0, 0, -50));
 
-  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, _particle_data.numParticles * sizeof(ParticleVtx), true, nullptr);
+  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
+  _ib = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, 1024 * 1024, true, nullptr);
 
   {
     TweakableParameterBlock block("blur");
@@ -359,11 +372,6 @@ bool SplineTest::init() {
         _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
       }
     });
-  }
-
-  // run the simulation for 10 seconds to get an interesting starting position
-  for (int i = 0; i < 1000; ++i) {
-    _particle_data.update(0.01f);
   }
 
   return true;
@@ -420,8 +428,6 @@ bool SplineTest::update(int64 global_time, int64 local_time, int64 delta_ns, boo
   PROPERTY_MANAGER.set_property(_view_mtx_id, _view);
   PROPERTY_MANAGER.set_property(_proj_mtx_id, _proj);
 
-  _particle_data.update(delta_ns / 1e6f);
-
   return true;
 }
 
@@ -444,31 +450,23 @@ void SplineTest::renderParticles() {
   int h = GRAPHICS.height();
 
   D3D11_MAPPED_SUBRESOURCE res;
+
   GRAPHICS.map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
-
-  ParticleVtx *verts = (ParticleVtx *)res.pData;
-  float *px = _particle_data.posX;
-  float *py = _particle_data.posY;
-  float *pz = _particle_data.posZ;
-  float *r = _particle_data.radius;
-  float *f = _particle_data.factor;
-  for (int i = 0; i < _particle_data.numParticles; ++i) {
-    verts[i].pos = XMFLOAT3(*px++, *py++, *pz++);
-    verts[i].scale.x = 1;
-    verts[i].scale.y = 1;
-
-    //float s = _particle_data.age[i] / _particle_data.maxAge[i];
-    //verts[i].scale.x = s * *r++;
-    //verts[i].scale.y = *f++;
+  PosNormal *verts = (PosNormal *)res.pData;
+  int numVerts = gSpline._dynamicVerts.size();
+  for (int i = 0; i < numVerts; ++i) {
+    verts[i].pos = gSpline._dynamicVerts[i];
+    verts[i].normal = gSpline._dynamicNormals[i];
   }
-
   GRAPHICS.unmap(_vb, 0);
 
-  //auto fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
-  Technique *technique = GRAPHICS.get_technique(_particle_technique);
+  GRAPHICS.map(_ib, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+  memcpy(res.pData, gSpline._dynamicIndices.data(), gSpline._dynamicIndices.size() * sizeof(int));
+  GRAPHICS.unmap(_ib, 0);
+
+  Technique *technique = GRAPHICS.get_technique(_splineTechnique);
   Shader *vs = technique->vertex_shader(0);
-  Shader *gs = technique->geometry_shader(0);
   Shader *ps = technique->pixel_shader(0);
 
   _ctx->set_rs(technique->rasterizer_state());
@@ -476,45 +474,30 @@ void SplineTest::renderParticles() {
   _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
   _ctx->set_vs(vs->handle());
-  _ctx->set_gs(gs->handle());
   _ctx->set_ps(ps->handle());
 
   _ctx->set_layout(vs->input_layout());
-  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  TextureArray arr = { _particle_texture };
-  _ctx->set_shader_resources(arr, ShaderType::kPixelShader);
-
-  auto &samplers = ps->samplers();
-  if (!samplers.empty()) {
-    _ctx->set_samplers(samplers);
-  }
-
-  struct ParticleCBuffer {
-    XMFLOAT4 cameraPos;
-    XMFLOAT4X4 worldView;
-    XMFLOAT4X4 proj;
-    XMFLOAT4 dofSettings;
+  struct CBuffer {
+    XMFLOAT4X4 worldViewProj;
+    XMFLOAT3 cameraPos;
   } cbuffer;
 
-  if (_useFreeFlyCamera) {
-    cbuffer.cameraPos = expand(_freefly_camera.pos(), 1);
-  } else {
-    cbuffer.cameraPos = XMFLOAT4(0,0,-50,1);
-  }
+  XMFLOAT4X4 view = _freefly_camera.viewMatrix();
+  XMFLOAT4X4 proj = _freefly_camera.projectionMatrix();
 
-  cbuffer.worldView = _view;
-  cbuffer.proj = _proj;
-  cbuffer.dofSettings = XMFLOAT4(_nearFocusStart, _nearFocusEnd, _farFocusStart, _farFocusEnd);
+  XMFLOAT4X4 mtx;
+  XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
 
-  _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
-  _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+  cbuffer.worldViewProj = transpose(mtx);
+  cbuffer.cameraPos = _freefly_camera.pos();
+  _ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
-  _ctx->set_vb(_vb, sizeof(ParticleVtx));
-  _ctx->draw(_particle_data.numParticles, 0);
-
-  _ctx->unset_render_targets(0, 1);
-
+  _ctx->set_vb(_vb, sizeof(PosNormal));
+  _ctx->set_ib(_ib, DXGI_FORMAT_R32_UINT);
+  _ctx->draw_indexed(gSpline._dynamicIndices.size(), 0, 0);
 }
 /*
 bool SplineTest::render() {

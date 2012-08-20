@@ -34,12 +34,15 @@ private:
   GraphicsObjectHandle _particle_technique;
   GraphicsObjectHandle _particle_texture;
   GraphicsObjectHandle _vb;
+  GraphicsObjectHandle _ib;
 
   GraphicsObjectHandle _gradient_technique;
   GraphicsObjectHandle _compose_technique;
   GraphicsObjectHandle _coalesce;
 
   GraphicsObjectHandle _scale;
+
+  GraphicsObjectHandle _splineTechnique;
   
   GaussianBlur _blur;
 
@@ -53,8 +56,6 @@ private:
   struct ParticleData {
     ParticleData(int numParticles);
     ~ParticleData();
-    void update(float delta);
-    inline void initParticle(int i);
     int numParticles;
     float *pos;
     float *posX;

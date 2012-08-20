@@ -3,7 +3,7 @@ rasterizer_desc BackfaceCulling {
 };
 
 rasterizer_desc NoCulling { 
-    cull_mode = back; 
+    cull_mode = none; 
 };
 
 depth_stencil_desc DepthEnable { 

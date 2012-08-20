@@ -82,6 +82,13 @@ inline XMFLOAT4 row(const XMFLOAT4X4 &m, int row) {
   return XMFLOAT4(m.m[row][0], m.m[row][1], m.m[row][2], m.m[row][3]);
 }
 
+inline void set_row(const XMFLOAT4 &v, int row, XMFLOAT4X4 *mtx) {
+  mtx->m[row][0] = v.x;
+  mtx->m[row][1] = v.y;
+  mtx->m[row][2] = v.z;
+  mtx->m[row][3] = v.w;
+}
+
 inline void set_row(const XMFLOAT3 &v, int row, XMFLOAT4X4 *mtx) {
   mtx->m[row][0] = v.x;
   mtx->m[row][1] = v.y;

@@ -197,7 +197,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
 
       // Parse input layout
       auto mapping = map_list_of
-        ("SV_POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
+        ("SV_POSITION", DXGI_FORMAT_R32G32B32A32_FLOAT)
         ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
         ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
         ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)

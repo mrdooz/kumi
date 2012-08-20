@@ -432,6 +432,8 @@ void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::
 void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen) {
 
   ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cb);
+  if (!buffer)
+    return;
   D3D11_MAPPED_SUBRESOURCE sub;
   _ctx->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &sub);
   memcpy(sub.pData, data, dataLen);
