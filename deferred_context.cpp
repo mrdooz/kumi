@@ -451,6 +451,42 @@ void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType:
     LOG_ERROR_LN("Implement me!");
 }
 
+bool DeferredContext::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
+  switch (h._type) {
+  case GraphicsObjectHandle::kTexture:
+    return SUCCEEDED(_ctx->Map(GRAPHICS._textures.get(h)->texture.resource, sub, type, flags, res));
+
+  case GraphicsObjectHandle::kVertexBuffer:
+    return SUCCEEDED(_ctx->Map(GRAPHICS._vertex_buffers.get(h), sub, type, flags, res));
+
+  case GraphicsObjectHandle::kIndexBuffer:
+    return SUCCEEDED(_ctx->Map(GRAPHICS._index_buffers.get(h), sub, type, flags, res));
+
+  default:
+    LOG_ERROR_LN("Invalid resource type passed to %s", __FUNCTION__);
+    return false;
+  }
+}
+
+void DeferredContext::unmap(GraphicsObjectHandle h, UINT sub) {
+  switch (h._type) {
+  case GraphicsObjectHandle::kTexture:
+    _ctx->Unmap(GRAPHICS._textures.get(h)->texture.resource, sub);
+    break;
+
+  case GraphicsObjectHandle::kVertexBuffer:
+    _ctx->Unmap(GRAPHICS._vertex_buffers.get(h), sub);
+    break;
+
+  case GraphicsObjectHandle::kIndexBuffer:
+    _ctx->Unmap(GRAPHICS._index_buffers.get(h), sub);
+    break;
+
+  default:
+    LOG_WARNING_LN("Invalid resource type passed to %s", __FUNCTION__);
+  }
+}
+
 void DeferredContext::draw_indexed(int count, int start_index, int base_vertex) {
   _ctx->DrawIndexed(count, start_index, base_vertex);
 }
@@ -473,3 +509,5 @@ void DeferredContext::end_frame() {
     GRAPHICS.add_command_list(cmd_list);
   }
 }
+
+

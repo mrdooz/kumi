@@ -83,6 +83,9 @@ public:
   void draw(int vertexCount, int startVertexLocation);
   void dispatch(int threadGroupCountX, int threadGroupCountY, int threadGroupCountZ);
 
+  bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
+  void unmap(GraphicsObjectHandle h, UINT sub);
+
 private:
   DeferredContext();
   ~DeferredContext();
