@@ -7,10 +7,10 @@
 
 struct Scene;
 class DeferredContext;
+class DynamicSpline;
 
 class SplineTest : public Effect {
 public:
-
   SplineTest(const std::string &name);
   ~SplineTest();
   virtual bool init() override;
@@ -52,25 +52,6 @@ private:
   float _nearFocusStart, _nearFocusEnd;
   float _farFocusStart, _farFocusEnd;
 
-
-  struct ParticleData {
-    ParticleData(int numParticles);
-    ~ParticleData();
-    int numParticles;
-    float *pos;
-    float *posX;
-    float *posY;
-    float *posZ;
-    float *vel;
-    float *velX;
-    float *velY;
-    float *velZ;
-    float *radius;
-    float *age;
-    float *maxAge;
-    float *factor;
-  } _particle_data;
-
   bool _useFreeFlyCamera;
   FreeFlyCamera _freefly_camera;
   int _mouse_horiz;
@@ -83,4 +64,6 @@ private:
   XMFLOAT4X4 _view, _proj;
 
   DeferredContext *_ctx;
+
+  std::vector<DynamicSpline *> _splines;
 };

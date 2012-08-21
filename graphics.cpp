@@ -942,7 +942,7 @@ bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags,
       return SUCCEEDED(_immediate_context->Map(_index_buffers.get(h), sub, type, flags, res));
 
     default:
-      LOG_WARNING_LN("Invalid resource type passed to %s", __FUNCTION__);
+      LOG_ERROR_LN("Invalid resource type passed to %s", __FUNCTION__);
       return false;
   }
 }

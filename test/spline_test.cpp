@@ -23,7 +23,7 @@ using namespace std;
 using namespace std::tr1::placeholders;
 
 XMFLOAT3 perpVector(const XMFLOAT3 &a) {
-  // return a vector perpendicular to a
+  // return a vector perpendicular to "a"
   float x = fabs(a.x), y = fabs(a.y), z = fabs(a.z);
   if (x <= y && x <= z) {
     return cross(a, XMFLOAT3(1,0,0));
@@ -77,25 +77,54 @@ void stepBSpline(int pointsPerSegment, const vector<XMFLOAT3> &controlPoints, ve
   }
 }
 
-
-
-struct DynamicSpline {
-
-  static const int cSegmentsPerSpline = 20;
+class DynamicSpline {
+public:
+  static const int cRingsPerSegment = 20;
   static const int cVertsPerRing = 20;
-  static const int numPts = 100;
 
-  DynamicSpline()
+  DynamicSpline(float x, float y, float z, float growthRate)
     : _curTime(0)
-    , _curTop(0,0,0) 
+    , _curTop(x, y, z)
+    , _curHeight(0)
+    , _segmentHeight(20)
+    , _growthRate(growthRate)
   {
     _controlPoints.push_back(_curTop);
-    for (int i = 0; i < numPts-1; ++i) {
+    for (int i = 0; i < 3; ++i) {
       _curTop.x += gaussianRand(0, 15);
       _curTop.y += gaussianRand(10, 2);
       _curTop.z += gaussianRand(0, 15);
       _controlPoints.push_back(_curTop);
     }
+  }
+
+  bool init() {
+    _dynamicSplineVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
+    _dynamicSplineIb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, 1024 * 1024, true, nullptr);
+
+    return true;
+  }
+
+  void update(float delta) {
+
+    float prevHeight = _curHeight;
+    _curHeight += _growthRate * delta;
+
+    float prevSegment = floorf(prevHeight / _segmentHeight);
+    float curSegment = floorf(_curHeight / _segmentHeight);
+
+    while (prevSegment != curSegment) {
+      prevSegment++;
+      _curTop.x += gaussianRand(0, 20);
+      _curTop.y += gaussianRand(10, 5);
+      _curTop.z += gaussianRand(0, 20);
+      _controlPoints.push_back(_curTop);
+    }
+
+    // create the vertices up to the current point
+    _dynamicVerts.clear();
+    _dynamicNormals.clear();
+    _dynamicIndices.clear();
 
     // calc initial reference frame
     XMFLOAT3 p0 = evalBSpline(0, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
@@ -106,30 +135,79 @@ struct DynamicSpline {
     XMFLOAT3 b = cross(t, n);
     _prevB = b;
 
-    for (int i = 0; i < numPts-1; ++i) {
-      auto &p0 = _controlPoints[max(0, i-1)];
-      auto &p1 = _controlPoints[max(0, i-0)];
-      auto &p2 = _controlPoints[max(0, i+1)];
-      auto &p3 = _controlPoints[min(numPts-1, i+2)];
+    const int numPts = _controlPoints.size();
+    float c = 0;
 
-      for (int j = 0; j < cSegmentsPerSpline; ++j) {
-        float t = j / (float)cSegmentsPerSpline;
-        auto a = evalBSpline(t, p0, p1, p2, p3);
-        auto b = evalBSpline(t + 0.1f, p0, p1, p2, p3);
+    float spikeLength = 100;
+    float maxRadius = 3;
+    float minRadius = 0.01f;
+    while (c < _curHeight) {
 
-        auto dir = normalize(b-a);
-        n = cross(dir, _prevB);
-        b = cross(n, dir);
-        addRing(a, n, dir, b, 10);
+      int idx = (int)(c / cRingsPerSegment);
+      auto &p0 = _controlPoints[max(0, idx-1)];
+      auto &p1 = _controlPoints[max(0, idx-0)];
+      auto &p2 = _controlPoints[min(numPts-1, idx+1)];
+      auto &p3 = _controlPoints[min(numPts-1, idx+2)];
+
+      float step = 1.0f / cRingsPerSegment;
+      float maxT = min(1, (_curHeight - c) / _segmentHeight);
+      for (int j = 0; j < cRingsPerSegment; ++j) {
+        float t = j * step;
+        auto pt0 = evalBSpline(t, p0, p1, p2, p3);
+        auto pt1 = evalBSpline(t + 0.01f, p0, p1, p2, p3);
+
+        auto dir = normalize(pt1-pt0);
+        auto n = cross(dir, _prevB);
+        auto b = cross(n, dir);
+        addRing(pt0, n, dir, b, maxRadius * min(1, max(minRadius, (_curHeight - c) / spikeLength)));
         _prevB = b;
+        c += _segmentHeight * step;
+        if (c >= _curHeight) {
+          c = _curHeight;
+          float t = maxT;
+          auto pt0 = evalBSpline(t, p0, p1, p2, p3);
+          auto pt1 = evalBSpline(t + 0.01f, p0, p1, p2, p3);
+
+          auto dir = normalize(pt1-pt0);
+          auto n = cross(dir, _prevB);
+          auto b = cross(n, dir);
+          addRing(pt0, n, dir, b, maxRadius * min(1, max(minRadius, (_curHeight - c) / spikeLength)));
+          break;
+        }
       }
     }
 
     createIndices();
   }
 
+  void render(DeferredContext *ctx) {
+    D3D11_MAPPED_SUBRESOURCE res;
+
+    GRAPHICS.map(_dynamicSplineVb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+    PosNormal *verts = (PosNormal *)res.pData;
+    int numVerts = _dynamicVerts.size();
+    for (int i = 0; i < numVerts; ++i) {
+      verts[i].pos = _dynamicVerts[i];
+      verts[i].normal = _dynamicNormals[i];
+    }
+    GRAPHICS.unmap(_dynamicSplineVb, 0);
+
+
+    GRAPHICS.map(_dynamicSplineIb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+    memcpy(res.pData, _dynamicIndices.data(), _dynamicIndices.size() * sizeof(int));
+    GRAPHICS.unmap(_dynamicSplineIb, 0);
+
+    ctx->set_vb(_dynamicSplineVb, sizeof(PosNormal));
+    ctx->set_ib(_dynamicSplineIb, DXGI_FORMAT_R32_UINT);
+    ctx->draw_indexed(_dynamicIndices.size(), 0, 0);
+
+  }
+
+private:
+
   void createIndices() {
-    for (int i = 0; i < (cSegmentsPerSpline - 1) * (numPts - 1); ++i) {
+    const int numRings = _dynamicVerts.size() / cVertsPerRing;
+    for (int i = 0; i < numRings - 1; ++i) {
 
       for (int j = 0; j < cVertsPerRing; ++j) {
 
@@ -161,43 +239,12 @@ struct DynamicSpline {
     set_row(expand(p, 1), 3, &mtx);
 
     for (int i = 0; i < cVertsPerRing; ++i) {
-      float x = sinf(2*XM_PI*i/cVertsPerRing);
+      float x = r*sinf(2*XM_PI*i/cVertsPerRing);
       float y = 0;
-      float z = cosf(2*XM_PI*i/cVertsPerRing);
+      float z = r*cosf(2*XM_PI*i/cVertsPerRing);
       _dynamicVerts.push_back(drop(XMFLOAT4(x,y,z,1) * mtx));
       _dynamicNormals.push_back(drop(XMFLOAT4(x,y,z,0) * mtx));
     }
-  }
-
-  bool init() {
-    _dynamicSplineVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 128 * 1024, true, nullptr);
-    _dynamicSplineIb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, 128 * 1024, true, nullptr);
-
-    return true;
-  }
-
-  void update(float delta) {
-
-    float prevTime = _curTime;
-    _curTime += delta;
-    // check if we should move the current dynamic spline to the static part
-    if ((int)(_curTime) != (int)prevTime) {
-
-    }
-
-    int knotsLeft = 0;
-    int threshold;
-
-    if (knotsLeft < threshold) {
-      _curTop.x += gaussianRand(0, 20);
-      _curTop.y += gaussianRand(0, 20);
-      _curTop.z += gaussianRand(0, 20);
-      _controlPoints.push_back(_curTop);
-    }
-  }
-
-  void render() {
-
   }
 
   vector<int> _dynamicIndices;
@@ -211,10 +258,14 @@ struct DynamicSpline {
   XMFLOAT3 _curTop;
   vector<XMFLOAT3> _controlPoints;
   int _curKnot;
+  int _curSegment;
+  float _segmentHeight;
+  float _curHeight;
+  float _growthRate;
   float _curTime;
 };
 
-DynamicSpline gSpline;
+//DynamicSpline gSpline;
 
 static float particleFade[512] = {0.0643f,0.0643f,0.0643f,0.0643f,0.0643f,0.0644f,0.0644f,0.0644f,0.0644f,0.0644f,0.0644f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0645f,0.0646f,0.0646f,0.0646f,0.0646f,0.0646f,0.0646f,0.0647f,0.0647f,0.0647f,0.0648f,0.0648f,0.0648f,0.0649f,0.0649f,0.0650f,0.0650f,0.0651f,0.0652f,0.0653f,0.0653f,0.0654f,0.0655f,0.0656f,0.0658f,0.0659f,0.0660f,0.0661f,0.0663f,0.0665f,0.0666f,0.0668f,0.0670f,0.0672f,0.0674f,0.0676f,0.0678f,0.0680f,0.0681f,0.0683f,0.0684f,0.0686f,0.0687f,0.0689f,0.0691f,0.0692f,0.0694f,0.0696f,0.0697f,0.0699f,0.0701f,0.0702f,0.0704f,0.0706f,0.0708f,0.0710f,0.0712f,0.0714f,0.0716f,0.0718f,0.0720f,0.0722f,0.0724f,0.0726f,0.0728f,0.0730f,0.0732f,0.0734f,0.0736f,0.0738f,0.0741f,0.0743f,0.0745f,0.0747f,0.0750f,0.0752f,0.0755f,0.0757f,0.0759f,0.0762f,0.0764f,0.0767f,0.0769f,0.0772f,0.0774f,0.0777f,0.0779f,0.0782f,0.0785f,0.0787f,0.0790f,0.0793f,0.0796f,0.0798f,0.0801f,0.0804f,0.0807f,0.0810f,0.0813f,0.0815f,0.0818f,0.0821f,0.0824f,0.0827f,0.0830f,0.0833f,0.0836f,0.0840f,0.0843f,0.0846f,0.0849f,0.0852f,0.0855f,0.0859f,0.0862f,0.0865f,0.0868f,0.0872f,0.0875f,0.0879f,0.0882f,0.0885f,0.0889f,0.0892f,0.0896f,0.0900f,0.0904f,0.0909f,0.0913f,0.0917f,0.0921f,0.0925f,0.0929f,0.0933f,0.0938f,0.0942f,0.0946f,0.0950f,0.0955f,0.0959f,0.0963f,0.0968f,0.0972f,0.0976f,0.0981f,0.0985f,0.0990f,0.0994f,0.0999f,0.1003f,0.1008f,0.1012f,0.1017f,0.1022f,0.1027f,0.1031f,0.1036f,0.1041f,0.1046f,0.1051f,0.1056f,0.1061f,0.1066f,0.1071f,0.1076f,0.1082f,0.1087f,0.1092f,0.1098f,0.1103f,0.1108f,0.1114f,0.1120f,0.1125f,0.1131f,0.1137f,0.1143f,0.1148f,0.1154f,0.1160f,0.1167f,0.1173f,0.1179f,0.1185f,0.1191f,0.1198f,0.1204f,0.1211f,0.1218f,0.1224f,0.1231f,0.1238f,0.1245f,0.1252f,0.1259f,0.1266f,0.1273f,0.1281f,0.1288f,0.1295f,0.1301f,0.1307f,0.1312f,0.1318f,0.1322f,0.1327f,0.1331f,0.1335f,0.1338f,0.1342f,0.1345f,0.1347f,0.1350f,0.1353f,0.1355f,0.1357f,0.1359f,0.1361f,0.1363f,0.1365f,0.1367f,0.1368f,0.1370f,0.1372f,0.1374f,0.1376f,0.1378f,0.1380f,0.1382f,0.1384f,0.1387f,0.1389f,0.1392f,0.1395f,0.1398f,0.1402f,0.1406f,0.1410f,0.1414f,0.1419f,0.1424f,0.1430f,0.1436f,0.1442f,0.1449f,0.1456f,0.1464f,0.1472f,0.1481f,0.1490f,0.1500f,0.1510f,0.1521f,0.1533f,0.1545f,0.1558f,0.1571f,0.1585f,0.1600f,0.1616f,0.1632f,0.1649f,0.1667f,0.1686f,0.1706f,0.1726f,0.1747f,0.1769f,0.1793f,0.1817f,0.1842f,0.1867f,0.1894f,0.1922f,0.1951f,0.1981f,0.2019f,0.2070f,0.2124f,0.2180f,0.2240f,0.2302f,0.2366f,0.2433f,0.2502f,0.2573f,0.2646f,0.2722f,0.2799f,0.2878f,0.2959f,0.3041f,0.3125f,0.3210f,0.3296f,0.3384f,0.3473f,0.3562f,0.3653f,0.3744f,0.3837f,0.3929f,0.4022f,0.4116f,0.4210f,0.4304f,0.4398f,0.4493f,0.4587f,0.4681f,0.4774f,0.4868f,0.4960f,0.5052f,0.5144f,0.5234f,0.5324f,0.5413f,0.5501f,0.5587f,0.5672f,0.5756f,0.5838f,0.5919f,0.5998f,0.6075f,0.6153f,0.6250f,0.6347f,0.6445f,0.6544f,0.6642f,0.6741f,0.6841f,0.6940f,0.7040f,0.7139f,0.7238f,0.7336f,0.7435f,0.7532f,0.7629f,0.7726f,0.7821f,0.7916f,0.8010f,0.8102f,0.8193f,0.8283f,0.8371f,0.8458f,0.8543f,0.8627f,0.8708f,0.8788f,0.8866f,0.8941f,0.9014f,0.9085f,0.9154f,0.9220f,0.9283f,0.9343f,0.9401f,0.9455f,0.9507f,0.9560f,0.9609f,0.9654f,0.9696f,0.9734f,0.9770f,0.9802f,0.9832f,0.9858f,0.9883f,0.9905f,0.9924f,0.9942f,0.9957f,0.9971f,0.9983f,0.9993f,1.0002f,1.0009f,1.0016f,1.0021f,1.0026f,1.0029f,1.0032f,1.0035f,1.0037f,1.0040f,1.0042f,1.0044f,1.0046f,1.0049f,1.0052f,1.0056f,1.0061f,1.0067f,1.0074f,1.0081f,1.0089f,1.0097f,1.0105f,1.0113f,1.0121f,1.0129f,1.0136f,1.0144f,1.0151f,1.0157f,1.0163f,1.0169f,1.0174f,1.0178f,1.0181f,1.0183f,1.0184f,1.0185f,1.0184f,1.0182f,1.0178f,1.0173f,1.0167f,1.0159f,1.0150f,1.0139f,1.0126f,1.0111f,1.0095f,1.0076f,1.0056f,1.0033f,1.0008f,0.9971f,0.9927f,0.9881f,0.9832f,0.9780f,0.9725f,0.9667f,0.9606f,0.9541f,0.9473f,0.9402f,0.9327f,0.9248f,0.9165f,0.9078f,0.8987f,0.8892f,0.8793f,0.8688f,0.8580f,0.8466f,0.8348f,0.8225f,0.8041f,0.7836f,0.7617f,0.7384f,0.7141f,0.6888f,0.6628f,0.6362f,0.6092f,0.5820f,0.5547f,0.5276f,0.5008f,0.4745f,0.4489f,0.4241f,0.3953f,0.3652f,0.3341f,0.3026f,0.2709f,0.2395f,0.2088f,0.1792f,0.1511f,0.1249f,0.1010f,0.0798f,0.0617f,0.0500f,0.0500f,0.0500f,0.0500f};
 /*[{"x":0.5382888381545609,"y":0.06428571428571428},{"x":10.990988241659629,"y":0.06785714285714284},{"x":28.018015268686657,"y":0.0892857142857143},{"x":42.597373971786595,"y":0.12857142857142856},{"x":57.84952649331181,"y":0.19999999999999996},{"x":67.68962489429582,"y":0.6142857142857143},{"x":75.31570115505842,"y":0.95},{"x":82.32677126575953,"y":1.0071428571428571},{"x":89.09909634976773,"y":1},{"x":93.5585558092272,"y":0.8214285714285714},{"x":96.6666639173353,"y":0.42500000000000004},{"x":99.36936662003801,"y":0.050000000000000044}]*/
@@ -236,64 +287,6 @@ T *aligned_new(int count, int alignment) {
   return (T *)_aligned_malloc(count * sizeof(T), alignment);
 }
 
-SplineTest::ParticleData::ParticleData(int numParticles)
-  : numParticles(numParticles)
-  , pos(aligned_new<float>(3 * numParticles, 16))
-  , posX(pos)
-  , posY(pos + numParticles)
-  , posZ(pos + 2 * numParticles)
-  , vel(aligned_new<float>(3 * numParticles, 16))
-  , velX(vel)
-  , velY(vel + numParticles)
-  , velZ(vel + 2 * numParticles)
-  , radius(aligned_new<float>(numParticles, 16))
-  , age(aligned_new<float>(numParticles, 16))
-  , maxAge(aligned_new<float>(numParticles, 16))
-  , factor(aligned_new<float>(numParticles, 16))
-{
-
-  vector<XMFLOAT3> controlPoints;
-
-  XMFLOAT3 cur(0,0,0);
-  for (int i = 0; i < 100; ++i) {
-    controlPoints.push_back(cur);
-    cur.x += gaussianRand(0, 20);
-    cur.y += gaussianRand(0, 20);
-    cur.z += gaussianRand(0, 20);
-  }
-
-
-  vector<XMFLOAT3> pts;
-  stepBSpline(20, controlPoints, &pts);
-
-  for (size_t i = 0; i < pts.size(); ++i) {
-    posX[i] = pts[i].x;
-    posY[i] = pts[i].y;
-    posZ[i] = pts[i].z;
-
-    radius[i] = gaussianRand(2.0f, 1.0f);
-    age[i] = 0.8f;
-    maxAge[i] = 1.0f;
-  }
-
-  numParticles = pts.size();
-/*
-  for (int i = 0; i < numParticles; ++i) {
-    initParticle(i);
-  }
-*/
-}
-
-SplineTest::ParticleData::~ParticleData() {
-  _aligned_free(pos);
-  _aligned_free(vel);
-  _aligned_free(radius);
-  _aligned_free(age);
-  _aligned_free(maxAge);
-  _aligned_free(factor);
-}
-
-
 SplineTest::SplineTest(const std::string &name) 
   : Effect(name)
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
@@ -304,7 +297,6 @@ SplineTest::SplineTest(const std::string &name)
   , _mouse_rbutton(false)
   , _mouse_pos_prev(~0)
   , _ctx(nullptr)
-  , _particle_data(5000)
   , _useFreeFlyCamera(true)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
 {
@@ -312,6 +304,7 @@ SplineTest::SplineTest(const std::string &name)
 }
 
 SplineTest::~SplineTest() {
+  seq_delete(&_splines);
   GRAPHICS.destroy_deferred_context(_ctx);
 }
 
@@ -374,6 +367,15 @@ bool SplineTest::init() {
     });
   }
 
+  for (int i = 0; i < 10; ++i) {
+    float x = randf(-50.0f, 50.0f);
+    float z = randf(-50.0f, 50.0f);
+    DynamicSpline *spline = new DynamicSpline(x, 0, z, gaussianRand(10, 3));
+    if (!spline->init())
+      return false;
+    _splines.push_back(spline);
+  }
+
   return true;
 }
 
@@ -423,6 +425,10 @@ bool SplineTest::update(int64 global_time, int64 local_time, int64 delta_ns, boo
 
   double time = local_time  / 1000.0;
 
+  for (size_t i = 0; i < _splines.size(); ++i) {
+    _splines[i]->update(delta_ns / 1e6f);
+  }
+
   calc_camera_matrices(time, delta_ns / 1e6, &_view, &_proj);
 
   PROPERTY_MANAGER.set_property(_view_mtx_id, _view);
@@ -449,6 +455,7 @@ void SplineTest::renderParticles() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
+/*
   D3D11_MAPPED_SUBRESOURCE res;
 
   GRAPHICS.map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
@@ -464,7 +471,7 @@ void SplineTest::renderParticles() {
   GRAPHICS.map(_ib, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
   memcpy(res.pData, gSpline._dynamicIndices.data(), gSpline._dynamicIndices.size() * sizeof(int));
   GRAPHICS.unmap(_ib, 0);
-
+*/
   Technique *technique = GRAPHICS.get_technique(_splineTechnique);
   Shader *vs = technique->vertex_shader(0);
   Shader *ps = technique->pixel_shader(0);
@@ -495,9 +502,14 @@ void SplineTest::renderParticles() {
   _ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
   _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
+  for (auto it = begin(_splines); it != end(_splines); ++it) {
+    (*it)->render(_ctx);
+  }
+/*
   _ctx->set_vb(_vb, sizeof(PosNormal));
   _ctx->set_ib(_ib, DXGI_FORMAT_R32_UINT);
   _ctx->draw_indexed(gSpline._dynamicIndices.size(), 0, 0);
+*/
 }
 /*
 bool SplineTest::render() {
