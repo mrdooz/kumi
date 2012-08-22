@@ -79,19 +79,22 @@ void stepBSpline(int pointsPerSegment, const vector<XMFLOAT3> &controlPoints, ve
 
 class DynamicSpline {
 public:
-  static const int cRingsPerSegment = 20;
+  static const int cRingsPerSegment = 10;
+  static const int cSegmentHeight = 40;
+  static const int cRingSpacing = cSegmentHeight / cRingsPerSegment;
   static const int cVertsPerRing = 20;
-  static const int cStaticVbSize = 1 << 20;
+  static const int cVertsPerSegment = cRingsPerSegment * cVertsPerRing;
+  static const int cStaticVbSize = 1 * 1024 * 1024;
   static const int cDynamicSegmentBuffer = 1;
 
   DynamicSpline(DeferredContext *ctx, float x, float y, float z, float growthRate)
     : _curTime(0)
     , _curTop(x, y, z)
     , _curHeight(0)
-    , _segmentHeight(20)
     , _growthRate(growthRate)
     , _curStaticBufferUsed(0)
     , _ctx(ctx)
+    , _prevCap(false)
   {
     _controlPoints.push_back(_curTop);
 
@@ -106,8 +109,7 @@ public:
   bool init() {
     _dynamicSplineVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
 
-    _dynamicVerts.reserve(100000);
-    _dynamicIndices.reserve(25000);
+    _dynamicVerts.reserve(10000);
 
     for (int i = 0; i < cVertsPerRing; ++i) {
       float x = sinf(2*XM_PI*i/cVertsPerRing);
@@ -119,6 +121,7 @@ public:
     static bool firstSpline = true;
     if (firstSpline) {
       firstSpline = false;
+      _dynamicIndices.reserve(25000);
       createIndices(100*cRingsPerSegment);
 
       _splineIb = GRAPHICS.create_buffer(FROM_HERE, 
@@ -135,8 +138,8 @@ public:
     float prevHeight = _curHeight;
     _curHeight += _growthRate * delta;
 
-    float prevSegment = floorf(prevHeight / _segmentHeight);
-    float curSegment = floorf(_curHeight / _segmentHeight);
+    int prevSegment = (int)(prevHeight / cSegmentHeight);
+    int curSegment = (int)(_curHeight / cSegmentHeight);
 
     // add new segments if needed
     while (prevSegment != curSegment) {
@@ -149,15 +152,23 @@ public:
 
     const int numPts = _controlPoints.size();
 
-    // start recreating vertices at the first segment containing the spike
     float spikeLength = 10;
-    int startingSegment = (int)(max(0,(_curHeight - spikeLength)) / _segmentHeight);
+
+    // start recreating vertices at the first ring containing the spike
+    int maxSpikeSegments = (int)(spikeLength / cRingSpacing) + 2;
+
+    int spikeSegments = (int)(spikeLength / cSegmentHeight) + 2;    // max # segments a spike can occupy
+    int startingSegment = max(0,curSegment - spikeSegments);
+/*
+    if (_prevCap)
+      _dynamicVerts.resize(_dynamicVerts.size() - cVertsPerRing);
 
     // if we have enough static segments, dump them to the static vb
-    if (startingSegment > cDynamicSegmentBuffer) {
+    const int completedSegments = _dynamicVerts.size() / cVertsPerSegment;
+    if (completedSegments >= spikeSegments + cDynamicSegmentBuffer) {
       auto *staticVb = &_staticSplines.back();
-      const int numVertsToStash = cDynamicSegmentBuffer * cRingsPerSegment * cVertsPerRing;
-      if (staticVb->numVerts + numVertsToStash > cStaticVbSize) {
+      const int numVertsToStash = (completedSegments - (spikeSegments + cDynamicSegmentBuffer)) * cVertsPerSegment;
+      if ((staticVb->numVerts + numVertsToStash) * sizeof(PosNormal) > cStaticVbSize) {
         // allocate a new static vb
         _staticSplines.push_back(StaticSpline(GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, cStaticVbSize, true, nullptr)));
         staticVb = &_staticSplines.back();
@@ -165,23 +176,19 @@ public:
       D3D11_MAPPED_SUBRESOURCE res;
       bool newVb = staticVb->numVerts == 0;
       _ctx->map(staticVb->vb, 0, newVb ? D3D11_MAP_WRITE_DISCARD : D3D11_MAP_WRITE_NO_OVERWRITE, 0, &res);
-      //memcpy((char *)res.pData + staticVb->numVerts * sizeof(PosNormal), _dynamicVerts.data(), numVertsToStash * sizeof(PosNormal));
+      memcpy((char *)res.pData + staticVb->numVerts * sizeof(PosNormal), _dynamicVerts.data(), numVertsToStash * sizeof(PosNormal));
       _ctx->unmap(staticVb->vb, 0);
       staticVb->numVerts += numVertsToStash;
 
-      int vertsLeft = _dynamicVerts.size() - numVertsToStash;
-      vector<PosNormal> newVerts(vertsLeft);
-      copy(begin(_dynamicVerts) + numVertsToStash, end(_dynamicVerts), begin(newVerts));
-
-      _dynamicVerts.resize(vertsLeft);
-      move(begin(newVerts), end(newVerts), begin(_dynamicVerts));
+      _dynamicVerts.erase(begin(_dynamicVerts), begin(_dynamicVerts) + numVertsToStash);
     } else {
-      _dynamicVerts.resize(startingSegment * cRingsPerSegment * cVertsPerRing);
+      _dynamicVerts.erase(begin(_dynamicVerts) + startingSegment * cVertsPerSegment, end(_dynamicVerts));
     }
-
-    float c = startingSegment * _segmentHeight;
+*/
+    float c = startingSegment * cSegmentHeight;
 
     // calc initial reference frame
+    // TODO: this should be stored per segment start
     XMFLOAT3 *pts = &_controlPoints[0];
     XMFLOAT3 p0 = evalBSpline(0, pts[0], pts[1], pts[2], pts[3]);
     XMFLOAT3 p1 = evalBSpline(0.1f, pts[0], pts[1], pts[2], pts[3]);
@@ -193,16 +200,17 @@ public:
 
     float maxRadius = 3;
     float minRadius = 0.01f;
+    _prevCap = false;
     while (c < _curHeight) {
 
-      int idx = (int)(c / cRingsPerSegment);
+      int idx = (int)(c / cSegmentHeight);
       auto &p0 = _controlPoints[max(0, idx-1)];
       auto &p1 = _controlPoints[max(0, idx-0)];
       auto &p2 = _controlPoints[min(numPts-1, idx+1)];
       auto &p3 = _controlPoints[min(numPts-1, idx+2)];
 
       float step = 1.0f / cRingsPerSegment;
-      float maxT = min(1, (_curHeight - c) / _segmentHeight);
+      float maxT = min(1, (_curHeight - c) / cSegmentHeight);
 
       const auto &addRingHelper = [&](float t){
         auto pt0 = evalBSpline(t, p0, p1, p2, p3);
@@ -218,10 +226,12 @@ public:
         float t = j * step;
         addRingHelper(t);
         _prevB = b;
-        c += _segmentHeight * step;
+        c += cSegmentHeight * step;
         if (c >= _curHeight) {
+          c = _curHeight;
           // if we exceed the max height with this segment, add a cap ring
           addRingHelper(maxT);
+          _prevCap = true;
           break;
         }
       }
@@ -231,7 +241,7 @@ public:
   void render() {
 
     _ctx->set_ib(_splineIb, DXGI_FORMAT_R32_UINT);
-/*
+
     // draw the static vbs
     for (size_t i = 0; i < _staticSplines.size(); ++i) {
       auto &cur = _staticSplines[i];
@@ -241,7 +251,7 @@ public:
         _ctx->draw_indexed(numIndices, 0, 0);
       }
     }
-*/
+
 
     // draw the dynamic vbs
 
@@ -253,6 +263,8 @@ public:
     _ctx->map(_dynamicSplineVb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
     memcpy(res.pData, _dynamicVerts.data(), numVerts * sizeof(PosNormal));
     _ctx->unmap(_dynamicSplineVb, 0);
+
+    KASSERT((numVerts % cVertsPerRing) == 0);
 
     _ctx->set_vb(_dynamicSplineVb, sizeof(PosNormal));
 
@@ -324,11 +336,11 @@ private:
   vector<XMFLOAT3> _extrudeShape;
   int _curKnot;
   int _curSegment;
-  float _segmentHeight;
   float _curHeight;
   float _growthRate;
   float _curTime;
   int _curStaticBufferUsed;
+  bool _prevCap;
 
   DeferredContext *_ctx;
 };
@@ -436,9 +448,9 @@ bool SplineTest::init() {
     });
   }
 
-  float span = 75;
+  float span = 0;
 #if _DEBUG
-  const int numSplines = 50;
+  const int numSplines = 1;
 #else
   const int numSplines = 500;
 #endif
