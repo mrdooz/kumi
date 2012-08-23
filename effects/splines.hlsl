@@ -31,5 +31,5 @@ PsInput vs_main(VsInput input)
 float4 ps_main(PsInput input) : SV_TARGET
 {
     //return float4(1,1,0,1);
-    return dot(normalize(input.normal), normalize(cameraPos - input.wsPos));
+    return saturate(dot(normalize(input.normal), normalize(cameraPos - input.wsPos)));
 }

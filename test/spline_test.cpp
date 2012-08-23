@@ -130,9 +130,15 @@ public:
     _controlPoints.push_back(_curTop);
 
     for (int i = 0; i < 3; ++i) {
-      _curTop.x += gaussianRand(0, 15);
+#if _DEBUG
+      _curTop.x += 0; //randf(-10, 10);
+      _curTop.y += 10; //gaussianRand(10, 2);
+      _curTop.z += 0; //randf(-10, 10);
+#else
+      _curTop.x += randf(-10, 10);
       _curTop.y += gaussianRand(10, 2);
-      _curTop.z += gaussianRand(0, 15);
+      _curTop.z += randf(-10, 10);
+#endif
       _controlPoints.push_back(_curTop);
     }
 
@@ -204,14 +210,20 @@ public:
 
     // # segments = # control points - 2
     while (curSegment > (int)_controlPoints.size() - 4) {
+#if _DEBUG
+      _curTop.x += 0; //randf(-10, 10);
+      _curTop.y += 10; //gaussianRand(10, 2);
+      _curTop.z += 0; //randf(-10, 10);
+#else
       _curTop.x += randf(-10, 10);
       _curTop.y += gaussianRand(10, 2);
       _curTop.z += randf(-10, 10);
+#endif
       _controlPoints.push_back(_curTop);
       updateVtxCache();
     }
 
-    float spikeLength = 20;
+    float spikeLength = 50;
     float spikeStart = max(0,_curHeight - spikeLength);
 
     int startRing = (int)(spikeStart / cRingSpacing);
@@ -234,15 +246,21 @@ public:
     float c = (float)(startRing * cRingSpacing);
     float step = cRingSpacing;
 
-    // add a pre-cap where the spike starts
-    {
-      float t = (spikeStart - (startRing * cRingSpacing)) / cRingSpacing;
+    // add the bottom ring
+    VtxCache &cur = _vtxCache[startRing-_ringOffset];
+    float r = lerp(minRadius, maxRadius, clamp(0.f, 1.f, (_curHeight - c) / spikeLength));
+    addRing(cur.p, cur.n, cur.dir, cur.b, r);
+
+    if (_curHeight > spikeLength) {
+      // add a ring where the spike starts
+      float t = (spikeStart - c) / step;
+      KASSERT(t >= 0 && t < 1)
       VtxCache &cur = _vtxCache[startRing-_ringOffset];
       VtxCache &next = _vtxCache[startRing+1-_ringOffset];
-      float r = maxRadius;
+      float r = lerp(minRadius, maxRadius, clamp(0.f, 1.f, (_curHeight - (c + step * t)) / spikeLength));
       addRing(lerp(cur.p, next.p, t), lerp(cur.n, next.n, t), lerp(cur.dir, next.dir, t), lerp(cur.b, next.b, t), r);
-      c += step;
     }
+    c += step;
 
     for (int i = startRing + 1; i <= curRing; ++i) {
       VtxCache &cur = _vtxCache[i-_ringOffset];
@@ -253,7 +271,7 @@ public:
 
     {
       // add the end cap by lerping between cur and next rings
-      float t = (_curHeight - (curRing * cRingSpacing)) / cRingSpacing;
+      float t = (_curHeight - curRing * step) / step;
       VtxCache &cur = _vtxCache[curRing-_ringOffset];
       VtxCache &next = _vtxCache[curRing+1-_ringOffset];
       float r = minRadius;
@@ -427,16 +445,21 @@ bool SplineTest::init() {
     });
   }
 
-  float span = 0;
 #if _DEBUG
   const int numSplines = 1;
+  float span = 0;
 #else
-  const int numSplines = 1000;
+  float span = 20;
+  const int numSplines = 500;
 #endif
   for (int i = 0; i < numSplines; ++i) {
     float x = randf(-span, span);
     float z = randf(-span, span);
-    DynamicSpline *spline = new DynamicSpline(_ctx, x, 0, z, gaussianRand(10, 3));
+    float g = gaussianRand(15, 10);
+#if _DEBUG
+    g = 1;
+#endif
+    DynamicSpline *spline = new DynamicSpline(_ctx, x, 0, z, g);
     if (!spline->init())
       return false;
     _splines.push_back(spline);
