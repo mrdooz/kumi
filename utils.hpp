@@ -176,4 +176,9 @@ T lerp(T a, T b, U v) {
   return a + (v * (b-a));
 }
 
+template <typename T>
+T clamp(T minValue, T maxValue, T value) {
+  return value < minValue ? minValue : value > maxValue ? maxValue : value;
+}
+
 float gaussianRand(float mean, float variance);

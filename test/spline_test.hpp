@@ -28,6 +28,8 @@ private:
   bool file_changed(const char *filename, void *token);
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
+  void createSplineIb();
+
 
   PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
 
@@ -43,6 +45,8 @@ private:
   GraphicsObjectHandle _scale;
 
   GraphicsObjectHandle _splineTechnique;
+
+  GraphicsObjectHandle _splineIb;
   
   GaussianBlur _blur;
 

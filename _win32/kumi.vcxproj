@@ -100,7 +100,7 @@
       <AdditionalOptions>/Zm250 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <DisableSpecificWarnings>4996; 4200</DisableSpecificWarnings>
       <OpenMPSupport>true</OpenMPSupport>
