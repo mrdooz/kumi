@@ -168,12 +168,13 @@ void erase_remove_if(Cont *cont, const Pred &pred) {
 
 template <typename T>
 T randf(T a, T b) {
-  return a + (b-a) * rand() / RAND_MAX;
+  float t = (float)rand() / RAND_MAX;
+  return lerp(a, b, t);
 }
 
 template <typename T, typename U>
 T lerp(T a, T b, U v) {
-  return a + (v * (b-a));
+  return (1-v) * a + v * b;
 }
 
 template <typename T>

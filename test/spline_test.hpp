@@ -28,6 +28,7 @@ private:
   bool file_changed(const char *filename, void *token);
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
+  bool initSplines();
   void createSplineIb();
 
 
@@ -68,6 +69,7 @@ private:
   XMFLOAT4X4 _view, _proj;
 
   DeferredContext *_ctx;
+  std::vector<XMFLOAT4> _extrudeShape;
 
   std::vector<DynamicSpline *> _splines;
 };

@@ -101,6 +101,13 @@ inline void set_col(const XMFLOAT3 &v, int col, XMFLOAT4X4 *mtx) {
   mtx->m[2][col] = v.z;
 }
 
+inline void set_col(const XMFLOAT4 &v, int col, XMFLOAT4X4 *mtx) {
+  mtx->m[0][col] = v.x;
+  mtx->m[1][col] = v.y;
+  mtx->m[2][col] = v.z;
+  mtx->m[3][col] = v.w;
+}
+
 inline XMFLOAT4 col(const XMFLOAT4X4 &m, int col) {
   return XMFLOAT4(m.m[0][col], m.m[1][col], m.m[2][col], m.m[3][col]);
 }

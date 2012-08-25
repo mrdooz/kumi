@@ -269,6 +269,7 @@ private:
   const char *_gs_profile;
 
   bool _vsync;
+  int _totalBytesAllocated;
 
   std::map<PredefinedGeometry, std::pair<GraphicsObjectHandle, GraphicsObjectHandle> > _predefined_geometry;
 

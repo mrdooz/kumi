@@ -196,6 +196,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
       // Parse input layout
+/*
       auto mapping = map_list_of
         ("SV_POSITION", DXGI_FORMAT_R32G32B32A32_FLOAT)
         ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
@@ -203,7 +204,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
         ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
         ("SIZE", DXGI_FORMAT_R32_FLOAT)
         ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
-
+*/
       vector<D3D11_INPUT_ELEMENT_DESC> inputs;
       for (i += 3; i < input.size(); ++i) {
         auto &row = input[i];
@@ -212,12 +213,25 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
           break;
         }
 
+        // determine the format from the type and mask
         DXGI_FORMAT fmt;
+        int count = row[2].len;
+        if (row[5] == "float") {
+          switch (count) {
+            case 1: fmt = DXGI_FORMAT_R32_FLOAT; break;
+            case 2: fmt = DXGI_FORMAT_R32G32_FLOAT; break;
+            case 3: fmt = DXGI_FORMAT_R32G32B32_FLOAT; break;
+            case 4: fmt = DXGI_FORMAT_R32G32B32A32_FLOAT; break;
+          }
+        } else {
+          LOG_ERROR_LN("Unknown type: %s", row[5]);
+        }
+/*
         if (!lookup<string, DXGI_FORMAT>(row[0].to_string(), mapping, &fmt)) {
           LOG_ERROR_LN("Invalid input semantic found: %s", row[0].c_str());
           return false;
         }
-
+*/
         inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, 0));
       }
 

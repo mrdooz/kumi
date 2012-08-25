@@ -6,6 +6,11 @@ technique SplineRender {
         file splines.hlsl;
         entry_point vs_main;
     };
+    
+    geometry_shader {
+        file splines.hlsl;
+        entry_point gs_main;
+    };
 
     pixel_shader {
         file splines.hlsl;

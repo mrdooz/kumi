@@ -160,18 +160,22 @@ void DeferredContext::set_default_render_target() {
 }
 
 void DeferredContext::set_vs(GraphicsObjectHandle vs) {
+  KASSERT(vs.type() == GraphicsObjectHandle::kVertexShader);
   _ctx->VSSetShader(GRAPHICS._vertex_shaders.get(vs), NULL, 0);
 }
 
 void DeferredContext::set_cs(GraphicsObjectHandle cs) {
+  KASSERT(cs.type() == GraphicsObjectHandle::kComputeShader);
   _ctx->CSSetShader(cs.is_valid() ? GRAPHICS._compute_shaders.get(cs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_gs(GraphicsObjectHandle gs) {
+  KASSERT(gs.type() == GraphicsObjectHandle::kGeometryShader);
   _ctx->GSSetShader(gs.is_valid() ? GRAPHICS._geometry_shaders.get(gs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_ps(GraphicsObjectHandle ps) {
+  KASSERT(ps.type() == GraphicsObjectHandle::kPixelShader);
   _ctx->PSSetShader(ps.is_valid() ? GRAPHICS._pixel_shaders.get(ps) : NULL, NULL, 0);
 }
 

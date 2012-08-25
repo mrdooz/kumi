@@ -71,6 +71,7 @@ Graphics::Graphics()
   , _resources(delete_obj<SimpleResource *>)
   , _structured_buffers(delete_obj<StructuredBuffer *>)
   , _vsync(false)
+  , _totalBytesAllocated(0)
 {
 }
 
@@ -115,7 +116,11 @@ bool Graphics::create_buffer_inner(const TrackedLocation &loc, D3D11_BIND_FLAG b
   ZeroMemory(&init_data, sizeof(init_data));
   init_data.pSysMem = data;
   HRESULT hr = _device->CreateBuffer(&desc, data ? &init_data : NULL, buffer);
+  if (hr == E_OUTOFMEMORY) {
+    LOG_ERROR_LN("Out of memory trying to allocate %d bytes for buffer [total allocated: %d bytes]", size, _totalBytesAllocated);
+  }
   set_private_data(loc, *buffer);
+  _totalBytesAllocated += size;
   return SUCCEEDED(hr);
 }
 
@@ -561,7 +566,6 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
 
   // Use the first adapter
   vector<CComPtr<IDXGIAdapter1> > adapters;
-  UINT i = 0;
   IDXGIAdapter1 *adapter = nullptr;
   int perfhud = -1;
   for (int i = 0; SUCCEEDED(dxgi_factory->EnumAdapters1(i, &adapter)); ++i) {
