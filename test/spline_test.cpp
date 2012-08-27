@@ -22,6 +22,8 @@
 using namespace std;
 using namespace std::tr1::placeholders;
 
+#define SPLINE_DEBUG 0
+
 static const int cRingsPerSegment = 5;
 static const int cSegmentHeight = 20;
 static const int cRingSpacing = cSegmentHeight / cRingsPerSegment;
@@ -116,7 +118,7 @@ public:
     _controlPoints.push_back(_curTop);
 
     for (int i = 0; i < 3; ++i) {
-#if _DEBUG
+#if _SPLINE_DEBUG
       _curTop.x += 0; //randf(-10, 10);
       _curTop.y += 10; //gaussianRand(10, 2);
       _curTop.z += 0; //randf(-10, 10);
@@ -192,7 +194,7 @@ public:
 
     // # segments = # control points - 2
     while (curSegment > (int)_controlPoints.size() - 4) {
-#if _DEBUG
+#if SPLINE_DEBUG
       _curTop.x += 0; //randf(-10, 10);
       _curTop.y += 10; //gaussianRand(10, 2);
       _curTop.z += 0; //randf(-10, 10);
@@ -424,7 +426,7 @@ bool SplineTest::file_changed(const char *filename, void *token) {
 void SplineTest::createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, DynamicSpline *parent) {
 
   auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
-#if _DEBUG
+#if SPLINE_DEBUG
   const int maxSplines = 100;
 #else
   const int maxSplines = 1500;
@@ -513,7 +515,7 @@ bool SplineTest::initSplines() {
 
   auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
 
-#if _DEBUG
+#if _SPLINE_DEBUG
   const int numSplines = 1;
   float span = 0;
 #else
@@ -524,7 +526,7 @@ bool SplineTest::initSplines() {
     float x = randf(-span, span);
     float z = randf(-span, span);
     float g = gaussianRand(15, 10);
-#if _DEBUG
+#if _SPLINE_DEBUG
     g = 5;
 #endif
     DynamicSpline *spline = new DynamicSpline(_ctx, XMFLOAT3(x,0,z), XMFLOAT3(0,1,0), XMFLOAT3(1,0,0), g, 1.5f, 10000, cb);
