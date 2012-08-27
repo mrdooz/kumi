@@ -28,6 +28,7 @@ static const int cRingSpacing = cSegmentHeight / cRingsPerSegment;
 static const int cVertsPerRing = 20;
 static const int cVertsPerSegment = cRingsPerSegment * cVertsPerRing;
 static const int cMaxRingsPerBuffer = 1000;
+static const float cChildRate = 2.0f;
 
 // each entry in the data sent to the VS/GS is 2 frames and 2 radius
 struct VsInput {
@@ -90,11 +91,15 @@ void stepBSpline(int pointsPerSegment, const vector<XMFLOAT3> &controlPoints, ve
   }
 }
 
+typedef std::function<void (const XMFLOAT3 &p, const XMFLOAT3 &d, const XMFLOAT3 &n, DynamicSpline *parent)> cbCreateSpline;
+
 class DynamicSpline {
 public:
-  DynamicSpline(DeferredContext *ctx, float x, float y, float z, float growthRate)
-    : _curTop(x, y, z)
+  DynamicSpline(DeferredContext *ctx, const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, 
+    float growthRate, float maxRadius, float maxHeight, const cbCreateSpline &cbCreateSpline)
+    : _curTop(p)
     , _curHeight(0)
+    , _elapsedTime(0)
     , _growthRate(growthRate)
     , _ctx(ctx)
     , _ringOffset(0)
@@ -103,6 +108,10 @@ public:
     , _prevStartRing(0)
     , _dynamicRings(128)
     , _totalStaticSegments(0)
+    , _maxRadius(maxRadius)
+    , _maxHeight(maxHeight)
+    , _cbCreateSpline(cbCreateSpline)
+    , _nextChild(gaussianRand(cChildRate, 1))
   {
     _controlPoints.push_back(_curTop);
 
@@ -122,11 +131,9 @@ public:
     const int numPts = _controlPoints.size();
 
     // calc initial reference frame
-    auto cur = evalBSpline(0, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
-    auto next = evalBSpline(0.1f, _controlPoints[0], _controlPoints[1], _controlPoints[2], _controlPoints[3]);
-    auto dir = normalize(next - cur);
-    auto n = perpVector(dir);
     _prevB = cross(dir, n);
+
+    _vtxCache.push_back(VtxCache(p, n, dir, _prevB));
 
     // calc initial vertex cache
     for (int i = 0; i < numPts-2; ++i) {
@@ -151,7 +158,7 @@ public:
       auto dir = normalize(next - cur);
       auto n = cross(_prevB, dir);
       auto b = cross(dir, n);
-      _vtxCache.push_back(VtxCache(cur, n, b, dir));
+      _vtxCache.push_back(VtxCache(cur, n, dir, b));
       cur = next;
       _prevB = b;
     }
@@ -164,6 +171,10 @@ public:
     return true;
   }
 
+  const XMFLOAT3 &pos() const {
+    return _curPos;
+  }
+
   void update(float delta) {
 
     // if the delta is too large, then i'm probably just debugging, so lets throw this step away
@@ -171,12 +182,16 @@ public:
       return;
 
     _curHeight += _growthRate * delta;
+    if (_curHeight > _maxHeight)
+      return;
+
+    _elapsedTime += delta;
 
     int curSegment = (int)(_curHeight / cSegmentHeight);
     int curRing = (int)(_curHeight / cRingSpacing);
 
     // # segments = # control points - 2
-    while (curSegment > (int)_controlPoints.size() - 10) {
+    while (curSegment > (int)_controlPoints.size() - 4) {
 #if _DEBUG
       _curTop.x += 0; //randf(-10, 10);
       _curTop.y += 10; //gaussianRand(10, 2);
@@ -194,8 +209,8 @@ public:
     const float spikeStart = max(0,_curHeight - spikeLength);
     const int startRing = (int)(spikeStart / cRingSpacing);
 
-    const float maxRadius = 2;
     const float minRadius = 0.01f;
+    const float maxRadius = _maxRadius;
     const float step = cRingSpacing;
 
     // if we're starting in a new ring, move the old one to the static buffer
@@ -225,6 +240,17 @@ public:
 
     // add the bottom ring
     VtxCache *cur = &_vtxCache[startRing-_ringOffset];
+
+    // check if we should create a new spline here
+    if (_elapsedTime > _nextChild) {
+      float x = randf(-0.1f, 0.1f);
+      float y = randf(-0.1f, 0.1f);
+      float z = randf(-0.1f, 0.1f);
+      XMFLOAT3 d = normalize(cur->n + XMFLOAT3(x, y, z));
+      _cbCreateSpline(cur->p, d, perpVector(d), this);
+      _nextChild += gaussianRand(cChildRate, 1);
+    }
+
     float r = clamp(minRadius, maxRadius, lerp(minRadius, maxRadius, remaining / spikeLength));
     addRing(cur->p, cur->n, cur->dir, cur->b, r, false);
 
@@ -250,7 +276,9 @@ public:
       cur = &_vtxCache[curRing-_ringOffset];
       auto *next = &_vtxCache[curRing+1-_ringOffset];
       r = minRadius;
-      addRing(lerp(cur->p, next->p, t), lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r, false);
+      XMFLOAT3 p = lerp(cur->p, next->p, t);
+      addRing(p, lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r, false);
+      _curPos = p;
     }
   }
 
@@ -283,6 +311,10 @@ public:
     }
   }
 
+  float growthRate() const { return _growthRate; }
+  float maxRadius() const { return _maxRadius; }
+  float maxHeight() const { return _maxHeight; }
+
 private:
 
   struct Ring {
@@ -309,7 +341,8 @@ private:
   }
 
   struct VtxCache {
-    VtxCache(const XMFLOAT3 &p, const XMFLOAT3 &n, const XMFLOAT3 &b, const XMFLOAT3 &dir) : p(p), n(n), b(b), dir(dir) {}
+    VtxCache() {}
+    VtxCache(const XMFLOAT3 &p, const XMFLOAT3 &n, const XMFLOAT3 &dir, const XMFLOAT3 &b) : p(p), n(n), dir(dir), b(b) {}
     XMFLOAT3 p;
     XMFLOAT3 n, b, dir;
   };
@@ -324,12 +357,19 @@ private:
   XMFLOAT3 _curTop;
   vector<XMFLOAT3> _controlPoints;
   float _curHeight;
+  float _elapsedTime;
   float _growthRate;
   int _curControlPt;
   int _startRing;
   int _prevStartRing;
 
   int _totalStaticSegments;
+  float _maxRadius;
+  float _maxHeight;
+  float _nextChild;
+
+  cbCreateSpline _cbCreateSpline;
+  XMFLOAT3 _curPos;
 
   DeferredContext *_ctx;
 };
@@ -364,7 +404,7 @@ SplineTest::SplineTest(const std::string &name)
   , _mouse_rbutton(false)
   , _mouse_pos_prev(~0)
   , _ctx(nullptr)
-  , _useFreeFlyCamera(true)
+  , _useFreeFlyCamera(false)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
   , _staticVertCount(0)
   , _useZFill(false)
@@ -379,6 +419,26 @@ SplineTest::~SplineTest() {
 
 bool SplineTest::file_changed(const char *filename, void *token) {
   return true;
+}
+
+void SplineTest::createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, DynamicSpline *parent) {
+
+  auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
+#if _DEBUG
+  const int maxSplines = 100;
+#else
+  const int maxSplines = 1500;
+#endif
+
+  if (_splines.size() > maxSplines)
+    return;
+
+  unique_ptr<DynamicSpline> spline(new DynamicSpline(_ctx, p, dir, n, 
+    parent->growthRate() * 0.75f, parent->maxRadius() * 0.75f, parent->maxHeight() * 0.1f,
+    cb));
+  if (!spline->init())
+    return;
+  _splines.push_back(spline.release());
 }
 
 
@@ -451,12 +511,14 @@ bool SplineTest::init() {
 
 bool SplineTest::initSplines() {
 
+  auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
+
 #if _DEBUG
   const int numSplines = 1;
   float span = 0;
 #else
-  float span = 100;
-  const int numSplines = 1000;
+  float span = 0;
+  const int numSplines = 1;
 #endif
   for (int i = 0; i < numSplines; ++i) {
     float x = randf(-span, span);
@@ -465,7 +527,7 @@ bool SplineTest::initSplines() {
 #if _DEBUG
     g = 5;
 #endif
-    DynamicSpline *spline = new DynamicSpline(_ctx, x, 0, z, g);
+    DynamicSpline *spline = new DynamicSpline(_ctx, XMFLOAT3(x,0,z), XMFLOAT3(0,1,0), XMFLOAT3(1,0,0), g, 1.5f, 10000, cb);
     if (!spline || !spline->init())
       return false;
     _splines.push_back(spline);
@@ -484,44 +546,9 @@ bool SplineTest::initSplines() {
   return true;
 }
 
-void SplineTest::createSplineIb() {
-
-  int numVerts = cMaxRingsPerBuffer * cVertsPerRing;
-  int numIndices = 3 * (numVerts / cVertsPerRing - 1) * 2 * cVertsPerRing;
-
-  _splineIb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, numVerts * sizeof(int), true, nullptr);
-  D3D11_MAPPED_SUBRESOURCE res;
-  _ctx->map(_splineIb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
-
-  int *indices = (int *)res.pData;
-
-  for (int i = 0; i < cMaxRingsPerBuffer; ++i) {
-
-    for (int j = 0; j < cVertsPerRing; ++j) {
-
-      int prev = (j + 1) %  cVertsPerRing;
-
-      int v0 = i*cVertsPerRing + j;
-      int v1 = (i+1)*cVertsPerRing + j;
-      int v2 = (i+1)*cVertsPerRing + prev;
-      int v3 = i*cVertsPerRing + prev;
-
-      *indices++ = v0;
-      *indices++ = v1;
-      *indices++ = v2;
-
-      *indices++ = v0;
-      *indices++ = v2;
-      *indices++ = v3;
-    }
-  }
-
-  _ctx->unmap(_splineIb, 0);
-}
-
 void SplineTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj) {
 
-  *proj = transpose(_freefly_camera.projectionMatrix());
+  *proj = _freefly_camera.projectionMatrix();
 
   double orgDelta = delta;
   if (is_bit_set(GetAsyncKeyState(VK_SHIFT), 15))
@@ -549,18 +576,19 @@ void SplineTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vie
       _freefly_camera.rotate(FreeFlyCamera::kYAxis, dy);
     }
 
-    *view = transpose(_freefly_camera.viewMatrix());
+    *view = _freefly_camera.viewMatrix();
   } else {
 
-    XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(0, 0, -50, 0));
-    XMVECTOR at = XMLoadFloat4(&XMFLOAT4(0, 0, 0, 0));
-    float x = -cosf((float)time/20);
-    float y = sinf((float)time/20);
-    XMVECTOR up = XMLoadFloat4(&XMFLOAT4(x, y, 0, 0));
+    float radius = 50;
+    XMFLOAT3 p = _splines.front()->pos();
+    XMVECTOR at =  XMLoadFloat4(&XMFLOAT4(p.x, p.y - 20, p.z, 0));
+    float s = sinf((float)time/10);
+    float c = -cosf((float)time/10);
+    XMFLOAT3 pp = p + radius * XMFLOAT3(s, s*c, c);
+    XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(pp.x, pp.y, pp.z, 0));
+    XMVECTOR up = XMLoadFloat4(&XMFLOAT4(0, 1, 0, 0));
     XMMATRIX lookat = XMMatrixLookAtLH(pos, at, up);
-    XMFLOAT4X4 tmp;
-    XMStoreFloat4x4(&tmp, lookat);
-    *view = transpose(tmp);
+    XMStoreFloat4x4(view, lookat);
   }
 }
 
@@ -627,12 +655,11 @@ void SplineTest::renderParticles() {
   } cbuffer;
 #pragma pack(pop)
 
-  XMFLOAT4X4 view = _freefly_camera.viewMatrix();
-  XMFLOAT4X4 proj = _freefly_camera.projectionMatrix();
+  XMFLOAT4X4 view = _view;
+  XMFLOAT4X4 proj = _proj;
 
   XMFLOAT4X4 mtx;
   XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
-
   cbuffer.worldViewProj = transpose(mtx);
   cbuffer.cameraPos = expand(_freefly_camera.pos(),0);
   memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
@@ -732,7 +759,7 @@ void SplineTest::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
       _keystate[wParam] = 0;
     switch (wParam) {
     case 'F':
-      //_use_freefly_camera = !_use_freefly_camera;
+      _useFreeFlyCamera = !_useFreeFlyCamera;
       break;
     case 'Z':
       _useZFill = !_useZFill;

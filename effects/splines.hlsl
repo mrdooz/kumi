@@ -72,7 +72,7 @@ float4 ps_main(PsInput input) : SV_TARGET
 {
   //return float4(input.wsPos,1);
   //return float4(1,1,0,1);
-  return saturate(dot(normalize(input.normal), normalize(float3(0,10000,-1000) - input.wsPos)));
+  return 0.3f + saturate(dot(normalize(input.normal), normalize(float3(0,10000,-1000) - input.wsPos)));
 }
 
 

@@ -9,6 +9,8 @@ struct Scene;
 class DeferredContext;
 class DynamicSpline;
 
+class DynamicSpline;
+
 class SplineTest : public Effect {
 public:
   SplineTest(const std::string &name);
@@ -29,9 +31,9 @@ private:
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
   bool initSplines();
-  void createSplineIb();
 
-
+  void createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, DynamicSpline *parent);
+  
   PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
 
   GraphicsObjectHandle _particle_technique;
