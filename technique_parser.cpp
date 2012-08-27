@@ -143,6 +143,8 @@ enum Symbol {
 
   kSymDepthStencilDesc,
     kSymDepthEnable,
+    kSymDepthFunc,
+    kSymDepthWriteMask,
 
   kSymBlendDesc,
     kSymAlphaToCoverageEnable,
@@ -236,6 +238,8 @@ struct {
 
   { kSymDepthStencilDesc, "depth_stencil_desc" },
     { kSymDepthEnable, "depth_enable" },
+    { kSymDepthFunc, "depth_func" },
+    { kSymDepthWriteMask, "depth_write_mask" },
 
   { kSymBlendDesc, "blend_desc" },
     { kSymAlphaToCoverageEnable, "alpha_to_coverage_enable" },
@@ -260,6 +264,75 @@ static auto valid_property_types = map_list_of
   (kSymFloat4x4, PropertyType::kFloat4x4)
   (kSymTexture2d, PropertyType::kTexture2d)
   (kSymSampler, PropertyType::kSampler);
+
+static auto valid_filters = map_list_of
+  ("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
+  ("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
+  ("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
+  ("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
+  ("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+  ("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
+  ("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
+  ("anisotropic", D3D11_FILTER_ANISOTROPIC)
+  ("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
+  ("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
+  ("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
+  ("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
+  ("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
+  ("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
+  ("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
+  ("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC);
+
+static auto valid_address = map_list_of
+  ("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
+  ("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
+  ("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
+  ("border", D3D11_TEXTURE_ADDRESS_BORDER)
+  ("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE);
+
+static auto valid_cmp_func = map_list_of
+  ("never", D3D11_COMPARISON_NEVER)
+  ("less", D3D11_COMPARISON_LESS)
+  ("equal", D3D11_COMPARISON_EQUAL)
+  ("less_equal", D3D11_COMPARISON_LESS_EQUAL)
+  ("greater", D3D11_COMPARISON_GREATER)
+  ("not_equal", D3D11_COMPARISON_NOT_EQUAL)
+  ("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
+  ("always", D3D11_COMPARISON_ALWAYS);
+
+static auto valid_sources = map_list_of
+  ("material", PropertySource::kMaterial)
+  ("system", PropertySource::kSystem)
+  ("instance", PropertySource::kInstance)
+  ("user", PropertySource::kUser)
+  ("mesh", PropertySource::kMesh);
+
+static auto valid_blend_settings = map_list_of
+  ("zero", D3D11_BLEND_ZERO)
+  ("one", D3D11_BLEND_ONE)
+  ("src_color", D3D11_BLEND_SRC_COLOR)
+  ("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
+  ("src_alpha", D3D11_BLEND_SRC_ALPHA)
+  ("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
+  ("dest_alpha", D3D11_BLEND_DEST_ALPHA)
+  ("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
+  ("dest_color", D3D11_BLEND_DEST_COLOR)
+  ("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
+  ("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
+  ("blend_factor", D3D11_BLEND_BLEND_FACTOR)
+  ("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
+  ("src1_color", D3D11_BLEND_SRC1_COLOR)
+  ("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
+  ("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
+  ("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA);
+
+static auto valid_blend_op = map_list_of
+  ("add", D3D11_BLEND_OP_ADD)
+  ("subtract", D3D11_BLEND_OP_SUBTRACT)
+  ("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
+  ("min", D3D11_BLEND_OP_MIN)
+  ("max", D3D11_BLEND_OP_MAX);
+
 
 class Trie {
 public:
@@ -580,12 +653,6 @@ Value lookup_throw(Key str, const std::unordered_map<Key, Value> &candidates) {
 
 void TechniqueParser::parse_param(const vector<string> &param, Technique *technique, ShaderTemplate *shader) {
 
-  auto valid_sources = map_list_of
-    ("material", PropertySource::kMaterial)
-    ("system", PropertySource::kSystem)
-    ("instance", PropertySource::kInstance)
-    ("user", PropertySource::kUser)
-    ("mesh", PropertySource::kMesh);
 
   THROW_ON_FALSE(param.size() >= 3);
 
@@ -763,15 +830,25 @@ void TechniqueParser::parse_depth_stencil_desc(Scope *scope, CD3D11_DEPTH_STENCI
 
   *desc = CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT());
 
-  auto tmp = list_of(kSymDepthEnable);
+  auto tmp = list_of(kSymDepthEnable)(kSymDepthFunc)(kSymDepthWriteMask);
   Symbol symbol;
 
   while (scope->consume_in(tmp, &symbol)) {
     string value;
     scope->munch(kSymEquals).next_identifier(&value).munch(kSymSemicolon);
+
     switch (symbol) {
+
       case kSymDepthEnable:
         desc->DepthEnable = lookup_throw<string, BOOL>(value, map_list_of("true", TRUE)("false", FALSE));
+        break;
+
+      case kSymDepthFunc:
+        desc->DepthFunc = lookup_throw<string, D3D11_COMPARISON_FUNC>(value, valid_cmp_func);
+        break;
+
+      case kSymDepthWriteMask:
+        sscanf(value.c_str(), "%ud", &desc->DepthWriteMask);
         break;
     }
   }
@@ -784,41 +861,6 @@ void TechniqueParser::parse_sampler_desc(Scope *scope, CD3D11_SAMPLER_DESC *desc
   auto valid = list_of
     (kSymFilter)(kSymAddressU)(kSymAddressV)(kSymAddressW)
     (kSymMipLODBias)(kSymMaxAnisotropy)(kSymComparisonFunc)(kSymBorderColor)(kSymMinLOD)(kSymMaxLOD);
-
-  auto valid_filters = map_list_of
-    ("min_mag_mip_point", D3D11_FILTER_MIN_MAG_MIP_POINT)
-    ("min_mag_point_mip_liner", D3D11_FILTER_MIN_MAG_POINT_MIP_LINEAR)
-    ("min_point_mag_linear_mip_point", D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT)
-    ("min_linear_mag_mip_point", D3D11_FILTER_MIN_LINEAR_MAG_MIP_POINT)
-    ("min_linear_mag_point_mip_linear", D3D11_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-    ("min_mag_linear_mip_point", D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT)
-    ("min_mag_mip_liner", D3D11_FILTER_MIN_MAG_MIP_LINEAR)
-    ("anisotropic", D3D11_FILTER_ANISOTROPIC)
-    ("comparison_min_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_POINT)
-    ("comparison_min_mag_point_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_POINT_MIP_LINEAR)
-    ("comparison_min_point_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_POINT_MAG_LINEAR_MIP_POINT)
-    ("comparison_min_linear_mag_mip_point", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_MIP_POINT)
-    ("comparison_min_linear_mag_point_mip_linear", D3D11_FILTER_COMPARISON_MIN_LINEAR_MAG_POINT_MIP_LINEAR)
-    ("comparison_min_mag_linear_mip_point", D3D11_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT)
-    ("comparison_min_mag_mip_liner", D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR)
-    ("comparison_anisotropic", D3D11_FILTER_COMPARISON_ANISOTROPIC);
-
-  auto valid_address = map_list_of
-    ("wrap", D3D11_TEXTURE_ADDRESS_WRAP)
-    ("mirror", D3D11_TEXTURE_ADDRESS_MIRROR)
-    ("clamp", D3D11_TEXTURE_ADDRESS_CLAMP)
-    ("border", D3D11_TEXTURE_ADDRESS_BORDER)
-    ("mirror_once", D3D11_TEXTURE_ADDRESS_MIRROR_ONCE);
-
-  auto valid_cmp_func = map_list_of
-    ("never", D3D11_COMPARISON_NEVER)
-    ("less", D3D11_COMPARISON_LESS)
-    ("equal", D3D11_COMPARISON_EQUAL)
-    ("less_equal", D3D11_COMPARISON_LESS_EQUAL)
-    ("greater", D3D11_COMPARISON_GREATER)
-    ("not_equal", D3D11_COMPARISON_NOT_EQUAL)
-    ("greater_equal", D3D11_COMPARISON_GREATER_EQUAL)
-    ("always", D3D11_COMPARISON_ALWAYS);
 
   Symbol symbol;
   while (!scope->end() && scope->consume_in(valid, &symbol)) {
@@ -870,32 +912,6 @@ void TechniqueParser::parse_render_target(Scope *scope, D3D11_RENDER_TARGET_BLEN
   auto valid_lhs = list_of
     (kSymBlendEnable)(kSymSrcBlend)(kSymDestBlend)(kSymSrcBlendAlpha)
     (kSymDestBlendAlpha)(kSymBlendOp)(kSymBlendOpAlpha)(kSymRenderTargetWriteMask);
-
-  auto valid_blend_settings = map_list_of
-    ("zero", D3D11_BLEND_ZERO)
-    ("one", D3D11_BLEND_ONE)
-    ("src_color", D3D11_BLEND_SRC_COLOR)
-    ("inv_src_color", D3D11_BLEND_INV_SRC_COLOR)
-    ("src_alpha", D3D11_BLEND_SRC_ALPHA)
-    ("inv_src_alpha", D3D11_BLEND_INV_SRC_ALPHA)
-    ("dest_alpha", D3D11_BLEND_DEST_ALPHA)
-    ("inv_dest_alpha", D3D11_BLEND_INV_DEST_ALPHA)
-    ("dest_color", D3D11_BLEND_DEST_COLOR)
-    ("inv_dest_color", D3D11_BLEND_INV_DEST_COLOR)
-    ("src_alpha_sat", D3D11_BLEND_SRC_ALPHA_SAT)
-    ("blend_factor", D3D11_BLEND_BLEND_FACTOR)
-    ("inv_blend_factor", D3D11_BLEND_INV_BLEND_FACTOR)
-    ("src1_color", D3D11_BLEND_SRC1_COLOR)
-    ("inv_src1_color", D3D11_BLEND_INV_SRC1_COLOR)
-    ("src1_alpha", D3D11_BLEND_SRC1_ALPHA)
-    ("inv_src1_alpha", D3D11_BLEND_INV_SRC1_ALPHA);
-
-  auto valid_blend_op = map_list_of
-    ("add", D3D11_BLEND_OP_ADD)
-    ("subtract", D3D11_BLEND_OP_SUBTRACT)
-    ("rev_subtract", D3D11_BLEND_OP_REV_SUBTRACT)
-    ("min", D3D11_BLEND_OP_MIN)
-    ("max", D3D11_BLEND_OP_MAX);
 
   Symbol symbol;
   while (!scope->end() && scope->consume_in(valid_lhs, &symbol)) {

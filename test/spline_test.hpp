@@ -46,6 +46,8 @@ private:
   GraphicsObjectHandle _scale;
 
   GraphicsObjectHandle _splineTechnique;
+  GraphicsObjectHandle _splineTechniqueZFill;
+  GraphicsObjectHandle _splineTechniqueNoZFill;
 
   GraphicsObjectHandle _splineIb;
   
@@ -65,6 +67,8 @@ private:
   bool _mouse_rbutton;
   DWORD _mouse_pos_prev;
   int _keystate[256];
+
+  bool _useZFill;
 
   GraphicsObjectHandle _dynamicVb;
   GraphicsObjectHandle _staticVb;

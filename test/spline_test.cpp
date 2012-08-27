@@ -367,6 +367,7 @@ SplineTest::SplineTest(const std::string &name)
   , _useFreeFlyCamera(true)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
   , _staticVertCount(0)
+  , _useZFill(false)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -398,6 +399,8 @@ bool SplineTest::init() {
   _coalesce = GRAPHICS.find_technique("coalesce");
 
   _splineTechnique = GRAPHICS.find_technique("SplineRender");
+  _splineTechniqueZFill = GRAPHICS.find_technique("SplineRenderZFill");
+  _splineTechniqueNoZFill = GRAPHICS.find_technique("SplineRenderNoZFill");
 
   _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "", false, nullptr);
 
@@ -567,7 +570,7 @@ bool SplineTest::update(int64 global_time, int64 local_time, int64 delta_ns, boo
   double time = local_time  / 1000.0;
 
   for (size_t i = 0; i < _splines.size(); ++i) {
-    _splines[i]->update(delta_ns / 1e6f);
+    _splines[i]->update(paused ? 0 : (delta_ns / 1e6f));
   }
 
   calc_camera_matrices(time, delta_ns / 1e6, &_view, &_proj);
@@ -596,43 +599,6 @@ void SplineTest::renderParticles() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
-  Technique *technique = GRAPHICS.get_technique(_splineTechnique);
-  Shader *vs = technique->vertex_shader(0);
-  Shader *gs = technique->geometry_shader(0);
-  Shader *ps = technique->pixel_shader(0);
-
-  _ctx->set_rs(technique->rasterizer_state());
-  _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-  _ctx->set_vs(vs->handle());
-  _ctx->set_gs(gs->handle());
-  _ctx->set_ps(ps->handle());
-
-  _ctx->set_layout(vs->input_layout());
-  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-
-#pragma pack(push, 1)
-  struct CBuffer {
-    XMFLOAT4X4 worldViewProj;
-    XMFLOAT4 cameraPos;
-    XMFLOAT4 extrudeShape[20];
-  } cbuffer;
-#pragma pack(pop)
-
-  XMFLOAT4X4 view = _freefly_camera.viewMatrix();
-  XMFLOAT4X4 proj = _freefly_camera.projectionMatrix();
-
-  XMFLOAT4X4 mtx;
-  XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
-
-  cbuffer.worldViewProj = transpose(mtx);
-  cbuffer.cameraPos = expand(_freefly_camera.pos(),0);
-  memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
-  //_ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
-  _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
-  _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
-
   D3D11_MAPPED_SUBRESOURCE staticRes;
   D3D11_MAPPED_SUBRESOURCE dynamicRes;
 
@@ -653,11 +619,80 @@ void SplineTest::renderParticles() {
   _ctx->unmap(_staticVb, 0);
   _ctx->unmap(_dynamicVb, 0);
 
-  _ctx->set_vb(_staticVb, sizeof(VsInput));
-  _ctx->draw(_staticVertCount, 0);
+#pragma pack(push, 1)
+  struct CBuffer {
+    XMFLOAT4X4 worldViewProj;
+    XMFLOAT4 cameraPos;
+    XMFLOAT4 extrudeShape[20];
+  } cbuffer;
+#pragma pack(pop)
 
-  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
-  _ctx->draw(newDynamicVerts, 0);
+  XMFLOAT4X4 view = _freefly_camera.viewMatrix();
+  XMFLOAT4X4 proj = _freefly_camera.projectionMatrix();
+
+  XMFLOAT4X4 mtx;
+  XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
+
+  cbuffer.worldViewProj = transpose(mtx);
+  cbuffer.cameraPos = expand(_freefly_camera.pos(),0);
+  memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
+
+  if (_useZFill) {
+    Technique *technique = GRAPHICS.get_technique(_splineTechniqueZFill);
+    Shader *vs = technique->vertex_shader(0);
+    Shader *gs = technique->geometry_shader(0);
+    Shader *ps = technique->pixel_shader(0);
+
+    _ctx->set_rs(technique->rasterizer_state());
+    _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+    _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+    _ctx->set_vs(vs->handle());
+    _ctx->set_gs(gs->handle());
+    _ctx->set_ps(ps->handle());
+
+    _ctx->set_layout(vs->input_layout());
+    _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+    //_ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+    _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+    //_ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
+
+    _ctx->set_vb(_staticVb, sizeof(VsInput));
+    _ctx->draw(_staticVertCount, 0);
+
+    _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+    _ctx->draw(newDynamicVerts, 0);
+  }
+
+  {
+    Technique *technique = GRAPHICS.get_technique(_useZFill ? _splineTechnique : _splineTechniqueNoZFill);
+    Shader *vs = technique->vertex_shader(0);
+    Shader *gs = technique->geometry_shader(0);
+    Shader *ps = technique->pixel_shader(0);
+
+    _ctx->set_rs(technique->rasterizer_state());
+    _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+    _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+    _ctx->set_vs(vs->handle());
+    _ctx->set_gs(gs->handle());
+    _ctx->set_ps(ps->handle());
+
+    _ctx->set_layout(vs->input_layout());
+    _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+    //_ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+    _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+    _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
+
+    _ctx->set_vb(_staticVb, sizeof(VsInput));
+    _ctx->draw(_staticVertCount, 0);
+
+    _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+    _ctx->draw(newDynamicVerts, 0);
+
+  }
 
 }
 
@@ -698,6 +733,9 @@ void SplineTest::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
     switch (wParam) {
     case 'F':
       //_use_freefly_camera = !_use_freefly_camera;
+      break;
+    case 'Z':
+      _useZFill = !_useZFill;
       break;
     }
     break;

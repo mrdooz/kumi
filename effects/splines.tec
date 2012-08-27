@@ -1,5 +1,30 @@
 include common.tec;
 
+technique SplineRenderZFill {
+
+    vertex_shader {
+        file splines.hlsl;
+        entry_point vs_main;
+    };
+    
+    geometry_shader {
+        file splines.hlsl;
+        entry_point gs_fill_main;
+    };
+
+    pixel_shader {
+        file splines.hlsl;
+        entry_point ps_fill_main;
+    };
+    
+    rasterizer_desc {
+      cull_mode = back;
+    };
+
+    depth_stencil_desc = DepthEnable;
+    blend_desc = BlendDisable;
+};
+
 technique SplineRender {
 
     vertex_shader {
@@ -18,8 +43,34 @@ technique SplineRender {
     };
     
     rasterizer_desc = BackfaceCulling;
-    //rasterizer_desc = NoCulling;
+    
+    depth_stencil_desc {
+      depth_enable = true;
+      depth_func = equal;
+      depth_write_mask = 0;
+    };
+    //depth_stencil_desc = DepthEnable;
+    blend_desc = BlendDisable;
+};
+
+technique SplineRenderNoZFill {
+
+    vertex_shader {
+        file splines.hlsl;
+        entry_point vs_main;
+    };
+    
+    geometry_shader {
+        file splines.hlsl;
+        entry_point gs_main;
+    };
+
+    pixel_shader {
+        file splines.hlsl;
+        entry_point ps_main;
+    };
+    
+    rasterizer_desc = BackfaceCulling;
     depth_stencil_desc = DepthEnable;
     blend_desc = BlendDisable;
-
 };
