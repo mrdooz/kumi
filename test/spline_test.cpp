@@ -29,6 +29,12 @@ static const int cVertsPerRing = 20;
 static const int cVertsPerSegment = cRingsPerSegment * cVertsPerRing;
 static const int cMaxRingsPerBuffer = 1000;
 
+// each entry in the data sent to the VS/GS is 2 frames and 2 radius
+struct VsInput {
+  XMFLOAT4X4 frame0, frame1;
+  XMFLOAT2 radius;
+};
+
 XMFLOAT3 perpVector(const XMFLOAT3 &a) {
   // return a vector perpendicular to "a"
   float x = fabs(a.x), y = fabs(a.y), z = fabs(a.z);
@@ -94,7 +100,9 @@ public:
     , _ringOffset(0)
     , _curControlPt(0)
     , _startRing(0)
-    , _dynamicRings(4*1024)
+    , _prevStartRing(0)
+    , _dynamicRings(128)
+    , _totalStaticSegments(0)
   {
     _controlPoints.push_back(_curTop);
 
@@ -153,8 +161,7 @@ public:
 
 
   bool init() {
-    _dynamicSplineVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 64 * 1024, true, nullptr);
-    return _dynamicSplineVb.is_valid();
+    return true;
   }
 
   void update(float delta) {
@@ -164,8 +171,6 @@ public:
       return;
 
     _curHeight += _growthRate * delta;
-
-    //_curHeight = 100;
 
     int curSegment = (int)(_curHeight / cSegmentHeight);
     int curRing = (int)(_curHeight / cRingSpacing);
@@ -185,10 +190,26 @@ public:
       updateVtxCache();
     }
 
-    float spikeLength = 10;
-    float spikeStart = max(0,_curHeight - spikeLength);
+    const float spikeLength = 10;
+    const float spikeStart = max(0,_curHeight - spikeLength);
+    const int startRing = (int)(spikeStart / cRingSpacing);
 
-    int startRing = (int)(spikeStart / cRingSpacing);
+    const float maxRadius = 2;
+    const float minRadius = 0.01f;
+    const float step = cRingSpacing;
+
+    // if we're starting in a new ring, move the old one to the static buffer
+    _staticRings.clear();
+    int prevStartRing = _prevStartRing;
+    if (prevStartRing < startRing) {
+      while (prevStartRing <= startRing) {
+        VtxCache *cur = &_vtxCache[prevStartRing - _ringOffset];
+        addRing(cur->p, cur->n, cur->dir, cur->b, maxRadius, true);
+        prevStartRing++;
+      }
+      prevStartRing--;
+    }
+    _prevStartRing = prevStartRing;
 
     // throw away any vtx-cache elements that we no longer care about
     while (_ringOffset < startRing) {
@@ -199,31 +220,27 @@ public:
     _startRing = startRing;
     _dynamicRings.clear();
 
-    float maxRadius = 2;
-    float minRadius = 0.01f;
-
-    float step = cRingSpacing;
-    float remaining = _curHeight - startRing * step;
+    const float startPos = (float)(startRing * cRingSpacing);
+    float remaining = _curHeight - startPos;
 
     // add the bottom ring
     VtxCache *cur = &_vtxCache[startRing-_ringOffset];
     float r = clamp(minRadius, maxRadius, lerp(minRadius, maxRadius, remaining / spikeLength));
-    addRing(cur->p, cur->n, cur->dir, cur->b, r);
+    addRing(cur->p, cur->n, cur->dir, cur->b, r, false);
 
-    const float startPos = (float)(startRing * cRingSpacing);
     // add a ring where the spike starts
-    if (_curHeight > spikeLength) {
+    if (remaining > spikeLength) {
       float t = (spikeStart - startPos) / step;
       KASSERT(t >= 0 && t < 1);
       VtxCache *next = &_vtxCache[startRing+1-_ringOffset];
-      addRing(lerp(cur->p, next->p, t), lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r);
+      addRing(lerp(cur->p, next->p, t), lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r, false);
     }
     remaining -= step;
 
     for (int i = startRing + 1; i <= curRing; ++i) {
       cur = &_vtxCache[i-_ringOffset];
       r = lerp(minRadius, maxRadius, clamp(0.f, 1.f, remaining / spikeLength));
-      addRing(cur->p, cur->n, cur->dir, cur->b, r);
+      addRing(cur->p, cur->n, cur->dir, cur->b, r, false);
       remaining -= step;
     }
 
@@ -233,40 +250,37 @@ public:
       cur = &_vtxCache[curRing-_ringOffset];
       auto *next = &_vtxCache[curRing+1-_ringOffset];
       r = minRadius;
-      addRing(lerp(cur->p, next->p, t), lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r);
+      addRing(lerp(cur->p, next->p, t), lerp(cur->n, next->n, t), lerp(cur->dir, next->dir, t), lerp(cur->b, next->b, t), r, false);
     }
-
   }
 
-  void render() {
+  void render(VsInput *staticVb, VsInput *dynamicVb, int *newStaticSegments, int *newDynamicSegments) {
 
-    int numRings = _startRing + _dynamicRings.size();
-    if (!numRings)
-      return;
-
-    // each entry in the data sent to the VS is actually 2 frames and a radius
-    struct VsInput {
-      XMFLOAT4X4 frame0, frame1;
-      XMFLOAT2 radius;
-    };
-
-    D3D11_MAPPED_SUBRESOURCE res;
-    _ctx->map(_dynamicSplineVb, 0, _startRing == 0 ? D3D11_MAP_WRITE_DISCARD : D3D11_MAP_WRITE_NO_OVERWRITE, 0, &res);
-
-    VsInput *vs = (VsInput *)res.pData + max(0,_startRing - 1);
-    int numEntries = numRings - _startRing - 1;
-    for (int i = 0; i < numEntries; ++i) {
-      auto &ring0 = _dynamicRings[i];
-      auto &ring1 = _dynamicRings[i+1];
-      vs[i].frame0 = ring0.frame;
-      vs[i].frame1 = ring1.frame;
-      vs[i].radius = XMFLOAT2(ring0.radius, ring1.radius);
+    // add new static parts
+    if (_staticRings.size() > 0) {
+      int numEntries = _staticRings.size()  - 1;
+      for (int i = 0; i < numEntries; ++i) {
+        auto &ring0 = _staticRings[i];
+        auto &ring1 = _staticRings[i+1];
+        staticVb[i].frame0 = ring0.frame;
+        staticVb[i].frame1 = ring1.frame;
+        staticVb[i].radius = XMFLOAT2(ring0.radius, ring1.radius);
+      }
+      *newStaticSegments += numEntries;
     }
 
-    _ctx->unmap(_dynamicSplineVb, 0);
-
-    _ctx->set_vb(_dynamicSplineVb, sizeof(VsInput));
-    _ctx->draw(numRings-1, 0);
+    // add new dynamic parts
+    if (_dynamicRings.size() > 0) {
+      int numEntries = _dynamicRings.size() - 1;
+      for (int i = 0; i < numEntries; ++i) {
+        auto &ring0 = _dynamicRings[i];
+        auto &ring1 = _dynamicRings[i+1];
+        dynamicVb[i].frame0 = ring0.frame;
+        dynamicVb[i].frame1 = ring1.frame;
+        dynamicVb[i].radius = XMFLOAT2(ring0.radius, ring1.radius);
+      }
+      *newDynamicSegments += numEntries;
+    }
   }
 
 private:
@@ -278,7 +292,7 @@ private:
     float radius;
   };
 
-  void addRing(const XMFLOAT3 &p, const XMFLOAT3 &x, const XMFLOAT3 &y, const XMFLOAT3 &z, float r) {
+  void addRing(const XMFLOAT3 &p, const XMFLOAT3 &x, const XMFLOAT3 &y, const XMFLOAT3 &z, float r, bool staticRing) {
 
     XMFLOAT4X4 mtx;
     // Create transform from reference frame to world
@@ -288,11 +302,11 @@ private:
     set_col(expand(z, 0), 2, &mtx);
     set_col(expand(p, 1), 3, &mtx);
 
-    _dynamicRings.push_back(Ring(mtx, r));
+    if (staticRing)
+      _staticRings.push_back(Ring(mtx, r));
+    else
+      _dynamicRings.push_back(Ring(mtx, r));
   }
-
-  vector<Ring> _dynamicRings;
-  GraphicsObjectHandle _dynamicSplineVb;
 
   struct VtxCache {
     VtxCache(const XMFLOAT3 &p, const XMFLOAT3 &n, const XMFLOAT3 &b, const XMFLOAT3 &dir) : p(p), n(n), b(b), dir(dir) {}
@@ -303,6 +317,9 @@ private:
   deque<VtxCache> _vtxCache;
   int _ringOffset;
 
+  vector<Ring> _staticRings;
+  vector<Ring> _dynamicRings;
+
   XMFLOAT3 _prevB;    // bitangent from previous iteration
   XMFLOAT3 _curTop;
   vector<XMFLOAT3> _controlPoints;
@@ -310,6 +327,9 @@ private:
   float _growthRate;
   int _curControlPt;
   int _startRing;
+  int _prevStartRing;
+
+  int _totalStaticSegments;
 
   DeferredContext *_ctx;
 };
@@ -346,6 +366,7 @@ SplineTest::SplineTest(const std::string &name)
   , _ctx(nullptr)
   , _useFreeFlyCamera(true)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
+  , _staticVertCount(0)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -419,6 +440,9 @@ bool SplineTest::init() {
   if (!initSplines())
     return false;
 
+  _staticVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 128 * 1024 * 1024, true, nullptr);
+  _dynamicVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1 * 1024 * 1024, true, nullptr);
+
   return true;
 }
 
@@ -429,7 +453,7 @@ bool SplineTest::initSplines() {
   float span = 0;
 #else
   float span = 100;
-  const int numSplines = 1500;
+  const int numSplines = 1000;
 #endif
   for (int i = 0; i < numSplines; ++i) {
     float x = randf(-span, span);
@@ -443,8 +467,6 @@ bool SplineTest::initSplines() {
       return false;
     _splines.push_back(spline);
   }
-
-  //createSplineIb();
 
   float angle = 0;
   float step = 2*XM_PI/cVertsPerRing;
@@ -611,11 +633,32 @@ void SplineTest::renderParticles() {
   _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
   _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
-  //_ctx->set_ib(_splineIb, DXGI_FORMAT_R32_UINT);
+  D3D11_MAPPED_SUBRESOURCE staticRes;
+  D3D11_MAPPED_SUBRESOURCE dynamicRes;
 
+  _ctx->map(_staticVb, 0, _staticVertCount == 0 ? D3D11_MAP_WRITE_DISCARD : D3D11_MAP_WRITE_NO_OVERWRITE, 0, &staticRes);
+  _ctx->map(_dynamicVb, 0, D3D11_MAP_WRITE_DISCARD, 0, &dynamicRes);
+
+  VsInput *staticVerts = (VsInput *)staticRes.pData;
+  VsInput *dynamicVerts = (VsInput *)dynamicRes.pData;
+
+  int newDynamicVerts = 0;
+  int newStaticVerts = 0;
   for (auto it = begin(_splines); it != end(_splines); ++it) {
-    (*it)->render();
+    DynamicSpline *spline = *it;
+    spline->render(staticVerts + _staticVertCount + newStaticVerts, dynamicVerts + newDynamicVerts, &newStaticVerts, &newDynamicVerts);
   }
+  _staticVertCount += newStaticVerts;
+
+  _ctx->unmap(_staticVb, 0);
+  _ctx->unmap(_dynamicVb, 0);
+
+  _ctx->set_vb(_staticVb, sizeof(VsInput));
+  _ctx->draw(_staticVertCount, 0);
+
+  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+  _ctx->draw(newDynamicVerts, 0);
+
 }
 
 bool SplineTest::render() {

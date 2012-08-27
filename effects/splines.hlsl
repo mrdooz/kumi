@@ -51,19 +51,20 @@ void gs_main(point VsGsInput input[1], inout TriangleStream<PsInput> outputStrea
 
   PsInput output = (PsInput)0;
 
-  for (int i = 0; i < 42; ++i) {
-    float3 pt = extrudeShape[(i/2) % 20].xyz;
-    if ((i%2) == 0) {
+  for (int i = 0; i < 21; ++i) {
+  
+      float3 pt = extrudeShape[i % 20].xyz;
+      
       // lower level
       output.pos    = mul(float4(pt, 1), mtx0);
       output.normal = mul(pt, (float3x3)f0);
       output.wsPos  = mul(float4(pt,1), f0).xyz;
-    } else {
+      outputStream.Append(output);
+
       output.pos    = mul(float4(pt, 1), mtx1);
       output.normal = mul(pt, (float3x3)f1);
       output.wsPos  = mul(float4(pt,1), f1).xyz;
-    }
-    outputStream.Append(output);
+      outputStream.Append(output);
   }
 }
 

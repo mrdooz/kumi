@@ -18,6 +18,7 @@ technique SplineRender {
     };
     
     rasterizer_desc = BackfaceCulling;
+    //rasterizer_desc = NoCulling;
     depth_stencil_desc = DepthEnable;
     blend_desc = BlendDisable;
 

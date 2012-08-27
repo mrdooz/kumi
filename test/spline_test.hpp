@@ -66,6 +66,10 @@ private:
   DWORD _mouse_pos_prev;
   int _keystate[256];
 
+  GraphicsObjectHandle _dynamicVb;
+  GraphicsObjectHandle _staticVb;
+  int _staticVertCount;
+
   XMFLOAT4X4 _view, _proj;
 
   DeferredContext *_ctx;
