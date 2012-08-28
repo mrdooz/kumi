@@ -13,6 +13,7 @@
 #include "deferred_context.hpp"
 #include "profiler.hpp"
 #include "effect.hpp"
+#include "_win32/resource.h"
 
 using namespace std;
 using namespace std::tr1::placeholders;
@@ -39,6 +40,27 @@ namespace
   }
 }
 
+static INT_PTR CALLBACK dialogWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+  switch (message) {
+    case WM_INITDIALOG: {
+      int a = 10;
+                    }
+    break;
+
+    case WM_COMMAND:
+      switch (wParam) {
+        case IDCANCEL:
+          EndDialog(hWnd, 0);
+          return TRUE;
+        case IDOK:
+          EndDialog(hWnd, 1);
+          return TRUE;
+      }
+      break;
+  }
+  return FALSE;
+}
+
 static GraphicsObjectHandle emptyGoh;
 
 Graphics* Graphics::_instance;
@@ -53,7 +75,6 @@ Graphics::Graphics()
   , _ps_profile("ps_5_0")
   , _cs_profile("cs_5_0")
   , _gs_profile("gs_5_0")
-  , _screen_size_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size"))
   , _vertex_shaders(release_obj<ID3D11VertexShader *>)
   , _pixel_shaders(release_obj<ID3D11PixelShader *>)
   , _compute_shaders(release_obj<ID3D11ComputeShader *>)
@@ -548,11 +569,20 @@ bool Graphics::create_default_geometry() {
   return true;
 }
 
+bool Graphics::config(HINSTANCE hInstance) {
+
+  int res = DialogBox(hInstance, MAKEINTRESOURCE(IDD_SETUP_DLG), NULL, dialogWndProc);
+  return res == IDOK;
+}
+
 bool Graphics::init(const HWND hwnd, const int width, const int height)
 {
   _width = width;
   _height = height;
   _buffer_format = DXGI_FORMAT_B8G8R8A8_UNORM; //DXGI_FORMAT_R8G8B8A8_UNORM;
+
+  _screen_size_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size");
+
 
   DXGI_SWAP_CHAIN_DESC swapchain_desc;
   ZeroMemory(&swapchain_desc, sizeof( swapchain_desc ) );

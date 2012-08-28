@@ -96,6 +96,8 @@ public:
 
   static bool close();
 
+  bool config(HINSTANCE hInstance);
+
   bool	init(const HWND hwnd, const int width, const int height);
   void	clear(const XMFLOAT4& c);
   void	clear(GraphicsObjectHandle h, const XMFLOAT4 &c);

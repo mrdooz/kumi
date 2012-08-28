@@ -77,6 +77,10 @@ bool App::init(HINSTANCE hinstance)
     break_on_error(true);
 
   _hinstance = hinstance;
+  B_ERR_BOOL(Graphics::create());
+  if (!GRAPHICS.config(_hinstance))
+    return false;
+
   _width = 3 * GetSystemMetrics(SM_CXSCREEN) / 4;
   _height = 3 * GetSystemMetrics(SM_CYSCREEN) / 4;
 
@@ -87,7 +91,6 @@ bool App::init(HINSTANCE hinstance)
 #else
   B_ERR_BOOL(PackedResourceManager::create("resources.dat"));
 #endif
-  B_ERR_BOOL(Graphics::create());
   B_ERR_BOOL(MaterialManager::create());
   B_ERR_BOOL(DemoEngine::create());
 #if WITH_WEBSOCKETS
