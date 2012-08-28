@@ -48,10 +48,8 @@ private:
   GraphicsObjectHandle _scale;
 
   GraphicsObjectHandle _splineTechnique;
-  GraphicsObjectHandle _splineTechniqueZFill;
-  GraphicsObjectHandle _splineTechniqueNoZFill;
 
-  GraphicsObjectHandle _splineIb;
+  GraphicsObjectHandle _cubeMap;
   
   GaussianBlur _blur;
 
@@ -77,6 +75,7 @@ private:
   int _staticVertCount;
 
   XMFLOAT4X4 _view, _proj;
+  XMFLOAT3 _cameraPos;
 
   DeferredContext *_ctx;
   std::vector<XMFLOAT4> _extrudeShape;

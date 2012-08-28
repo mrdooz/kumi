@@ -186,7 +186,11 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
   Path outputPath(shader_template->_templateFilename);
   string src = outputPath.get_path() + shader_template->_source_filename;
   const char *ep = shader_template->_entry_point.c_str();
+#if _DEBUG
+  string basePath = outputPath.get_path() + "obj_debug/" ;
+#else
   string basePath = outputPath.get_path() + "obj/" ;
+#endif
 #if WITH_UNPACKED_RESOUCES
   string outputDir = stripTrailingSlash(basePath);
   if (!directory_exists(outputDir.c_str()))
@@ -228,11 +232,15 @@ bool Technique::create_shaders(ShaderTemplate *shader_template) {
 #if WITH_UNPACKED_RESOUCES
     // compile the shader if the source is newer, or the object file doesn't exist
     if (force || RESOURCE_MANAGER.file_exists(src.c_str()) && (!RESOURCE_MANAGER.file_exists(obj) || RESOURCE_MANAGER.mdate(src.c_str()) > RESOURCE_MANAGER.mdate(obj))) {
-      if (!compile_shader(type, ep, src.c_str(), obj, cur.flags))
+      if (!compile_shader(type, ep, src.c_str(), obj, cur.flags)) {
+        add_error_msg("Error compiling shader: %s", src.c_str());
         return false;
+      }
     } else {
-      if (!RESOURCE_MANAGER.file_exists(obj))
+      if (!RESOURCE_MANAGER.file_exists(obj)) {
+        add_error_msg("Compiled shader not found: %s", obj);
         return false;
+      }
     }
 
     vector<char> buf;

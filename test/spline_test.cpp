@@ -24,7 +24,7 @@ using namespace std::tr1::placeholders;
 
 #define SPLINE_DEBUG 0
 
-static const int cRingsPerSegment = 5;
+static const int cRingsPerSegment = 10;
 static const int cSegmentHeight = 20;
 static const int cRingSpacing = cSegmentHeight / cRingsPerSegment;
 static const int cVertsPerRing = 20;
@@ -118,7 +118,7 @@ public:
     _controlPoints.push_back(_curTop);
 
     for (int i = 0; i < 3; ++i) {
-#if _SPLINE_DEBUG
+#if SPLINE_DEBUG
       _curTop.x += 0; //randf(-10, 10);
       _curTop.y += 10; //gaussianRand(10, 2);
       _curTop.z += 0; //randf(-10, 10);
@@ -192,7 +192,6 @@ public:
     int curSegment = (int)(_curHeight / cSegmentHeight);
     int curRing = (int)(_curHeight / cRingSpacing);
 
-    // # segments = # control points - 2
     while (curSegment > (int)_controlPoints.size() - 4) {
 #if SPLINE_DEBUG
       _curTop.x += 0; //randf(-10, 10);
@@ -207,7 +206,11 @@ public:
       updateVtxCache();
     }
 
+#if SPLINE_DEBUG
+    const float spikeLength = 0.01f;
+#else
     const float spikeLength = 10;
+#endif
     const float spikeStart = max(0,_curHeight - spikeLength);
     const int startRing = (int)(spikeStart / cRingSpacing);
 
@@ -217,16 +220,13 @@ public:
 
     // if we're starting in a new ring, move the old one to the static buffer
     _staticRings.clear();
-    int prevStartRing = _prevStartRing;
-    if (prevStartRing < startRing) {
-      while (prevStartRing <= startRing) {
-        VtxCache *cur = &_vtxCache[prevStartRing - _ringOffset];
+    if (_prevStartRing < startRing) {
+      for (int i = _prevStartRing; i <= startRing; ++i) {
+        VtxCache *cur = &_vtxCache[i - _ringOffset];
         addRing(cur->p, cur->n, cur->dir, cur->b, maxRadius, true);
-        prevStartRing++;
       }
-      prevStartRing--;
+      _prevStartRing = startRing;
     }
-    _prevStartRing = prevStartRing;
 
     // throw away any vtx-cache elements that we no longer care about
     while (_ringOffset < startRing) {
@@ -249,7 +249,7 @@ public:
       float y = randf(-0.1f, 0.1f);
       float z = randf(-0.1f, 0.1f);
       XMFLOAT3 d = normalize(cur->n + XMFLOAT3(x, y, z));
-      _cbCreateSpline(cur->p, d, perpVector(d), this);
+      _cbCreateSpline(cur->p, d, cross(d, cur->dir), this);
       _nextChild += gaussianRand(cChildRate, 1);
     }
 
@@ -409,7 +409,6 @@ SplineTest::SplineTest(const std::string &name)
   , _useFreeFlyCamera(false)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
   , _staticVertCount(0)
-  , _useZFill(false)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -427,7 +426,7 @@ void SplineTest::createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, co
 
   auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
 #if SPLINE_DEBUG
-  const int maxSplines = 100;
+  const int maxSplines = 0;
 #else
   const int maxSplines = 1500;
 #endif
@@ -461,10 +460,9 @@ bool SplineTest::init() {
   _coalesce = GRAPHICS.find_technique("coalesce");
 
   _splineTechnique = GRAPHICS.find_technique("SplineRender");
-  _splineTechniqueZFill = GRAPHICS.find_technique("SplineRenderZFill");
-  _splineTechniqueNoZFill = GRAPHICS.find_technique("SplineRenderNoZFill");
 
-  _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "", false, nullptr);
+  _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "particle3.png", false, nullptr);
+  _cubeMap = RESOURCE_MANAGER.load_texture("gfx/pearly3_cubemap2.dds", "pearly3_cubemap.dds", false, nullptr);
 
   _scale = GRAPHICS.find_technique("scale");
 
@@ -515,7 +513,7 @@ bool SplineTest::initSplines() {
 
   auto cb = bind(&SplineTest::createSplineCallback, this, _1, _2, _3, _4);
 
-#if _SPLINE_DEBUG
+#if SPLINE_DEBUG
   const int numSplines = 1;
   float span = 0;
 #else
@@ -526,10 +524,12 @@ bool SplineTest::initSplines() {
     float x = randf(-span, span);
     float z = randf(-span, span);
     float g = gaussianRand(15, 10);
-#if _SPLINE_DEBUG
+    float r = 1.5f;
+#if SPLINE_DEBUG
     g = 5;
+    r = 10;
 #endif
-    DynamicSpline *spline = new DynamicSpline(_ctx, XMFLOAT3(x,0,z), XMFLOAT3(0,1,0), XMFLOAT3(1,0,0), g, 1.5f, 10000, cb);
+    DynamicSpline *spline = new DynamicSpline(_ctx, XMFLOAT3(x,0,z), XMFLOAT3(0,1,0), XMFLOAT3(1,0,0), g, r, 10000, cb);
     if (!spline || !spline->init())
       return false;
     _splines.push_back(spline);
@@ -537,12 +537,13 @@ bool SplineTest::initSplines() {
 
   float angle = 0;
   float step = 2*XM_PI/cVertsPerRing;
-  for (int i = 0; i < cVertsPerRing; ++i) {
+  // output an extra vertex to avoid a "%" in the shader
+  for (int i = 0; i <= cVertsPerRing; ++i) {
     float x = sinf(angle);
     float y = 0;
     float z = cosf(angle);
     angle += step;
-    _extrudeShape.push_back(XMFLOAT4(x,y,z, 0));
+    _extrudeShape.push_back(XMFLOAT4(x,y,z, 1));
   }
 
   return true;
@@ -577,16 +578,18 @@ void SplineTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vie
       _freefly_camera.rotate(FreeFlyCamera::kXAxis, dx);
       _freefly_camera.rotate(FreeFlyCamera::kYAxis, dy);
     }
+    _cameraPos = _freefly_camera.pos();
 
     *view = _freefly_camera.viewMatrix();
   } else {
 
-    float radius = 50;
+    float radius = 75;
     XMFLOAT3 p = _splines.front()->pos();
     XMVECTOR at =  XMLoadFloat4(&XMFLOAT4(p.x, p.y - 20, p.z, 0));
     float s = sinf((float)time/10);
     float c = -cosf((float)time/10);
     XMFLOAT3 pp = p + radius * XMFLOAT3(s, s*c, c);
+    _cameraPos = pp;
     XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(pp.x, pp.y, pp.z, 0));
     XMVECTOR up = XMLoadFloat4(&XMFLOAT4(0, 1, 0, 0));
     XMMATRIX lookat = XMMatrixLookAtLH(pos, at, up);
@@ -653,7 +656,7 @@ void SplineTest::renderParticles() {
   struct CBuffer {
     XMFLOAT4X4 worldViewProj;
     XMFLOAT4 cameraPos;
-    XMFLOAT4 extrudeShape[20];
+    XMFLOAT4 extrudeShape[21];
   } cbuffer;
 #pragma pack(pop)
 
@@ -663,65 +666,38 @@ void SplineTest::renderParticles() {
   XMFLOAT4X4 mtx;
   XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
   cbuffer.worldViewProj = transpose(mtx);
-  cbuffer.cameraPos = expand(_freefly_camera.pos(),0);
+  cbuffer.cameraPos = expand(_cameraPos,0);
   memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
 
-  if (_useZFill) {
-    Technique *technique = GRAPHICS.get_technique(_splineTechniqueZFill);
-    Shader *vs = technique->vertex_shader(0);
-    Shader *gs = technique->geometry_shader(0);
-    Shader *ps = technique->pixel_shader(0);
 
-    _ctx->set_rs(technique->rasterizer_state());
-    _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-    _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+  Technique *technique = GRAPHICS.get_technique(_splineTechnique);
+  Shader *vs = technique->vertex_shader(0);
+  Shader *gs = technique->geometry_shader(0);
+  Shader *ps = technique->pixel_shader(0);
 
-    _ctx->set_vs(vs->handle());
-    _ctx->set_gs(gs->handle());
-    _ctx->set_ps(ps->handle());
+  _ctx->set_rs(technique->rasterizer_state());
+  _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+  _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
 
-    _ctx->set_layout(vs->input_layout());
-    _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+  _ctx->set_vs(vs->handle());
+  _ctx->set_gs(gs->handle());
+  _ctx->set_ps(ps->handle());
 
-    //_ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
-    _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
-    //_ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_layout(vs->input_layout());
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-    _ctx->set_vb(_staticVb, sizeof(VsInput));
-    _ctx->draw(_staticVertCount, 0);
+  _ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
-    _ctx->set_vb(_dynamicVb, sizeof(VsInput));
-    _ctx->draw(newDynamicVerts, 0);
-  }
+  _ctx->set_samplers(ps->samplers());
+  _ctx->set_shader_resource(_cubeMap, ShaderType::kPixelShader);
 
-  {
-    Technique *technique = GRAPHICS.get_technique(_useZFill ? _splineTechnique : _splineTechniqueNoZFill);
-    Shader *vs = technique->vertex_shader(0);
-    Shader *gs = technique->geometry_shader(0);
-    Shader *ps = technique->pixel_shader(0);
+  _ctx->set_vb(_staticVb, sizeof(VsInput));
+  _ctx->draw(_staticVertCount, 0);
 
-    _ctx->set_rs(technique->rasterizer_state());
-    _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-    _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-    _ctx->set_vs(vs->handle());
-    _ctx->set_gs(gs->handle());
-    _ctx->set_ps(ps->handle());
-
-    _ctx->set_layout(vs->input_layout());
-    _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
-
-    //_ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
-    _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
-    _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
-
-    _ctx->set_vb(_staticVb, sizeof(VsInput));
-    _ctx->draw(_staticVertCount, 0);
-
-    _ctx->set_vb(_dynamicVb, sizeof(VsInput));
-    _ctx->draw(newDynamicVerts, 0);
-
-  }
+  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+  _ctx->draw(newDynamicVerts, 0);
 
 }
 
@@ -734,7 +710,7 @@ bool SplineTest::render() {
 
   _ctx->set_default_render_target();
 
-//  _ctx->render_technique(_gradient_technique, 
+  //_ctx->render_technique(_gradient_technique, 
     //bind(&SplineTest::fill_cbuffer, this, _1), TextureArray(), DeferredContext::InstanceData());
 
   renderParticles();
@@ -764,7 +740,7 @@ void SplineTest::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
       _useFreeFlyCamera = !_useFreeFlyCamera;
       break;
     case 'Z':
-      _useZFill = !_useZFill;
+      //_useZFill = !_useZFill;
       break;
     }
     break;

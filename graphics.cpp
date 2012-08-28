@@ -22,6 +22,8 @@ using namespace std::tr1::placeholders;
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "D3DX11.lib")
 
+static const int cMultisampleCount = 4;
+
 namespace
 {
   template <class T>
@@ -337,8 +339,12 @@ GraphicsObjectHandle Graphics::get_texture(const char *filename) {
 
 GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info) {
 
-  if (info && FAILED(D3DX11GetImageInfoFromFile(filename, NULL, info, NULL)))
+  D3DX11_IMAGE_INFO imageInfo;
+  if (FAILED(D3DX11GetImageInfoFromFile(filename, NULL, &imageInfo, NULL)))
     return emptyGoh;
+
+  if (info)
+    *info = imageInfo;
 
   auto data = unique_ptr<SimpleResource>(new SimpleResource());
   if (FAILED(D3DX11CreateTextureFromFile(_device, filename, NULL, NULL, &data->resource, NULL)))
@@ -346,7 +352,9 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
 
   // TODO: allow for srgb loading
   auto fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
-  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(D3D11_SRV_DIMENSION_TEXTURE2D, fmt);
+  // check if this is a cube map
+  auto dim = imageInfo.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE ? D3D11_SRV_DIMENSION_TEXTURECUBE : D3D11_SRV_DIMENSION_TEXTURE2D;
+  auto desc = CD3D11_SHADER_RESOURCE_VIEW_DESC(dim, fmt);
   if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->view.resource)))
     return emptyGoh;
 
@@ -482,7 +490,7 @@ bool Graphics::create_back_buffers(int width, int height)
 
   // depth buffer
   B_ERR_HR(_device->CreateTexture2D(
-    &CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL), 
+    &CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL, D3D11_USAGE_DEFAULT, 0, cMultisampleCount), 
     NULL, &rt->depth_stencil.resource));
   rt->depth_stencil.resource->GetDesc(&rt->depth_stencil.desc);
   set_private_data(FROM_HERE, rt->depth_stencil.resource.p);
@@ -526,10 +534,10 @@ bool Graphics::create_default_geometry() {
   // fullscreen pos quad
   {
     static const float verts[] = {
-      -1, +1, +1,
-      +1, +1, +1,
-      -1, -1, +1,
-      +1, -1, +1,
+      -1, +1, +1, 0,
+      +1, +1, +1, 0,
+      -1, -1, +1, 0,
+      +1, -1, +1, 0,
     };
 
     auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
@@ -556,7 +564,7 @@ bool Graphics::init(const HWND hwnd, const int width, const int height)
   swapchain_desc.BufferDesc.RefreshRate.Denominator = 1;
   swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   swapchain_desc.OutputWindow = hwnd;
-  swapchain_desc.SampleDesc.Count = 1;
+  swapchain_desc.SampleDesc.Count = cMultisampleCount;
   swapchain_desc.SampleDesc.Quality = 0;
   swapchain_desc.Windowed = TRUE;
 
@@ -798,30 +806,8 @@ bool Graphics::technique_file_changed(const char *filename, void *token) {
 }
 
 bool Graphics::shader_file_changed(const char *filename, void *token) {
-  // TODO
-/*
-  LOG_CONTEXT("%st loading: %s", __FUNCTION__, filename);
-
   Technique *t = (Technique *)token;
-  for (int i = 0; i < t->vertex_shader_count(); ++i) {
-    if (Shader *shader = t->vertex_shader(i)) {
-      if (!t->create_shaders(_ri, shader)) {
-        LOG_WARNING_LN("Error initializing vertex shader: %s", filename);
-        return false;
-      }
-    }
-  }
-
-  for (int i = 0; i < t->pixel_shader_count(); ++i) {
-    if (Shader *shader = t->pixel_shader(i)) {
-      if (!t->init_shader(_ri, shader)) {
-        LOG_WARNING_LN("Error initializing pixel shader: %s", filename);
-        return false;
-      }
-    }
-  }
-*/
-  return true;
+  return t->init();
 }
 
 bool Graphics::load_techniques(const char *filename, bool add_materials) {
@@ -1030,7 +1016,7 @@ void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHa
     case kGeomFsQuadPos:
       *vb = _predefined_geometry[kGeomFsQuadPos].first;
       *ib = _predefined_geometry[kGeomFsQuadPos].second;
-      *vertex_size = sizeof(XMFLOAT3);
+      *vertex_size = sizeof(XMFLOAT4);
       *index_count = 6;
       break;
 

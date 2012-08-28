@@ -102,14 +102,17 @@ JsonValue::JsonValuePtr ProfileManager::end_frame() {
     cur_thread->add_key_value("maxDepth", tl->max_depth);
     auto &timeline = JsonValue::create_array();
 
-    for (auto j = begin(tl->events); j != end(tl->events); ++j) {
-      auto &cur_event = JsonValue::create_object();
-      cur_event->add_key_value("name", j->name ? j->name : "Unknown");
-      cur_event->add_key_value("start", j->start.QuadPart / freq);
-      cur_event->add_key_value("end", j->end.QuadPart / freq);
-      cur_event->add_key_value("level", j->cur_level);
-      timeline->add_value(cur_event);
+    if (tl->events.size() < 1000) {
+      for (auto j = begin(tl->events); j != end(tl->events); ++j) {
+        auto &cur_event = JsonValue::create_object();
+        cur_event->add_key_value("name", j->name ? j->name : "Unknown");
+        cur_event->add_key_value("start", j->start.QuadPart / freq);
+        cur_event->add_key_value("end", j->end.QuadPart / freq);
+        cur_event->add_key_value("level", j->cur_level);
+        timeline->add_value(cur_event);
+      }
     }
+
     cur_thread->add_key_value("events", timeline);
     threads->add_value(cur_thread);
   }

@@ -177,6 +177,11 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
             var.name = class_id.empty() ? name : class_id;
 #endif
             cbuffer.vars.emplace_back(var);
+          } else {
+            // we need the size even for unused elements
+            int ofs = atoi(row[4].c_str());
+            int len = atoi(row[6].c_str());
+            size = max(size, ofs + len);
           }
         }
       }

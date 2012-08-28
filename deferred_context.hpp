@@ -71,6 +71,7 @@ public:
   void set_bs(GraphicsObjectHandle bs, const float *blend_factors, UINT sample_mask);
   void set_samplers(const SamplerArray &samplers);
   void set_shader_resources(const TextureArray &resources, ShaderType::Enum type);
+  void set_shader_resource(GraphicsObjectHandle resource, ShaderType::Enum type);
   void set_uavs(const TextureArray &uavs);
   void unset_uavs(int first, int count);
   void unset_shader_resource(int first_view, int num_views, ShaderType::Enum type);

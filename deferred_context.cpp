@@ -160,22 +160,22 @@ void DeferredContext::set_default_render_target() {
 }
 
 void DeferredContext::set_vs(GraphicsObjectHandle vs) {
-  KASSERT(vs.type() == GraphicsObjectHandle::kVertexShader);
+  KASSERT(vs.type() == GraphicsObjectHandle::kVertexShader || !vs.is_valid());
   _ctx->VSSetShader(GRAPHICS._vertex_shaders.get(vs), NULL, 0);
 }
 
 void DeferredContext::set_cs(GraphicsObjectHandle cs) {
-  KASSERT(cs.type() == GraphicsObjectHandle::kComputeShader);
+  KASSERT(cs.type() == GraphicsObjectHandle::kComputeShader || !cs.is_valid());
   _ctx->CSSetShader(cs.is_valid() ? GRAPHICS._compute_shaders.get(cs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_gs(GraphicsObjectHandle gs) {
-  KASSERT(gs.type() == GraphicsObjectHandle::kGeometryShader);
+  KASSERT(gs.type() == GraphicsObjectHandle::kGeometryShader || !gs.is_valid());
   _ctx->GSSetShader(gs.is_valid() ? GRAPHICS._geometry_shaders.get(gs) : NULL, NULL, 0);
 }
 
 void DeferredContext::set_ps(GraphicsObjectHandle ps) {
-  KASSERT(ps.type() == GraphicsObjectHandle::kPixelShader);
+  KASSERT(ps.type() == GraphicsObjectHandle::kPixelShader || !ps.is_valid());
   _ctx->PSSetShader(ps.is_valid() ? GRAPHICS._pixel_shaders.get(ps) : NULL, NULL, 0);
 }
 
@@ -284,6 +284,11 @@ void DeferredContext::set_uavs(const TextureArray &uavs) {
         ofs++;
     }
   }
+}
+
+void DeferredContext::set_shader_resource(GraphicsObjectHandle resource, ShaderType::Enum type) {
+  TextureArray arr = { resource };
+  return set_shader_resources(arr, type);
 }
 
 void DeferredContext::set_shader_resources(const TextureArray &resources, ShaderType::Enum type) {

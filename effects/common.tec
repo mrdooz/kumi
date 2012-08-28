@@ -40,6 +40,13 @@ sampler_desc LinearSampler {
     address_v = clamp;
 };
 
+sampler_desc LinearSamplerWrap {
+  filter = min_mag_mip_linear;
+  address_u = wrap;
+  address_v = wrap;
+};
+
+
 technique quad_base {
     vertex_shader {
         file common.hlsl;
