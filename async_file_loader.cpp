@@ -8,7 +8,8 @@ using std::tuple;
 using std::make_tuple;
 using std::get;
 using std::tie;
-using boost::scoped_ptr;
+using std::unique_ptr;
+//using boost::scoped_ptr;
 
 struct LoadData {
 	HANDLE h;
@@ -49,7 +50,7 @@ UINT LoaderThread::thread_proc(void *userdata)
 
 void LoaderThread::load_file_apc(ULONG_PTR data)
 {
-	scoped_ptr<LoadFileData> load_data((LoadFileData *)data);
+	unique_ptr<LoadFileData> load_data((LoadFileData *)data);
 	const string &filename = get<0>(*load_data);
 	const CbFileLoaded &cb = get<1>(*load_data);
 	HANDLE h = CreateFileA(filename.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
@@ -68,7 +69,7 @@ void LoaderThread::load_file_apc(ULONG_PTR data)
 
 void LoaderThread::cancel_load_apc(ULONG_PTR data)
 {
-	scoped_ptr<CancelLoadData> c((CancelLoadData *)data);
+	unique_ptr<CancelLoadData> c((CancelLoadData *)data);
 /*
 	HANDLE h = get<0>(*c);
 	const string &filename = get<1>(*c);
@@ -79,7 +80,7 @@ void LoaderThread::cancel_load_apc(ULONG_PTR data)
 
 void LoaderThread::remove_callback_apc(ULONG_PTR data)
 {
-	scoped_ptr<RemoveCallbackData> c((RemoveCallbackData *)data);
+	unique_ptr<RemoveCallbackData> c((RemoveCallbackData *)data);
 }
 
 void LoaderThread::terminate_apc(ULONG_PTR data)
@@ -89,7 +90,7 @@ void LoaderThread::terminate_apc(ULONG_PTR data)
 
 void LoaderThread::on_completion(DWORD error_code, DWORD bytes_transfered, OVERLAPPED *overlapped)
 {
-	scoped_ptr<InProgressLoad> data((InProgressLoad *)overlapped->hEvent);
+	unique_ptr<InProgressLoad> data((InProgressLoad *)overlapped->hEvent);
 	const CbFileLoaded &cb = get<2>(*data);
 	const string &filename = get<5>(*data);
 

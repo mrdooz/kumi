@@ -42,11 +42,7 @@ const TCHAR *g_app_window_title = _T("kumi - magnus österlind");
 App::App()
   : GreedyThread(threading::kMainThread)
   , _hinstance(NULL)
-  , _width(-1)
-  , _height(-1)
-  , _hwnd(NULL)
   , _test_effect(NULL)
-  , _dbg_message_count(0)
   , _frame_time(0)
 {
   find_app_root();
@@ -81,9 +77,6 @@ bool App::init(HINSTANCE hinstance)
   if (!GRAPHICS.config(_hinstance))
     return false;
 
-  _width = 3 * GetSystemMetrics(SM_CXSCREEN) / 4;
-  _height = 3 * GetSystemMetrics(SM_CYSCREEN) / 4;
-
   B_ERR_BOOL(ProfileManager::create());
   B_ERR_BOOL(PropertyManager::create());
 #if WITH_UNPACKED_RESOUCES
@@ -98,7 +91,7 @@ bool App::init(HINSTANCE hinstance)
 #endif
   B_ERR_BOOL(AnimationManager::create());
 
-  B_ERR_BOOL(create_window());
+  B_ERR_BOOL(GRAPHICS.init(wnd_proc));
 
 #if WITH_UNPACKED_RESOUCES
   RESOURCE_MANAGER.add_path("D:\\SkyDrive");
@@ -145,48 +138,6 @@ bool App::close() {
   Logger::close();
   Dispatcher::close();
   delete exch_null(_instance);
-  return true;
-}
-
-void App::set_client_size()
-{
-  RECT client_rect;
-  RECT window_rect;
-  GetClientRect(_hwnd, &client_rect);
-  GetWindowRect(_hwnd, &window_rect);
-  window_rect.right -= window_rect.left;
-  window_rect.bottom -= window_rect.top;
-  const int dx = window_rect.right - client_rect.right;
-  const int dy = window_rect.bottom - client_rect.bottom;
-
-  SetWindowPos(_hwnd, NULL, -1, -1, _width + dx, _height + dy, SWP_NOZORDER | SWP_NOREPOSITION);
-}
-
-bool App::create_window()
-{
-  WNDCLASSEX wcex;
-  ZeroMemory(&wcex, sizeof(wcex));
-
-  wcex.cbSize = sizeof(WNDCLASSEX);
-  wcex.style          = CS_HREDRAW | CS_VREDRAW;
-  wcex.lpfnWndProc    = wnd_proc;
-  wcex.hInstance      = _hinstance;
-  wcex.hbrBackground  = 0;
-  wcex.lpszClassName  = g_app_window_class;
-
-  B_ERR_INT(RegisterClassEx(&wcex));
-
-  //const UINT window_style = WS_VISIBLE | WS_POPUP | WS_OVERLAPPEDWINDOW;
-  const UINT window_style = WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS; //WS_VISIBLE | WS_POPUP;
-
-  _hwnd = CreateWindow(g_app_window_class, g_app_window_title, window_style,
-    CW_USEDEFAULT, CW_USEDEFAULT, _width, _height, NULL, NULL,
-    _hinstance, NULL);
-
-  set_client_size();
-
-  ShowWindow(_hwnd, SW_SHOW);
-
   return true;
 }
 
@@ -413,26 +364,12 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
   switch( message ) {
 
-  case WM_SETFOCUS:
-  case WM_KILLFOCUS:
-    {
-      SetFocus(_instance->_hwnd);
-    }
-    return 0;
-
   case WM_SIZE:
     GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
     break;
 
   case WM_APP_CLOSE:
     DestroyWindow(hWnd);
-    break;
-
-  case WM_CREATE:
-    {
-      _instance->_hwnd = hWnd;
-      B_ERR_BOOL(GRAPHICS.init(hWnd, _instance->_width, _instance->_height));
-    }
     break;
 
   case WM_DESTROY:

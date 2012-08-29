@@ -97,13 +97,12 @@ public:
   static bool close();
 
   bool config(HINSTANCE hInstance);
-
-  bool	init(const HWND hwnd, const int width, const int height);
+  bool	init(WNDPROC wndProc);
   void	clear(const XMFLOAT4& c);
   void	clear(GraphicsObjectHandle h, const XMFLOAT4 &c);
 
   void	present();
-  void	resize(const int width, const int height);
+  void	resize(int width, int height);
 
   const char *vs_profile() const { return _vs_profile; }
   const char *ps_profile() const { return _ps_profile; }
@@ -180,10 +179,18 @@ public:
 
   static GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
 
+  void setDisplayAllModes(bool value) { _displayAllModes = value; }
+  bool displayAllModes() const { return _displayAllModes; }
+
+  const DXGI_MODE_DESC &selectedVideoMode() const;
+
 private:
   DISALLOW_COPY_AND_ASSIGN(Graphics);
 
   Graphics();
+
+  bool createWindow(WNDPROC wndProc);
+  void setClientSize();
 
   void set_default_render_target();
 
@@ -209,6 +216,29 @@ private:
 
   GraphicsObjectHandle load_texture(const char *filename, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
   GraphicsObjectHandle load_texture_from_memory(const void *buf, size_t len, const char *friendly_name, bool srgb, D3DX11_IMAGE_INFO *info);
+
+
+  static INT_PTR CALLBACK dialogWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+  static bool enumerateDisplayModes(HWND hWnd);
+
+  struct VideoAdapter {
+    CComPtr<IDXGIAdapter1> adapter;
+    DXGI_ADAPTER_DESC desc;
+    vector<DXGI_MODE_DESC> videoModes;
+  };
+
+  struct Setup {
+
+    Setup() : selectedAdapter(-1), selectedVideoMode(-1), multisampleCount(-1), selectedAspectRatio(-1), windowed(false) {}
+
+    std::vector<VideoAdapter> videoAdapters;
+    int selectedAdapter;
+    int selectedVideoMode;
+    int selectedAspectRatio;
+    int multisampleCount;
+    bool windowed;
+
+  } _curSetup;
 
 
   // resources
@@ -277,6 +307,10 @@ private:
 
   PropertyId _screen_size_id;
   std::map<std::string, int> _shader_flags;
+
+  HWND _hwnd;
+  HINSTANCE _hInstance;
+  bool _displayAllModes;
 };
 
 #define GRAPHICS Graphics::instance()

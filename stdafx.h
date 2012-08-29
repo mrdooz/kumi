@@ -19,6 +19,7 @@
 #endif
 
 #include <windows.h>
+#include <windowsx.h>
 #include <atlbase.h>
 #include <process.h>
 #include <TlHelp32.h>
@@ -45,7 +46,6 @@ typedef uint64_t uint64;
 #include <io.h>
 #include <sys/stat.h>
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/assign/list_of.hpp>
 #include <boost/algorithm/string.hpp>
 

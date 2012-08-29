@@ -7,17 +7,6 @@
 
 #pragma comment(lib, "winmm.lib")
 
-using std::pair;
-using std::make_pair;
-using std::string;
-using std::map;
-using std::vector;
-using std::deque;
-using std::tuple;
-using std::make_tuple;
-using std::get;
-using boost::scoped_ptr;
-
 using namespace threading;
 using namespace std;
 

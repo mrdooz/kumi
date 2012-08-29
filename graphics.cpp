@@ -13,6 +13,7 @@
 #include "deferred_context.hpp"
 #include "profiler.hpp"
 #include "effect.hpp"
+#include "kumi.hpp"
 #include "_win32/resource.h"
 
 using namespace std;
@@ -23,7 +24,7 @@ using namespace std::tr1::placeholders;
 #pragma comment(lib, "D3D11.lib")
 #pragma comment(lib, "D3DX11.lib")
 
-static const int cMultisampleCount = 4;
+#define USE_CONFIG_DLG 0
 
 namespace
 {
@@ -40,21 +41,171 @@ namespace
   }
 }
 
-static INT_PTR CALLBACK dialogWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+bool Graphics::enumerateDisplayModes(HWND hWnd) {
+  // Create DXGI factory to enumerate adapters
+
+  CComPtr<IDXGIFactory1> dxgi_factory;
+  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&dxgi_factory)))) {
+    return false;
+  }
+
+  GRAPHICS._curSetup.videoAdapters.clear();
+
+  // Enumerate the adapters
+  CComPtr<IDXGIAdapter1> adapter;
+  for (int i = 0; SUCCEEDED(dxgi_factory->EnumAdapters1(i, &adapter)); ++i) {
+
+    VideoAdapter &curAdapter = dummy_push_back(&GRAPHICS._curSetup.videoAdapters);
+    curAdapter.adapter = adapter;
+    adapter->GetDesc(&curAdapter.desc);
+    HWND hAdapter = GetDlgItem(hWnd, IDC_VIDEO_ADAPTER);
+    ComboBox_AddString(hAdapter, wide_char_to_utf8(curAdapter.desc.Description).c_str());
+    ComboBox_SetCurSel(hAdapter, 0);
+    GRAPHICS._curSetup.selectedAdapter = 0;
+
+    IDXGIOutput *output = nullptr;
+    vector<CComPtr<IDXGIOutput>> outputs;
+    vector<DXGI_MODE_DESC> displayModes;
+
+    // Only enumerate the first adapter
+    for (int j = 0; SUCCEEDED(adapter->EnumOutputs(j, &output)); ++j) {
+      DXGI_OUTPUT_DESC outputDesc;
+      output->GetDesc(&outputDesc);
+      UINT numModes;
+      output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, 0, &numModes, NULL);
+      size_t prevSize = displayModes.size();
+      displayModes.resize(displayModes.size() + numModes);
+      output->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, 0, &numModes, displayModes.data() + prevSize);
+      output->Release();
+      if (!GRAPHICS._displayAllModes)
+        break;
+    }
+
+    // Only keep the version of each display mode with the highest refresh rate
+    auto &safeRational = [](const DXGI_RATIONAL &r) { return r.Denominator == 0 ? 0 : r.Numerator / r.Denominator; };
+    if (GRAPHICS.displayAllModes()) {
+      curAdapter.videoModes = displayModes;
+    } else {
+      std::map<pair<int, int>, DXGI_RATIONAL> highestRate;
+      for (size_t i = 0; i < displayModes.size(); ++i) {
+        auto &cur = displayModes[i];
+        auto key = make_pair(cur.Width, cur.Height);
+        if (safeRational(cur.RefreshRate) > safeRational(highestRate[key])) {
+          highestRate[key] = cur.RefreshRate;
+        }
+      }
+
+      for (auto it = begin(highestRate); it != end(highestRate); ++it) {
+        DXGI_MODE_DESC desc;
+        desc.Width = it->first.first;
+        desc.Height = it->first.second;
+        desc.RefreshRate = it->second;
+        curAdapter.videoModes.push_back(desc);
+      }
+
+      auto &resSorter = [&](const DXGI_MODE_DESC &a, const DXGI_MODE_DESC &b) { 
+        return a.Width < b.Width; };
+
+      sort(begin(curAdapter.videoModes), end(curAdapter.videoModes), resSorter);
+    }
+
+    HWND hDisplayMode = GetDlgItem(hWnd, IDC_DISPLAY_MODES);
+    for (size_t k = 0; k < curAdapter.videoModes.size(); ++k) {
+      auto &cur = curAdapter.videoModes[k];
+      char buf[256];
+      sprintf(buf, "%dx%d (%dHz)", cur.Width, cur.Height, safeRational(cur.RefreshRate));
+      ComboBox_InsertString(hDisplayMode, -1, buf);
+    }
+    int cnt = ComboBox_GetCount(hDisplayMode);
+    ComboBox_SetCurSel(hDisplayMode, cnt-1);
+    GRAPHICS._curSetup.selectedVideoMode = cnt-1;
+  }
+
+  HWND hMultisample = GetDlgItem(hWnd, IDC_MULTISAMPLE);
+  ComboBox_InsertString(hMultisample, -1, "No multisample");
+  ComboBox_InsertString(hMultisample, -1, "2x multisample");
+  ComboBox_InsertString(hMultisample, -1, "4x multisample");
+  ComboBox_InsertString(hMultisample, -1, "8x multisample");
+
+  ComboBox_SetItemData(hMultisample, 0, 1);
+  ComboBox_SetItemData(hMultisample, 1, 2);
+  ComboBox_SetItemData(hMultisample, 2, 4);
+  ComboBox_SetItemData(hMultisample, 3, 8);
+
+  ComboBox_SetCurSel(hMultisample, 2);
+  GRAPHICS._curSetup.multisampleCount = 4;
+
+#if DISTRIBUTION
+  GRAPHICS._curSetup.windowed = false;
+#else
+  GRAPHICS._curSetup.windowed = true;
+  Button_SetCheck(GetDlgItem(hWnd, IDC_WINDOWED), TRUE);
+#endif
+
+  return true;
+}
+
+INT_PTR CALLBACK Graphics::dialogWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
   switch (message) {
+
     case WM_INITDIALOG: {
-      int a = 10;
-                    }
-    break;
+      if (!enumerateDisplayModes(hWnd)) {
+        EndDialog(hWnd, -1);
+      }
+#if !USE_CONFIG_DLG
+      GRAPHICS._curSetup.selectedVideoMode = 3 * GRAPHICS._curSetup.videoAdapters[0].videoModes.size() / 4;
+      EndDialog(hWnd, 1);
+#endif
+      RECT rect;
+      GetClientRect(hWnd, &rect);
+      int width = GetSystemMetrics(SM_CXSCREEN);
+      int height = GetSystemMetrics(SM_CYSCREEN);
+      SetWindowPos(hWnd, NULL, width/2 - (rect.right - rect.left) / 2, height/2 - (rect.bottom - rect.top)/2, -1, -1, 
+        SWP_NOZORDER | SWP_NOSIZE);
+      break;
+    }
 
     case WM_COMMAND:
-      switch (wParam) {
+
+      switch (LOWORD(wParam)) {
+
         case IDCANCEL:
           EndDialog(hWnd, 0);
           return TRUE;
+
         case IDOK:
           EndDialog(hWnd, 1);
           return TRUE;
+
+        case IDC_WINDOWED: {
+          switch (HIWORD(wParam)) {
+            case BN_CLICKED:
+              GRAPHICS._curSetup.windowed = !!Button_GetCheck((HWND)lParam);
+              return TRUE;
+          }
+          break;
+        }
+
+        case IDC_DISPLAY_MODES:
+          switch (HIWORD(wParam)) {
+            case CBN_SELCHANGE: {
+              int sel = ComboBox_GetCurSel((HWND)lParam);
+              GRAPHICS._curSetup.selectedVideoMode = sel;
+              return TRUE;
+            }
+          }
+
+        case IDC_MULTISAMPLE:
+          switch (HIWORD(wParam)) {
+            case CBN_SELCHANGE: {
+              int sel = ComboBox_GetCurSel((HWND)lParam);
+              GRAPHICS._curSetup.multisampleCount = ComboBox_GetItemData((HWND)lParam, sel);
+              return TRUE;
+            }
+          }
+          break;
+
+
       }
       break;
   }
@@ -95,12 +246,143 @@ Graphics::Graphics()
   , _structured_buffers(delete_obj<StructuredBuffer *>)
   , _vsync(false)
   , _totalBytesAllocated(0)
+  , _displayAllModes(false)
 {
 }
 
 bool Graphics::create() {
   KASSERT(!_instance);
   _instance = new Graphics();
+  return true;
+}
+
+void Graphics::setClientSize()
+{
+  RECT client_rect;
+  RECT window_rect;
+  GetClientRect(_hwnd, &client_rect);
+  GetWindowRect(_hwnd, &window_rect);
+  window_rect.right -= window_rect.left;
+  window_rect.bottom -= window_rect.top;
+  const int dx = window_rect.right - client_rect.right;
+  const int dy = window_rect.bottom - client_rect.bottom;
+
+  SetWindowPos(_hwnd, NULL, -1, -1, _width + dx, _height + dy, SWP_NOZORDER | SWP_NOREPOSITION);
+}
+
+bool Graphics::createWindow(WNDPROC wndProc) {
+
+  WNDCLASSEX wcex;
+  ZeroMemory(&wcex, sizeof(wcex));
+
+  wcex.cbSize = sizeof(WNDCLASSEX);
+  wcex.style          = CS_HREDRAW | CS_VREDRAW;
+  wcex.lpfnWndProc    = wndProc;
+  wcex.hInstance      = _hInstance;
+  wcex.hbrBackground  = 0;
+  wcex.lpszClassName  = g_app_window_class;
+
+  B_ERR_INT(RegisterClassEx(&wcex));
+
+  //const UINT window_style = WS_VISIBLE | WS_POPUP | WS_OVERLAPPEDWINDOW;
+  const UINT window_style = WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN | WS_CLIPSIBLINGS; //WS_VISIBLE | WS_POPUP;
+
+  _hwnd = CreateWindow(g_app_window_class, g_app_window_title, window_style,
+    CW_USEDEFAULT, CW_USEDEFAULT, _width, _height, NULL, NULL,
+    _hInstance, NULL);
+
+  setClientSize();
+
+  ShowWindow(_hwnd, SW_SHOW);
+
+  return true;
+}
+
+const DXGI_MODE_DESC &Graphics::selectedVideoMode() const {
+  return _curSetup.videoAdapters[_curSetup.selectedAdapter].videoModes[_curSetup.selectedVideoMode];
+}
+
+bool Graphics::init(WNDPROC wndProc)
+{
+  auto &curMode = selectedVideoMode();
+  _width = curMode.Width;
+  _height = curMode.Height;
+  _buffer_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+  createWindow(wndProc);
+
+  _screen_size_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size");
+
+  DXGI_SWAP_CHAIN_DESC swapchain_desc;
+  ZeroMemory(&swapchain_desc, sizeof( swapchain_desc ) );
+  swapchain_desc.BufferCount = 3;
+  swapchain_desc.BufferDesc.Width = _width;
+  swapchain_desc.BufferDesc.Height = _height;
+  swapchain_desc.BufferDesc.Format = _buffer_format;
+  swapchain_desc.BufferDesc.RefreshRate = curMode.RefreshRate;
+  swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  swapchain_desc.OutputWindow = _hwnd;
+  swapchain_desc.SampleDesc.Count = _curSetup.multisampleCount;
+  swapchain_desc.SampleDesc.Quality = 0;
+  swapchain_desc.Windowed = _curSetup.windowed;
+
+  // Create DXGI factory to enumerate adapters
+  IDXGIFactory1 *dxgi_factory = nullptr;
+  B_ERR_HR(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
+
+  // Use the first adapter
+  vector<CComPtr<IDXGIAdapter1> > adapters;
+  IDXGIAdapter1 *adapter = nullptr;
+  int perfhud = -1;
+  for (int i = 0; SUCCEEDED(dxgi_factory->EnumAdapters1(i, &adapter)); ++i) {
+    adapters.push_back(adapter);
+    DXGI_ADAPTER_DESC desc;
+    adapter->GetDesc(&desc);
+    exch_null(adapter)->Release();
+    if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0) {
+      perfhud = i;
+    }
+  }
+  exch_null(dxgi_factory)->Release();
+
+  B_ERR_BOOL(!adapters.empty());
+
+  adapter = perfhud != -1 ? adapters[perfhud] : adapters.front();
+
+  int flags = 0;
+#ifdef _DEBUG
+  flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+  // Create the DX11 device
+  B_ERR_HR(D3D11CreateDeviceAndSwapChain(
+    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, 
+    D3D11_SDK_VERSION, &swapchain_desc, &_swap_chain.p, &_device.p,
+    &_feature_level, &_immediate_context.p));
+  set_private_data(FROM_HERE, _immediate_context.p);
+
+  B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
+
+#ifdef _DEBUG
+  B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&(_d3d_debug.p)));
+#endif
+
+  B_ERR_BOOL(create_back_buffers(_width, _height));
+
+  _default_depth_stencil_state = create_depth_stencil_state(FROM_HERE, CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()));
+  _default_rasterizer_state = create_rasterizer_state(FROM_HERE, CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()));
+  _default_blend_state = create_blend_state(FROM_HERE, CD3D11_BLEND_DESC(CD3D11_DEFAULT()));
+
+  _device->CreateClassLinkage(&_class_linkage.p);
+
+  create_default_geometry();
+
+  // Create a dummy texture
+  DWORD black = 0;
+  _dummy_texture = create_texture(FROM_HERE, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, &black, 1, 1, 1, "dummy_texture");
+
+  for (int i = 0; i < 4; ++i)
+    _default_blend_factors[i] = 1.0f;
   return true;
 }
 
@@ -511,7 +793,7 @@ bool Graphics::create_back_buffers(int width, int height)
 
   // depth buffer
   B_ERR_HR(_device->CreateTexture2D(
-    &CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL, D3D11_USAGE_DEFAULT, 0, cMultisampleCount), 
+    &CD3D11_TEXTURE2D_DESC(DXGI_FORMAT_D24_UNORM_S8_UINT, width, height, 1, 1, D3D11_BIND_DEPTH_STENCIL, D3D11_USAGE_DEFAULT, 0, _curSetup.multisampleCount), 
     NULL, &rt->depth_stencil.resource));
   rt->depth_stencil.resource->GetDesc(&rt->depth_stencil.desc);
   set_private_data(FROM_HERE, rt->depth_stencil.resource.p);
@@ -571,92 +853,11 @@ bool Graphics::create_default_geometry() {
 
 bool Graphics::config(HINSTANCE hInstance) {
 
+  _hInstance = hInstance;
   int res = DialogBox(hInstance, MAKEINTRESOURCE(IDD_SETUP_DLG), NULL, dialogWndProc);
   return res == IDOK;
 }
 
-bool Graphics::init(const HWND hwnd, const int width, const int height)
-{
-  _width = width;
-  _height = height;
-  _buffer_format = DXGI_FORMAT_B8G8R8A8_UNORM; //DXGI_FORMAT_R8G8B8A8_UNORM;
-
-  _screen_size_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size");
-
-
-  DXGI_SWAP_CHAIN_DESC swapchain_desc;
-  ZeroMemory(&swapchain_desc, sizeof( swapchain_desc ) );
-  swapchain_desc.BufferCount = 3;
-  swapchain_desc.BufferDesc.Width = width;
-  swapchain_desc.BufferDesc.Height = height;
-  swapchain_desc.BufferDesc.Format = _buffer_format;
-  swapchain_desc.BufferDesc.RefreshRate.Numerator = 0;
-  swapchain_desc.BufferDesc.RefreshRate.Denominator = 1;
-  swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  swapchain_desc.OutputWindow = hwnd;
-  swapchain_desc.SampleDesc.Count = cMultisampleCount;
-  swapchain_desc.SampleDesc.Quality = 0;
-  swapchain_desc.Windowed = TRUE;
-
-  // Create DXGI factory to enumerate adapters
-  IDXGIFactory1 *dxgi_factory = nullptr;
-  B_ERR_HR(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
-
-  // Use the first adapter
-  vector<CComPtr<IDXGIAdapter1> > adapters;
-  IDXGIAdapter1 *adapter = nullptr;
-  int perfhud = -1;
-  for (int i = 0; SUCCEEDED(dxgi_factory->EnumAdapters1(i, &adapter)); ++i) {
-    adapters.push_back(adapter);
-    DXGI_ADAPTER_DESC desc;
-    adapter->GetDesc(&desc);
-    exch_null(adapter)->Release();
-    if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0) {
-      perfhud = i;
-    }
-  }
-  exch_null(dxgi_factory)->Release();
-
-  B_ERR_BOOL(!adapters.empty());
-
-  adapter = perfhud != -1 ? adapters[perfhud] : adapters.front();
-
-  int flags = 0;
-#ifdef _DEBUG
-  flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
-  // Create the DX11 device
-  B_ERR_HR(D3D11CreateDeviceAndSwapChain(
-    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, 
-    D3D11_SDK_VERSION, &swapchain_desc, &_swap_chain.p, &_device.p,
-    &_feature_level, &_immediate_context.p));
-  set_private_data(FROM_HERE, _immediate_context.p);
-
-  B_ERR_BOOL(_feature_level >= D3D_FEATURE_LEVEL_9_3);
-
-#ifdef _DEBUG
-  B_ERR_HR(_device->QueryInterface(IID_ID3D11Debug, (void **)&(_d3d_debug.p)));
-#endif
-
-  B_ERR_BOOL(create_back_buffers(width, height));
-
-  _default_depth_stencil_state = create_depth_stencil_state(FROM_HERE, CD3D11_DEPTH_STENCIL_DESC(CD3D11_DEFAULT()));
-  _default_rasterizer_state = create_rasterizer_state(FROM_HERE, CD3D11_RASTERIZER_DESC(CD3D11_DEFAULT()));
-  _default_blend_state = create_blend_state(FROM_HERE, CD3D11_BLEND_DESC(CD3D11_DEFAULT()));
-
-  _device->CreateClassLinkage(&_class_linkage.p);
-
-  create_default_geometry();
-
-  // Create a dummy texture
-  DWORD black = 0;
-  _dummy_texture = create_texture(FROM_HERE, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, &black, 1, 1, 1, "dummy_texture");
-
-  for (int i = 0; i < 4; ++i)
-    _default_blend_factors[i] = 1.0f;
-  return true;
-}
 
 void Graphics::set_default_render_target()
 {
@@ -696,7 +897,7 @@ void Graphics::present()
   _swap_chain->Present(_vsync ? 1 : 0,0);
 }
 
-void Graphics::resize(const int width, const int height)
+void Graphics::resize(int width, int height)
 {
   if (!_swap_chain || width == 0 || height == 0)
     return;

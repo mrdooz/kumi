@@ -5,6 +5,7 @@ std::string to_string(char const * const format, ... );
 std::string trim(const std::string &str);
 bool wide_char_to_utf8(LPCOLESTR unicode, size_t len, std::string *str);
 std::string wide_char_to_utf8(const std::wstring &str);
+std::string wide_char_to_utf8(const WCHAR *str);
 ustring ansi_to_host(const char *str);
 std::wstring utf8_to_wide(const char *str);
 

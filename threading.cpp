@@ -4,7 +4,6 @@
 
 using std::pair;
 using std::make_pair;
-using boost::scoped_ptr;
 
 const DWORD MS_VC_EXCEPTION=0x406D1388;
 

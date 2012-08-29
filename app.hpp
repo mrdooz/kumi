@@ -52,8 +52,6 @@ private:
 #if WITH_WEBSOCKETS
   void send_stats(const JsonValue::JsonValuePtr &frame);
 #endif
-  bool create_window();
-  void set_client_size();
   void find_app_root();
 
   void save_settings();
@@ -66,10 +64,6 @@ protected:
   static App* _instance;
   EffectBase* _test_effect;
   HINSTANCE _hinstance;
-  int32_t _width;
-  int32_t _height;
-  HWND _hwnd;
-  int _dbg_message_count;
 
   double _frame_time;
 
