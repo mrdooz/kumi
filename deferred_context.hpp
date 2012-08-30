@@ -51,8 +51,8 @@ public:
 
   void render_technique(GraphicsObjectHandle technique_handle,
     const std::function<void(CBuffer *)> &fnSystemCbuffers,
-    const TextureArray &resources,
-    const InstanceData &instance_data);
+    const TextureArray &resources = TextureArray(),
+    const InstanceData &instance_data = InstanceData());
 
   void begin_frame();
   void end_frame();

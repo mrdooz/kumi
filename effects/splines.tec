@@ -18,7 +18,20 @@ technique SplineRender {
     };
     
     rasterizer_desc = BackfaceCulling;
-    //rasterizer_desc = NoCulling;
     depth_stencil_desc = DepthEnable;
     blend_desc = BlendDisable;
+};
+
+technique spline_gradient inherits quad_base_simple {
+    pixel_shader {
+        file splines.hlsl;
+        entry_point gradient_ps_main;
+    };
+};
+
+technique spline_compose inherits quad_base {
+    pixel_shader {
+        file splines.hlsl;
+        entry_point ps_compose;
+    };
 };

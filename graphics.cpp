@@ -822,10 +822,10 @@ bool Graphics::create_default_geometry() {
   {
     // fullscreen pos/tex quad
     static const float verts[] = {
-      -1, +1, +1, +0, +0,
-      +1, +1, +1, +1, +0,
-      -1, -1, +1, +0, +1,
-      +1, -1, +1, +1, +1
+      -1, +1, +1, +1, +0, +0,
+      +1, +1, +1, +1, +1, +0,
+      -1, -1, +1, +1, +0, +1,
+      +1, -1, +1, +1, +1, +1
     };
 
 
@@ -837,10 +837,10 @@ bool Graphics::create_default_geometry() {
   // fullscreen pos quad
   {
     static const float verts[] = {
-      -1, +1, +1, 0,
-      +1, +1, +1, 0,
-      -1, -1, +1, 0,
-      +1, -1, +1, 0,
+      -1, +1, +1, 1,
+      +1, +1, +1, 1,
+      -1, -1, +1, 1,
+      +1, -1, +1, 1,
     };
 
     auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
@@ -1254,7 +1254,7 @@ void Graphics::get_predefined_geometry(PredefinedGeometry geom, GraphicsObjectHa
     case kGeomFsQuadPosTex:
       *vb = _predefined_geometry[kGeomFsQuadPosTex].first;
       *ib = _predefined_geometry[kGeomFsQuadPosTex].second;
-      *vertex_size = sizeof(PosTex);
+      *vertex_size = sizeof(Pos4Tex);
       *index_count = 6;
       break;
   }

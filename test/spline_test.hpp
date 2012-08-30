@@ -23,7 +23,7 @@ public:
 
 private:
 
-  void renderParticles();
+  void renderSplines();
 
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 

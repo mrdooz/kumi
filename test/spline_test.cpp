@@ -396,6 +396,33 @@ T *aligned_new(int count, int alignment) {
   return (T *)_aligned_malloc(count * sizeof(T), alignment);
 }
 
+static void setupTechnique(DeferredContext *ctx, GraphicsObjectHandle hTechnique, Technique **outTechnique, Shader **outVs, Shader **outGs, Shader **outPs) {
+
+  Technique *technique = GRAPHICS.get_technique(hTechnique);
+  Shader *vs = technique->vertex_shader(0);
+  Shader *gs = technique->geometry_shader(0);
+  Shader *ps = technique->pixel_shader(0);
+
+  ctx->set_rs(technique->rasterizer_state());
+  ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+  ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+  ctx->set_vs(vs ? vs->handle() : GraphicsObjectHandle());
+  ctx->set_gs(gs ? gs->handle() : GraphicsObjectHandle());
+  ctx->set_ps(ps ? ps->handle() : GraphicsObjectHandle());
+
+  ctx->set_vb(technique->vb(), technique->vertex_size());
+  ctx->set_ib(technique->ib(), technique->index_format());
+
+  ctx->set_layout(vs->input_layout());
+  ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+  if (outTechnique) *outTechnique = technique;
+  if (outVs) *outVs = vs;
+  if (outGs) *outGs = gs;
+  if (outPs) *outPs = ps;
+}
+
 SplineTest::SplineTest(const std::string &name) 
   : Effect(name)
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
@@ -455,13 +482,13 @@ bool SplineTest::init() {
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/splines.tec", true));
 
   _particle_technique = GRAPHICS.find_technique("particles");
-  _gradient_technique = GRAPHICS.find_technique("gradient");
-  _compose_technique = GRAPHICS.find_technique("compose");
+  _gradient_technique = GRAPHICS.find_technique("spline_gradient");
+  _compose_technique = GRAPHICS.find_technique("spline_compose");
   _coalesce = GRAPHICS.find_technique("coalesce");
 
   _splineTechnique = GRAPHICS.find_technique("SplineRender");
 
-  _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle3.png", "particle3.png", false, nullptr);
+  _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle1.png", "particle1.png", false, nullptr);
   _cubeMap = RESOURCE_MANAGER.load_texture("gfx/pearly3_cubemap2.dds", "pearly3_cubemap.dds", false, nullptr);
 
   _scale = GRAPHICS.find_technique("scale");
@@ -627,7 +654,7 @@ void SplineTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle o
     _ctx->unset_render_targets(0, 1);
 }
 
-void SplineTest::renderParticles() {
+void SplineTest::renderSplines() {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
@@ -660,12 +687,9 @@ void SplineTest::renderParticles() {
   } cbuffer;
 #pragma pack(pop)
 
-  XMFLOAT4X4 view = _view;
-  XMFLOAT4X4 proj = _proj;
-
-  XMFLOAT4X4 mtx;
-  XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&view), XMLoadFloat4x4(&proj)));
-  cbuffer.worldViewProj = transpose(mtx);
+  XMFLOAT4X4 worldViewProj;
+  XMStoreFloat4x4(&worldViewProj, XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj)));
+  cbuffer.worldViewProj = transpose(worldViewProj);
   cbuffer.cameraPos = expand(_cameraPos,0);
   memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
 
@@ -708,12 +732,78 @@ bool SplineTest::render() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
-  _ctx->set_default_render_target();
+  XMFLOAT4X4 worldViewProj;
+  XMMATRIX xWorldViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
+  XMStoreFloat4x4(&worldViewProj, XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj)));
+  XMFLOAT4 clipSpaceLightPos(0,100,200,1);
+  XMStoreFloat4(&clipSpaceLightPos, XMVector3TransformCoord(XMLoadFloat4(&clipSpaceLightPos), xWorldViewProj));
+  // divide by w -> ndc
+  clipSpaceLightPos.x /= clipSpaceLightPos.w;
+  clipSpaceLightPos.y /= clipSpaceLightPos.w;
+  clipSpaceLightPos.z /= clipSpaceLightPos.w;
 
-  //_ctx->render_technique(_gradient_technique, 
-    //bind(&SplineTest::fill_cbuffer, this, _1), TextureArray(), DeferredContext::InstanceData());
+  // convert to texture space
+  struct {
+    XMFLOAT4 ssLight;
+    XMFLOAT4 texLight;
+    XMFLOAT2 screenSize;
+  } cbufferLight;
 
-  renderParticles();
+  cbufferLight.texLight.x = (0.5f + 0.5f * clipSpaceLightPos.x);
+  cbufferLight.texLight.y = (1.0f - (0.5f + 0.5f * clipSpaceLightPos.y));
+  cbufferLight.ssLight.x = cbufferLight.texLight.x * w;
+  cbufferLight.ssLight.y = cbufferLight.texLight.y * h;
+
+  cbufferLight.screenSize = XMFLOAT2((float)w, (float)h);
+
+  ScopedRt rtColor(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtColor");
+  ScopedRt rtOcclude(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtOcclude");
+
+
+  int w2 = w/2;
+  int h2 = h/2;
+  ScopedRt rtDownscale(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtDownscale");
+  ScopedRt rtBlur1(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur1");
+  ScopedRt rtBlur2(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur2");
+
+  post_process(rtOcclude, rtDownscale, _scale);
+  _blur.do_blur(10, rtDownscale, rtBlur1, rtBlur2, w2, h2, _ctx);
+
+  {
+    Technique *technique;
+    Shader *ps, *vs;
+    setupTechnique(_ctx, _gradient_technique, &technique, &vs, nullptr, &ps);
+    _ctx->set_cbuffer(ps->find_cbuffer("WorldToScreenSpace"), 0, ShaderType::kPixelShader, &cbufferLight, sizeof(cbufferLight));
+
+    _ctx->set_render_target(rtColor, true);
+    _ctx->draw_indexed(technique->index_count(), 0, 0);
+
+    _ctx->set_render_target(rtOcclude, true);
+    _ctx->draw_indexed(technique->index_count(), 0, 0);
+  }
+
+
+  GraphicsObjectHandle rts[] = { rtColor, rtOcclude };
+  bool clear[] = { false, false };
+  _ctx->set_render_targets(rts, clear, 2);
+
+  renderSplines();
+
+  {
+    Technique *technique;
+    Shader *ps, *vs;
+    setupTechnique(_ctx, _compose_technique, &technique, &vs, nullptr, &ps);
+
+    _ctx->set_cbuffer(ps->find_cbuffer("WorldToScreenSpace"), 0, ShaderType::kPixelShader, &cbufferLight, sizeof(cbufferLight));
+
+    _ctx->set_default_render_target();
+    TextureArray arr = { rtColor, rtBlur2 };
+    _ctx->set_samplers(ps->samplers());
+    _ctx->set_shader_resources(arr, ShaderType::kPixelShader);
+
+    _ctx->draw_indexed(technique->index_count(), 0, 0);
+    _ctx->unset_shader_resource(0, 2, ShaderType::kPixelShader);
+  }
 
   _ctx->end_frame();
 

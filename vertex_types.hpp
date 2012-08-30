@@ -29,6 +29,15 @@ struct PosTex
   XMFLOAT2 tex;
 };
 
+struct Pos4Tex
+{
+  Pos4Tex() {}
+  Pos4Tex(const XMFLOAT4 &pos, const XMFLOAT2& tex) : pos(pos), tex(tex) {}
+  Pos4Tex(float x, float y, float z, float w, float u, float v) : pos(x, y, z, w), tex(u, v) {}
+  XMFLOAT4 pos;
+  XMFLOAT2 tex;
+};
+
 struct PosCol
 {
   PosCol() {}
