@@ -157,3 +157,7 @@ private:
   std::string _error_msg;
   bool _valid;
 };
+
+// Helper functions
+class DeferredContext;
+void setupTechnique(DeferredContext *ctx, GraphicsObjectHandle hTechnique, bool setBuffers, Technique **outTechnique, Shader **outVs, Shader **outGs, Shader **outPs);

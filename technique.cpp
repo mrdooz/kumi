@@ -8,6 +8,7 @@
 #include "string_utils.hpp"
 #include "shader_reflection.hpp"
 #include "file_utils.hpp"
+#include "deferred_context.hpp"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
@@ -358,3 +359,34 @@ Shader *Technique::geometry_shader(int flags) const {
   return _geometry_shaders.empty() ? nullptr : _geometry_shaders[flags & _gs_flag_mask];
 }
 
+
+void setupTechnique(DeferredContext *ctx, GraphicsObjectHandle hTechnique, bool setBuffers, 
+                    Technique **outTechnique, Shader **outVs, Shader **outGs, Shader **outPs) {
+  Technique *technique = GRAPHICS.get_technique(hTechnique);
+  Shader *vs = technique->vertex_shader(0);
+  Shader *gs = technique->geometry_shader(0);
+  Shader *ps = technique->pixel_shader(0);
+
+  ctx->set_rs(technique->rasterizer_state());
+  ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
+  ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
+
+  ctx->set_vs(vs ? vs->handle() : GraphicsObjectHandle());
+  ctx->set_gs(gs ? gs->handle() : GraphicsObjectHandle());
+  ctx->set_ps(ps ? ps->handle() : GraphicsObjectHandle());
+
+  ctx->set_layout(vs->input_layout());
+
+  if (setBuffers) {
+    ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    ctx->set_vb(technique->vb(), technique->vertex_size());
+    ctx->set_ib(technique->ib(), technique->index_format());
+  }
+
+
+  if (outTechnique) *outTechnique = technique;
+  if (outVs) *outVs = vs;
+  if (outGs) *outGs = gs;
+  if (outPs) *outPs = ps;
+
+}

@@ -35,3 +35,25 @@ technique spline_compose inherits quad_base {
         entry_point ps_compose;
     };
 };
+
+technique spline_particles {
+    
+    vertex_shader {
+        file spline_particles.hlsl;
+        entry_point vs_main;
+    };
+
+    geometry_shader {
+        file spline_particles.hlsl;
+        entry_point gs_main;
+    };
+
+    pixel_shader {
+        file spline_particles.hlsl;
+        entry_point ps_main;
+    };
+    
+    rasterizer_desc = NoCulling;
+    depth_stencil_desc = DepthReadEnable;
+    blend_desc = BlendOneOne;
+};

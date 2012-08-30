@@ -111,13 +111,9 @@ cbuffer WorldToScreenSpace {
 
 float4 gradient_ps_main(quad_simple_ps_input input) : SV_Target
 {
-    // hehe, this realy is the ugliest thing evar :)
-    return 0;
-    float2 d = input.pos.xy - screenSpaceLight.xy;
-    d.x /= screenSize.x;
-    d.y /= screenSize.y;
-    return 1 - saturate(2*sqrt(d.x*d.x + d.y*d.y));
-    
+    float y = input.pos.y / 5000;
+    return y;
+/*
     float width = 1440;
     float height = 1000;
     float x = input.pos.x/width;
@@ -127,7 +123,7 @@ float4 gradient_ps_main(quad_simple_ps_input input) : SV_Target
     float fadeOutStart = 1 - fadeInEnd;
     float fadeOutEnd = 1 - fadeInStart;
 
-    float dx = x*y;
+    float dx = y;
     
     float a = 1 - saturate((dx - fadeInStart) / (fadeInEnd - fadeInStart));
     float b = saturate((dx - fadeOutStart) / (fadeOutEnd - fadeOutStart));
@@ -137,6 +133,7 @@ float4 gradient_ps_main(quad_simple_ps_input input) : SV_Target
     float4 inner = float4(41.f/255, 78.f/255, 124.f/255, 255.f/255);
 
     return lerp(outer, inner, c);
+*/    
 }
 
 ///////////////////////////////////
@@ -148,28 +145,6 @@ float4 ps_compose(quad_ps_input input) : SV_Target
     float4 base = Texture0.Sample(LinearSampler, input.tex);
     float4 blur = Texture1.Sample(LinearSampler, input.tex);
     return base + 2.5 * blur;
-
-    float Density = 1.8f;
-    float Weight = 0.9f;
-    float Decay = 0.5f;
-    float Exposition = 0.5f;
-
-    int numSteps = 30;
-    float2 v = (input.tex - textureSpaceLight.xy) / (numSteps * Density);
-
-    float illuminationDecay = 1.0f;
-    float4 color = Texture1.Sample(LinearSampler, input.tex);
-    float2 uv = input.tex;
-    float4 bonus = float4(0,0,0,0);
-    for (int i = 0; i < numSteps; ++i) {
-        uv -= v;
-        float4 tmp = Texture1.Sample(LinearSampler, uv);
-        tmp *= illuminationDecay * Weight;
-        color += tmp;
-        illuminationDecay *= Decay;
-    }
-
-    return color * Exposition + base;
 }
 
 //http://http.developer.nvidia.com/GPUGems3/gpugems3_ch13.html

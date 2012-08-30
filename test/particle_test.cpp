@@ -301,29 +301,16 @@ void ParticleTest::renderParticles() {
 
   //auto fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
-  Technique *technique = GRAPHICS.get_technique(_particle_technique);
-  Shader *vs = technique->vertex_shader(0);
-  Shader *gs = technique->geometry_shader(0);
-  Shader *ps = technique->pixel_shader(0);
+  Technique *technique;
+  Shader *vs, *gs, *ps;
+  setupTechnique(_ctx, _particle_technique, false, &technique, &vs, &gs, &ps);
 
-  _ctx->set_rs(technique->rasterizer_state());
-  _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-  _ctx->set_vs(vs->handle());
-  _ctx->set_gs(gs->handle());
-  _ctx->set_ps(ps->handle());
-
-  _ctx->set_layout(vs->input_layout());
   _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
   TextureArray arr = { _particle_texture };
   _ctx->set_shader_resources(arr, ShaderType::kPixelShader);
 
-  auto &samplers = ps->samplers();
-  if (!samplers.empty()) {
-    _ctx->set_samplers(samplers);
-  }
+  _ctx->set_samplers(ps->samplers());
 
   struct ParticleCBuffer {
     XMFLOAT4 cameraPos;

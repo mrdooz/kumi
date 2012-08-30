@@ -24,6 +24,7 @@ public:
 private:
 
   void renderSplines();
+  void renderParticles();
 
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 
@@ -38,8 +39,7 @@ private:
 
   GraphicsObjectHandle _particle_technique;
   GraphicsObjectHandle _particle_texture;
-  GraphicsObjectHandle _vb;
-  GraphicsObjectHandle _ib;
+  GraphicsObjectHandle _particleVb;
 
   GraphicsObjectHandle _gradient_technique;
   GraphicsObjectHandle _compose_technique;

@@ -24,6 +24,8 @@ using namespace std::tr1::placeholders;
 
 #define SPLINE_DEBUG 0
 
+static const int cNumParticles = 10000;
+
 static const int cRingsPerSegment = 10;
 static const int cSegmentHeight = 20;
 static const int cRingSpacing = cSegmentHeight / cRingsPerSegment;
@@ -396,33 +398,6 @@ T *aligned_new(int count, int alignment) {
   return (T *)_aligned_malloc(count * sizeof(T), alignment);
 }
 
-static void setupTechnique(DeferredContext *ctx, GraphicsObjectHandle hTechnique, Technique **outTechnique, Shader **outVs, Shader **outGs, Shader **outPs) {
-
-  Technique *technique = GRAPHICS.get_technique(hTechnique);
-  Shader *vs = technique->vertex_shader(0);
-  Shader *gs = technique->geometry_shader(0);
-  Shader *ps = technique->pixel_shader(0);
-
-  ctx->set_rs(technique->rasterizer_state());
-  ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-  ctx->set_vs(vs ? vs->handle() : GraphicsObjectHandle());
-  ctx->set_gs(gs ? gs->handle() : GraphicsObjectHandle());
-  ctx->set_ps(ps ? ps->handle() : GraphicsObjectHandle());
-
-  ctx->set_vb(technique->vb(), technique->vertex_size());
-  ctx->set_ib(technique->ib(), technique->index_format());
-
-  ctx->set_layout(vs->input_layout());
-  ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-  if (outTechnique) *outTechnique = technique;
-  if (outVs) *outVs = vs;
-  if (outGs) *outGs = gs;
-  if (outPs) *outPs = ps;
-}
-
 SplineTest::SplineTest(const std::string &name) 
   : Effect(name)
   , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
@@ -475,13 +450,11 @@ bool SplineTest::init() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
-  auto tjong = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 32 * 1024 * 1024, true, nullptr);
-
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/particles.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/scale.tec", true));
   B_ERR_BOOL(GRAPHICS.load_techniques("effects/splines.tec", true));
 
-  _particle_technique = GRAPHICS.find_technique("particles");
+  _particle_technique = GRAPHICS.find_technique("spline_particles");
   _gradient_technique = GRAPHICS.find_technique("spline_gradient");
   _compose_technique = GRAPHICS.find_technique("spline_compose");
   _coalesce = GRAPHICS.find_technique("coalesce");
@@ -500,9 +473,6 @@ bool SplineTest::init() {
   }
 
   _freefly_camera.setPos(XMFLOAT3(0, 0, -50));
-
-  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
-  _ib = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, 1024 * 1024, true, nullptr);
 
   {
     TweakableParameterBlock block("blur");
@@ -532,6 +502,24 @@ bool SplineTest::init() {
 
   _staticVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 128 * 1024 * 1024, true, nullptr);
   _dynamicVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1 * 1024 * 1024, true, nullptr);
+
+  _particleVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
+
+  D3D11_MAPPED_SUBRESOURCE res;
+  _ctx->map(_particleVb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+  PosTex *particles = (PosTex *)res.pData;
+  for (int i = 0; i < cNumParticles; ++i) {
+    float particleRadius = randf<float>(1, 5000);
+    float angle = randf<float>(0, 2 * XM_PI);
+    float h = randf<float>(-500, 500);
+    particles[i].pos = XMFLOAT3(particleRadius * sinf(angle), h, particleRadius * cosf(angle));
+    float s = gaussianRand(2, 1);
+    particles[i].tex = XMFLOAT2(s, 1);
+  }
+
+  _ctx->unmap(_particleVb, 0);
+
+
 
   return true;
 }
@@ -654,6 +642,39 @@ void SplineTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle o
     _ctx->unset_render_targets(0, 1);
 }
 
+void SplineTest::renderParticles() {
+
+  int w = GRAPHICS.width();
+  int h = GRAPHICS.height();
+
+  Technique *technique;
+  Shader *vs, *gs, *ps;
+  setupTechnique(_ctx, _particle_technique, false, &technique, &vs, &gs, &ps);
+
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+
+  TextureArray arr = { _particle_texture };
+  _ctx->set_shader_resources(arr, ShaderType::kPixelShader);
+
+  _ctx->set_samplers(ps->samplers());
+
+  struct {
+    XMFLOAT4 cameraPos;
+    XMFLOAT4X4 worldView;
+    XMFLOAT4X4 proj;
+  } cbuffer;
+
+  cbuffer.cameraPos = expand(_cameraPos, 0);
+  cbuffer.worldView = transpose(_view);
+  cbuffer.proj = transpose(_proj);
+
+  _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+
+  _ctx->set_vb(_particleVb, sizeof(ParticleVtx));
+  _ctx->draw(cNumParticles, 0);
+}
+
 void SplineTest::renderSplines() {
 
   int w = GRAPHICS.width();
@@ -680,7 +701,7 @@ void SplineTest::renderSplines() {
   _ctx->unmap(_dynamicVb, 0);
 
 #pragma pack(push, 1)
-  struct CBuffer {
+  struct {
     XMFLOAT4X4 worldViewProj;
     XMFLOAT4 cameraPos;
     XMFLOAT4 extrudeShape[21];
@@ -693,21 +714,10 @@ void SplineTest::renderSplines() {
   cbuffer.cameraPos = expand(_cameraPos,0);
   memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
 
+  Technique *technique;
+  Shader *vs, *gs, *ps;
+  setupTechnique(_ctx, _splineTechnique, false, &technique, &vs, &gs, &ps);
 
-  Technique *technique = GRAPHICS.get_technique(_splineTechnique);
-  Shader *vs = technique->vertex_shader(0);
-  Shader *gs = technique->geometry_shader(0);
-  Shader *ps = technique->pixel_shader(0);
-
-  _ctx->set_rs(technique->rasterizer_state());
-  _ctx->set_dss(technique->depth_stencil_state(), GRAPHICS.default_stencil_ref());
-  _ctx->set_bs(technique->blend_state(), GRAPHICS.default_blend_factors(), GRAPHICS.default_sample_mask());
-
-  _ctx->set_vs(vs->handle());
-  _ctx->set_gs(gs->handle());
-  _ctx->set_ps(ps->handle());
-
-  _ctx->set_layout(vs->input_layout());
   _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
   _ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
@@ -756,43 +766,44 @@ bool SplineTest::render() {
 
   cbufferLight.screenSize = XMFLOAT2((float)w, (float)h);
 
-  ScopedRt rtColor(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtColor");
-  ScopedRt rtOcclude(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtOcclude");
-
-
-  int w2 = w/2;
-  int h2 = h/2;
-  ScopedRt rtDownscale(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "rtDownscale");
-  ScopedRt rtBlur1(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur1");
-  ScopedRt rtBlur2(w2, h2, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur2");
-
-  post_process(rtOcclude, rtDownscale, _scale);
-  _blur.do_blur(10, rtDownscale, rtBlur1, rtBlur2, w2, h2, _ctx);
+  ScopedRt rtColor(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "rtColor");
+  ScopedRt rtOcclude(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "rtOcclude");
 
   {
     Technique *technique;
     Shader *ps, *vs;
-    setupTechnique(_ctx, _gradient_technique, &technique, &vs, nullptr, &ps);
+    setupTechnique(_ctx, _gradient_technique, true, &technique, &vs, nullptr, &ps);
     _ctx->set_cbuffer(ps->find_cbuffer("WorldToScreenSpace"), 0, ShaderType::kPixelShader, &cbufferLight, sizeof(cbufferLight));
 
     _ctx->set_render_target(rtColor, true);
     _ctx->draw_indexed(technique->index_count(), 0, 0);
 
-    _ctx->set_render_target(rtOcclude, true);
-    _ctx->draw_indexed(technique->index_count(), 0, 0);
+    //_ctx->set_render_target(rtOcclude, true);
+    //_ctx->draw_indexed(technique->index_count(), 0, 0);
   }
 
 
   GraphicsObjectHandle rts[] = { rtColor, rtOcclude };
-  bool clear[] = { false, false };
+  bool clear[] = { false, true };
   _ctx->set_render_targets(rts, clear, 2);
 
   renderSplines();
+  renderParticles();
+
+  int w2 = w/2;
+  int h2 = h/2;
+  ScopedRt rtDownscale(w2, h2, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "rtDownscale");
+  ScopedRt rtBlur1(w2, h2, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur1");
+  ScopedRt rtBlur2(w2, h2, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateUav, "rtBlur2");
+
+  post_process(rtOcclude, rtDownscale, _scale);
+  _blur.do_blur(10, rtDownscale, rtBlur1, rtBlur2, w2, h2, _ctx);
+
 
   {
     Technique *technique;
     Shader *ps, *vs;
-    setupTechnique(_ctx, _compose_technique, &technique, &vs, nullptr, &ps);
+    setupTechnique(_ctx, _compose_technique, true, &technique, &vs, nullptr, &ps);
 
     _ctx->set_cbuffer(ps->find_cbuffer("WorldToScreenSpace"), 0, ShaderType::kPixelShader, &cbufferLight, sizeof(cbufferLight));
 

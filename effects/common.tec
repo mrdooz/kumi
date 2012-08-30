@@ -6,11 +6,16 @@ rasterizer_desc NoCulling {
     cull_mode = none; 
 };
 
-depth_stencil_desc DepthEnable { 
+depth_stencil_desc DepthEnable {
     depth_enable = true; 
 };
 
-depth_stencil_desc DepthDisable { 
+depth_stencil_desc DepthReadEnable {
+    depth_enable = true; 
+    depth_write_mask = 0;
+};
+
+depth_stencil_desc DepthDisable {
     depth_enable = false; 
 };
 
