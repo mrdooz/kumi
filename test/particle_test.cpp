@@ -35,12 +35,6 @@ struct ParticleVtx {
 
 static const int numParticles = 5000;
 
-// a bit of a misnomer, as we don't call T's ctor
-template<typename T>
-T *aligned_new(int count, int alignment) {
-  return (T *)_aligned_malloc(count * sizeof(T), alignment);
-}
-
 ParticleTest::ParticleData::ParticleData(int numParticles)
   : numParticles(numParticles)
   , pos(aligned_new<float>(3 * numParticles, 16))
@@ -127,8 +121,6 @@ void ParticleTest::ParticleData::update(float delta) {
 
 ParticleTest::ParticleTest(const std::string &name) 
   : Effect(name)
-  , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
-  , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _mouse_horiz(0)
   , _mouse_vert(0)
   , _mouse_lbutton(false)
@@ -144,10 +136,6 @@ ParticleTest::ParticleTest(const std::string &name)
 
 ParticleTest::~ParticleTest() {
   GRAPHICS.destroy_deferred_context(_ctx);
-}
-
-bool ParticleTest::file_changed(const char *filename, void *token) {
-  return true;
 }
 
 
@@ -254,9 +242,6 @@ bool ParticleTest::update(int64 global_time, int64 local_time, int64 delta_ns, b
   double time = local_time  / 1000.0;
 
   calc_camera_matrices(time, delta_ns / 1e6, &_view, &_proj);
-
-  PROPERTY_MANAGER.set_property(_view_mtx_id, _view);
-  PROPERTY_MANAGER.set_property(_proj_mtx_id, _proj);
 
   _particle_data.update(delta_ns / 1e6f);
 

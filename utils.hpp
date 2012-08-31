@@ -183,3 +183,9 @@ T clamp(T minValue, T maxValue, T value) {
 }
 
 float gaussianRand(float mean, float variance);
+
+// a bit of a misnomer, as we don't call T's ctor
+template<typename T>
+T *aligned_new(int count, int alignment) {
+  return (T *)_aligned_malloc(count * sizeof(T), alignment);
+}

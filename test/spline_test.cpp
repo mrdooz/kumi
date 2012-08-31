@@ -390,18 +390,9 @@ struct ParticleVtx {
   XMFLOAT2 scale;
 };
 
-//static const int numParticles = 5000;
-
-// a bit of a misnomer, as we don't call T's ctor
-template<typename T>
-T *aligned_new(int count, int alignment) {
-  return (T *)_aligned_malloc(count * sizeof(T), alignment);
-}
 
 SplineTest::SplineTest(const std::string &name) 
   : Effect(name)
-  , _view_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::view"))
-  , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _mouse_horiz(0)
   , _mouse_vert(0)
   , _mouse_lbutton(false)
@@ -409,7 +400,6 @@ SplineTest::SplineTest(const std::string &name)
   , _mouse_pos_prev(~0)
   , _ctx(nullptr)
   , _useFreeFlyCamera(false)
-  , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
   , _staticVertCount(0)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
@@ -418,10 +408,6 @@ SplineTest::SplineTest(const std::string &name)
 SplineTest::~SplineTest() {
   seq_delete(&_splines);
   GRAPHICS.destroy_deferred_context(_ctx);
-}
-
-bool SplineTest::file_changed(const char *filename, void *token) {
-  return true;
 }
 
 void SplineTest::createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, DynamicSpline *parent) {
@@ -613,9 +599,6 @@ bool SplineTest::update(int64 global_time, int64 local_time, int64 delta_ns, boo
   }
 
   calc_camera_matrices(time, delta_ns / 1e6, &_view, &_proj);
-
-  PROPERTY_MANAGER.set_property(_view_mtx_id, _view);
-  PROPERTY_MANAGER.set_property(_proj_mtx_id, _proj);
 
   return true;
 }

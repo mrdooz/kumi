@@ -24,12 +24,7 @@ private:
   void renderParticles();
 
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
-
-  bool file_changed(const char *filename, void *token);
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
-
-
-  PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
 
   GraphicsObjectHandle _particle_technique;
   GraphicsObjectHandle _particle_texture;
@@ -48,7 +43,6 @@ private:
   PropertyId _DofSettingsId;
   float _nearFocusStart, _nearFocusEnd;
   float _farFocusStart, _farFocusEnd;
-
 
   struct ParticleData {
     ParticleData(int numParticles);

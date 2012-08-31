@@ -29,15 +29,12 @@ private:
 
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
 
-  bool file_changed(const char *filename, void *token);
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
   bool initSplines();
 
   void createSplineCallback(const XMFLOAT3 &p, const XMFLOAT3 &dir, const XMFLOAT3 &n, DynamicSpline *parent);
   
-  PropertyId _view_mtx_id, _view_proj_mtx_id, _proj_mtx_id;
-
   GraphicsObjectHandle _particle_technique;
   GraphicsObjectHandle _particle_texture;
   GraphicsObjectHandle _particleVb;
@@ -60,7 +57,6 @@ private:
 
   float _blurX, _blurY;
 
-  PropertyId _DofSettingsId;
   float _nearFocusStart, _nearFocusEnd;
   float _farFocusStart, _farFocusEnd;
 
