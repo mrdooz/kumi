@@ -1,12 +1,12 @@
 include common.tec;
 
-technique SplineRender {
+technique spline_render {
 
     vertex_shader {
         file splines.hlsl;
         entry_point vs_main;
     };
-    
+
     geometry_shader {
         file splines.hlsl;
         entry_point gs_main;
@@ -16,7 +16,7 @@ technique SplineRender {
         file splines.hlsl;
         entry_point ps_main;
     };
-    
+
     rasterizer_desc = BackfaceCulling;
     depth_stencil_desc = DepthEnable;
     blend_desc = BlendDisable;
@@ -37,7 +37,7 @@ technique spline_compose inherits quad_base {
 };
 
 technique spline_particles {
-    
+
     vertex_shader {
         file spline_particles.hlsl;
         entry_point vs_main;
@@ -52,8 +52,25 @@ technique spline_particles {
         file spline_particles.hlsl;
         entry_point ps_main;
     };
-    
+
     rasterizer_desc = NoCulling;
     depth_stencil_desc = DepthReadEnable;
     blend_desc = BlendOneOne;
+};
+
+technique spline_plane {
+
+    vertex_shader {
+        file spline_plane.hlsl;
+        entry_point vs_main;
+    };
+
+    pixel_shader {
+        file spline_plane.hlsl;
+        entry_point ps_main;
+    };
+
+    rasterizer_desc = BackfaceCulling;
+    depth_stencil_desc = DepthEnable;
+    blend_desc = BlendSrcAlphaInvSrcAlpha;
 };

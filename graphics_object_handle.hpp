@@ -32,14 +32,14 @@ private:
   enum { 
     cTypeBits = 8,
     cGenerationBits = 8,
-    cIdBits = 16 
+    cIdBits = 10 
   };
   GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
   union {
     struct {
       uint32 _type : 8;
       uint32 _generation : 8;
-      uint32 _id : 16;
+      uint32 _id : 10;
     };
     uint32 _data;
   };

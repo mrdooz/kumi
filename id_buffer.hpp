@@ -43,6 +43,7 @@ public:
       if (!Traits::get(_buffer[i]))
         return i;
     }
+    LOG_ERROR_LN("No free index found!");
     return -1;
   }
 
@@ -124,6 +125,15 @@ struct SearchableIdBuffer : public IdBufferBase<SearchableTraits<Key, Value>, N>
   int idx_from_token(const typename Traits::Key &key) {
     auto it = _key_to_idx.find(key);
     return it == end(_key_to_idx) ? -1 : it->second;
+  }
+
+  int find_free_index() {
+    return IdBufferBase<Traits, N>::find_free_index();
+  }
+
+  int find_free_index(const typename Traits::Key &key) {
+    auto idx = idx_from_token(key);
+    return idx != -1 ? idx : IdBufferBase<Traits, N>::find_free_index();
   }
 
   template<typename R>

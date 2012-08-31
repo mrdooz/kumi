@@ -23,7 +23,8 @@ public:
 
 private:
 
-  void renderSplines();
+  void renderSplines(GraphicsObjectHandle rtMirror);
+  void renderPlane(GraphicsObjectHandle rtMirror);
   void renderParticles();
 
   void post_process(GraphicsObjectHandle input, GraphicsObjectHandle output, GraphicsObjectHandle technique);
@@ -41,6 +42,9 @@ private:
   GraphicsObjectHandle _particle_texture;
   GraphicsObjectHandle _particleVb;
 
+  GraphicsObjectHandle _planeVb;
+  GraphicsObjectHandle _planeIb;
+
   GraphicsObjectHandle _gradient_technique;
   GraphicsObjectHandle _compose_technique;
   GraphicsObjectHandle _coalesce;
@@ -48,6 +52,7 @@ private:
   GraphicsObjectHandle _scale;
 
   GraphicsObjectHandle _splineTechnique;
+  GraphicsObjectHandle _planeTechnique;
 
   GraphicsObjectHandle _cubeMap;
   

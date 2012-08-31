@@ -44,6 +44,8 @@ public:
 
   void add_parameter_block(const TweakableParameterBlock &block, bool initialCallback, const cbParamChanged &onChanged);
 
+  const std::string &appRoot() const { return _app_root; }
+
 private:
   DISALLOW_COPY_AND_ASSIGN(App);
   App();

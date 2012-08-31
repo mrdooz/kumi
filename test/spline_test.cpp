@@ -457,9 +457,9 @@ bool SplineTest::init() {
   _particle_technique = GRAPHICS.find_technique("spline_particles");
   _gradient_technique = GRAPHICS.find_technique("spline_gradient");
   _compose_technique = GRAPHICS.find_technique("spline_compose");
-  _coalesce = GRAPHICS.find_technique("coalesce");
 
-  _splineTechnique = GRAPHICS.find_technique("SplineRender");
+  _splineTechnique = GRAPHICS.find_technique("spline_render");
+  _planeTechnique = GRAPHICS.find_technique("spline_plane");
 
   _particle_texture = RESOURCE_MANAGER.load_texture("gfx/particle1.png", "particle1.png", false, nullptr);
   _cubeMap = RESOURCE_MANAGER.load_texture("gfx/pearly3_cubemap2.dds", "pearly3_cubemap.dds", false, nullptr);
@@ -474,34 +474,11 @@ bool SplineTest::init() {
 
   _freefly_camera.setPos(XMFLOAT3(0, 0, -50));
 
-  {
-    TweakableParameterBlock block("blur");
-    block._params.emplace_back(TweakableParameter("blurX", 10.0f, 1.0f, 250.0f));
-    block._params.emplace_back(TweakableParameter("blurY", 10.0f, 1.0f, 250.0f));
-
-    block._params.emplace_back(TweakableParameter("nearFocusStart", 10.0f, 1.0f, 2500.0f));
-    block._params.emplace_back(TweakableParameter("nearFocusEnd", 50.0f, 1.0f, 2500.0f));
-    block._params.emplace_back(TweakableParameter("farFocusStart", 100.0f, 1.0f, 2500.0f));
-    block._params.emplace_back(TweakableParameter("farFocusEnd", 150.0f, 1.0f, 2500.0f));
-
-    APP.add_parameter_block(block, true, [=](const JsonValue::JsonValuePtr &msg) {
-      _blurX = (float)msg->get("blurX")->get("value")->to_number();
-      _blurY = (float)msg->get("blurY")->get("value")->to_number();
-
-      if (msg->has_key("nearFocusStart")) {
-        _nearFocusStart = (float)msg->get("nearFocusStart")->get("value")->to_number();
-        _nearFocusEnd = (float)msg->get("nearFocusEnd")->get("value")->to_number();
-        _farFocusStart = (float)msg->get("farFocusStart")->get("value")->to_number();
-        _farFocusEnd = (float)msg->get("farFocusEnd")->get("value")->to_number();
-      }
-    });
-  }
-
   if (!initSplines())
     return false;
 
-  _staticVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 128 * 1024 * 1024, true, nullptr);
-  _dynamicVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1 * 1024 * 1024, true, nullptr);
+  _staticVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr);
+  _dynamicVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 4 * 1024 * 1024, true, nullptr);
 
   _particleVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
 
@@ -511,7 +488,7 @@ bool SplineTest::init() {
   for (int i = 0; i < cNumParticles; ++i) {
     float particleRadius = randf<float>(1, 5000);
     float angle = randf<float>(0, 2 * XM_PI);
-    float h = randf<float>(-500, 500);
+    float h = randf<float>(0, 500);
     particles[i].pos = XMFLOAT3(particleRadius * sinf(angle), h, particleRadius * cosf(angle));
     float s = gaussianRand(2, 1);
     particles[i].tex = XMFLOAT2(s, 1);
@@ -519,6 +496,20 @@ bool SplineTest::init() {
 
   _ctx->unmap(_particleVb, 0);
 
+  XMFLOAT3 planeVerts[] = {
+    XMFLOAT3(-1000, 0, -1000),
+    XMFLOAT3(-1000, 0, +1000),
+    XMFLOAT3(+1000, 0, +1000),
+    XMFLOAT3(+1000, 0, -1000),
+  };
+
+  int planeIndices[] = {
+    0, 1, 2,
+    0, 2, 3,
+  };
+
+  _planeVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, sizeof(planeVerts), false, planeVerts);
+  _planeIb = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, sizeof(planeIndices), false, planeIndices);
 
 
   return true;
@@ -605,7 +596,7 @@ void SplineTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *vie
     float c = -cosf((float)time/10);
     XMFLOAT3 pp = p + radius * XMFLOAT3(s, s*c, c);
     _cameraPos = pp;
-    XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(pp.x, pp.y, pp.z, 0));
+    XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(pp.x, pp.y + 2, pp.z, 0));
     XMVECTOR up = XMLoadFloat4(&XMFLOAT4(0, 1, 0, 0));
     XMMATRIX lookat = XMMatrixLookAtLH(pos, at, up);
     XMStoreFloat4x4(view, lookat);
@@ -642,6 +633,35 @@ void SplineTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle o
     _ctx->unset_render_targets(0, 1);
 }
 
+void SplineTest::renderPlane(GraphicsObjectHandle rtMirror) {
+  int w = GRAPHICS.width();
+  int h = GRAPHICS.height();
+
+  Technique *technique;
+  Shader *vs, *gs, *ps;
+  setupTechnique(_ctx, _planeTechnique, false, &technique, &vs, &gs, &ps);
+
+  struct {
+    XMFLOAT4X4 worldViewProj;
+    XMFLOAT4X4 mirrorViewProj;
+  } cbuffer;
+
+  XMMATRIX xmViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
+  XMStoreFloat4x4(&cbuffer.worldViewProj, XMMatrixTranspose(xmViewProj));
+
+  XMMATRIX reflect = XMMatrixReflect(XMLoadFloat4(&XMFLOAT4(0,1,0,0)));
+  XMStoreFloat4x4(&cbuffer.mirrorViewProj, XMMatrixTranspose(XMMatrixMultiply(reflect, xmViewProj)));
+
+  _ctx->set_cbuffer(vs->find_cbuffer("cbPlane"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_samplers(ps->samplers());
+  _ctx->set_shader_resource(rtMirror, ShaderType::kPixelShader);
+
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  _ctx->set_vb(_planeVb, sizeof(XMFLOAT3));
+  _ctx->set_ib(_planeIb, DXGI_FORMAT_R32_UINT);
+  _ctx->draw_indexed(6, 0, 0);
+}
+
 void SplineTest::renderParticles() {
 
   int w = GRAPHICS.width();
@@ -675,7 +695,7 @@ void SplineTest::renderParticles() {
   _ctx->draw(cNumParticles, 0);
 }
 
-void SplineTest::renderSplines() {
+void SplineTest::renderSplines(GraphicsObjectHandle rtMirror) {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
@@ -709,8 +729,8 @@ void SplineTest::renderSplines() {
 #pragma pack(pop)
 
   XMFLOAT4X4 worldViewProj;
-  XMStoreFloat4x4(&worldViewProj, XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj)));
-  cbuffer.worldViewProj = transpose(worldViewProj);
+  XMMATRIX xmViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
+  XMStoreFloat4x4(&cbuffer.worldViewProj, XMMatrixTranspose(xmViewProj));
   cbuffer.cameraPos = expand(_cameraPos,0);
   memcpy(cbuffer.extrudeShape, _extrudeShape.data(), sizeof(cbuffer.extrudeShape));
 
@@ -732,6 +752,25 @@ void SplineTest::renderSplines() {
 
   _ctx->set_vb(_dynamicVb, sizeof(VsInput));
   _ctx->draw(newDynamicVerts, 0);
+
+
+  _ctx->set_render_target(rtMirror, true);
+
+  XMMATRIX reflect = XMMatrixReflect(XMLoadFloat4(&XMFLOAT4(0,1,0,0)));
+  XMStoreFloat4x4(&cbuffer.worldViewProj, XMMatrixTranspose(XMMatrixMultiply(reflect, xmViewProj)));
+  XMStoreFloat4(&cbuffer.cameraPos, XMVector4Transform(XMLoadFloat4(&cbuffer.cameraPos), reflect));
+  _ctx->set_cbuffer(vs->find_cbuffer("test"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(gs->find_cbuffer("test"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
+
+  _ctx->set_rs(GRAPHICS.find_rasterizer_state("FrontfaceCulling"));
+  _ctx->set_vb(_staticVb, sizeof(VsInput));
+  _ctx->draw(_staticVertCount, 0);
+
+  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+  _ctx->draw(newDynamicVerts, 0);
+
+  _ctx->unset_render_targets(0, 1);
 
 }
 
@@ -787,8 +826,19 @@ bool SplineTest::render() {
   bool clear[] = { false, true };
   _ctx->set_render_targets(rts, clear, 2);
 
-  renderSplines();
+  int w4 = w/4;
+  int h4 = h/4;
+  ScopedRt rtMirror(w4, h4, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "rtMirror");
+  renderSplines(rtMirror);
+
+  _ctx->set_render_target(rtColor, false);
   renderParticles();
+
+  ScopedRt rtMirrorBlur1(w4, h4, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateUav, "rtMirrorBlur1");
+  ScopedRt rtMirrorBlur2(w4, h4, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateUav, "rtMirrorBlur2");
+  _blur.do_blur(4, rtMirror, rtMirrorBlur1, rtMirrorBlur2, w4, h4, _ctx);
+
+  renderPlane(rtMirrorBlur2);
 
   int w2 = w/2;
   int h2 = h/2;

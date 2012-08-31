@@ -661,12 +661,10 @@ GraphicsObjectHandle Graphics::load_texture(const char *filename, const char *fr
   if (FAILED(_device->CreateShaderResourceView(data->resource, &desc, &data->view.resource)))
     return emptyGoh;
 
-  int idx = _resources.idx_from_token(friendly_name);
-  if (idx != -1 || (idx = _resources.find_free_index()) != -1) {
-    if (_resources[idx])
-      _resources[idx]->reset();
-    _resources.set_pair(idx, make_pair(friendly_name, data.release()));
-  }
+  int idx = _resources.find_free_index(friendly_name);
+  if (_resources[idx])
+    _resources[idx]->reset();
+  _resources.set_pair(idx, make_pair(friendly_name, data.release()));
   return make_goh(GraphicsObjectHandle::kResource, idx);
 }
 
@@ -982,37 +980,48 @@ int find_existing(const T &desc, Cont &c) {
   return -1;
 }
 
-GraphicsObjectHandle Graphics::create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc) {
-  int idx = find_existing(desc, _rasterizer_states);
+GraphicsObjectHandle Graphics::create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc, const char *name) {
+
+  int idx = name ? _rasterizer_states.idx_from_token(name) : find_existing(desc, _rasterizer_states);
   if (idx != -1)
     return make_goh(GraphicsObjectHandle::kRasterizerState, idx);
 
   idx = _rasterizer_states.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &_rasterizer_states[idx]))) {
+  ID3D11RasterizerState *rs;
+  if (idx != -1 && SUCCEEDED(_device->CreateRasterizerState(&desc, &rs))) {
+    _rasterizer_states.set_pair(idx, make_pair(name ? name : "", rs));
     return make_goh(GraphicsObjectHandle::kRasterizerState, idx);
   }
   return emptyGoh;
 }
 
-GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc) {
-  int idx = find_existing(desc, _blend_states);
+GraphicsObjectHandle Graphics::create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc, const char *name) {
+
+  int idx = name ? _blend_states.idx_from_token(name) : find_existing(desc, _blend_states);
   if (idx != -1)
     return make_goh(GraphicsObjectHandle::kBlendState, idx);
 
   idx = _blend_states.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &_blend_states[idx])))
+  ID3D11BlendState *bs;
+  if (idx != -1 && SUCCEEDED(_device->CreateBlendState(&desc, &bs))) {
+    _blend_states.set_pair(idx, make_pair(name ? name : "", bs));
     return make_goh(GraphicsObjectHandle::kBlendState, idx);
+  }
   return emptyGoh;
 }
 
-GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc) {
-  int idx = find_existing(desc, _depth_stencil_states);
+GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc, const char *name) {
+
+  int idx = name ? _depth_stencil_states.idx_from_token(name) : find_existing(desc, _depth_stencil_states);
   if (idx != -1)
     return make_goh(GraphicsObjectHandle::kDepthStencilState, idx);
 
   idx = _depth_stencil_states.find_free_index();
-  if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &_depth_stencil_states[idx])))
+  ID3D11DepthStencilState *dss;
+  if (idx != -1 && SUCCEEDED(_device->CreateDepthStencilState(&desc, &dss))) {
+    _depth_stencil_states.set_pair(idx, make_pair(name ? name : "", dss));
     return make_goh(GraphicsObjectHandle::kDepthStencilState, idx);
+  }
   return emptyGoh;
 }
 
@@ -1059,44 +1068,34 @@ bool Graphics::load_techniques(const char *filename, bool add_materials) {
       MATERIAL_MANAGER.add_material(*it, true);
   }
 
+  auto &shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
+
   // Init the techniques
-  for (auto it = begin(tmp); it != end(tmp); ) {
-    Technique *t = *it;
+  while (!tmp.empty()) {
+    unique_ptr<Technique> t(tmp.back());
+    tmp.pop_back();
+
     if (!t->init()) {
       LOG_ERROR_LN("init failed for technique: %s (%s). Error msg: %s", t->name().c_str(), filename, t->error_msg().c_str());
-      delete exch_null(t);
-      it = tmp.erase(it);
-    } else {
-      ++it;
+      continue;
     }
-  }
 
-  auto &v = _techniques_by_file[filename];
-  v.clear();
-
-  for (auto i = begin(tmp); i != end(tmp); ++i) {
-    Technique *t = *i;
-
-    auto shader_changed = bind(&Graphics::shader_file_changed, this, _1, _2);
-    if (Shader *vs = t->vertex_shader(0)) {
 #if WITH_UNPACKED_RESOUCES
-      RESOURCE_MANAGER.add_file_watch(vs->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
-#endif
-    }
-    if (Shader *ps = t->pixel_shader(0)) {
-#if WITH_UNPACKED_RESOUCES
-      RESOURCE_MANAGER.add_file_watch(ps->source_filename().c_str(), t, shader_changed, false, nullptr, -1);
-#endif
-    }
+    // Add file watches on the shader files
+    set<string> shaderFiles;
+    if (Shader *vs = t->vertex_shader(0)) shaderFiles.insert(vs->source_filename());
+    if (Shader *gs = t->geometry_shader(0)) shaderFiles.insert(gs->source_filename());
+    if (Shader *ps = t->pixel_shader(0)) shaderFiles.insert(ps->source_filename());
+    if (Shader *cs = t->compute_shader(0)) shaderFiles.insert(cs->source_filename());
 
-    int idx = _techniques.idx_from_token(t->name());
-    if (idx != -1 || (idx = _techniques.find_free_index()) != -1) {
-      SAFE_DELETE(_techniques[idx]);
-      _techniques.set_pair(idx, make_pair(t->name(), t));
-      v.push_back(t->name());
-    } else {
-      SAFE_DELETE(t);
-    }
+    for (auto it = begin(shaderFiles); it != end(shaderFiles); ++it) 
+      RESOURCE_MANAGER.add_file_watch(it->c_str(), t.get(), shader_changed, false, nullptr, -1);
+#endif
+
+    int idx = _techniques.find_free_index(t->name());
+    SAFE_DELETE(_techniques[idx]);
+    auto tt = t.release();
+    _techniques.set_pair(idx, make_pair(tt->name(), tt));
   }
 
 #if WITH_UNPACKED_RESOUCES
@@ -1122,16 +1121,26 @@ GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
   return make_goh(GraphicsObjectHandle::kRenderTarget, idx);
 }
 
-GraphicsObjectHandle Graphics::find_technique(const char *name) {
-  int idx = _techniques.idx_from_token(name);
-  KASSERT(idx != -1);
-  return idx != -1 ? GraphicsObjectHandle(GraphicsObjectHandle::kTechnique, 0, idx) : emptyGoh;
+GraphicsObjectHandle Graphics::find_technique(const std::string &name) {
+  return make_goh(GraphicsObjectHandle::kTechnique, _techniques.idx_from_token(name));
 }
 
 GraphicsObjectHandle Graphics::find_sampler(const std::string &name) {
-  int idx = _sampler_states.idx_from_token(name);
-  return make_goh(GraphicsObjectHandle::kSamplerState, idx);
+  return make_goh(GraphicsObjectHandle::kSamplerState, _sampler_states.idx_from_token(name));
 }
+
+GraphicsObjectHandle Graphics::find_blend_state(const std::string &name) {
+  return make_goh(GraphicsObjectHandle::kBlendState, _blend_states.idx_from_token(name));
+}
+
+GraphicsObjectHandle Graphics::find_rasterizer_state(const std::string &name) {
+  return make_goh(GraphicsObjectHandle::kRasterizerState, _rasterizer_states.idx_from_token(name));
+}
+
+GraphicsObjectHandle Graphics::find_depth_stencil_state(const std::string &name) {
+  return make_goh(GraphicsObjectHandle::kDepthStencilState, _depth_stencil_states.idx_from_token(name));
+}
+
 
 void Graphics::unbind_resource_views(int resource_bitmask) {
 
@@ -1205,6 +1214,7 @@ int Graphics::get_shader_flag(const std::string &flag) {
 }
 
 GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx) {
+  KASSERT(idx != -1);
   return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : emptyGoh;
 }
 

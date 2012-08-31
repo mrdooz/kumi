@@ -120,9 +120,9 @@ public:
   GraphicsObjectHandle create_compute_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
   GraphicsObjectHandle create_geometry_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
 
-  GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc);
-  GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc);
-  GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc);
+  GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc, const char *name = nullptr);
+  GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc, const char *name = nullptr);
+  GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc, const char *name = nullptr);
   GraphicsObjectHandle create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc);
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
@@ -152,9 +152,12 @@ public:
 
   bool load_techniques(const char *filename, bool add_materials);
   Technique *get_technique(GraphicsObjectHandle h);
-  GraphicsObjectHandle find_technique(const char *name);
+  GraphicsObjectHandle find_technique(const std::string &name);
   GraphicsObjectHandle find_resource(const std::string &name);
   GraphicsObjectHandle find_sampler(const std::string &name);
+  GraphicsObjectHandle find_blend_state(const std::string &name);
+  GraphicsObjectHandle find_rasterizer_state(const std::string &name);
+  GraphicsObjectHandle find_depth_stencil_state(const std::string &name);
 
   GraphicsObjectHandle default_render_target() const { return _default_render_target; }
 
@@ -247,20 +250,21 @@ private:
   SearchableIdBuffer<std::string, ID3D11PixelShader *, IdCount> _pixel_shaders;
   SearchableIdBuffer<std::string, ID3D11ComputeShader *, IdCount> _compute_shaders;
   SearchableIdBuffer<std::string, ID3D11GeometryShader *, IdCount> _geometry_shaders;
+  IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
   IdBuffer<ID3D11Buffer *, IdCount> _vertex_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _index_buffers;
   IdBuffer<ID3D11Buffer *, IdCount> _constant_buffers;
   SearchableIdBuffer<std::string, Technique *, IdCount> _techniques;
-  IdBuffer<ID3D11InputLayout *, IdCount> _input_layouts;
 
-  IdBuffer<ID3D11BlendState *, IdCount> _blend_states;
-  IdBuffer<ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
-  IdBuffer<ID3D11RasterizerState *, IdCount> _rasterizer_states;
-  IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
+  SearchableIdBuffer<std::string, ID3D11BlendState *, IdCount> _blend_states;
+  SearchableIdBuffer<std::string, ID3D11DepthStencilState *, IdCount> _depth_stencil_states;
+  SearchableIdBuffer<std::string, ID3D11RasterizerState *, IdCount> _rasterizer_states;
   SearchableIdBuffer<std::string, ID3D11SamplerState *, IdCount> _sampler_states;
+
   SearchableIdBuffer<std::string, TextureResource *, IdCount> _textures;
   SearchableIdBuffer<std::string, RenderTargetResource *, IdCount> _render_targets;
   SearchableIdBuffer<std::string, SimpleResource *, IdCount> _resources;
+  IdBuffer<ID3D11ShaderResourceView *, IdCount> _shader_resource_views;
   IdBuffer<StructuredBuffer *, IdCount> _structured_buffers;
 
   static Graphics* _instance;
@@ -293,8 +297,6 @@ private:
 
   CComPtr<ID3D11ClassLinkage> _class_linkage;
 
-  std::map<std::string, std::vector<std::string> > _techniques_by_file;
-
   const char *_vs_profile;
   const char *_ps_profile;
   const char *_cs_profile;
@@ -314,5 +316,7 @@ private:
 };
 
 #define GRAPHICS Graphics::instance()
+
+#define GFX_create_buffer(bind, size, dynamic, data) GRAPHICS.create_buffer(FROM_HERE, bind, size, dynamic, data);
 
 #endif

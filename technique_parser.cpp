@@ -10,6 +10,7 @@
 #include "path_utils.hpp"
 #include "graphics.hpp"
 #include "resource_interface.hpp"
+#include "app.hpp"
 
 using namespace std;
 using namespace boost::assign;
@@ -21,7 +22,8 @@ struct parser_exception : public exception {
   string str;
 };
 
-#define THROW_ON_FALSE(x) if (!(x)) throw parser_exception(__FUNCTION__ ":" #x);
+#define THROW_ON_FALSE(x) if (!(x)) throw parser_exception(to_string("%s(%d): %s", __FILE__, __LINE__, #x));
+#define THROW_ON_FALSE_SCOPE(x, ...) if (!(x)) throw parser_exception(to_string("%s/%s(%d): %s", APP.appRoot().c_str(), _filename.c_str(), scope->current_line(), to_string(__VA_ARGS__).c_str()));
 
 static DXGI_FORMAT index_size_to_format(int size) {
   if (size == 2) return DXGI_FORMAT_R16_UINT;
@@ -622,8 +624,7 @@ struct Scope {
     return string(tmp, _start - tmp);
   }
 
-  void log_error(const char *expected_symbol) {
-    // an error occured at the current position, so work backwards to figure out the line #
+  int current_line() {
     int line = 1;
     const char *tmp = _start;
     while (tmp >= _org_start) {
@@ -632,7 +633,12 @@ struct Scope {
         ++line;
       --tmp;
     }
+    return line;
+  }
 
+  void log_error(const char *expected_symbol) {
+    // an error occured at the current position, so work backwards to figure out the line #
+    int line = current_line();
     LOG_ERROR_DIRECT_LN(_parser->_filename.c_str(), line, "Expected: \"%s\", found \"%s\"", 
       expected_symbol,
       string(_start, min(_end - _start + 1, 20)).c_str());
@@ -1169,7 +1175,7 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
           string name;
           scope->munch(kSymEquals).next_identifier(&name).munch(kSymSemicolon);
           auto it = _result->rasterizer_states.find(name);
-          THROW_ON_FALSE(it != _result->rasterizer_states.end());
+          THROW_ON_FALSE_SCOPE(it != _result->rasterizer_states.end(), "Rasterizer Desc %s not found", name.c_str());
           technique->_rasterizer_state = it->second;
           
         } else if (next == kSymBlockOpen) {
@@ -1273,7 +1279,7 @@ void TechniqueParser::parse_technique(Scope *scope, Technique *technique) {
 template<typename Desc>
 void parse_standalone_desc(Scope *scope,
                            function<void(Scope *, Desc *)> parser,
-                           function<GraphicsObjectHandle(Desc)> creator,
+                           function<GraphicsObjectHandle(Desc, const char *)> creator,
                            map<string, GraphicsObjectHandle> *states) {
   string name;
   scope->next_identifier(&name).munch(kSymBlockOpen);
@@ -1284,7 +1290,7 @@ void parse_standalone_desc(Scope *scope,
   Desc desc;
   parser(scope, &desc);
   scope->munch(kSymBlockClose).munch(kSymSemicolon);
-  (*states)[name] = creator(desc);
+  (*states)[name] = creator(desc, name.c_str());
 }
 
 Technique *TechniqueParser::find_technique(const std::string &str) {
@@ -1329,7 +1335,7 @@ bool TechniqueParser::parse() {
         case kSymRasterizerDesc: {
           parse_standalone_desc<CD3D11_RASTERIZER_DESC>(&scope,
             bind(&TechniqueParser::parse_rasterizer_desc, this, _1, _2),
-            bind(&Graphics::create_rasterizer_state, &GRAPHICS, FROM_HERE, _1),
+            bind(&Graphics::create_rasterizer_state, &GRAPHICS, FROM_HERE, _1, _2),
             &_result->rasterizer_states);
           break;
         }
@@ -1337,7 +1343,7 @@ bool TechniqueParser::parse() {
         case kSymDepthStencilDesc: {
           parse_standalone_desc<CD3D11_DEPTH_STENCIL_DESC>(&scope, 
             bind(&TechniqueParser::parse_depth_stencil_desc, this, _1, _2),
-            bind(&Graphics::create_depth_stencil_state, &GRAPHICS, FROM_HERE, _1),
+            bind(&Graphics::create_depth_stencil_state, &GRAPHICS, FROM_HERE, _1, _2),
             &_result->depth_stencil_states);
           break;
         }
@@ -1345,7 +1351,7 @@ bool TechniqueParser::parse() {
         case kSymBlendDesc: {
           parse_standalone_desc<CD3D11_BLEND_DESC>(&scope, 
             bind(&TechniqueParser::parse_blend_desc, this, _1, _2),
-            bind(&Graphics::create_blend_state, &GRAPHICS, FROM_HERE, _1),
+            bind(&Graphics::create_blend_state, &GRAPHICS, FROM_HERE, _1, _2),
             &_result->blend_states);
           break;
         }
@@ -1388,7 +1394,8 @@ bool TechniqueParser::parse() {
           return false;
       }
     }
-  } catch (const parser_exception &/*e*/) {
+  } catch (const parser_exception &e) {
+    LOG_ERROR_NAKED_LN(e.what());
     return false;
   }
 
