@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#if WITH_PROFILER
 #include "profiler.hpp"
 #include "utils.hpp"
 #include "json_utils.hpp"
@@ -136,3 +137,4 @@ ProfileScope::~ProfileScope() {
   if (!_dummy_scope)
     PROFILE_MANAGER.leave_scope(this);
 }
+#endif

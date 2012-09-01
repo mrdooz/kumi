@@ -1,4 +1,5 @@
 #pragma once
+#if WITH_PROFILER
 #include "json_utils.hpp"
 #include "utils.hpp"
 
@@ -59,3 +60,10 @@ private:
 #define PROFILE_MANAGER ProfileManager::instance()
 #define ADD_PROFILE_SCOPE() ProfileScope GEN_NAME(PROFILE, __LINE__)(__FUNCTION__);
 #define ADD_NAMED_PROFILE_SCOPE(name) ProfileScope GEN_NAME(PROFILE, __LINE__)(name);
+
+#else
+#define PROFILE_MANAGER //
+#define ADD_PROFILE_SCOPE()
+#define ADD_NAMED_PROFILE_SCOPE(name)
+
+#endif

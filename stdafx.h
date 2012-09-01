@@ -2,11 +2,13 @@
 
 
 #ifdef DISTRIBUTION
+#define WITH_PROFILER 0
 #define WITH_WEBSOCKETS 0
 #define WITH_TRACKED_LOCATION 0
 #define WITH_UNPACKED_RESOUCES 0
 #define WITH_LOGGER 0
 #else
+#define WITH_PROFILER 1
 #define WITH_WEBSOCKETS 1
 #define WITH_TRACKED_LOCATION 1
 #define WITH_UNPACKED_RESOUCES 1
@@ -88,7 +90,6 @@ typedef uint64_t uint64;
 
 typedef std::basic_string<TCHAR> ustring;
 
-
 #ifdef _DEBUG
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
@@ -98,4 +99,3 @@ typedef std::basic_string<TCHAR> ustring;
 #else
 #include <stdlib.h>
 #endif
-
