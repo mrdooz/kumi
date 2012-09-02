@@ -10,7 +10,7 @@
 SubMesh::SubMesh(Mesh *mesh) 
   : _mesh(mesh)
 {
-  _render_key.cmd = RenderKey::kRenderMesh;
+  //_render_key.cmd = RenderKey::kRenderMesh;
 }
 
 SubMesh::~SubMesh() {

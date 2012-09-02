@@ -1,9 +1,9 @@
 #pragma once
 
-#include "graphics_submit.hpp"
 #include "json_utils.hpp"
 
 class AnimatedTweakableParam;
+struct CBuffer;
 
 class Effect {
 public:

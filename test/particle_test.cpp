@@ -252,7 +252,7 @@ void ParticleTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle
   if (output.is_valid())
     _ctx->set_render_target(output, true);
   else
-    _ctx->set_default_render_target();
+    _ctx->set_default_render_target(false);
 
   TextureArray arr = { input };
   _ctx->render_technique(technique, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
@@ -267,7 +267,7 @@ void ParticleTest::renderParticles() {
   int h = GRAPHICS.height();
 
   D3D11_MAPPED_SUBRESOURCE res;
-  GRAPHICS.map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
+  _ctx->map(_vb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
 
   ParticleVtx *verts = (ParticleVtx *)res.pData;
   float *px = _particle_data.posX;
@@ -282,7 +282,7 @@ void ParticleTest::renderParticles() {
     verts[i].scale.y = *f++;
   }
 
-  GRAPHICS.unmap(_vb, 0);
+  _ctx->unmap(_vb, 0);
 
   //auto fmt = DXGI_FORMAT_R32G32B32A32_FLOAT;
 
@@ -367,7 +367,7 @@ bool ParticleTest::render() {
 
   {
     TextureArray arr = { rtCoalesce, rtBlur2, rtBackground };
-    _ctx->set_default_render_target();
+    _ctx->set_default_render_target(false);
     _ctx->render_technique(_compose_technique, bind(&ParticleTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
   }
 

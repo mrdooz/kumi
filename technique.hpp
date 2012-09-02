@@ -3,7 +3,6 @@
 #include "utils.hpp"
 #include "property.hpp"
 #include "graphics_object_handle.hpp"
-#include "graphics_submit.hpp"
 #include "property_manager.hpp"
 #include "shader.hpp"
 

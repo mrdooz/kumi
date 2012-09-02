@@ -44,7 +44,7 @@ public:
     std::vector<InstanceVar> vars;
   };
 
-  void set_default_render_target();
+  void set_default_render_target(bool clear);
   void set_render_target(GraphicsObjectHandle render_target, bool clear_target);
   void set_render_targets(GraphicsObjectHandle *render_targets, bool *clear_targets, int num_render_targets);
   void generate_mips(GraphicsObjectHandle h);

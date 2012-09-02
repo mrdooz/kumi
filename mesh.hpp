@@ -1,7 +1,7 @@
 #pragma once
-#include "graphics_submit.hpp"
 #include "property.hpp"
 #include "property_manager.hpp"
+#include "graphics_submit.hpp"
 
 struct TrackedLocation;
 class SubMesh;
@@ -15,7 +15,7 @@ public:
   ~SubMesh();
   void update();
   void fill_renderdata(MeshRenderData *render_data) const;
-  RenderKey render_key() const { return _render_key; }
+  //RenderKey render_key() const { return _render_key; }
 
   const std::string &name() const { return _name; }
   GraphicsObjectHandle material_id() const { return _material_id; }
@@ -30,7 +30,7 @@ private:
 
   std::string _name;
   Mesh *_mesh;
-  RenderKey _render_key;
+  //RenderKey _render_key;
   GraphicsObjectHandle _material_id;
   MeshGeometry _geometry;
 };

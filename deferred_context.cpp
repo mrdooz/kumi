@@ -152,11 +152,15 @@ void DeferredContext::set_render_targets(GraphicsObjectHandle *render_targets, b
   _ctx->OMSetRenderTargets(num_render_targets, rts, dsv);
 }
 
-void DeferredContext::set_default_render_target() {
+void DeferredContext::set_default_render_target(bool clear) {
   auto rt = GRAPHICS._render_targets.get(GRAPHICS._default_render_target);
   _ctx->OMSetRenderTargets(1, &rt->rtv.resource.p, rt->dsv.resource);
+  if (clear) {
+    static float color[4] = {0,0,0,0};
+    _ctx->ClearRenderTargetView(rt->rtv.resource, color);
+    _ctx->ClearDepthStencilView(rt->dsv.resource, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
+  }
   _ctx->RSSetViewports(1, &GRAPHICS._viewport);
-
 }
 
 void DeferredContext::set_vs(GraphicsObjectHandle vs) {
@@ -461,7 +465,7 @@ void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType:
 }
 
 bool DeferredContext::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-  switch (h._type) {
+  switch (h.type()) {
   case GraphicsObjectHandle::kTexture:
     return SUCCEEDED(_ctx->Map(GRAPHICS._textures.get(h)->texture.resource, sub, type, flags, res));
 
@@ -478,7 +482,7 @@ bool DeferredContext::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT
 }
 
 void DeferredContext::unmap(GraphicsObjectHandle h, UINT sub) {
-  switch (h._type) {
+  switch (h.type()) {
   case GraphicsObjectHandle::kTexture:
     _ctx->Unmap(GRAPHICS._textures.get(h)->texture.resource, sub);
     break;

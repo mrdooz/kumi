@@ -1,8 +1,9 @@
 #pragma once
-#include "graphics_submit.hpp"
+#include "property.hpp"
 
 struct TrackedLocation;
 class Mesh;
+class SubMesh;
 class Material;
 class DeferredContext;
 class Effect;

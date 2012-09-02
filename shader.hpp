@@ -1,7 +1,6 @@
 #pragma once
 #include "property.hpp"
 #include "property_manager.hpp"
-#include "graphics_submit.hpp"
 
 namespace ShaderType {
   enum Enum {

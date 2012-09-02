@@ -607,7 +607,7 @@ void SplineTest::post_process(GraphicsObjectHandle input, GraphicsObjectHandle o
   if (output.is_valid())
     _ctx->set_render_target(output, true);
   else
-    _ctx->set_default_render_target();
+    _ctx->set_default_render_target(false);
 
   TextureArray arr = { input };
   _ctx->render_technique(technique, bind(&SplineTest::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
@@ -764,6 +764,8 @@ bool SplineTest::render() {
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
+  KASSERT(w && h);
+
   XMFLOAT4X4 worldViewProj;
   XMMATRIX xWorldViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
   XMStoreFloat4x4(&worldViewProj, XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj)));
@@ -840,7 +842,7 @@ bool SplineTest::render() {
 
     _ctx->set_cbuffer(ps->find_cbuffer("WorldToScreenSpace"), 0, ShaderType::kPixelShader, &cbufferLight, sizeof(cbufferLight));
 
-    _ctx->set_default_render_target();
+    _ctx->set_default_render_target(false);
     TextureArray arr = { rtColor, rtBlur2 };
     _ctx->set_samplers(ps->samplers());
     _ctx->set_shader_resources(arr, ShaderType::kPixelShader);

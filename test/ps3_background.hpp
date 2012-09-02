@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../effect.hpp"
+#include "../graphics_object_handle.hpp"
 
 class Ps3BackgroundEffect : public Effect {
 public:

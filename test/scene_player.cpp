@@ -368,7 +368,8 @@ bool ScenePlayer::render() {
         // transform pos to camera space
         auto light = _scene->lights[i];
         XMVECTOR v = XMLoadFloat4(&light->pos);
-        XMMATRIX m = XMLoadFloat4x4(&transpose(_view));
+        XMFLOAT4X4 tmp = transpose(_view);
+        XMMATRIX m = XMLoadFloat4x4(&tmp);
         XMVECTOR v2 = XMVector3Transform(v, m);
         XMStoreFloat4(lightpos, v2);
         *lightcolor = light->color;
@@ -414,7 +415,7 @@ bool ScenePlayer::render() {
 
     {
       // gamma correction
-      _ctx->set_default_render_target();
+      _ctx->set_default_render_target(false);
       TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmpb, rt_pos };
       _ctx->render_technique(_gamma_correct, 
         bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
@@ -446,7 +447,7 @@ void ScenePlayer::post_process(GraphicsObjectHandle input, GraphicsObjectHandle 
   if (output.is_valid())
     _ctx->set_render_target(output, true);
   else
-    _ctx->set_default_render_target();
+    _ctx->set_default_render_target(false);
 
   TextureArray arr = { input };
   _ctx->render_technique(technique, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
