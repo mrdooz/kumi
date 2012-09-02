@@ -4,7 +4,6 @@
 #include "technique.hpp"
 #include "technique_parser.hpp"
 #include "resource_interface.hpp"
-#include "property_manager.hpp"
 #include "material_manager.hpp"
 #include "string_utils.hpp"
 #include "tracked_location.hpp"
@@ -84,7 +83,7 @@ bool Graphics::enumerateDisplayModes(HWND hWnd) {
     // Only keep the version of each display mode with the highest refresh rate
     auto &safeRational = [](const DXGI_RATIONAL &r) { return r.Denominator == 0 ? 0 : r.Numerator / r.Denominator; };
     if (GRAPHICS.displayAllModes()) {
-      curAdapter.videoModes = displayModes;
+      curAdapter.displayModes = displayModes;
     } else {
       std::map<pair<int, int>, DXGI_RATIONAL> highestRate;
       for (size_t i = 0; i < displayModes.size(); ++i) {
@@ -100,25 +99,27 @@ bool Graphics::enumerateDisplayModes(HWND hWnd) {
         desc.Width = it->first.first;
         desc.Height = it->first.second;
         desc.RefreshRate = it->second;
-        curAdapter.videoModes.push_back(desc);
+        curAdapter.displayModes.push_back(desc);
       }
 
       auto &resSorter = [&](const DXGI_MODE_DESC &a, const DXGI_MODE_DESC &b) { 
         return a.Width < b.Width; };
 
-      sort(begin(curAdapter.videoModes), end(curAdapter.videoModes), resSorter);
+      sort(begin(curAdapter.displayModes), end(curAdapter.displayModes), resSorter);
     }
 
     HWND hDisplayMode = GetDlgItem(hWnd, IDC_DISPLAY_MODES);
-    for (size_t k = 0; k < curAdapter.videoModes.size(); ++k) {
-      auto &cur = curAdapter.videoModes[k];
+    for (size_t k = 0; k < curAdapter.displayModes.size(); ++k) {
+      auto &cur = curAdapter.displayModes[k];
       char buf[256];
       sprintf(buf, "%dx%d (%dHz)", cur.Width, cur.Height, safeRational(cur.RefreshRate));
-      ComboBox_InsertString(hDisplayMode, -1, buf);
+      ComboBox_InsertString(hDisplayMode, k, buf);
+      // encode width << 16 | height in the item data
+      ComboBox_SetItemData(hDisplayMode, k, (cur.Width << 16) | cur.Height);
     }
+
     int cnt = ComboBox_GetCount(hDisplayMode);
     ComboBox_SetCurSel(hDisplayMode, cnt-1);
-    GRAPHICS._curSetup.selectedVideoMode = cnt-1;
   }
 
   HWND hMultisample = GetDlgItem(hWnd, IDC_MULTISAMPLE);
@@ -153,7 +154,7 @@ INT_PTR CALLBACK Graphics::dialogWndProc(HWND hWnd, UINT message, WPARAM wParam,
         EndDialog(hWnd, -1);
       }
 #if !USE_CONFIG_DLG
-      GRAPHICS._curSetup.selectedVideoMode = 3 * GRAPHICS._curSetup.videoAdapters[0].videoModes.size() / 4;
+      ComboBox_SetCurSel(GetDlgItem(hWnd, IDC_DISPLAY_MODES), 3 * GRAPHICS._curSetup.videoAdapters[0].displayModes.size() / 4);
       EndDialog(hWnd, 1);
 #endif
       RECT rect;
@@ -166,9 +167,7 @@ INT_PTR CALLBACK Graphics::dialogWndProc(HWND hWnd, UINT message, WPARAM wParam,
     }
 
     case WM_COMMAND:
-
       switch (LOWORD(wParam)) {
-
         case IDCANCEL:
           EndDialog(hWnd, 0);
           return TRUE;
@@ -176,38 +175,25 @@ INT_PTR CALLBACK Graphics::dialogWndProc(HWND hWnd, UINT message, WPARAM wParam,
         case IDOK:
           EndDialog(hWnd, 1);
           return TRUE;
-
-        case IDC_WINDOWED: {
-          switch (HIWORD(wParam)) {
-            case BN_CLICKED:
-              GRAPHICS._curSetup.windowed = !!Button_GetCheck((HWND)lParam);
-              return TRUE;
-          }
-          break;
-        }
-
-        case IDC_DISPLAY_MODES:
-          switch (HIWORD(wParam)) {
-            case CBN_SELCHANGE: {
-              int sel = ComboBox_GetCurSel((HWND)lParam);
-              GRAPHICS._curSetup.selectedVideoMode = sel;
-              return TRUE;
-            }
-          }
-
-        case IDC_MULTISAMPLE:
-          switch (HIWORD(wParam)) {
-            case CBN_SELCHANGE: {
-              int sel = ComboBox_GetCurSel((HWND)lParam);
-              GRAPHICS._curSetup.multisampleCount = ComboBox_GetItemData((HWND)lParam, sel);
-              return TRUE;
-            }
-          }
-          break;
-
-
       }
+      break; // end WM_COMMAND
+
+    case WM_DESTROY: {
+      // read the settings
+      GRAPHICS._curSetup.windowed = !!Button_GetCheck(GetDlgItem(hWnd, IDC_WINDOWED));
+      GRAPHICS._curSetup.selectedDisplayMode = ComboBox_GetCurSel(GetDlgItem(hWnd, IDC_DISPLAY_MODES));
+
+      HWND hMultisample = GetDlgItem(hWnd, IDC_MULTISAMPLE);
+      GRAPHICS._curSetup.multisampleCount = ComboBox_GetItemData(hMultisample, ComboBox_GetCurSel(hMultisample));
+
+      HWND hDisplayModes = GetDlgItem(hWnd, IDC_DISPLAY_MODES);
+      int sel = ComboBox_GetCurSel(hDisplayModes);
+      int data = ComboBox_GetItemData(hDisplayModes, sel);
+      int w = HIWORD(data);
+      GRAPHICS._width = w;
+      GRAPHICS._height = LOWORD(data);
       break;
+    }
   }
   return FALSE;
 }
@@ -219,6 +205,7 @@ Graphics* Graphics::_instance;
 Graphics::Graphics()
   : _width(-1)
   , _height(-1)
+  , _buffer_format(DXGI_FORMAT_R8G8B8A8_UNORM)
   , _start_fps_time(0xffffffff)
   , _frame_count(0)
   , _fps(0)
@@ -256,6 +243,10 @@ bool Graphics::create() {
   return true;
 }
 
+bool Graphics::close() {
+  delete exch_null(_instance);
+  return true;
+}
 void Graphics::setClientSize()
 {
   RECT client_rect;
@@ -298,23 +289,18 @@ bool Graphics::createWindow(WNDPROC wndProc) {
   return true;
 }
 
-const DXGI_MODE_DESC &Graphics::selectedVideoMode() const {
-  return _curSetup.videoAdapters[_curSetup.selectedAdapter].videoModes[_curSetup.selectedVideoMode];
+const DXGI_MODE_DESC &Graphics::selectedDisplayMode() const {
+  return _curSetup.videoAdapters[_curSetup.selectedAdapter].displayModes[_curSetup.selectedDisplayMode];
 }
 
 bool Graphics::init(WNDPROC wndProc)
 {
-  auto &curMode = selectedVideoMode();
-  _width = curMode.Width;
-  _height = curMode.Height;
-  _buffer_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  auto &curMode = selectedDisplayMode();
 
   createWindow(wndProc);
 
-  _screen_size_id = PROPERTY_MANAGER.get_or_create<XMFLOAT4>("System::g_screen_size");
-
   DXGI_SWAP_CHAIN_DESC swapchain_desc;
-  ZeroMemory(&swapchain_desc, sizeof( swapchain_desc ) );
+  ZeroMemory(&swapchain_desc, sizeof(swapchain_desc));
   swapchain_desc.BufferCount = 3;
   swapchain_desc.BufferDesc.Width = _width;
   swapchain_desc.BufferDesc.Height = _height;
@@ -326,29 +312,6 @@ bool Graphics::init(WNDPROC wndProc)
   swapchain_desc.SampleDesc.Quality = 0;
   swapchain_desc.Windowed = _curSetup.windowed;
 
-  // Create DXGI factory to enumerate adapters
-  IDXGIFactory1 *dxgi_factory = nullptr;
-  B_ERR_HR(CreateDXGIFactory1(__uuidof(IDXGIFactory1), (void**)&dxgi_factory));
-
-  // Use the first adapter
-  vector<CComPtr<IDXGIAdapter1> > adapters;
-  IDXGIAdapter1 *adapter = nullptr;
-  int perfhud = -1;
-  for (int i = 0; SUCCEEDED(dxgi_factory->EnumAdapters1(i, &adapter)); ++i) {
-    adapters.push_back(adapter);
-    DXGI_ADAPTER_DESC desc;
-    adapter->GetDesc(&desc);
-    exch_null(adapter)->Release();
-    if (wcscmp(desc.Description, L"NVIDIA PerfHud") == 0) {
-      perfhud = i;
-    }
-  }
-  exch_null(dxgi_factory)->Release();
-
-  B_ERR_BOOL(!adapters.empty());
-
-  adapter = perfhud != -1 ? adapters[perfhud] : adapters.front();
-
   int flags = 0;
 #ifdef _DEBUG
   flags |= D3D11_CREATE_DEVICE_DEBUG;
@@ -356,7 +319,7 @@ bool Graphics::init(WNDPROC wndProc)
 
   // Create the DX11 device
   B_ERR_HR(D3D11CreateDeviceAndSwapChain(
-    adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, 
+    _curSetup.videoAdapters[_curSetup.selectedAdapter].adapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, flags, NULL, 0, 
     D3D11_SDK_VERSION, &swapchain_desc, &_swap_chain.p, &_device.p,
     &_feature_level, &_immediate_context.p));
   set_private_data(FROM_HERE, _immediate_context.p);
@@ -380,6 +343,7 @@ bool Graphics::init(WNDPROC wndProc)
   // Create a dummy texture
   DWORD black = 0;
   _dummy_texture = create_texture(FROM_HERE, 1, 1, DXGI_FORMAT_R8G8B8A8_UNORM, &black, 1, 1, 1, "dummy_texture");
+  _immediate_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
   for (int i = 0; i < 4; ++i)
     _default_blend_factors[i] = 1.0f;
@@ -407,7 +371,6 @@ GraphicsObjectHandle Graphics::create_buffer(const TrackedLocation &loc, D3D11_B
     LOG_ERROR_LN("Implement me!");
   }
   return emptyGoh;
-
 }
 
 
@@ -427,14 +390,6 @@ bool Graphics::create_buffer_inner(const TrackedLocation &loc, D3D11_BIND_FLAG b
   set_private_data(loc, *buffer);
   _totalBytesAllocated += size;
   return SUCCEEDED(hr);
-}
-
-void Graphics::set_vb(ID3D11Buffer *buf, uint32_t stride)
-{
-  UINT ofs[] = { 0 };
-  ID3D11Buffer* bufs[] = { buf };
-  uint32_t strides[] = { stride };
-  _immediate_context->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
 GraphicsObjectHandle Graphics::get_temp_render_target(const TrackedLocation &loc, 
@@ -805,7 +760,7 @@ bool Graphics::create_back_buffers(int width, int height)
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
 
-  set_default_render_target();
+  //set_default_render_target();
 
   return true;
 }
@@ -856,32 +811,6 @@ bool Graphics::config(HINSTANCE hInstance) {
   return res == IDOK;
 }
 
-
-void Graphics::set_default_render_target()
-{
-  RenderTargetResource *rt = _render_targets.get(_default_render_target);
-  _immediate_context->OMSetRenderTargets(1, &rt->rtv.resource.p, rt->dsv.resource);
-  _immediate_context->RSSetViewports(1, &_viewport);
-}
-
-bool Graphics::close() {
-  delete exch_null(_instance);
-  return true;
-}
-
-void Graphics::clear(GraphicsObjectHandle h, const XMFLOAT4 &c) {
-  RenderTargetResource *rt = _render_targets.get(h);
-  _immediate_context->ClearRenderTargetView(rt->rtv.resource, &c.x);
-  _immediate_context->ClearDepthStencilView(rt->dsv.resource, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
-}
-
-void Graphics::clear(const XMFLOAT4& c)
-{
-  RenderTargetResource *rt = _render_targets.get(_default_render_target);
-  _immediate_context->ClearRenderTargetView(rt->rtv.resource, &c.x);
-  _immediate_context->ClearDepthStencilView(rt->dsv.resource, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0 );
-}
-
 void Graphics::present()
 {
   const DWORD now = timeGetTime();
@@ -894,7 +823,7 @@ void Graphics::present()
   }
   _swap_chain->Present(_vsync ? 1 : 0,0);
 }
-
+/*
 void Graphics::resize(int width, int height)
 {
   if (!_swap_chain || width == 0 || height == 0)
@@ -902,7 +831,7 @@ void Graphics::resize(int width, int height)
   PROPERTY_MANAGER.set_property(_screen_size_id, XMFLOAT4((float)width, (float)height, 0, 0));
   create_back_buffers(width, height);
 }
-
+*/
 GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode) {
   const int idx = _input_layouts.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(&desc[0], desc.size(), &shader_bytecode[0], shader_bytecode.size(), &_input_layouts[idx])))
@@ -1139,58 +1068,6 @@ GraphicsObjectHandle Graphics::find_rasterizer_state(const std::string &name) {
 
 GraphicsObjectHandle Graphics::find_depth_stencil_state(const std::string &name) {
   return make_goh(GraphicsObjectHandle::kDepthStencilState, _depth_stencil_states.idx_from_token(name));
-}
-
-
-void Graphics::unbind_resource_views(int resource_bitmask) {
-
-  ID3D11ShaderResourceView *null_view = nullptr;
-
-  ID3D11DeviceContext *ctx = _immediate_context;
-  for (int i = 0; i < 8; ++i) {
-    if (resource_bitmask & (1 << i))
-      ctx->PSSetShaderResources(i, 1, &null_view);
-  }
-}
-
-bool Graphics::map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res) {
-  switch (h._type) {
-    case GraphicsObjectHandle::kTexture:
-      return SUCCEEDED(_immediate_context->Map(_textures.get(h)->texture.resource, sub, type, flags, res));
-
-    case GraphicsObjectHandle::kVertexBuffer:
-      return SUCCEEDED(_immediate_context->Map(_vertex_buffers.get(h), sub, type, flags, res));
-
-    case GraphicsObjectHandle::kIndexBuffer:
-      return SUCCEEDED(_immediate_context->Map(_index_buffers.get(h), sub, type, flags, res));
-
-    default:
-      LOG_ERROR_LN("Invalid resource type passed to %s", __FUNCTION__);
-      return false;
-  }
-}
-
-void Graphics::unmap(GraphicsObjectHandle h, UINT sub) {
-  switch (h._type) {
-    case GraphicsObjectHandle::kTexture:
-      _immediate_context->Unmap(_textures.get(h)->texture.resource, sub);
-      break;
-
-    case GraphicsObjectHandle::kVertexBuffer:
-      _immediate_context->Unmap(_vertex_buffers.get(h), sub);
-      break;
-
-    case GraphicsObjectHandle::kIndexBuffer:
-      _immediate_context->Unmap(_index_buffers.get(h), sub);
-      break;
-
-    default:
-      LOG_WARNING_LN("Invalid resource type passed to %s", __FUNCTION__);
-  }
-}
-
-void Graphics::copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src) {
-  _immediate_context->CopyResource(_textures.get(dst)->texture.resource, _textures.get(src)->texture.resource);
 }
 
 Technique *Graphics::get_technique(GraphicsObjectHandle h) {

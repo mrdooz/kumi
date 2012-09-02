@@ -5,7 +5,6 @@
 #include "id_buffer.hpp"
 #include "graphics_object_handle.hpp"
 #include "technique.hpp"
-#include "property_manager.hpp"
 #include "tracked_location.hpp"
 
 struct Io;
@@ -98,11 +97,9 @@ public:
 
   bool config(HINSTANCE hInstance);
   bool	init(WNDPROC wndProc);
-  void	clear(const XMFLOAT4& c);
-  void	clear(GraphicsObjectHandle h, const XMFLOAT4 &c);
 
   void	present();
-  void	resize(int width, int height);
+  //void	resize(int width, int height);
 
   const char *vs_profile() const { return _vs_profile; }
   const char *ps_profile() const { return _ps_profile; }
@@ -137,8 +134,6 @@ public:
 
   bool read_texture(const char *filename, D3DX11_IMAGE_INFO *info, uint32 *pitch, vector<uint8> *bits);
 
-  bool map(GraphicsObjectHandle h, UINT sub, D3D11_MAP type, UINT flags, D3D11_MAPPED_SUBRESOURCE *res);
-  void unmap(GraphicsObjectHandle h, UINT sub);
   void copy_resource(GraphicsObjectHandle dst, GraphicsObjectHandle src);
 
   // Create a texture, and fill it with data
@@ -148,7 +143,6 @@ public:
   float fps() const { return _fps; }
   int width() const { return _width; }
   int height() const { return _height; }
-  void size(int *width, int *height) const { *width = _width; *height = _height; }
 
   bool load_techniques(const char *filename, bool add_materials);
   Technique *get_technique(GraphicsObjectHandle h);
@@ -185,21 +179,13 @@ public:
   void setDisplayAllModes(bool value) { _displayAllModes = value; }
   bool displayAllModes() const { return _displayAllModes; }
 
-  const DXGI_MODE_DESC &selectedVideoMode() const;
+  const DXGI_MODE_DESC &selectedDisplayMode() const;
 
-private:
-  DISALLOW_COPY_AND_ASSIGN(Graphics);
-
+//private:
   Graphics();
 
   bool createWindow(WNDPROC wndProc);
   void setClientSize();
-
-  void set_default_render_target();
-
-  void set_vb(ID3D11Buffer *buf, uint32_t stride);
-  void set_resource_views(Technique *technique, Shader *shader, int *resources_set);
-  void unbind_resource_views(int resource_bitmask);
 
   bool create_buffer_inner(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data, ID3D11Buffer** buffer);
 
@@ -227,16 +213,16 @@ private:
   struct VideoAdapter {
     CComPtr<IDXGIAdapter1> adapter;
     DXGI_ADAPTER_DESC desc;
-    vector<DXGI_MODE_DESC> videoModes;
+    vector<DXGI_MODE_DESC> displayModes;
   };
 
   struct Setup {
 
-    Setup() : selectedAdapter(-1), selectedVideoMode(-1), multisampleCount(-1), selectedAspectRatio(-1), windowed(false) {}
+    Setup() : selectedAdapter(-1), selectedDisplayMode(-1), multisampleCount(-1), selectedAspectRatio(-1), windowed(false) {}
 
     std::vector<VideoAdapter> videoAdapters;
     int selectedAdapter;
-    int selectedVideoMode;
+    int selectedDisplayMode;
     int selectedAspectRatio;
     int multisampleCount;
     bool windowed;
@@ -307,7 +293,6 @@ private:
 
   std::map<PredefinedGeometry, std::pair<GraphicsObjectHandle, GraphicsObjectHandle> > _predefined_geometry;
 
-  PropertyId _screen_size_id;
   std::map<std::string, int> _shader_flags;
 
   HWND _hwnd;
