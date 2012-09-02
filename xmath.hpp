@@ -116,6 +116,10 @@ inline float dot(const XMFLOAT4 &a, const XMFLOAT4 &b) {
   return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
 }
 
+inline float dot34(const XMFLOAT3 &a, const XMFLOAT4 &b) {
+  return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
 inline float dot(const XMFLOAT3 &a, const XMFLOAT3 &b) {
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
@@ -156,6 +160,14 @@ inline XMFLOAT4 operator*(const XMFLOAT4 &v, const XMFLOAT4X4 &m) {
     dot(v, col(m, 2)),
     dot(v, col(m, 3)));
 }
+
+inline XMFLOAT3 operator*(const XMFLOAT3 &v, const XMFLOAT4X4 &m) {
+  return XMFLOAT3(
+    dot34(v, col(m, 0)),
+    dot34(v, col(m, 1)),
+    dot34(v, col(m, 2)));
+}
+
 
 inline XMFLOAT4X4 mtx_from_axis_angle(const XMFLOAT3 &v, float angle) {
   // NOTE: rotations are counter clockwise around the axis

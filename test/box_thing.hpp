@@ -37,6 +37,8 @@ private:
 
   XMFLOAT4X4 _view, _proj;
   XMFLOAT3 _cameraPos;
+  XMFLOAT3 _lightPos;
+  int _numCubes;
 
   DeferredContext *_ctx;
 };

@@ -201,19 +201,10 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
 
       // Parse input layout
-/*
-      auto mapping = map_list_of
-        ("SV_POSITION", DXGI_FORMAT_R32G32B32A32_FLOAT)
-        ("POSITION", DXGI_FORMAT_R32G32B32_FLOAT)
-        ("NORMAL", DXGI_FORMAT_R32G32B32_FLOAT)
-        ("COLOR", DXGI_FORMAT_R32G32B32A32_FLOAT)
-        ("SIZE", DXGI_FORMAT_R32_FLOAT)
-        ("TEXCOORD", DXGI_FORMAT_R32G32_FLOAT);
-*/
       vector<D3D11_INPUT_ELEMENT_DESC> inputs;
       for (i += 3; i < input.size(); ++i) {
         auto &row = input[i];
-        if (row.size() != 7) {
+        if (row.size() < 6) {
           --i;  // rewind to the previous row
           break;
         }
@@ -231,12 +222,6 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
         } else {
           LOG_ERROR_LN("Unknown type: %s", row[5]);
         }
-/*
-        if (!lookup<string, DXGI_FORMAT>(row[0].to_string(), mapping, &fmt)) {
-          LOG_ERROR_LN("Invalid input semantic found: %s", row[0].c_str());
-          return false;
-        }
-*/
         inputs.push_back(CD3D11_INPUT_ELEMENT_DESC(row[0].c_str(), atoi(row[1].c_str()), fmt, 0));
       }
 
