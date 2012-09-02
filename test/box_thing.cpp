@@ -30,7 +30,7 @@ BoxThing::BoxThing(const std::string &name)
   , _mouse_rbutton(false)
   , _mouse_pos_prev(~0)
   , _ctx(nullptr)
-  , _useFreeFlyCamera(false)
+  , _useFreeFlyCamera(true)
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -41,10 +41,45 @@ BoxThing::~BoxThing() {
 
 bool BoxThing::init() {
 
-  int w = GRAPHICS.width();
+  int x = GRAPHICS.width();
   int h = GRAPHICS.height();
 
   _ctx = GRAPHICS.create_deferred_context(true);
+
+  float s = 10;
+  XMFLOAT3 verts[] = {
+    XMFLOAT3(-s, +s, -s),
+    XMFLOAT3(+s, +s, -s),
+    XMFLOAT3(-s, -s, -s),
+    XMFLOAT3(+s, -s, -s),
+    XMFLOAT3(-s, +s, +s),
+    XMFLOAT3(+s, +s, +s),
+    XMFLOAT3(-s, -s, +s),
+    XMFLOAT3(+s, -s, +s),
+  };
+
+  int indices[] = {
+    0, 1, 2,
+    2, 1, 3,
+    3, 1, 5,
+    3, 5, 7,
+    7, 5, 4,
+    7, 4, 6,
+    6, 4, 0,
+    6, 0, 2,
+    4, 5, 0,
+    0, 5, 1,
+    6, 2, 3,
+    6, 3, 7,
+  };
+
+  _vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
+  _ib = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, sizeof(indices), false, indices);
+
+  GRAPHICS.load_techniques("effects/box_thing.tec", false);
+  _technique = GRAPHICS.find_technique("box_thing");
+
+  _freefly_camera.setPos(0, 0, -100);
 
   return true;
 }
@@ -58,7 +93,6 @@ void BoxThing::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view,
     delta /= 10;
 
   if (_useFreeFlyCamera) {
-
     if (_keystate['W'])
       _freefly_camera.move(FreeFlyCamera::kForward, (float)(100 * delta));
     if (_keystate['S'])
@@ -102,6 +136,26 @@ bool BoxThing::render() {
 
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
+
+  _ctx->set_default_render_target(true);
+
+  Technique *technique;
+  Shader *vs, *ps;
+  setupTechnique(_ctx, _technique, false, &technique, &vs, nullptr, &ps);
+
+  struct {
+    XMFLOAT4X4 worldViewProj;
+  } cbuffer;
+
+  XMMATRIX xmViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
+  XMStoreFloat4x4(&cbuffer.worldViewProj, XMMatrixTranspose(xmViewProj));
+
+  _ctx->set_cbuffer(vs->find_cbuffer("cbMain"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+
+  _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  _ctx->set_vb(_vb, sizeof(XMFLOAT3));
+  _ctx->set_ib(_ib, DXGI_FORMAT_R32_UINT);
+  _ctx->draw_indexed(36, 0, 0);
 
   _ctx->end_frame();
 

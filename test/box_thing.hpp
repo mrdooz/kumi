@@ -20,6 +20,10 @@ public:
 
 private:
 
+  GraphicsObjectHandle _vb;
+  GraphicsObjectHandle _ib;
+  GraphicsObjectHandle _technique;
+
   void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
   bool _useFreeFlyCamera;

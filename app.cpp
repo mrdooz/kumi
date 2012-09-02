@@ -78,7 +78,9 @@ bool App::init(HINSTANCE hinstance)
   if (!GRAPHICS.config(_hinstance))
     return false;
 
+#if WITH_PROFILER
   B_ERR_BOOL(ProfileManager::create());
+#endif
   B_ERR_BOOL(PropertyManager::create());
 #if WITH_UNPACKED_RESOUCES
   B_ERR_BOOL(ResourceManager::create("resources.log"));
@@ -107,8 +109,8 @@ bool App::init(HINSTANCE hinstance)
 
   //auto effect = new ScenePlayer("simple effect");
   //auto effect = new ParticleTest("particle test");
-  //auto effect = new SplineTest("spline test");
-  auto effect = new BoxThing("boxthing");
+  auto effect = new SplineTest("spline test");
+  //auto effect = new BoxThing("boxthing");
   DEMO_ENGINE.add_effect(effect, 0, 10000 * 1000);
 
   load_settings();
@@ -135,7 +137,9 @@ bool App::close() {
   B_ERR_BOOL(PackedResourceManager::close());
 #endif
   B_ERR_BOOL(PropertyManager::close());
+#if WITH_PROFILER
   B_ERR_BOOL(ProfileManager::close());
+#endif
 
   Logger::close();
   Dispatcher::close();
@@ -256,7 +260,9 @@ UINT App::run(void *userdata) {
       DispatchMessage(&msg);
     } else {
 
+#if WITH_PROFILER
       PROFILE_MANAGER.start_frame();
+#endif
       LARGE_INTEGER start, end;
       QueryPerformanceCounter(&start);
       {
@@ -264,7 +270,7 @@ UINT App::run(void *userdata) {
 
         process_deferred();
 
-        GRAPHICS.clear(XMFLOAT4(0,0,0,1));
+        //GRAPHICS.clear(XMFLOAT4(0,0,0,1));
         DEMO_ENGINE.tick();
       }
       {
@@ -279,7 +285,12 @@ UINT App::run(void *userdata) {
       double cur_frame = delta / (double)freq.QuadPart;
       _frame_time = lerp(cur_frame, _frame_time, 0.6);
 
+#if WITH_PROFILER
       JsonValue::JsonValuePtr frame = PROFILE_MANAGER.end_frame();
+#else
+      JsonValue::JsonValuePtr frame = JsonValue::emptyValue();
+#endif
+
 #if WITH_WEBSOCKETS
       // limit how often we send the profile data
       static DWORD lastTime = timeGetTime();
@@ -367,7 +378,7 @@ LRESULT App::wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
   switch( message ) {
 
   case WM_SIZE:
-    GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
+    //GRAPHICS.resize(LOWORD(lParam), HIWORD(lParam));
     break;
 
   case WM_APP_CLOSE:

@@ -224,9 +224,6 @@
     <ClInclude Include="..\resource_manager.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\graphics_submit.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\graphics_object_handle.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

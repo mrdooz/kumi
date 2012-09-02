@@ -225,7 +225,6 @@
     <ClInclude Include="..\gaussian_blur.hpp" />
     <ClInclude Include="..\graphics.hpp" />
     <ClInclude Include="..\graphics_object_handle.hpp" />
-    <ClInclude Include="..\graphics_submit.hpp" />
     <ClInclude Include="..\id_buffer.hpp" />
     <ClInclude Include="..\json_utils.hpp" />
     <ClInclude Include="..\kumi.hpp" />
