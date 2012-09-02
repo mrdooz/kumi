@@ -762,7 +762,8 @@ static const char *ext_from_type(ShaderType::Enum type) {
     case ShaderType::kGeometryShader: return ".gso";
     default: LOG_ERROR_LN("Implement me!");
   }
-  __assume(false);
+  //__assume(false);
+  return "";
 }
 
 void TechniqueParser::parse_shader_template(Scope *scope, Technique *technique, ShaderTemplate *shader) {
@@ -1034,7 +1035,7 @@ void TechniqueParser::parse_rasterizer_desc(Scope *scope, CD3D11_RASTERIZER_DESC
 
 void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 
-  auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+  auto valid_tags(list_of(kSymFormat)(kSymData));
   auto vertex_fmts = map_list_of("pos", 3 * sizeof(float))("pos_tex", 5 * sizeof(float));
   vector<float> vertices;
 
@@ -1067,7 +1068,7 @@ void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
 
 void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
 
-  auto valid_tags = vector<Symbol>(list_of(kSymFormat)(kSymData));
+  auto valid_tags(list_of(kSymFormat)(kSymData));
   auto index_fmts = map_list_of("index16", DXGI_FORMAT_R16_UINT)("index32", DXGI_FORMAT_R32_UINT);
 
   technique->_index_format = DXGI_FORMAT_UNKNOWN;
@@ -1357,16 +1358,10 @@ bool TechniqueParser::parse() {
         }
 
         case kSymSamplerDesc: {
-          string name;
-          scope.next_identifier(&name).munch(kSymBlockOpen);
-          auto it = _result->sampler_states.find(name);
-          if (_result->sampler_states.find(name) != _result->sampler_states.end()) {
-            LOG_WARNING_LN("Duplicate state found: %s", name.c_str());
-          }
-          CD3D11_SAMPLER_DESC desc;
-          parse_sampler_desc(&scope, &desc);
-          scope.munch(kSymBlockClose).munch(kSymSemicolon);
-          _result->sampler_states[name] = GRAPHICS.create_sampler(FROM_HERE, name, desc);
+          parse_standalone_desc<CD3D11_SAMPLER_DESC>(&scope,
+            bind(&TechniqueParser::parse_sampler_desc, this, _1, _2),
+            bind(&Graphics::create_sampler_state, &GRAPHICS, FROM_HERE, _1, _2),
+            &_result->sampler_states);
           break;
         }
 

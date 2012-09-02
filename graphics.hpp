@@ -120,7 +120,7 @@ public:
   GraphicsObjectHandle create_rasterizer_state(const TrackedLocation &loc, const D3D11_RASTERIZER_DESC &desc, const char *name = nullptr);
   GraphicsObjectHandle create_blend_state(const TrackedLocation &loc, const D3D11_BLEND_DESC &desc, const char *name = nullptr);
   GraphicsObjectHandle create_depth_stencil_state(const TrackedLocation &loc, const D3D11_DEPTH_STENCIL_DESC &desc, const char *name = nullptr);
-  GraphicsObjectHandle create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc);
+  GraphicsObjectHandle create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc, const char *name = nullptr);
 
   D3D_FEATURE_LEVEL feature_level() const { return _feature_level; }
 

@@ -3,7 +3,7 @@
 class GraphicsObjectHandle {
 public:
   enum Type {
-    kInvalid = -1,
+    kInvalid = -1,    // NB: You have to compare _raw against kInvalid to test
     kContext,
     kVertexBuffer,
     kIndexBuffer,
@@ -25,31 +25,35 @@ public:
     kFontFamily,
     kMaterial,
     kStructuredBuffer,
+    cNumTypes
   };	
 private:
   friend class Graphics;
   friend class MaterialManager;
   enum { 
     cTypeBits = 8,
-    cGenerationBits = 8,
-    cIdBits = 10 
+    cIdBits = 12,
+    cDataBits = 32 - (cTypeBits + cIdBits),
   };
-  GraphicsObjectHandle(uint32 type, uint32 generation, uint32 id) : _type(type), _generation(generation), _id(id) {}
+  static_assert(1 << GraphicsObjectHandle::cTypeBits > GraphicsObjectHandle::cNumTypes, "Not enough type bits");
+
+  //GraphicsObjectHandle(uint32 type, uint32 id, uint32 data, int apa) : _type(type), _id(id), _data(data) {}
+  GraphicsObjectHandle(uint32 type, uint32 id) : _type(type), _id(id), _data(0) {}
   union {
     struct {
-      uint32 _type : 8;
-      uint32 _generation : 8;
-      uint32 _id : 10;
+      uint32 _type : cTypeBits;
+      uint32 _id : cIdBits;
+      uint32 _data : cDataBits;
     };
-    uint32 _data;
+    uint32 _raw;
   };
 public:
-  GraphicsObjectHandle() : _data(kInvalid) {}
-  GraphicsObjectHandle(uint32 data) : _data(data) {}
-  bool is_valid() const { return _data != kInvalid; }
-  operator int() const { return _data; }
+  GraphicsObjectHandle() : _raw(kInvalid) {}
+  bool is_valid() const { return _raw != kInvalid; }
+  operator int() const { return _raw; }
   uint32 id() const { return _id; }
   Type type() const { return (Type)_type; }
 };
 
 static_assert(sizeof(GraphicsObjectHandle) <= sizeof(uint32_t), "GraphicsObjectHandle too large");
+

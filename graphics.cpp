@@ -238,7 +238,7 @@ Graphics::Graphics()
 }
 
 bool Graphics::create() {
-  KASSERT(!_instance);
+  assert(!_instance);
   _instance = new Graphics();
   return true;
 }
@@ -247,6 +247,7 @@ bool Graphics::close() {
   delete exch_null(_instance);
   return true;
 }
+
 void Graphics::setClientSize()
 {
   RECT client_rect;
@@ -720,13 +721,14 @@ bool Graphics::create_texture(const TrackedLocation &loc, int width, int height,
 
 bool Graphics::create_back_buffers(int width, int height)
 {
+  KASSERT(width && height);
   _width = width;
   _height = height;
 
   int idx = _render_targets.idx_from_token("default_rt");
   RenderTargetResource *rt = nullptr;
   if (idx != -1) {
-    rt = _render_targets.get(idx);
+    rt = _render_targets[idx];
     rt->reset();
     // release any existing buffers
     //_immediate_context->ClearState();
@@ -740,7 +742,11 @@ bool Graphics::create_back_buffers(int width, int height)
   B_ERR_HR(_swap_chain->GetBuffer(0, IID_PPV_ARGS(&rt->texture.resource)));
   rt->texture.resource->GetDesc(&rt->texture.desc);
 
-  B_ERR_HR(_device->CreateRenderTargetView(rt->texture.resource, NULL, &rt->rtv.resource));
+  D3D11_RENDER_TARGET_VIEW_DESC rtViewDesc;
+  ZeroMemory(&rtViewDesc, sizeof(rtViewDesc));
+  rtViewDesc.Format = rt->texture.desc.Format;
+  rtViewDesc.ViewDimension = rt->texture.desc.SampleDesc.Count == 1 ? D3D11_RTV_DIMENSION_TEXTURE2D : D3D11_RTV_DIMENSION_TEXTURE2DMS;
+  B_ERR_HR(_device->CreateRenderTargetView(rt->texture.resource, &rtViewDesc, &rt->rtv.resource));
   set_private_data(FROM_HERE, rt->rtv.resource.p);
   rt->rtv.resource->GetDesc(&rt->rtv.desc);
 
@@ -756,7 +762,7 @@ bool Graphics::create_back_buffers(int width, int height)
   rt->dsv.resource->GetDesc(&rt->dsv.desc);
 
   _render_targets.set_pair(idx, make_pair("default_rt", rt));
-  _default_render_target = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, 0, idx);
+  _default_render_target = GraphicsObjectHandle(GraphicsObjectHandle::kRenderTarget, idx);
 
   _viewport = CD3D11_VIEWPORT (0.0f, 0.0f, (float)_width, (float)_height);
 
@@ -823,24 +829,25 @@ void Graphics::present()
   }
   _swap_chain->Present(_vsync ? 1 : 0,0);
 }
+
 /*
 void Graphics::resize(int width, int height)
 {
   if (!_swap_chain || width == 0 || height == 0)
     return;
-  PROPERTY_MANAGER.set_property(_screen_size_id, XMFLOAT4((float)width, (float)height, 0, 0));
   create_back_buffers(width, height);
 }
 */
+
 GraphicsObjectHandle Graphics::create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode) {
   const int idx = _input_layouts.find_free_index();
   if (idx != -1 && SUCCEEDED(_device->CreateInputLayout(&desc[0], desc.size(), &shader_bytecode[0], shader_bytecode.size(), &_input_layouts[idx])))
-    return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, 0, idx);
+    return GraphicsObjectHandle(GraphicsObjectHandle::kInputLayout, idx);
   return emptyGoh;
 }
 
 template<typename T, class Cont>
-int add_shader(const TrackedLocation &loc, int idx, Cont &cont, T *shader, const string &id, GraphicsObjectHandle::Type type) {
+GraphicsObjectHandle add_shader(const TrackedLocation &loc, int idx, Cont &cont, T *shader, const string &id, GraphicsObjectHandle::Type type) {
   set_private_data(loc, shader);
   SAFE_RELEASE(cont[idx]);
   cont.set_pair(idx, make_pair(id, shader));
@@ -954,17 +961,16 @@ GraphicsObjectHandle Graphics::create_depth_stencil_state(const TrackedLocation 
   return emptyGoh;
 }
 
-GraphicsObjectHandle Graphics::create_sampler(const TrackedLocation &loc, const std::string &name, const D3D11_SAMPLER_DESC &desc) {
-  // TODO: skip finding duplicates for now, until we've sorted out the whole naming issue..
-/*
-  int idx = find_existing(desc, _sampler_states);
+GraphicsObjectHandle Graphics::create_sampler_state(const TrackedLocation &loc, const D3D11_SAMPLER_DESC &desc, const char *name) {
+
+  int idx = name ? _sampler_states.idx_from_token(name) : find_existing(desc, _sampler_states);
   if (idx != -1)
     return make_goh(GraphicsObjectHandle::kSamplerState, idx);
-*/
-  int idx = _sampler_states.find_free_index();
+
+  idx = _sampler_states.find_free_index();
   ID3D11SamplerState *ss;
   if (idx != -1 && SUCCEEDED(_device->CreateSamplerState(&desc, &ss))) {
-    _sampler_states.set_pair(idx, make_pair(name, ss));
+    _sampler_states.set_pair(idx, make_pair(name ? name : "", ss));
     return make_goh(GraphicsObjectHandle::kSamplerState, idx);
   }
   return emptyGoh;
@@ -1042,10 +1048,10 @@ GraphicsObjectHandle Graphics::find_resource(const std::string &name) {
   // check textures, then resources, then render targets
   int idx = _textures.idx_from_token(name);
   if (idx != -1)
-    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, 0, idx);
+    return GraphicsObjectHandle(GraphicsObjectHandle::kTexture, idx);
   idx = _resources.idx_from_token(name);
   if (idx != -1)
-    return GraphicsObjectHandle(GraphicsObjectHandle::kResource, 0, idx);
+    return GraphicsObjectHandle(GraphicsObjectHandle::kResource, idx);
   idx = _render_targets.idx_from_token(name);
   return make_goh(GraphicsObjectHandle::kRenderTarget, idx);
 }
@@ -1092,7 +1098,7 @@ int Graphics::get_shader_flag(const std::string &flag) {
 
 GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx) {
   KASSERT(idx != -1);
-  return idx != -1 ? GraphicsObjectHandle(type, 0, idx) : emptyGoh;
+  return idx != -1 ? GraphicsObjectHandle(type, idx) : emptyGoh;
 }
 
 void Graphics::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {

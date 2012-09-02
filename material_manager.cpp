@@ -48,7 +48,7 @@ void MaterialManager::remove_material(const std::string &name) {
 
 GraphicsObjectHandle MaterialManager::find_material(const string &name) {
   int idx = _materials.idx_from_token(name);
-  return idx == -1 ? GraphicsObjectHandle() : GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
+  return idx == -1 ? GraphicsObjectHandle() : GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, idx);
 }
 
 GraphicsObjectHandle MaterialManager::add_material(Material *material, bool replace_existing) {
@@ -60,7 +60,7 @@ GraphicsObjectHandle MaterialManager::add_material(Material *material, bool repl
   if (old_idx != -1 && replace_existing || old_idx == -1 && new_idx != -1) {
     int idx = old_idx != -1 ? old_idx : new_idx;      
     _materials.set_pair(idx, make_pair(name, material));
-    return GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, 0, idx);
+    return GraphicsObjectHandle(GraphicsObjectHandle::kMaterial, idx);
   }
   return GraphicsObjectHandle();
 }

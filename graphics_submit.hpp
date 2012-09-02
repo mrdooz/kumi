@@ -81,7 +81,7 @@ struct RenderTargetData {
   GraphicsObjectHandle render_targets[8]; // if there's a depth buffer, it's attached to rt0
   bool clear_target[8];
 };
-
+/*
 // from http://realtimecollisiondetection.net/blog/?p=86
 struct RenderKey {
   enum Cmd {
@@ -129,3 +129,5 @@ struct RenderKey {
 
 #pragma pack(pop)
 static_assert(sizeof(RenderKey) <= sizeof(uint64_t), "RenderKey too large");
+*/
+#pragma pack(pop)
