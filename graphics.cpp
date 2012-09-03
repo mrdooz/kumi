@@ -351,21 +351,26 @@ bool Graphics::init(WNDPROC wndProc)
   return true;
 }
 
-GraphicsObjectHandle Graphics::create_buffer(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data) {
+GraphicsObjectHandle Graphics::create_buffer(const TrackedLocation &loc, 
+                                             D3D11_BIND_FLAG bind, int size, bool dynamic, const void* buf, int data) {
 
   if (bind == D3D11_BIND_INDEX_BUFFER) {
     const int idx = _index_buffers.find_free_index();
-    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_index_buffers[idx]))
-      return make_goh(GraphicsObjectHandle::kIndexBuffer, idx);
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, buf, &_index_buffers[idx])) {
+      KASSERT(data == DXGI_FORMAT_R16_UINT || data == DXGI_FORMAT_R32_UINT);
+      return make_goh(GraphicsObjectHandle::kIndexBuffer, idx, data);
+    }
 
   } else if (bind == D3D11_BIND_VERTEX_BUFFER) {
     const int idx = _vertex_buffers.find_free_index();
-    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_vertex_buffers[idx]))
-      return make_goh(GraphicsObjectHandle::kVertexBuffer, idx);
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, buf, &_vertex_buffers[idx])) {
+      KASSERT(data > 0);
+      return make_goh(GraphicsObjectHandle::kVertexBuffer, idx, data);
+    }
 
   } else if (bind == D3D11_BIND_CONSTANT_BUFFER) {
     const int idx = _constant_buffers.find_free_index();
-    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, data, &_constant_buffers[idx]))
+    if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, buf, &_constant_buffers[idx]))
       return make_goh(GraphicsObjectHandle::kConstantBuffer, idx);
 
   } else {
@@ -788,8 +793,8 @@ bool Graphics::create_default_geometry() {
     };
 
 
-    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
-    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices);
+    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts, sizeof(Pos4Tex));
+    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices, DXGI_FORMAT_R16_UINT);
     _predefined_geometry.insert(make_pair(kGeomFsQuadPosTex, make_pair(vb, ib)));
   }
 
@@ -802,8 +807,8 @@ bool Graphics::create_default_geometry() {
       +1, -1, +1, 1,
     };
 
-    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts);
-    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices);
+    auto vb = create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, sizeof(verts), false, verts, sizeof(XMFLOAT4));
+    auto ib = create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, sizeof(quadIndices), false, quadIndices, DXGI_FORMAT_R16_UINT);
     _predefined_geometry.insert(make_pair(kGeomFsQuadPos, make_pair(vb, ib)));
   }
 
@@ -1096,9 +1101,9 @@ int Graphics::get_shader_flag(const std::string &flag) {
   return it == _shader_flags.end() ? 0 : it->second;
 }
 
-GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx) {
+GraphicsObjectHandle Graphics::make_goh(GraphicsObjectHandle::Type type, int idx, int data) {
   KASSERT(idx != -1);
-  return idx != -1 ? GraphicsObjectHandle(type, idx) : emptyGoh;
+  return idx != -1 ? GraphicsObjectHandle(type, idx, data) : emptyGoh;
 }
 
 void Graphics::fill_system_resource_views(const ResourceViewArray &views, TextureArray *out) const {

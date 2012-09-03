@@ -1063,7 +1063,7 @@ void TechniqueParser::parse_vertices(Scope *scope, Technique *technique) {
     }
   }
   THROW_ON_FALSE(technique->_vertex_size != -1);
-  technique->_vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, technique->_vertex_size * vertices.size(), false, &vertices[0]);
+  technique->_vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, technique->_vertex_size * vertices.size(), false, &vertices[0], technique->_vertex_size);
 }
 
 void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
@@ -1115,9 +1115,9 @@ void TechniqueParser::parse_indices(Scope *scope, Technique *technique) {
     // create a local copy of the indices
     vector<uint16> v;
     copy(RANGE(indices), back_inserter(v));
-    technique->_ib = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, index_format_to_size(technique->_index_format) * v.size(), false, &v[0]);
+    technique->_ib = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, index_format_to_size(technique->_index_format) * v.size(), false, &v[0], technique->_index_format);
   } else {
-    technique->_ib = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_INDEX_BUFFER, index_format_to_size(technique->_index_format) * indices.size(), false, &indices[0]);
+    technique->_ib = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, index_format_to_size(technique->_index_format) * indices.size(), false, &indices[0], technique->_index_format);
   }
   technique->_index_count = indices.size();
 }

@@ -110,7 +110,7 @@ public:
 
   GraphicsObjectHandle create_input_layout(const TrackedLocation &loc, const std::vector<D3D11_INPUT_ELEMENT_DESC> &desc, const std::vector<char> &shader_bytecode);
 
-  GraphicsObjectHandle create_buffer(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* data);
+  GraphicsObjectHandle create_buffer(const TrackedLocation &loc, D3D11_BIND_FLAG bind, int size, bool dynamic, const void* buf, int data);
 
   GraphicsObjectHandle create_vertex_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
   GraphicsObjectHandle create_pixel_shader(const TrackedLocation &loc, const std::vector<char> &shader_bytecode, const std::string &id);
@@ -174,7 +174,7 @@ public:
   bool vsync() const { return _vsync; }
   void set_vsync(bool value) { _vsync = value; }
 
-  static GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx);
+  static GraphicsObjectHandle make_goh(GraphicsObjectHandle::Type type, int idx, int data = 0);
 
   void setDisplayAllModes(bool value) { _displayAllModes = value; }
   bool displayAllModes() const { return _displayAllModes; }
@@ -302,6 +302,6 @@ public:
 
 #define GRAPHICS Graphics::instance()
 
-#define GFX_create_buffer(bind, size, dynamic, data) GRAPHICS.create_buffer(FROM_HERE, bind, size, dynamic, data);
+#define GFX_create_buffer(bind, size, dynamic, buf, data) GRAPHICS.create_buffer(FROM_HERE, bind, size, dynamic, buf, data);
 
 #endif

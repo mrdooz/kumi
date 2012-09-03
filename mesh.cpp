@@ -103,8 +103,8 @@ void Mesh::render(DeferredContext *ctx, GraphicsObjectHandle technique_handle) {
     ctx->set_ps(ps->handle());
 
     ctx->set_layout(vs->input_layout());
-    ctx->set_vb(geometry->vb, geometry->vertex_size);
-    ctx->set_ib(geometry->ib, geometry->index_format);
+    ctx->set_vb(geometry->vb);
+    ctx->set_ib(geometry->ib);
     ctx->set_topology(geometry->topology);
 
     // set cbuffers

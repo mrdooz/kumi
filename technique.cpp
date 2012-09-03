@@ -379,8 +379,8 @@ void setupTechnique(DeferredContext *ctx, GraphicsObjectHandle hTechnique, bool 
 
   if (setBuffers) {
     ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ctx->set_vb(technique->vb(), technique->vertex_size());
-    ctx->set_ib(technique->ib(), technique->index_format());
+    ctx->set_vb(technique->vb());
+    ctx->set_ib(technique->ib());
   }
 
 

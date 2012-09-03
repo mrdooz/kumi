@@ -152,7 +152,7 @@ bool BoxThing::init() {
 
   _ctx = GRAPHICS.create_deferred_context(true);
 
-  _vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr);
+  _vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr, sizeof(PosNormal));
 
   ScopedMap<PosNormal> pn(_ctx, D3D11_MAP_WRITE_DISCARD, _vb);
   _numCubes = fillSpace(pn, 0, 0, 0, 10, 30, -1, mtx_identity());
@@ -245,7 +245,7 @@ bool BoxThing::render() {
   _ctx->set_cbuffer(ps->find_cbuffer("cbMain"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
   _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  _ctx->set_vb(_vb, sizeof(PosNormal));
+  _ctx->set_vb(_vb);
   //_ctx->set_ib(_ib, DXGI_FORMAT_R32_UINT);
   _ctx->draw(_numCubes * 36, 0);
 

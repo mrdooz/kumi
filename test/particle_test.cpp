@@ -163,7 +163,7 @@ bool ParticleTest::init() {
 
   _freefly_camera.setPos(0, 0, -50);
 
-  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, numParticles * sizeof(ParticleVtx), true, nullptr);
+  _vb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, numParticles * sizeof(ParticleVtx), true, nullptr, sizeof(ParticleVtx));
 
   {
     TweakableParameterBlock block("blur");
@@ -317,7 +317,7 @@ void ParticleTest::renderParticles() {
   _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
   _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
 
-  _ctx->set_vb(_vb, sizeof(ParticleVtx));
+  _ctx->set_vb(_vb);
   _ctx->draw(numParticles, 0);
 
   _ctx->unset_render_targets(0, 1);

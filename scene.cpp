@@ -119,8 +119,8 @@ void Scene::render(DeferredContext *ctx, Effect *effect, GraphicsObjectHandle te
       const MeshGeometry *geometry = submesh->geometry();
       Mesh *mesh = submesh->mesh();
 
-      ctx->set_vb(geometry->vb, geometry->vertex_size);
-      ctx->set_ib(geometry->ib, geometry->index_format);
+      ctx->set_vb(geometry->vb);
+      ctx->set_ib(geometry->ib);
       ctx->set_topology(geometry->topology);
 
       // set cbuffers

@@ -37,8 +37,12 @@ private:
   };
   static_assert(1 << GraphicsObjectHandle::cTypeBits > GraphicsObjectHandle::cNumTypes, "Not enough type bits");
 
-  //GraphicsObjectHandle(uint32 type, uint32 id, uint32 data, int apa) : _type(type), _id(id), _data(data) {}
   GraphicsObjectHandle(uint32 type, uint32 id) : _type(type), _id(id), _data(0) {}
+  GraphicsObjectHandle(uint32 type, uint32 id, uint32 data) : _type(type), _id(id), _data(data) 
+  {
+    KASSERT(data < (1 << cDataBits));
+  }
+
   union {
     struct {
       uint32 _type : cTypeBits;
@@ -52,6 +56,7 @@ public:
   bool is_valid() const { return _raw != kInvalid; }
   operator int() const { return _raw; }
   uint32 id() const { return _id; }
+  uint32 data() const { return _data; }
   Type type() const { return (Type)_type; }
 };
 

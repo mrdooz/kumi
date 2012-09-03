@@ -36,8 +36,8 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
 
   set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   set_layout(vs->input_layout());
-  set_vb(technique->vb(), technique->vertex_size());
-  set_ib(technique->ib(), technique->index_format());
+  set_vb(technique->vb());
+  set_ib(technique->ib());
 
   set_rs(technique->rasterizer_state());
   set_dss(technique->depth_stencil_state(), _default_stencil_ref);
@@ -195,12 +195,12 @@ void DeferredContext::set_vb(ID3D11Buffer *buf, uint32_t stride)
   _ctx->IASetVertexBuffers(0, 1, bufs, strides, ofs);
 }
 
-void DeferredContext::set_vb(GraphicsObjectHandle vb, int vertex_size) {
-  set_vb(GRAPHICS._vertex_buffers.get(vb), vertex_size);
+void DeferredContext::set_vb(GraphicsObjectHandle vb) {
+set_vb(GRAPHICS._vertex_buffers.get(vb), vb.data());
 }
 
-void DeferredContext::set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format) {
-  _ctx->IASetIndexBuffer(GRAPHICS._index_buffers.get(ib), format, 0);
+void DeferredContext::set_ib(GraphicsObjectHandle ib) {
+  _ctx->IASetIndexBuffer(GRAPHICS._index_buffers.get(ib), (DXGI_FORMAT)ib.data(), 0);
 }
 
 void DeferredContext::set_topology(D3D11_PRIMITIVE_TOPOLOGY top) {

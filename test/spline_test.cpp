@@ -463,10 +463,10 @@ bool SplineTest::init() {
   if (!initSplines())
     return false;
 
-  _staticVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr);
-  _dynamicVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 4 * 1024 * 1024, true, nullptr);
+  _staticVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr, sizeof(VsInput));
+  _dynamicVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 4 * 1024 * 1024, true, nullptr, sizeof(VsInput));
 
-  _particleVb = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr);
+  _particleVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 1024 * 1024, true, nullptr, sizeof(ParticleVtx));
 
   D3D11_MAPPED_SUBRESOURCE res;
   _ctx->map(_particleVb, 0, D3D11_MAP_WRITE_DISCARD, 0, &res);
@@ -494,8 +494,8 @@ bool SplineTest::init() {
     0, 2, 3,
   };
 
-  _planeVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, sizeof(planeVerts), false, planeVerts);
-  _planeIb = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, sizeof(planeIndices), false, planeIndices);
+  _planeVb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, sizeof(planeVerts), false, planeVerts, sizeof(XMFLOAT3));
+  _planeIb = GFX_create_buffer(D3D11_BIND_INDEX_BUFFER, sizeof(planeIndices), false, planeIndices, DXGI_FORMAT_R32_UINT);
 
 
   return true;
@@ -640,8 +640,8 @@ void SplineTest::renderPlane(GraphicsObjectHandle rtMirror) {
   _ctx->set_shader_resource(rtMirror, ShaderType::kPixelShader);
 
   _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-  _ctx->set_vb(_planeVb, sizeof(XMFLOAT3));
-  _ctx->set_ib(_planeIb, DXGI_FORMAT_R32_UINT);
+  _ctx->set_vb(_planeVb);
+  _ctx->set_ib(_planeIb);
   _ctx->draw_indexed(6, 0, 0);
 }
 
@@ -674,7 +674,7 @@ void SplineTest::renderParticles() {
   _ctx->set_cbuffer(vs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
   _ctx->set_cbuffer(gs->find_cbuffer("ParticleBuffer"), 0, ShaderType::kGeometryShader, &cbuffer, sizeof(cbuffer));
 
-  _ctx->set_vb(_particleVb, sizeof(ParticleVtx));
+  _ctx->set_vb(_particleVb);
   _ctx->draw(cNumParticles, 0);
 }
 
@@ -730,10 +730,10 @@ void SplineTest::renderSplines(GraphicsObjectHandle rtMirror) {
   _ctx->set_samplers(ps->samplers());
   _ctx->set_shader_resource(_cubeMap, ShaderType::kPixelShader);
 
-  _ctx->set_vb(_staticVb, sizeof(VsInput));
+  _ctx->set_vb(_staticVb);
   _ctx->draw(_staticVertCount, 0);
 
-  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+  _ctx->set_vb(_dynamicVb);
   _ctx->draw(newDynamicVerts, 0);
 
 
@@ -747,10 +747,10 @@ void SplineTest::renderSplines(GraphicsObjectHandle rtMirror) {
   _ctx->set_cbuffer(ps->find_cbuffer("test"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
   _ctx->set_rs(GRAPHICS.find_rasterizer_state("FrontfaceCulling"));
-  _ctx->set_vb(_staticVb, sizeof(VsInput));
+  _ctx->set_vb(_staticVb);
   _ctx->draw(_staticVertCount, 0);
 
-  _ctx->set_vb(_dynamicVb, sizeof(VsInput));
+  _ctx->set_vb(_dynamicVb);
   _ctx->draw(newDynamicVerts, 0);
 
   _ctx->unset_render_targets(0, 1);

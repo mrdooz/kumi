@@ -63,8 +63,8 @@ public:
   void set_cs(GraphicsObjectHandle cs);
   void set_gs(GraphicsObjectHandle cs);
   void set_layout(GraphicsObjectHandle layout);
-  void set_vb(GraphicsObjectHandle vb, int vertex_size);
-  void set_ib(GraphicsObjectHandle ib, DXGI_FORMAT format);
+  void set_vb(GraphicsObjectHandle vb);
+  void set_ib(GraphicsObjectHandle ib);
   void set_topology(D3D11_PRIMITIVE_TOPOLOGY top);
   void set_rs(GraphicsObjectHandle rs);
   void set_dss(GraphicsObjectHandle dss, UINT stencil_ref);

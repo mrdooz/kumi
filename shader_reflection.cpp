@@ -187,7 +187,7 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
       }
 
       if (size > 0) {
-        cbuffer.handle = GRAPHICS.create_buffer(FROM_HERE, D3D11_BIND_CONSTANT_BUFFER, size, true, nullptr);
+        cbuffer.handle = GFX_create_buffer(D3D11_BIND_CONSTANT_BUFFER, size, true, nullptr, 0);
         cbuffer.staging.resize(size);
 
         if (source == PropertySource::kUnknown) {
