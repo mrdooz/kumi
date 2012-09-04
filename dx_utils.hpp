@@ -56,4 +56,31 @@ private:
   GraphicsObjectHandle _handle;
 };
 
+class DeferredContext;
+
+template<typename T>
+class ScopedMap {
+public:
+  ScopedMap(DeferredContext *ctx, D3D11_MAP type, GraphicsObjectHandle obj) : _ctx(ctx), _obj(obj) {
+    _ctx->map(_obj, 0, type, 0, &_res);
+  }
+
+  ~ScopedMap() {
+    unmap();
+  }
+
+  void unmap() {
+    if (_ctx) {
+      _ctx->unmap(_obj, 0);
+      _ctx = nullptr;
+    }
+  }
+
+  operator T *() { return (T *)_res.pData; }
+private:
+  D3D11_MAPPED_SUBRESOURCE _res;
+  DeferredContext *_ctx;
+  GraphicsObjectHandle _obj;
+};
+
 #endif

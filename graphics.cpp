@@ -133,8 +133,8 @@ bool Graphics::enumerateDisplayModes(HWND hWnd) {
   ComboBox_SetItemData(hMultisample, 2, 4);
   ComboBox_SetItemData(hMultisample, 3, 8);
 
-  ComboBox_SetCurSel(hMultisample, 2);
-  GRAPHICS._curSetup.multisampleCount = 4;
+  ComboBox_SetCurSel(hMultisample, 0);
+  GRAPHICS._curSetup.multisampleCount = 1;
 
 #if DISTRIBUTION
   GRAPHICS._curSetup.windowed = false;
@@ -371,7 +371,7 @@ GraphicsObjectHandle Graphics::create_buffer(const TrackedLocation &loc,
   } else if (bind == D3D11_BIND_CONSTANT_BUFFER) {
     const int idx = _constant_buffers.find_free_index();
     if (idx != -1 && create_buffer_inner(loc, bind, size, dynamic, buf, &_constant_buffers[idx]))
-      return make_goh(GraphicsObjectHandle::kConstantBuffer, idx);
+      return make_goh(GraphicsObjectHandle::kConstantBuffer, idx, size);
 
   } else {
     LOG_ERROR_LN("Implement me!");

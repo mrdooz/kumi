@@ -46,10 +46,17 @@ void Shader::set_cbuffer_slot(PropertySource::Enum src, int slot) {
 }
 
 GraphicsObjectHandle Shader::find_cbuffer(const char *name) {
-  auto it = _named_cbuffers.find(name);
-  return it == _named_cbuffers.end() ? GraphicsObjectHandle() : it->second.handle;
+  auto it = _cbuffers_by_name.find(name);
+  KASSERT(it != _cbuffers_by_name.end());
+  return it == _cbuffers_by_name.end() ? GraphicsObjectHandle() : it->second.handle;
 }
 
 void Shader::add_named_cbuffer(const char *name, const CBuffer &cbuffer) {
-  _named_cbuffers[name] = cbuffer;
+  _cbuffers_by_name[name] = cbuffer;
+  _cbuffers_by_idx.push_back(cbuffer);
+}
+
+GraphicsObjectHandle Shader::cbuffer_by_index(int idx) {
+  KASSERT(idx < (int)_cbuffers_by_idx.size());
+  return _cbuffers_by_idx[idx].handle;
 }

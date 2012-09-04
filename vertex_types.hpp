@@ -2,22 +2,53 @@
 
 // Some common vertex types collected in one place..
 
+struct TangentSpace {
+  TangentSpace() {}
+  TangentSpace(const XMFLOAT3 &tangent, const XMFLOAT3& normal, const XMFLOAT3 &bitangent)
+    : tangent(tangent), normal(normal), bitangent(bitangent) {}
+  TangentSpace(float tx, float ty, float tz, float nx, float ny, float nz, float bx, float by, float bz) 
+    : tangent(tx, ty, tz), normal(nx, ny, nz), bitangent(bx, by, bz) {}
+  XMFLOAT3 tangent, normal, bitangent;
+};
+
+
 struct PosNormal
 {
-	PosNormal() {}
-	PosNormal(const XMFLOAT3& pos, const XMFLOAT3& normal) : pos(pos), normal(normal) {}
+  PosNormal() {}
+  PosNormal(const XMFLOAT3& pos, const XMFLOAT3& normal) : pos(pos), normal(normal) {}
   PosNormal(float x, float y, float z, float nx, float ny, float nz) : pos(x, y, z), normal(nx, ny, nz) {}
-	XMFLOAT3 pos;
-	XMFLOAT3 normal;
+  XMFLOAT3 pos;
+  XMFLOAT3 normal;
+};
+
+struct PosTangentSpace
+{
+  PosTangentSpace() {}
+  PosTangentSpace(const XMFLOAT3& pos, const XMFLOAT2 &tex, const XMFLOAT3 &tangent, const XMFLOAT3 &bitangent, const XMFLOAT3& normal) 
+    : pos(pos), tex(tex), tangent(tangent), bitangent(bitangent), normal(normal) {}
+  XMFLOAT3 pos;
+  XMFLOAT2 tex;
+  XMFLOAT3 tangent, bitangent, normal;
+};
+
+// bitangent = cross(normal, tangent)
+struct PosTangentSpace2
+{
+  PosTangentSpace2() {}
+  PosTangentSpace2(const XMFLOAT3& pos, const XMFLOAT2 &tex, const XMFLOAT3 &tangent, const XMFLOAT3& normal) 
+    : pos(pos), tex(tex), tangent(tangent), normal(normal) {}
+  XMFLOAT3 pos;
+  XMFLOAT2 tex;
+  XMFLOAT3 tangent, normal;
 };
 
 struct Pos2Tex
 {
-	Pos2Tex() {}
-	Pos2Tex(const XMFLOAT2& pos, const XMFLOAT2& tex) : pos(pos), tex(tex) {}
-	Pos2Tex(float x, float y, float u, float v) : pos(x, y), tex(u, v) {}
-	XMFLOAT2 pos;
-	XMFLOAT2 tex;
+  Pos2Tex() {}
+  Pos2Tex(const XMFLOAT2& pos, const XMFLOAT2& tex) : pos(pos), tex(tex) {}
+  Pos2Tex(float x, float y, float u, float v) : pos(x, y), tex(u, v) {}
+  XMFLOAT2 pos;
+  XMFLOAT2 tex;
 };
 
 struct PosTex
@@ -52,9 +83,9 @@ struct PosCol
 
 struct PosNormalTex
 {
-	PosNormalTex() {}
-	PosNormalTex(const XMFLOAT3& pos, const XMFLOAT3& normal, const XMFLOAT2& tex) : pos(pos), normal(normal), tex(tex) {}
-	XMFLOAT3 pos;
-	XMFLOAT3 normal;
-	XMFLOAT2 tex;
+  PosNormalTex() {}
+  PosNormalTex(const XMFLOAT3& pos, const XMFLOAT3& normal, const XMFLOAT2& tex) : pos(pos), normal(normal), tex(tex) {}
+  XMFLOAT3 pos;
+  XMFLOAT3 normal;
+  XMFLOAT2 tex;
 };

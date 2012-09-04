@@ -48,6 +48,8 @@ public:
 
   GraphicsObjectHandle input_layout() const { return _input_layout; }
   GraphicsObjectHandle find_cbuffer(const char *name);
+  GraphicsObjectHandle cbuffer_by_index(int idx);
+  size_t cbuffer_count() const { return _cbuffers_by_idx.size(); }
   void add_named_cbuffer(const char *name, const CBuffer &cbuffer);
 
 private:
@@ -64,7 +66,8 @@ private:
   std::vector<std::string> _flags;
 #endif
 
-  std::map<std::string, CBuffer> _named_cbuffers;
+  std::map<std::string, CBuffer> _cbuffers_by_name;
+  std::vector<CBuffer> _cbuffers_by_idx;
 
   GraphicsObjectHandle _handle;
   ShaderType::Enum _type;

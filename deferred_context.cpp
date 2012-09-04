@@ -444,6 +444,7 @@ void DeferredContext::set_cbuffers(const std::vector<CBuffer *> &vs, const std::
 
 void DeferredContext::set_cbuffer(GraphicsObjectHandle cb, int slot, ShaderType::Enum type, const void *data, int dataLen) {
 
+  KASSERT(dataLen == cb.data());
   ID3D11Buffer *buffer = GRAPHICS._constant_buffers.get(cb);
   if (!buffer)
     return;

@@ -22,21 +22,21 @@
 using namespace std;
 using namespace std::tr1::placeholders;
 
-static void addCube(float x, float y, float z, float s, const XMFLOAT4X4 &mtx, PosNormal *dst) {
+static void addCube(float x, float y, float z, float w, float h, float d, const XMFLOAT4X4 &mtx, PosTangentSpace2 *dst) {
 
   XMFLOAT3 verts[] = {
-    XMFLOAT3(-s, +s, -s),
-    XMFLOAT3(+s, +s, -s),
-    XMFLOAT3(-s, -s, -s),
-    XMFLOAT3(+s, -s, -s),
-    XMFLOAT3(-s, +s, +s),
-    XMFLOAT3(+s, +s, +s),
-    XMFLOAT3(-s, -s, +s),
-    XMFLOAT3(+s, -s, +s),
+    XMFLOAT3(-w, +h, -d),
+    XMFLOAT3(+w, +h, -d),
+    XMFLOAT3(-w, -h, -d),
+    XMFLOAT3(+w, -h, -d),
+    XMFLOAT3(-w, +h, +d),
+    XMFLOAT3(+w, +h, +d),
+    XMFLOAT3(-w, -h, +d),
+    XMFLOAT3(+w, -h, +d),
   };
 
   int indices[] = {
-    0, 1, 2,  // front
+    2, 0, 1,  // front
     2, 1, 3,
     3, 1, 5,  // right
     3, 5, 7,
@@ -44,68 +44,49 @@ static void addCube(float x, float y, float z, float s, const XMFLOAT4X4 &mtx, P
     7, 4, 6,
     6, 4, 0,  // left
     6, 0, 2,
-    4, 5, 0,  // top
+    0, 4, 5,  // top
     0, 5, 1,
     6, 2, 3,  // bottom
     6, 3, 7,
   };
 
-  XMFLOAT3 normals[] = {
-    XMFLOAT3(0,0,-1),
-    XMFLOAT3(+1,0,0),
-    XMFLOAT3(0,0,+1),
-    XMFLOAT3(-1,0,0),
-    XMFLOAT3(0,+1,0),
-    XMFLOAT3(0,-1,0)
+  XMFLOAT2 tex[] = {
+    XMFLOAT2(0,1),
+    XMFLOAT2(0,0),
+    XMFLOAT2(1,0),
+    XMFLOAT2(0,1),
+    XMFLOAT2(1,0),
+    XMFLOAT2(1,1),
   };
 
-
+  XMFLOAT3 tangentSpace[] = {
+    // tangent, normal
+    // bitangent = cross(normal, tangent)
+    XMFLOAT3(-1,0,0), XMFLOAT3(0,0,-1),
+    XMFLOAT3(0,0,-1), XMFLOAT3(+1,0,0),
+    XMFLOAT3(+1,0,0), XMFLOAT3(0,0,+1),
+    XMFLOAT3(0,0,+1), XMFLOAT3(-1,0,0),
+    XMFLOAT3(-1,0,0), XMFLOAT3(0,+1,0),
+    XMFLOAT3(-1,0,0), XMFLOAT3(0,-1,0),
+  };
 
   XMFLOAT3 p(x,y,z);
   for (int i = 0; i < ELEMS_IN_ARRAY(indices); ++i) {
     int idx = indices[i];
-    *dst++ = PosNormal(p + verts[idx] * mtx, normals[i/6] * mtx);
+    int tIdx = 2*(i/6);
+    *dst++ = PosTangentSpace2(p + verts[idx] * mtx, 
+      tex[i%6],
+      tangentSpace[tIdx+0] * mtx, tangentSpace[tIdx+1]);
   }
 }
+/*
+static int fillSpace(PosNormal *dst, float x, float y, float z, float cubeHeight, float value, int dir, const XMFLOAT4X4 &parent, int level, int maxLevel) {
 
-BoxThing::BoxThing(const std::string &name) 
-  : Effect(name)
-  , _mouse_horiz(0)
-  , _mouse_vert(0)
-  , _mouse_lbutton(false)
-  , _mouse_rbutton(false)
-  , _mouse_pos_prev(~0)
-  , _ctx(nullptr)
-  , _useFreeFlyCamera(true)
-  , _numCubes(1)
-{
-  ZeroMemory(_keystate, sizeof(_keystate));
-}
-
-BoxThing::~BoxThing() {
-  GRAPHICS.destroy_deferred_context(_ctx);
-}
-
-template<typename T>
-class ScopedMap {
-public:
-  ScopedMap(DeferredContext *ctx, D3D11_MAP type, GraphicsObjectHandle obj) : _ctx(ctx), _obj(obj) {
-    _ctx->map(_obj, 0, type, 0, &_res);
-  }
-   ~ScopedMap() {
-     _ctx->unmap(_obj, 0);
-   }
-   operator T *() { return (T *)_res.pData; }
-private:
-  D3D11_MAPPED_SUBRESOURCE _res;
-  DeferredContext *_ctx;
-  GraphicsObjectHandle _obj;
-};
-
-int fillSpace(PosNormal *dst, float x, float y, float z, float cubeHeight, float value, int dir, const XMFLOAT4X4 &parent) {
-
-  if (value < 0.1f || cubeHeight < 1)
+  if (level >= maxLevel)
     return 0;
+
+  //if (value < 0.1f || cubeHeight < 1)
+  //return 0;
 
   XMFLOAT4X4 mtx(mtx_identity());
 
@@ -119,12 +100,12 @@ int fillSpace(PosNormal *dst, float x, float y, float z, float cubeHeight, float
   };
 
   if (dir != -1) {
-    mtx = mtx_from_axis_angle(axis[dir], gaussianRand(0, 1.5f));
+    mtx = mtx_from_axis_angle(axis[dir], gaussianRand(0, XM_PI));
   }
 
   XMStoreFloat4x4(&mtx, XMMatrixMultiply(XMLoadFloat4x4(&mtx), XMLoadFloat4x4(&parent)));
 
-  addCube(x, y, z, cubeHeight, mtx, dst);
+  addCube(x, y, z, cubeHeight, cubeHeight, cubeHeight, mtx, dst);
 
   float f = gaussianRand(2, 0.5f);
   float d = cubeHeight + cubeHeight/f;
@@ -138,11 +119,30 @@ int fillSpace(PosNormal *dst, float x, float y, float z, float cubeHeight, float
   for (int i = 0; i < 6; ++i) {
     if (dir == -1 || i != skip[dir]) {
       XMFLOAT3 pos = p + d * axis[i] * mtx;
-      res += fillSpace(dst + 36*res, pos.x, pos.y, pos.z, cubeHeight/f, value - cubeHeight, i, mtx);
+      res += fillSpace(dst + 36*res, pos.x, pos.y, pos.z, cubeHeight/f, value - cubeHeight, i, mtx, level + 1, maxLevel);
     }
   }
 
   return res;
+}
+*/
+BoxThing::BoxThing(const std::string &name) 
+  : Effect(name)
+  , _mouse_horiz(0)
+  , _mouse_vert(0)
+  , _mouse_lbutton(false)
+  , _mouse_rbutton(false)
+  , _mouse_pos_prev(~0)
+  , _ctx(nullptr)
+  , _useFreeFlyCamera(true)
+  , _numCubes(1)
+  , _curTime(0)
+{
+  ZeroMemory(_keystate, sizeof(_keystate));
+}
+
+BoxThing::~BoxThing() {
+  GRAPHICS.destroy_deferred_context(_ctx);
 }
 
 bool BoxThing::init() {
@@ -152,15 +152,14 @@ bool BoxThing::init() {
 
   _ctx = GRAPHICS.create_deferred_context(true);
 
-  _vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 64 * 1024 * 1024, true, nullptr, sizeof(PosNormal));
-
-  ScopedMap<PosNormal> pn(_ctx, D3D11_MAP_WRITE_DISCARD, _vb);
-  _numCubes = fillSpace(pn, 0, 0, 0, 10, 30, -1, mtx_identity());
+  _vb = GFX_create_buffer(D3D11_BIND_VERTEX_BUFFER, 16 * 1024 * 1024, true, nullptr, sizeof(PosTangentSpace2));
 
   GRAPHICS.load_techniques("effects/box_thing.tec", false);
   _technique = GRAPHICS.find_technique("box_thing");
 
   _freefly_camera.setPos(0, 0, -100);
+
+  _normalMap = RESOURCE_MANAGER.load_texture("gfx/normalmap2.png", "normalmap2.png", false, nullptr);
 
   return true;
 }
@@ -204,7 +203,8 @@ void BoxThing::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view,
 bool BoxThing::update(int64 global_time, int64 local_time, int64 delta_ns, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) {
   ADD_PROFILE_SCOPE();
 
-  double time = local_time  / 1000.0;
+  double time = local_time / 1000.0;
+  _curTime = local_time / 1000.0;
 
   calc_camera_matrices(time, delta_ns / 1e6, &_view, &_proj);
 
@@ -219,6 +219,31 @@ bool BoxThing::render() {
   ADD_PROFILE_SCOPE();
   _ctx->begin_frame();
 
+  ScopedMap<PosTangentSpace2> pn(_ctx, D3D11_MAP_WRITE_DISCARD, _vb);
+  //addCube(0, 0, 0, 10, 10, 10, mtx_identity(), pn);
+  //_numCubes = 1;
+
+  float step = 1 / 150.0f;
+  float t = (float)_curTime / 2;
+  PosTangentSpace2 *p = pn;
+  XMFLOAT3 pos(-200,0,0);
+  XMFLOAT4X4 mtx(mtx_identity());
+  _numCubes = 0;
+  float cubeWidth = 4;
+  float angle = t*2;
+  for (int i = 0; i < 100; ++i) {
+    mtx = mtx_from_axis_angle(XMFLOAT3(sinf(t),cosf(t),0), angle);
+    addCube(pos.x, pos.y, pos.z, cubeWidth, 10, 10 + 5*sinf(i/10.0f), mtx, p);
+    p += 36;
+    pos.x += cubeWidth;
+    pos.y = 10 + 9 * sinf(5*t);
+    t += step;
+    angle += XM_PI/6;
+    _numCubes++;
+  }
+
+  pn.unmap();
+
   int w = GRAPHICS.width();
   int h = GRAPHICS.height();
 
@@ -232,21 +257,24 @@ bool BoxThing::render() {
     XMFLOAT4X4 worldViewProj;
     XMFLOAT4X4 worldView;
     XMFLOAT4 lightPos;
-    XMFLOAT4 eyePos;
+    XMFLOAT3 eyePos;
   } cbuffer;
 
   XMMATRIX xmViewProj = XMMatrixMultiply(XMLoadFloat4x4(&_view), XMLoadFloat4x4(&_proj));
   XMStoreFloat4x4(&cbuffer.worldViewProj, XMMatrixTranspose(xmViewProj));
   cbuffer.worldView = transpose(_view);
   cbuffer.lightPos = expand(_lightPos, 0);
-  cbuffer.eyePos = expand(_cameraPos, 0);
+  cbuffer.eyePos = _cameraPos;
 
-  _ctx->set_cbuffer(vs->find_cbuffer("cbMain"), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
-  _ctx->set_cbuffer(ps->find_cbuffer("cbMain"), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
+  _ctx->set_samplers(ps->samplers());
+  _ctx->set_shader_resource(_normalMap, ShaderType::kPixelShader);
+
+  _ctx->set_cbuffer(vs->cbuffer_by_index(0), 0, ShaderType::kVertexShader, &cbuffer, sizeof(cbuffer));
+  if (ps->cbuffer_count())
+    _ctx->set_cbuffer(ps->cbuffer_by_index(0), 0, ShaderType::kPixelShader, &cbuffer, sizeof(cbuffer));
 
   _ctx->set_topology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   _ctx->set_vb(_vb);
-  //_ctx->set_ib(_ib, DXGI_FORMAT_R32_UINT);
   _ctx->draw(_numCubes * 36, 0);
 
   _ctx->end_frame();

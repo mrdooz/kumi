@@ -190,12 +190,9 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
         cbuffer.handle = GFX_create_buffer(D3D11_BIND_CONSTANT_BUFFER, size, true, nullptr, 0);
         cbuffer.staging.resize(size);
 
-        if (source == PropertySource::kUnknown) {
-          shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
-
-        } else {
+        if (source != PropertySource::kUnknown)
           shader->set_cbuffer(source, cbuffer);
-        }
+        shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
       }
 
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {
