@@ -143,9 +143,9 @@ bool DemoEngine::tick() {
 
     if (find(begin(firstTimers), end(firstTimers), e) != end(firstTimers)) {
       e->set_start_time(current_time_ms);
-      e->update(current_time_ms, 0, 0, _paused, update_freq, 1, 0);
+      e->updateBase(current_time_ms, 0, 0, _paused, update_freq, 1, 0);
     } else {
-      e->update(current_time_ms, current_time_ms - e->start_time(), delta_ns, _paused, 
+      e->updateBase(current_time_ms, current_time_ms - e->start_time(), delta_ns, _paused, 
         update_freq, int_num_ticks, frac_num_ticks);
     }
 
@@ -213,6 +213,6 @@ JsonValue::JsonValuePtr DemoEngine::get_info() {
 
 void DemoEngine::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
   for (size_t i = 0; i < _active_effects.size(); ++i) {
-    _active_effects[i]->wnd_proc(message, wParam, lParam);
+    _active_effects[i]->wndProcBase(message, wParam, lParam);
   }
 }

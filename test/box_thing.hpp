@@ -16,26 +16,14 @@ public:
   virtual bool update(int64 global_time, int64 local_time, int64 delta_ns, bool paused, int64 frequency, int32 num_ticks, float ticks_fraction) override;
   virtual bool render() override;
   virtual bool close() override;
-  virtual void wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) override;
-
 private:
+  void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
 
   GraphicsObjectHandle _vb;
   GraphicsObjectHandle _ib;
   GraphicsObjectHandle _technique;
 
   GraphicsObjectHandle _normalMap;
-
-  void calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj);
-
-  bool _useFreeFlyCamera;
-  FreeFlyCamera _freefly_camera;
-  int _mouse_horiz;
-  int _mouse_vert;
-  bool _mouse_lbutton;
-  bool _mouse_rbutton;
-  DWORD _mouse_pos_prev;
-  int _keystate[256];
 
   XMFLOAT4X4 _view, _proj;
   XMFLOAT3 _cameraPos;

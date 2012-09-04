@@ -121,16 +121,11 @@ void ParticleTest::ParticleData::update(float delta) {
 
 ParticleTest::ParticleTest(const std::string &name) 
   : Effect(name)
-  , _mouse_horiz(0)
-  , _mouse_vert(0)
-  , _mouse_lbutton(false)
-  , _mouse_rbutton(false)
-  , _mouse_pos_prev(~0)
   , _ctx(nullptr)
   , _particle_data(numParticles)
-  , _useFreeFlyCamera(false)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
 {
+  _useFreeflyCamera = false;
   ZeroMemory(_keystate, sizeof(_keystate));
 }
 
@@ -199,31 +194,9 @@ bool ParticleTest::init() {
 void ParticleTest::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj) {
   *proj = transpose(_freefly_camera.projectionMatrix());
 
-  if (_useFreeFlyCamera) {
-
-    if (_keystate['W'])
-      _freefly_camera.move(FreeFlyCamera::kForward, (float)(100 * delta));
-    if (_keystate['S'])
-      _freefly_camera.move(FreeFlyCamera::kForward, (float)(-100 * delta));
-    if (_keystate['A'])
-      _freefly_camera.move(FreeFlyCamera::kRight, (float)(-100 * delta));
-    if (_keystate['D'])
-      _freefly_camera.move(FreeFlyCamera::kRight, (float)(100 * delta));
-    if (_keystate['Q'])
-      _freefly_camera.move(FreeFlyCamera::kUp, (float)(100 * delta));
-    if (_keystate['E'])
-      _freefly_camera.move(FreeFlyCamera::kUp, (float)(-100 * delta));
-
-    if (_mouse_lbutton) {
-      float dx = (float)(100 * delta) * _mouse_horiz / 200.0f;
-      float dy = (float)(100 * delta) * _mouse_vert / 200.0f;
-      _freefly_camera.rotate(FreeFlyCamera::kXAxis, dx);
-      _freefly_camera.rotate(FreeFlyCamera::kYAxis, dy);
-    }
-
+  if (_useFreeflyCamera) {
     *view = transpose(_freefly_camera.viewMatrix());
   } else {
-
     XMVECTOR pos = XMLoadFloat4(&XMFLOAT4(0, 0, -50, 0));
     XMVECTOR at = XMLoadFloat4(&XMFLOAT4(0, 0, 0, 0));
     float x = -cosf((float)time/20);
@@ -304,7 +277,7 @@ void ParticleTest::renderParticles() {
     XMFLOAT4 dofSettings;
   } cbuffer;
 
-  if (_useFreeFlyCamera) {
+  if (_useFreeflyCamera) {
     cbuffer.cameraPos = expand(_freefly_camera.pos(), 1);
   } else {
     cbuffer.cameraPos = XMFLOAT4(0,0,-50,0);
@@ -380,47 +353,3 @@ bool ParticleTest::close() {
   return true;
 }
 
-void ParticleTest::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
-
-  switch (message) {
-  case WM_KEYDOWN:
-    if (wParam <= 255)
-      _keystate[wParam] = 1;
-    break;
-
-  case WM_KEYUP:
-    if (wParam <= 255)
-      _keystate[wParam] = 0;
-    switch (wParam) {
-    case 'F':
-      //_use_freefly_camera = !_use_freefly_camera;
-      break;
-    }
-    break;
-
-  case WM_MOUSEMOVE:
-    if (_mouse_pos_prev != ~0) {
-      _mouse_horiz = LOWORD(lParam) - LOWORD(_mouse_pos_prev);
-      _mouse_vert = HIWORD(lParam) - HIWORD(_mouse_pos_prev);
-    }
-    _mouse_pos_prev = lParam;
-    break;
-
-  case WM_LBUTTONDOWN:
-    _mouse_lbutton = true;
-    break;
-
-  case WM_LBUTTONUP:
-    _mouse_lbutton = false;
-    break;
-
-  case WM_RBUTTONDOWN:
-    _mouse_rbutton = true;
-    break;
-
-  case WM_RBUTTONUP:
-    _mouse_rbutton = false;
-    break;
-  }
-
-}

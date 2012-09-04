@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "camera.hpp"
 
-FreeFlyCamera::FreeFlyCamera() 
+FreeflyCamera::FreeflyCamera() 
   : _xAngle(0)
   , _yAngle(0)
   , _pos(0,0,0)
@@ -16,16 +16,16 @@ FreeFlyCamera::FreeFlyCamera()
   // points down the z-axis
 } 
 
-void FreeFlyCamera::move(Direction dir, float amount) {
+void FreeflyCamera::move(Direction dir, float amount) {
 
   switch (dir) {
-    case FreeFlyCamera::kRight:
+    case FreeflyCamera::kRight:
       _pos += amount * _right;
       break;
-    case FreeFlyCamera::kUp:
+    case FreeflyCamera::kUp:
       _pos += amount * _up;
       break;
-    case FreeFlyCamera::kForward:
+    case FreeflyCamera::kForward:
       _pos += amount * _dir;
       break;
     default:
@@ -34,13 +34,13 @@ void FreeFlyCamera::move(Direction dir, float amount) {
   }
 }
 
-void FreeFlyCamera::rotate(Axis axis, float amount) {
+void FreeflyCamera::rotate(Axis axis, float amount) {
 
   switch (axis) {
-    case FreeFlyCamera::kXAxis:
+    case FreeflyCamera::kXAxis:
       _xAngle += amount;
       break;
-    case FreeFlyCamera::kYAxis:
+    case FreeflyCamera::kYAxis:
       _yAngle += amount;
       break;
     default:
@@ -49,11 +49,11 @@ void FreeFlyCamera::rotate(Axis axis, float amount) {
   }
 }
 
-XMFLOAT4X4 FreeFlyCamera::projectionMatrix() {
+XMFLOAT4X4 FreeflyCamera::projectionMatrix() {
   return perspective_foh(_fov, _aspectRatio, _zNear, _zFar);
 }
 
-XMFLOAT4X4 FreeFlyCamera::viewMatrix() {
+XMFLOAT4X4 FreeflyCamera::viewMatrix() {
 
   XMMATRIX a = XMLoadFloat4x4(&mtx_from_axis_angle(XMFLOAT3(0,1,0), _xAngle));
   XMMATRIX b = XMLoadFloat4x4(&mtx_from_axis_angle(XMFLOAT3(1,0,0), _yAngle));
@@ -81,11 +81,11 @@ XMFLOAT4X4 FreeFlyCamera::viewMatrix() {
   return view;
 }
 
-void FreeFlyCamera::setPos(const XMFLOAT3 &pos) {
+void FreeflyCamera::setPos(const XMFLOAT3 &pos) {
   _pos = pos;
 }
 
-void FreeFlyCamera::setPos(float x, float y, float z) {
+void FreeflyCamera::setPos(float x, float y, float z) {
   _pos.x = x;
   _pos.y = y;
   _pos.z = z;

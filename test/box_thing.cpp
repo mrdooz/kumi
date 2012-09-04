@@ -128,13 +128,7 @@ static int fillSpace(PosNormal *dst, float x, float y, float z, float cubeHeight
 */
 BoxThing::BoxThing(const std::string &name) 
   : Effect(name)
-  , _mouse_horiz(0)
-  , _mouse_vert(0)
-  , _mouse_lbutton(false)
-  , _mouse_rbutton(false)
-  , _mouse_pos_prev(~0)
   , _ctx(nullptr)
-  , _useFreeFlyCamera(true)
   , _numCubes(1)
   , _curTime(0)
 {
@@ -167,36 +161,10 @@ bool BoxThing::init() {
 void BoxThing::calc_camera_matrices(double time, double delta, XMFLOAT4X4 *view, XMFLOAT4X4 *proj) {
 
   *proj = _freefly_camera.projectionMatrix();
-
-  double orgDelta = delta;
-  if (is_bit_set(GetAsyncKeyState(VK_SHIFT), 15))
-    delta /= 10;
-
-  if (_useFreeFlyCamera) {
-    if (_keystate['W'])
-      _freefly_camera.move(FreeFlyCamera::kForward, (float)(100 * delta));
-    if (_keystate['S'])
-      _freefly_camera.move(FreeFlyCamera::kForward, (float)(-100 * delta));
-    if (_keystate['A'])
-      _freefly_camera.move(FreeFlyCamera::kRight, (float)(-100 * delta));
-    if (_keystate['D'])
-      _freefly_camera.move(FreeFlyCamera::kRight, (float)(100 * delta));
-    if (_keystate['Q'])
-      _freefly_camera.move(FreeFlyCamera::kUp, (float)(100 * delta));
-    if (_keystate['E'])
-      _freefly_camera.move(FreeFlyCamera::kUp, (float)(-100 * delta));
-
-    if (_mouse_lbutton) {
-      float dx = (float)(100 * orgDelta) * _mouse_horiz / 200.0f;
-      float dy = (float)(100 * orgDelta) * _mouse_vert / 200.0f;
-      _freefly_camera.rotate(FreeFlyCamera::kXAxis, dx);
-      _freefly_camera.rotate(FreeFlyCamera::kYAxis, dy);
-    }
+  if (_useFreeflyCamera) {
     _cameraPos = _freefly_camera.pos();
-
     *view = _freefly_camera.viewMatrix();
   } else {
-
   }
 }
 
@@ -303,50 +271,3 @@ bool BoxThing::close() {
   return true;
 }
 
-void BoxThing::wnd_proc(UINT message, WPARAM wParam, LPARAM lParam) {
-
-  switch (message) {
-  case WM_KEYDOWN:
-    if (wParam <= 255)
-      _keystate[wParam] = 1;
-    break;
-
-  case WM_KEYUP:
-    if (wParam <= 255)
-      _keystate[wParam] = 0;
-    switch (wParam) {
-    case 'F':
-      _useFreeFlyCamera = !_useFreeFlyCamera;
-      break;
-    case 'Z':
-      //_useZFill = !_useZFill;
-      break;
-    }
-    break;
-
-  case WM_MOUSEMOVE:
-    if (_mouse_pos_prev != ~0) {
-      _mouse_horiz = LOWORD(lParam) - LOWORD(_mouse_pos_prev);
-      _mouse_vert = HIWORD(lParam) - HIWORD(_mouse_pos_prev);
-    }
-    _mouse_pos_prev = lParam;
-    break;
-
-  case WM_LBUTTONDOWN:
-    _mouse_lbutton = true;
-    break;
-
-  case WM_LBUTTONUP:
-    _mouse_lbutton = false;
-    break;
-
-  case WM_RBUTTONDOWN:
-    _mouse_rbutton = true;
-    break;
-
-  case WM_RBUTTONUP:
-    _mouse_rbutton = false;
-    break;
-  }
-
-}

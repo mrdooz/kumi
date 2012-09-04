@@ -1,6 +1,6 @@
 #pragma once
 
-class FreeFlyCamera {
+class FreeflyCamera {
 public:
   enum Direction {
     kRight,
@@ -13,7 +13,7 @@ public:
     kYAxis,
   };
 
-  FreeFlyCamera();
+  FreeflyCamera();
 
   void move(Direction dir, float amount);
   void rotate(Axis axis, float amount);
