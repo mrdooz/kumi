@@ -22,17 +22,17 @@
 using namespace std;
 using namespace std::tr1::placeholders;
 
-static void addCube(float x, float y, float z, float w, float h, float d, const XMFLOAT4X4 &mtx, PosTangentSpace2 *dst) {
+static void addCube(float x, float y, float z, float wn, float wf, float hn, float hf, float d, const XMFLOAT4X4 &mtx, PosTangentSpace2 *dst) {
 
   XMFLOAT3 verts[] = {
-    XMFLOAT3(-w, +h, -d),
-    XMFLOAT3(+w, +h, -d),
-    XMFLOAT3(-w, -h, -d),
-    XMFLOAT3(+w, -h, -d),
-    XMFLOAT3(-w, +h, +d),
-    XMFLOAT3(+w, +h, +d),
-    XMFLOAT3(-w, -h, +d),
-    XMFLOAT3(+w, -h, +d),
+    XMFLOAT3(-wn, +hn, -d),
+    XMFLOAT3(+wn, +hn, -d),
+    XMFLOAT3(-wn, -hn, -d),
+    XMFLOAT3(+wn, -hn, -d),
+    XMFLOAT3(-wf, +hf, +d),
+    XMFLOAT3(+wf, +hf, +d),
+    XMFLOAT3(-wf, -hf, +d),
+    XMFLOAT3(+wf, -hf, +d),
   };
 
   int indices[] = {
@@ -220,9 +220,26 @@ bool BoxThing::render() {
   _ctx->begin_frame();
 
   ScopedMap<PosTangentSpace2> pn(_ctx, D3D11_MAP_WRITE_DISCARD, _vb);
-  //addCube(0, 0, 0, 10, 10, 10, mtx_identity(), pn);
-  //_numCubes = 1;
+  int numSegments = 20;
+  float step = 2 * XM_PI / numSegments;
 
+  PosTangentSpace2 *p = pn;
+
+  _numCubes = 0;
+  int numCogs = 100;
+  for (int j = 0; j < numCogs; ++j) {
+    float angle = (float)j;
+    for (int i = 0; i < numSegments; ++i) {
+      XMFLOAT4X4 mtx = mtx_from_axis_angle(XMFLOAT3(1,0,0), angle);
+      XMFLOAT3 ofs = XMFLOAT3(0, 0, -10) * mtx;
+      angle += step;
+      addCube(ofs.x+(j-numCogs/2)*4, ofs.y, ofs.z, 2, 1, 2, 1, 10, mtx, p);
+      p += 36;
+      _numCubes++;
+    }
+
+  }
+/*
   float step = 1 / 150.0f;
   float t = (float)_curTime / 2;
   PosTangentSpace2 *p = pn;
@@ -241,7 +258,7 @@ bool BoxThing::render() {
     angle += XM_PI/6;
     _numCubes++;
   }
-
+*/
   pn.unmap();
 
   int w = GRAPHICS.width();
