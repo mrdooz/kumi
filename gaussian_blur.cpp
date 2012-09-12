@@ -32,18 +32,18 @@ bool GaussianBlur::init() {
   return _cs_blur_x.is_valid() && _cs_blur_y.is_valid() && _cbufferX.is_valid() && _cbufferY.is_valid();
 }
 
-void GaussianBlur::do_blur(float amount, GraphicsObjectHandle inputTexture, GraphicsObjectHandle outputTexture, GraphicsObjectHandle outputTexture2, 
-                           int width, int height, DeferredContext *ctx) {
+typedef GraphicsObjectHandle G;
+
+void GaussianBlur::do_blur(float amount, G inputTexture, G outputTexture, G outputTexture2, int width, int height, DeferredContext *ctx) {
 
   struct blurSettings {
-    int dstWidth, dstHeight;
     float radius;
-  } settings = { width, height, amount };
+  } settings = { amount };
 
   int threadsPerGroup = 64;
 
-  GraphicsObjectHandle src = inputTexture;
-  GraphicsObjectHandle dst = outputTexture;
+  auto src = inputTexture;
+  auto dst = outputTexture;
 
   auto swapBuffers = [&] {
     if (dst == outputTexture) {
@@ -66,7 +66,7 @@ void GaussianBlur::do_blur(float amount, GraphicsObjectHandle inputTexture, Grap
       ctx->set_uavs(uav);
 
       ctx->set_cbuffer(_cbufferX, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      ctx->dispatch((settings.dstHeight + threadsPerGroup-1) / threadsPerGroup, 1, 1);
+      ctx->dispatch((height + threadsPerGroup-1) / threadsPerGroup, 1, 1);
 
       ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
       ctx->unset_uavs(0, 1);
@@ -83,7 +83,7 @@ void GaussianBlur::do_blur(float amount, GraphicsObjectHandle inputTexture, Grap
       TextureArray uav = { dst };
       ctx->set_uavs(uav);
       ctx->set_cbuffer(_cbufferY, 0, ShaderType::kComputeShader, &settings, sizeof(settings));
-      ctx->dispatch((settings.dstWidth + threadsPerGroup-1) / threadsPerGroup, 1, 1);
+      ctx->dispatch((width + threadsPerGroup-1) / threadsPerGroup, 1, 1);
 
       ctx->unset_shader_resource(0, 1, ShaderType::kComputeShader);
       ctx->unset_uavs(0, 1);

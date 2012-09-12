@@ -26,10 +26,12 @@ technique ssao_compute inherits quad_base {
         file ssao.hlsl;
         entry_point compute_ps_main;
         params [
-            texture2d rt_pos system;
-            texture2d rt_normal system;
+            texture2d rt_pos user;
+            texture2d rt_normal user;
         ];
     };
+    
+    depth_stencil_desc = DepthDisable;
 };
 
 technique ssao_blur inherits quad_base {
@@ -41,6 +43,7 @@ technique ssao_blur inherits quad_base {
             texture2d Texture0 user;
         ];
     };
+    depth_stencil_desc = DepthDisable;
 };
 
 
@@ -49,9 +52,10 @@ technique ssao_ambient inherits quad_base {
         file ssao.hlsl;
         entry_point ambient_ps_main;
         params [
-            texture2d rt_occlusion system;
+            texture2d rt_occlusion user;
         ];
     };
+    depth_stencil_desc = DepthDisable;
 };
 
 
@@ -60,14 +64,15 @@ technique ssao_light inherits quad_base{
         file ssao.hlsl;
         entry_point light_ps_main;
         params [
-            texture2d rt_pos system;
-            texture2d rt_normal system;
-            texture2d rt_diffuse system;
-            texture2d rt_specular system;
-            texture2d rt_occlusion system;
+            texture2d rt_pos user;
+            texture2d rt_normal user;
+            texture2d rt_diffuse user;
+            texture2d rt_specular user;
+            texture2d rt_occlusion user;
         ];
     };
     blend_desc = BlendOneOne;
+    depth_stencil_desc = DepthDisable;
 };
 
 technique gamma_correction inherits quad_base {
@@ -76,10 +81,11 @@ technique gamma_correction inherits quad_base {
         file ssao.hlsl;
         entry_point gamma_ps_main;
         params [
-            texture2d rt_composite system;
-            texture2d rt_luminance system;
+            texture2d rt_composite user;
+            texture2d rt_luminance user;
             texture2d Texture1 user;
         ];
     };
+    depth_stencil_desc = DepthDisable;
 };
 

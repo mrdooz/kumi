@@ -54,6 +54,9 @@ public:
   operator GraphicsObjectHandle();
 private:
   GraphicsObjectHandle _handle;
+#if _DEBUG
+  std::string _name;
+#endif
 };
 
 class DeferredContext;
@@ -76,7 +79,9 @@ public:
     }
   }
 
-  operator T *() { return (T *)_res.pData; }
+  T *data() { return (T *)_res.pData; }
+
+  operator T *() { return data(); }
 private:
   D3D11_MAPPED_SUBRESOURCE _res;
   DeferredContext *_ctx;

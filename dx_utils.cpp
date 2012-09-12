@@ -62,8 +62,12 @@ void make_quad_clip_space_unindexed(float *x, float *y, float *tx, float *ty, in
 }
 
 
-ScopedRt::ScopedRt(int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) {
-  _handle = GRAPHICS.get_temp_render_target(FROM_HERE, width, height, format, bufferFlags, name);
+ScopedRt::ScopedRt(int width, int height, DXGI_FORMAT format, uint32 bufferFlags, const std::string &name) 
+  : _handle(GRAPHICS.get_temp_render_target(FROM_HERE, width, height, format, bufferFlags, name))
+#if _DEBUG
+  , _name(name)
+#endif
+{
 }
 
 ScopedRt::~ScopedRt() {

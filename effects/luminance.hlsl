@@ -25,8 +25,9 @@ float4 luminance_map_ps_main(quad_ps_input input) : SV_Target
 Texture2D rt_luminance;
 float4 scale_cutoff(quad_ps_input input) : SV_Target
 {
+  // texture1 = rt_luminance
   float3 color = Texture0.Sample(LinearSampler, input.tex).rgb;
-  float avg_lum = exp(rt_luminance.SampleLevel(PointSampler, input.tex, 10.0));
+  float avg_lum = exp(Texture1.SampleLevel(PointSampler, input.tex, 10.0));
   float cur_lum = max(CalcLuminance(color), 0.00001f);
   
   return cur_lum >= 10 * avg_lum ? float4(color, 1) : float4(0,0,0,1);

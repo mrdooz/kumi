@@ -197,6 +197,7 @@
     <ClCompile Include="..\technique.cpp" />
     <ClCompile Include="..\technique_parser.cpp" />
     <ClCompile Include="..\test\box_thing.cpp" />
+    <ClCompile Include="..\test\grid_thing.cpp" />
     <ClCompile Include="..\test\particle_test.cpp" />
     <ClCompile Include="..\test\scene_player.cpp" />
     <ClCompile Include="..\test\ps3_background.cpp" />
@@ -252,6 +253,7 @@
     <ClInclude Include="..\technique.hpp" />
     <ClInclude Include="..\technique_parser.hpp" />
     <ClInclude Include="..\test\box_thing.hpp" />
+    <ClInclude Include="..\test\grid_thing.hpp" />
     <ClInclude Include="..\test\particle_test.hpp" />
     <ClInclude Include="..\test\ps3_background.hpp" />
     <ClInclude Include="..\test\scene_player.hpp" />

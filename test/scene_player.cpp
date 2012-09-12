@@ -34,6 +34,7 @@ ScenePlayer::ScenePlayer(const std::string &name)
   , _proj_mtx_id(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::proj"))
   , _ctx(nullptr)
   , _DofSettingsId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::DOFDepths"))
+  , _screenSizeId(PROPERTY_MANAGER.get_or_create<XMFLOAT4X4>("System::screenSize"))
 {
   ZeroMemory(_keystate, sizeof(_keystate));
 }
@@ -97,21 +98,18 @@ bool ScenePlayer::init() {
   _blur_horiz = GRAPHICS.find_technique("blur_horiz");
   _blur_vert = GRAPHICS.find_technique("blur_vert");
 
-  _cs_blur_x = GRAPHICS.find_technique("hblur");
-  _cs_blur_y = GRAPHICS.find_technique("vblur");
-  _copy_uav = GRAPHICS.find_technique("copy_uav");
-
-  _blur_sbuffer = GRAPHICS.create_structured_buffer(FROM_HERE, sizeof(XMFLOAT4), w*h, true);
   _rt_final = GRAPHICS.create_render_target(FROM_HERE, w, h, DXGI_FORMAT_R32G32B32A32_FLOAT, Graphics::kCreateSrv, "rt_final");
 
   //string material_connections = RESOURCE_MANAGER.resolve_filename("meshes/torus_materials.json", true);
 
   KumiLoader loader;
-  if (!loader.load("meshes/torus.kumi", nullptr /*material_connections.c_str()*/, &_scene))
+  if (!loader.load("meshes/greeble.kumi", nullptr /*material_connections.c_str()*/, &_scene))
     return false;
 
   _ambient_id = PROPERTY_MANAGER.get_or_create_raw("System::Ambient", sizeof(XMFLOAT4), nullptr);
   PROPERTY_MANAGER.set_property_raw(_ambient_id, &_scene->ambient.x, sizeof(XMFLOAT4));
+
+  PROPERTY_MANAGER.set_property_raw(_ambient_id, &XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f), sizeof(XMFLOAT4));
 
   _ctx = GRAPHICS.create_deferred_context(true);
 
@@ -286,22 +284,18 @@ bool ScenePlayer::render() {
     int w = GRAPHICS.width();
     int h = GRAPHICS.height();
 
-    auto tmp_rt = [&](DXGI_FORMAT fmt, uint32 bufferFlags, const string& name) {
-      return GRAPHICS.get_temp_render_target(FROM_HERE, w, h, fmt, bufferFlags, name);
-    };
+    ScopedRt rt_pos(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "System::rt_pos");
+    ScopedRt rt_normal(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_normal");
+    ScopedRt rt_diffuse(w, h, DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "System::rt_diffuse");
+    ScopedRt rt_specular(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_specular");
 
-    auto rt_pos = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv | Graphics::kCreateDepthBuffer, "System::rt_pos");
-    auto rt_normal = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_normal");
-    auto rt_diffuse = tmp_rt(DXGI_FORMAT_R8G8B8A8_UNORM, Graphics::kCreateSrv, "System::rt_diffuse");
-    auto rt_specular = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_specular");
+    ScopedRt rt_composite(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_composite");
+    ScopedRt rt_blur(w, h, DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_blur");
 
-    auto rt_composite = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_composite");
-    auto rt_blur = tmp_rt(DXGI_FORMAT_R16G16B16A16_FLOAT, Graphics::kCreateSrv, "System::rt_blur");
+    ScopedRt rt_occlusion(w, h, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion");
+    ScopedRt rt_occlusion_tmp(w/2, h/2, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion_tmp");
 
-    auto rt_occlusion = tmp_rt(DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion");
-    auto rt_occlusion_tmp = tmp_rt(DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "System::rt_occlusion_tmp");
-
-    auto rt_luminance = GRAPHICS.get_temp_render_target(FROM_HERE, 1024, 1024, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateMipMaps | Graphics::kCreateSrv, "System::rt_luminance");
+    ScopedRt rt_luminance(1024, 1024, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateMipMaps | Graphics::kCreateSrv, "System::rt_luminance");
 
     {
       ADD_NAMED_PROFILE_SCOPE("render_meshes");
@@ -311,14 +305,21 @@ bool ScenePlayer::render() {
       _scene->render(_ctx, this, _ssao_fill);
     }
 
-    // Calc the occlusion
-    post_process(GraphicsObjectHandle(), rt_occlusion_tmp, _ssao_compute);
+    {
+      // Calc the occlusion
+      _ctx->set_render_target(rt_occlusion_tmp, true);
+      TextureArray arr = { rt_pos, rt_normal };
+      _ctx->render_technique(_ssao_compute, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+      _ctx->unset_render_targets(0, 1);
+    }
 
-    // Blur the occlusion
+
+    // Downscale and blur the occlusion
+    //ScopedRt rt_occlusion_downscale(w/4, h/4, DXGI_FORMAT_R16_FLOAT, Graphics::kCreateSrv, "rt_occlusion_downscale");
     post_process(rt_occlusion_tmp, rt_occlusion, _ssao_blur);
 
     // Render Ambient * occlusion
-    post_process(GraphicsObjectHandle(), rt_composite, _ssao_ambient);
+    post_process(rt_occlusion, rt_composite, _ssao_ambient);
 
     {
       _ctx->set_render_target(rt_composite, false);
@@ -350,21 +351,31 @@ bool ScenePlayer::render() {
         *lightattend = light->far_attenuation_end;
       }
 
-      _ctx->render_technique(_ssao_light, bind(&ScenePlayer::fill_cbuffer, this, _1), TextureArray(), data);
+      TextureArray arr = { rt_pos, rt_normal, rt_diffuse, rt_specular, rt_occlusion };
+      _ctx->render_technique(_ssao_light, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, data);
+      _ctx->unset_render_targets(0, 1);
     }
 
+    auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
+
+/*
     // calc luminance
     post_process(rt_composite, rt_luminance, _luminance_map);
     _ctx->generate_mips(rt_luminance);
 
-    auto fmt = DXGI_FORMAT_R16G16B16A16_FLOAT;
-    auto downscale1 = GRAPHICS.get_temp_render_target(FROM_HERE, w/2, h/2, fmt, Graphics::kCreateSrv, "downscale1");
-    auto downscale2 = GRAPHICS.get_temp_render_target(FROM_HERE, w/4, h/4, fmt, Graphics::kCreateSrv, "downscale2");
-    auto downscale3 = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, Graphics::kCreateSrv, "downscale3");
-    auto blur_tmp = GRAPHICS.get_temp_render_target(FROM_HERE, w/8, h/8, fmt, Graphics::kCreateSrv, "blur_tmp");
+    ScopedRt downscale1(w/2, h/2, fmt, Graphics::kCreateSrv, "downscale1");
+    ScopedRt downscale2(w/4, h/4, fmt, Graphics::kCreateSrv, "downscale2");
+    ScopedRt downscale3(w/8, h/8, fmt, Graphics::kCreateSrv, "downscale3");
+    ScopedRt blur_tmp(w/8, h/8, fmt, Graphics::kCreateSrv, "blur_tmp");
 
     // scale down
-    post_process(rt_composite, downscale1, _scale_cutoff);
+    {
+      _ctx->set_render_target(rt_composite, true);
+      TextureArray arr = { downscale1, rt_luminance };
+      _ctx->render_technique(_scale_cutoff, bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
+      //post_process(rt_composite, downscale1, _scale_cutoff);
+      _ctx->unset_render_targets(0, 1);
+    }
     post_process(downscale1, downscale2, _scale);
     post_process(downscale2, downscale3, _scale);
 
@@ -378,37 +389,31 @@ bool ScenePlayer::render() {
     post_process(downscale3, downscale2, _scale);
     post_process(downscale2, downscale1, _scale);
 
-    ScopedRt rt_tmp(w, h, fmt, Graphics::kCreateSrv | Graphics::kCreateSrv, "rt_tmp");
+    int w4 = w/4;
+    int h4 = h/4;
+    ScopedRt rt_tmp(w4, h4, fmt, Graphics::kCreateSrv, "rt_tmp");
     post_process(rt_composite, rt_tmp, _scale);
 
-    ScopedRt rt_tmpa(w, h, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpa");
-    ScopedRt rt_tmpb(w, h, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpb");
+    ScopedRt rt_tmpa(w4, h4, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpa");
+    ScopedRt rt_tmpb(w4, h4, fmt, Graphics::kCreateUav | Graphics::kCreateSrv, "rt_tmpb");
 
-    _blur.do_blur(_blurX, rt_tmp, rt_tmpa, rt_tmpb, w, h, _ctx);
+    _ctx->set_vs(GraphicsObjectHandle());
+    _ctx->set_ps(GraphicsObjectHandle());
+    _ctx->set_gs(GraphicsObjectHandle());
+    _blur.do_blur(0, rt_tmp, rt_tmpa, rt_tmpb, w4, h4, _ctx);
 
+    _ctx->set_cs(GraphicsObjectHandle());
+*/
+    post_process(rt_composite, GraphicsObjectHandle(), _scale);
+/*
     {
       // gamma correction
       _ctx->set_default_render_target(false);
-      TextureArray arr = { GraphicsObjectHandle(), _rt_final, rt_tmpb, rt_pos };
+      TextureArray arr = { rt_composite, _rt_final, rt_tmpb, rt_pos };
       _ctx->render_technique(_gamma_correct, 
         bind(&ScenePlayer::fill_cbuffer, this, _1), arr, DeferredContext::InstanceData());
     }
-
-
-    GRAPHICS.release_temp_render_target(blur_tmp);
-    GRAPHICS.release_temp_render_target(downscale3);
-    GRAPHICS.release_temp_render_target(downscale2);
-    GRAPHICS.release_temp_render_target(downscale1);
-
-    GRAPHICS.release_temp_render_target(rt_pos);
-    GRAPHICS.release_temp_render_target(rt_normal);
-    GRAPHICS.release_temp_render_target(rt_diffuse);
-    GRAPHICS.release_temp_render_target(rt_specular);
-    GRAPHICS.release_temp_render_target(rt_composite);
-    GRAPHICS.release_temp_render_target(rt_blur);
-    GRAPHICS.release_temp_render_target(rt_occlusion);
-    GRAPHICS.release_temp_render_target(rt_occlusion_tmp);
-    GRAPHICS.release_temp_render_target(rt_luminance);
+*/
   }
 
   _ctx->end_frame();
@@ -499,6 +504,12 @@ void ScenePlayer::fill_cbuffer(CBuffer *cbuffer) const {
       p[1] = _nearFocusEnd;
       p[2] = _farFocusStart;
       p[3] = _farFocusEnd;
+    } else if (cur.id == _screenSizeId) {
+      float *p = (float *)&cbuffer->staging[cur.ofs];
+      p[0] = (float)GRAPHICS.width();
+      p[1] = (float)GRAPHICS.height();
+      p[2] = (float)GRAPHICS.width() / 2;
+      p[3] = (float)GRAPHICS.height() / 2;
     } else {
       PROPERTY_MANAGER.get_property_raw(cur.id, &cbuffer->staging[cur.ofs], cur.len);
     }

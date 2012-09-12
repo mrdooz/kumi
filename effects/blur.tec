@@ -13,11 +13,3 @@ technique vblur {
         entry_point boxBlurY;
     };
 };
-
-technique copy_uav inherits quad_base {
-    pixel_shader {
-        file blur.hlsl;
-        entry_point ps_copy_uav;
-    };
-};
-

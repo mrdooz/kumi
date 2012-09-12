@@ -6,6 +6,7 @@ cbuffer PerFrame {
   float4 DOFDepths;
   float4 kernel[32];
   float4 noise[16];
+  float4 screenSize;    // (screenX, screenY, occlusionX, occlusionY)
 };
 /*
 cbuffer PerFrame {
@@ -23,8 +24,8 @@ cbuffer PerMesh {
   matrix world;
 };
 
-static const float ScreenWidth = 1440;
-static const float ScreenHeight = 900;
+//static const float ScreenWidth = 1440;
+//static const float ScreenHeight = 900;
 
 static const float Gamma = 2.0;
 static const float InvGamma = 1/Gamma;
@@ -47,7 +48,7 @@ float BlurFactor(in float depth) {
 // g-buffer fill
 ///////////////////////////////////
 struct fill_vs_input {
-    float4 pos : POSITION;
+    float3 pos : POSITION;
     float3 normal : NORMAL;
 #if DIFFUSE_TEXTURE
     float2 tex : TEXCOORD;
@@ -72,16 +73,17 @@ fill_ps_input fill_vs_main(fill_vs_input input)
 {
     fill_ps_input output = (fill_ps_input)0;
     float4x4 world_view = mul(world, view);
-    output.pos = mul(input.pos, mul(world_view, proj));
+    output.vs_pos = mul(float4(input.pos, 1), world_view);
+    output.pos = mul(output.vs_pos, proj);
 #if DIFFUSE_TEXTURE
     output.tex = input.tex;
 #endif
-    output.vs_pos = mul(input.pos, world_view);
     output.vs_normal = mul(float4(input.normal,0), world_view);
     return output;
 }
 
 fill_ps_output fill_ps_main(fill_ps_input input)
+//float4 fill_ps_main(fill_ps_input input) : SV_TARGET
 {
     fill_ps_output output = (fill_ps_output)0;
     output.rt_pos = input.vs_pos;
@@ -95,6 +97,8 @@ fill_ps_output fill_ps_main(fill_ps_input input)
   #endif
     output.rt_specular.rgb = Specular.rgb;
     output.rt_specular.a = Shininess;
+
+    //return output.rt_normal;
     return output;
 }
 
@@ -114,8 +118,8 @@ float compute_ps_main(quad_ps_input input) : SV_Target
     float3 normal = rt_normal.Sample(PointSampler, input.tex).xyz;
    
     // tile the noise in a 4x4 grid
-    int x = (int)(ScreenWidth * input.tex.x);
-    int y = (int)(ScreenHeight * input.tex.y);
+    int x = (int)(screenSize.z * input.tex.x);
+    int y = (int)(screenSize.w * input.tex.y);
     int idx = (y%4)*4 + (x%4);
     float3 rvec = noise[idx].xyz;
     
@@ -129,7 +133,8 @@ float compute_ps_main(quad_ps_input input) : SV_Target
         normal.x, normal.y, normal.z);
         
     float occlusion = 0.0;
-    float radius = 27;
+    //float radius = 27;
+    float radius = 5;
     int KERNEL_SIZE = 32;
     for (int i = 0; i < KERNEL_SIZE; ++i) {
         // get sample position
@@ -162,12 +167,11 @@ float blur_ps_main(quad_ps_input input) : SV_Target
     float res = 0.0;
     for (int i = 0; i < 4; ++i) {
         for (int j = 0; j < 4; ++j) {
-            float2 ofs = float2(1/ScreenWidth * j, 1/ScreenHeight*i);
+            float2 ofs = float2(1/screenSize.z * j, 1/screenSize.w*i);
             res += Texture0.Sample(PointSampler, input.tex + ofs).r;
         }
     }
-    float occ = res / 16.0;
-    return occ;
+    return res / 16.0;
 }
 
 ///////////////////////////////////
@@ -182,7 +186,8 @@ cbuffer PerFrame {
 
 float4 ambient_ps_main(quad_ps_input input) : SV_Target
 {
-  return Ambient * rt_occlusion.Sample(PointSampler, input.tex).r;
+  // Texture0 = rt_occlusion
+  return Ambient * Texture0.Sample(PointSampler, input.tex).r;
 }
 
 ///////////////////////////////////
@@ -195,10 +200,16 @@ cbuffer PerInstance {
 
 float4 light_ps_main(quad_ps_input input) : SV_Target
 {
-    float3 pos = rt_pos.Sample(PointSampler, input.tex).xyz;
-    float3 normal = normalize(rt_normal.Sample(PointSampler, input.tex).xyz);
-    float4 diffuse = rt_diffuse.Sample(PointSampler, input.tex);
-    float4 st = rt_specular.Sample(PointSampler, input.tex);
+    // Textures:
+    // 0: rt_pos
+    // 1: rt_normal
+    // 2: rt_diffuse
+    // 3: rt_specular
+    // 4: rt_occlusion
+    float3 pos = Texture0.Sample(PointSampler, input.tex).xyz;
+    float3 normal = normalize(Texture1.Sample(PointSampler, input.tex).xyz);
+    float4 diffuse = Texture2.Sample(PointSampler, input.tex);
+    float4 st = Texture3.Sample(PointSampler, input.tex);
     float3 specular = st.rgb;
     float shininess = st.a;
     float3 lp = LightPos.xyz;
@@ -223,7 +234,7 @@ float4 light_ps_main(quad_ps_input input) : SV_Target
     float3 h = normalize(-pos + ll);
     float4 ss = float4(specular * pow(saturate(dot(h, normal)), shininess), 1);
 
-    float occ = rt_occlusion.Sample(PointSampler, input.tex).r;
+    float occ = Texture4.Sample(PointSampler, input.tex).r;
     
     float decay = dist < 40 ? 1 : 40 / dist;
    
@@ -238,10 +249,12 @@ Texture2D rt_composite : register(t0);
 
 float4 gamma_ps_main(quad_ps_input input) : SV_Target
 {
-    float dof = Texture3.Sample(LinearSampler, input.tex).a;
-    float4 color = rt_composite.Sample(PointSampler, input.tex);
+    // Texture0 = rt_composite
+    float4 color = Texture0.Sample(PointSampler, input.tex);
     float4 bloom = Texture1.Sample(LinearSampler, input.tex);
     float4 blurred = Texture2.Sample(LinearSampler, input.tex);
+    float dof = Texture3.Sample(LinearSampler, input.tex).a;
     //return pow(color + 0.25 * bloom, InvGamma);
     return pow(lerp(color, blurred, dof), InvGamma);
+    return color;
 }

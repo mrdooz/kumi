@@ -16,7 +16,7 @@ technique scale_cutoff inherits quad_base {
       entry_point scale_cutoff;
       params [
           texture2d Texture0 user;
-          texture2d rt_luminance system;
+          texture2d rt_luminance user;
       ];
   };
 };

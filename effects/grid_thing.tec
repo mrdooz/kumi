@@ -1,0 +1,18 @@
+include common.tec;
+
+technique grid_thing {
+
+    vertex_shader {
+        file grid_thing.hlsl;
+        entry_point vs_main;
+    };
+
+    pixel_shader {
+        file grid_thing.hlsl;
+        entry_point ps_main;
+    };
+
+    rasterizer_desc = NoCulling;
+    depth_stencil_desc = DepthDisable;
+    blend_desc = BlendDisable;
+};

@@ -43,9 +43,6 @@ private:
   GraphicsObjectHandle _scale, _scale_cutoff;
   GraphicsObjectHandle _blur_horiz, _blur_vert;
 
-  GraphicsObjectHandle _cs_blur_x, _cs_blur_y;
-  GraphicsObjectHandle _copy_uav;
-
   GraphicsObjectHandle _luminance_map;
 
   GraphicsObjectHandle _blur_sbuffer;
@@ -61,6 +58,7 @@ private:
 
   float _blurX, _blurY;
 
+  PropertyId _screenSizeId;
   PropertyId _DofSettingsId;
   float _nearFocusStart, _nearFocusEnd;
   float _farFocusStart, _farFocusEnd;

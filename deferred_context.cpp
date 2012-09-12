@@ -46,7 +46,7 @@ void DeferredContext::render_technique(GraphicsObjectHandle technique_handle,
   // set samplers
   auto &samplers = ps->samplers();
   if (!samplers.empty()) {
-    set_samplers(ps->samplers());
+    set_samplers(samplers);
   }
 
   // set resource views

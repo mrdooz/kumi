@@ -156,6 +156,9 @@
     <ClCompile Include="..\test\box_thing.cpp">
       <Filter>test</Filter>
     </ClCompile>
+    <ClCompile Include="..\test\grid_thing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\stdafx.h">
@@ -316,6 +319,9 @@
     </ClInclude>
     <ClInclude Include="..\test\box_thing.hpp">
       <Filter>test</Filter>
+    </ClInclude>
+    <ClInclude Include="..\test\grid_thing.hpp">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

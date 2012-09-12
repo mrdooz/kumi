@@ -193,6 +193,8 @@ bool ShaderReflection::do_reflection(char *text, int textLen, Shader *shader, Sh
         if (source != PropertySource::kUnknown)
           shader->set_cbuffer(source, cbuffer);
         shader->add_named_cbuffer(cbuffer_name.c_str(), cbuffer);
+      } else {
+        LOG_WARNING_LN("Zero size cbuffer found: ", cbuffer_name.c_str());
       }
 
     } else if (shader->type() == ShaderType::kVertexShader && cur_line[0] == "Input" && cur_line[1] == "signature:") {

@@ -10,7 +10,7 @@ FreeflyCamera::FreeflyCamera()
   , _up(0,1,0)
   , _fov(45 * XM_PI / 180)
   , _aspectRatio(1.6f)
-  , _zNear(1)
+  , _zNear(0.1f)
   , _zFar(2500)
 {
   // points down the z-axis
